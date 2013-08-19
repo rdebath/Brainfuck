@@ -12,6 +12,22 @@ loop is only a good start not perfect assembler.
 gcc -O3 -Wall -pedantic -ansi -o bf bf.c
 
 *****************************************************************************/
+
+#if 0
+TODO:
+    Load multiple files into single memory image
+    Strip image: Replace all "[...]" sequences after a Start or "]" with spaces
+    "!" processing, if data from stdin stop reading on "!"
+    Force "[]" to balance, replace unbalanced ones by "{}"
+    Strip lines that match "^[\t ]*#.*$"
+    Inplace update to bytecode, check the pointers don't collide; if they do'
+	do the copy to a new calloc()d array.
+
+    Use sigaction and mmap to make the "tape" infinite.
+	Add "ADD(0)" tokens evey few kb of tape movement.
+	Only create file if memory exceeds N Mb
+#endif
+
 #ifdef __STDC__
 #include <stdio.h>
 #include <unistd.h>
@@ -24,31 +40,23 @@ gcc -O3 -Wall -pedantic -ansi -o bf bf.c
 #define XTRAINST
 #define no_ALIGNTO sizeof(int)
 
+typedef unsigned char cell; /* The type of the cell for the 'tape' */
+
 void read_image(char * imagename);
 void process_image(void);
 void run_image(void);
 void hex_image(void);
+void set_alignment_trap(void);
 
 unsigned char * image;
 int imagelen;
-unsigned char * mem;
+cell * mem;
 int memlen = 128*1024;
 
 int
 main(int argc, char **argv)
 {
-#ifdef ALIGNTO
-/* This triggers a Bus Error on an unaligned access. */
-#if defined(__GNUC__)
-# if defined(__i386__)
-    /* Enable Alignment Checking on x86 */
-    __asm__("pushf\norl $0x40000,(%esp)\npopf");
-# elif defined(__x86_64__) 
-     /* Enable Alignment Checking on x86_64 */
-    __asm__("pushf\norl $0x40000,(%rsp)\npopf");
-# endif
-#endif
-#endif
+    set_alignment_trap();
 
     if(argc < 2) {
 	fprintf(stderr, "Usage: %s filename\n", argv[0]);
@@ -57,17 +65,19 @@ main(int argc, char **argv)
     read_image(argv[1]);
     process_image();
     run_image();
-    /*hex_image();*/
+    /*
+    hex_image();
+    */
 
-    free(image); *image = 0; imagelen = 0;
-    free(mem); *mem = 0; memlen = 0;
+    if(image) free(image); image = 0; imagelen = 0;
+    if(mem) free(mem); mem = 0; memlen = 0;
     return 0;
 }
 
 void
 read_image(char * imagename)
 {
-   int fd;
+   int fd = -1;
    struct stat st;
 
    fd = open(imagename, 0);
@@ -77,17 +87,19 @@ read_image(char * imagename)
       exit(9);
    }
    imagelen=st.st_size;
+
    if( imagelen!=st.st_size || (image = malloc(imagelen)) == 0 )
    {
       fprintf(stderr, "Out of memory\n");
       exit(7);
    }
+
    if( read(fd, image, imagelen) != imagelen )
    {
       fprintf(stderr, "Read error reading %s\n", imagename);
       exit(7);
    }
-   close(fd);
+   if (fd > 2) close(fd);
 }
 
 void
@@ -151,24 +163,25 @@ process_image(void)
 	    case '<': case '>': case '+': case '-':
 		if (c == lastc) {
 		    lastcount++;
-		    newimage[p-1] += 8;
+		    newimage[p-1]++;
 		} else {
 		    switch (c) {
-			case '<': newimage[p++] = 0 + 8; break;
-			case '>': newimage[p++] = 1 + 8; break;
-			case '+': newimage[p++] = 2 + 8; break;
-			case '-': newimage[p++] = 3 + 8; break;
+			case '>': newimage[p++] = (0<<4) + 1; break;
+			case '<': newimage[p++] = (2<<4) + 1; break;
+			case '+': newimage[p++] = (4<<4) + 1; break;
+			case '-': newimage[p++] = (6<<4) + 1; break;
 		    }
 		    lastc = c;
 		    lastcount=1;
 		}
-		if (lastcount == 31) lastc = 0;
+		if (lastcount == 31)
+		    lastc = 0;
 		break;
 
 	    case '.': case ',':
 		lastc = c;
 		lastcount=1;
-		newimage[p++] = 4 + (c == ',');
+		newimage[p++] = (10<<4) + (c == ',');
 		break;
 	    case '[': case ']':
 		lastc = c;
@@ -176,27 +189,39 @@ process_image(void)
 #ifdef XTRAINST
 		if (image[i] == '[' && image[i+2] == ']') {
 		    if (image[i+1] == '>'){
-			newimage[p++] = (1<<3) + 7;
+			newimage[p++] = 0xB0;
 			i+=2;
 			break;
 		    }
 		    if (image[i+1] == '<'){
-			newimage[p++] = (2<<3) + 7;
+			newimage[p++] = 0xC0;
 			i+=2;
 			break;
 		    }
 		    if (image[i+1] == '-' || image[i+1] == '+'){
-			newimage[p++] = (3<<3) + 7;
+			newimage[p++] = 0xD0;
 			i+=2;
+			break;
+		    }
+		}
+		if (image[i] == '[' && image[i+3] == ']') {
+		    if (image[i+1] == '>' && image[i+2] == '>'){
+			newimage[p++] = 0xE0;
+			i+=3;
+			break;
+		    }
+		    if (image[i+1] == '<' && image[i+2] == '<'){
+			newimage[p++] = 0xF0;
+			i+=3;
 			break;
 		    }
 		}
 #endif
 #ifdef ALIGNTO
 		while (p % ALIGNTO != ALIGNTO-1) 
-		    newimage[p++] = 0xFF;
+		    newimage[p++] = 0x20;
 #endif
-		newimage[p] = 6 + (c == ']');
+		newimage[p] = ((8 + (c == ']')) << 4);
 
 		if (c == '[') {
 		    stack[depth] = p;
@@ -210,7 +235,8 @@ process_image(void)
 		     */
 		    depth --;
 		    *((int*)(newimage+(stack[depth]+1))) =
-			    (p+1+sizeof(int)) - (stack[depth]+1);
+/*			    (p+1+sizeof(int)) - (stack[depth]+1); */
+			    sizeof(int) + p - stack[depth];
 
 		    *((int*)(newimage+(p+1))) = stack[depth] - (p+1);
 		} else
@@ -273,78 +299,92 @@ void hex_image(void)
     hex_output(stdout, EOF);
 }
 
-/* Byte code interpreter.
+/* Byte code interpreter.	(TODO)
  * 
  * Byte		Code
- * 00000000	End.
- * xxxxx000	m -= x
- * xxxxx001	m += x
- * xxxxx010	m[0] += x
- * xxxxx011	m[0] -= x
- * 00000100	print m[0]
- * 00000101	input m[0]
- * 00000110	start loop (followed by an int.)
- * 00000111	end loop (followed by an int.)
- * 00001111	[>]
- * 00010111	[<]
- * 00011111	[-] or [+]
- * 11111111	Defined NOP instruction.
+ * 00000000	End
+ * 00100000	NOP
+ *
+ * 000xxxxx	m += x
+ * 001xxxxx	m -= x
+ * 010xxxxx	m[0] += x
+ * 011xxxxx	m[0] -= x
+ *
+ * 10000000	loop start[i]
+ * 10010000	loop end[i]
+ *
+ * 10100000	print m[0]
+ * 10100001	input m[0]
+ *
+ * 10110000	[>]		extend: [>*x]
+ * 11000000	[<]		extend: [<*x]
+ * 11010000	[-] or [+]	extend: [<+>-]
  */
+
 void run_image(void)
 {
-    unsigned char *m, *p;
+    unsigned char *p;
+    cell * m;
     int c;
 
     m = mem = calloc(memlen,sizeof*m);
     p = image;
 #if DEBUG
-    fprintf(stderr, "p=0x%08x+%d, m=0x%08x\n", p, m-p, m);
+    fprintf(stderr, "p=0x%08x+%d, m=0x%08x+%d\n",
+		    image, imagelen, mem, memlen);
 #endif
 
     while((c = *p++)) 
     {
 #if DEBUG
-	fprintf(stderr, "p=%d, m=%d, *m=%d, c=0x%03o\n",
+	fprintf(stderr, "p=%d, m=%d, *m=%d, c=0x%02x\n",
 		p-image-1, m-mem, *m, c);
 #endif
-	switch(c & 7)
+	switch(c>>4)
 	{
-	    case 0: m -= (c >> 3); break;
-	    case 1: m += (c >> 3); break;
-	    case 2: *m += (c >> 3); break;
-	    case 3: *m -= (c >> 3); break;
-	    case 4: write(1,m,1); break;
-	    case 5: read(0,m,1); break;
-	    case 6:
-		if (*m) p += sizeof(int);
-		else
-		    p = p + *((int*)p);
+	    case 0: case 1:  m += (c & 0x1F); break;
+	    case 2: case 3:  m -= (c & 0x1F); break;
+	    case 4: case 5: *m += (c & 0x1F); break;
+	    case 6: case 7: *m -= (c & 0x1F); break;
+
+	    case 8:
+		if (*m)	p += sizeof(int);
+		else	p = p + *((int*)p);
 		break;
-#ifndef XTRAINST
-	    case 7:
-		p = p + *((int*)p);
+	    case 9:
+		if (*m)	p = p + *((int*)p);
+		else	p += sizeof(int);
 		break;
-#else
-	    case 7:
-		switch(c>>3)
+
+	    case 10: 
+		switch(c & 0xF)
 		{
-		case 0:
-		    p = p + *((int*)p);
-		    break;
-		case 1:
+		    case 0: write(1,m,1); break;
+		    case 1: read(0,m,1); break;
+		}
+		break;
+
+#ifdef XTRAINST
+	    case 11:
 #ifndef __OPTIMIZE__
+		if (*m)
 		    m += strlen(m);
 #else
-		    while(*m) m++;
+		while(*m) m++;
 #endif
-		    break;
-		case 2:
-		    while(*m) m--;
-		    break;
-		case 3:
-		    *m = 0;
-		    break;
-		}
+		break;
+	    case 12:
+		while(*m) m--;
+		break;
+	    case 13:
+		*m = 0;
+		break;
+
+	    case 14:
+		while(*m) m+=2;
+		break;
+	    case 15:
+		while(*m) m-=2;
 		break;
 #endif
 	}
@@ -354,44 +394,30 @@ void run_image(void)
     }
 }
 
-/* Byte code interpreter.	(NEW)
- * 
- * Byte		Code
- * 00000000	End
- * 00000001	NOP
- * 00010000	loop start[i]
- * 00100000	loop end[i]
- * 00110000	[>]		extend: [>*x]
- * 01000000	[<]		extend: [<*x]
- * 01010000	[-] or [+]
- * 01100000			[<+>-]
- * 01110000
- * 100xxxxx	m += x
- * 101xxxxx	m -= x
- * 110xxxxx	m[0] += x
- * 111xxxxx	m[0] -= x
- *
- * Byte		Code
- * 00000000	End.
- * xxxxx000	m -= x
- * xxxxx001	m += x
- * xxxxx010	m[0] += x
- * xxxxx011	m[0] -= x
- * 00000100	print m[0]
- * 00000101	input m[0]
- * 00000110	start loop (followed by an int.)
- * 00000111	end loop (followed by an int.)
- * 00001111	[>]
- * 00010111	[<]
- * 00011111	[-] or [+]
- * 11111111	Defined NOP instruction.
- */
+void
+set_alignment_trap(void)
+{
+#ifdef ALIGNTO
+/* This triggers a Bus Error on an unaligned access. */
+#if defined(__GNUC__)
+# if defined(__i386__)
+    /* Enable Alignment Checking on x86 */
+    __asm__("pushf\norl $0x40000,(%esp)\npopf");
+# elif defined(__x86_64__) 
+     /* Enable Alignment Checking on x86_64 */
+    __asm__("pushf\norl $0x40000,(%rsp)\npopf");
+# endif
+#endif
+#endif
+}
 
+#ifdef  __GNUC__
 #ifndef __OPTIMIZE__
 #warning The interpreter should be optimised for best performance.
 #endif
+#endif
 #ifdef  __TINYC__
-#warning Beware TCC does NOT optimise
+#warning Beware TCC does NOT optimise and the interpreter should be optimised for best performance.
 #ifdef __BOUNDS_CHECKING_ON
 #warning and is even slower with bounds checking!
 #endif
