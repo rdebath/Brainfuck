@@ -13,20 +13,20 @@ gcc -O3 -Wall -pedantic -ansi -o bf bf.c
 
 *****************************************************************************/
 
-#if 0
+/*
 TODO:
     Load multiple files into single memory image
     Strip image: Replace all "[...]" sequences after a Start or "]" with spaces
     "!" processing, if data from stdin stop reading on "!"
     Force "[]" to balance, replace unbalanced ones by "{}"
     Strip lines that match "^[\t ]*#.*$"
-    Inplace update to bytecode, check the pointers don't collide; if they do'
+    Inplace update to bytecode, check the pointers don't collide; if they do
 	do the copy to a new calloc()d array.
 
     Use sigaction and mmap to make the "tape" infinite.
 	Add "ADD(0)" tokens evey few kb of tape movement.
 	Only create file if memory exceeds N Mb
-#endif
+*/
 
 #ifdef __STDC__
 #include <stdio.h>
@@ -38,7 +38,7 @@ TODO:
 #include <string.h>
 
 #define XTRAINST
-#define no_ALIGNTO sizeof(int)
+#define NO_ALIGNTO sizeof(int)
 
 typedef unsigned char cell; /* The type of the cell for the 'tape' */
 
@@ -106,7 +106,7 @@ void
 process_image(void)
 {
     int i, p;
-    int c, lastc = 0, lastcount = 0;
+    int c, lastc = ']', lastcount = 0;
     int len = 0, newimagelen;
     unsigned char * newimage = 0;
     int depth = 0, maxdepth = 0;
@@ -122,7 +122,8 @@ process_image(void)
 		    lastcount=1;
 		    len++;
 		}
-		if (lastcount == 31) lastc = 0;
+		if (lastcount == 31)
+		    lastc = 0;
 		image[p++] = c;
 		break;
 
@@ -151,7 +152,6 @@ process_image(void)
     }
     while(p<imagelen) image[p++] = 0;
 
-    /* 32 bytes between program and data. */
     newimagelen = len+8;
     newimage = calloc(newimagelen, 1);
     stack = calloc(maxdepth+1, sizeof*stack);
@@ -188,31 +188,28 @@ process_image(void)
 		lastcount=1;
 #ifdef XTRAINST
 		if (image[i] == '[' && image[i+2] == ']') {
-		    if (image[i+1] == '>'){
+		    if (image[i+1] == '-' || image[i+1] == '+'){
 			newimage[p++] = 0xB0;
 			i+=2;
 			break;
 		    }
-		    if (image[i+1] == '<'){
-			newimage[p++] = 0xC0;
-			i+=2;
-			break;
-		    }
-		    if (image[i+1] == '-' || image[i+1] == '+'){
-			newimage[p++] = 0xD0;
-			i+=2;
-			break;
-		    }
 		}
-		if (image[i] == '[' && image[i+3] == ']') {
-		    if (image[i+1] == '>' && image[i+2] == '>'){
-			newimage[p++] = 0xE0;
-			i+=3;
-			break;
+
+		/* [>>>>>>>>>>>>>>>>] */
+		/* 0123456789abcdefg  */
+		/*                 v  */
+		if (image[i] == '[' && (image[i+1] == '>' || image[i+1] == '<'))
+		{
+		    int v;
+		    for(v=2; v<17; v++) {
+			if (image[i+v] != image[i+1])
+			    break;
 		    }
-		    if (image[i+1] == '<' && image[i+2] == '<'){
-			newimage[p++] = 0xF0;
-			i+=3;
+		    if (image[i+v] == ']') {
+			newimage[p++] = 
+			    ((12+(image[i+1] == '<'))<<4) +
+			    v-2;
+			i+=v;
 			break;
 		    }
 		}
@@ -235,7 +232,6 @@ process_image(void)
 		     */
 		    depth --;
 		    *((int*)(newimage+(stack[depth]+1))) =
-/*			    (p+1+sizeof(int)) - (stack[depth]+1); */
 			    sizeof(int) + p - stack[depth];
 
 		    *((int*)(newimage+(p+1))) = stack[depth] - (p+1);
@@ -246,7 +242,11 @@ process_image(void)
 		break;
 	}
     }
-    newimage[p] = 0;
+    newimage[p++] = 0;
+    if (p>newimagelen)
+	fprintf(stderr, "Memory overun, conversion to byte code was longer than expected!!\n");
+
+    newimagelen = p;
 
     free(stack);
     free(image);
@@ -286,17 +286,22 @@ static int pos = 0, addr = 0;
 void hex_image(void)
 {
     int     i, j = 0;
-    for (i = 0; i < imagelen; i++)
-	hex_output(stdout, image[i]);
-    hex_output(stdout, EOF);
-    putchar('\n');
-    for (i = 0; i < memlen + 1; i++)
-	if (mem[i])
-	    j = i + 1;
-    j = ((j + 15) & ~0xF);
-    for (i = 0; i < j; i++)
-	hex_output(stdout, mem[i]);
-    hex_output(stdout, EOF);
+    if (image) {
+	for (i = 0; i < imagelen; i++)
+	    hex_output(stdout, image[i]);
+	hex_output(stdout, EOF);
+	putchar('\n');
+    }
+
+    if (mem) {
+	for (i = 0; i < memlen; i++)
+	    if (mem[i])
+		j = i + 1;
+	j = ((j + 15) & ~0xF);
+	for (i = 0; i < j; i++)
+	    hex_output(stdout, mem[i]);
+	hex_output(stdout, EOF);
+    }
 }
 
 /* Byte code interpreter.	(TODO)
@@ -310,15 +315,24 @@ void hex_image(void)
  * 010xxxxx	m[0] += x
  * 011xxxxx	m[0] -= x
  *
- * 10000000	loop start[i]
- * 10010000	loop end[i]
+ * 10000000	jz [i]
+ * 10010000	jnz [i]
  *
  * 10100000	print m[0]
  * 10100001	input m[0]
+ * 10100010			SET *m = 0-255
+ * 10100011
+ * 10100100			ADD *m += 0-255
+ * 10100101			SUB *m -= 0-255
+ * 10100110			ADD  m += 0-255
+ * 10100111			SUB  m -= 0-255
  *
- * 10110000	[>]		extend: [>*x]
- * 11000000	[<]		extend: [<*x]
- * 11010000	[-] or [+]	extend: [<+>-]
+ * 11110000	[-] or [+]	extend: [<+>-]
+ * 11000000	[>*x] x=1..16
+ * 11010000	[<*x] x=1..16
+ *
+ * 11100000
+ * 11110000	
  */
 
 void run_image(void)
@@ -366,25 +380,20 @@ void run_image(void)
 
 #ifdef XTRAINST
 	    case 11:
-#ifndef __OPTIMIZE__
-		if (*m)
-		    m += strlen(m);
-#else
-		while(*m) m++;
-#endif
-		break;
-	    case 12:
-		while(*m) m--;
-		break;
-	    case 13:
 		*m = 0;
 		break;
 
-	    case 14:
-		while(*m) m+=2;
+	    case 12:
+		{
+		    int v = ((c&0xF) + 1);
+		    while(*m) m += v;
+		}
 		break;
-	    case 15:
-		while(*m) m-=2;
+	    case 13:
+		{
+		    int v = ((c&0xF) + 1);
+		    while(*m) m -= v;
+		}
 		break;
 #endif
 	}
