@@ -66,9 +66,10 @@ TODO:
 #endif
 
 #define USEPRINTF
+
 #ifndef NOPCOUNT
-/* 72, 8, 88, 104 */
-#define NOPCOUNT 8
+/* 80=30, 0=30, 112=34, 24  */
+/* #define NOPCOUNT 0 */
 #endif
 
 #ifdef USEHUGERAM
@@ -86,13 +87,13 @@ int do_C = 0;
 int do_asm = 0;
 int do_adder = 0;
 int do_bf = 0;
-int opt_level = 4;  /* 3 => Allow unsafe optimisations */
+int opt_level = 3;  /* 4 => Allow unsafe optimisations */
 int output_limit = 0;
 int enable_trace = 0;
 
+int cell_size = 0;  /* 0=> 8,16,32 or more. 7 and up are number of bits */
 int cell_mask = 0;
-int cell_size = 0;
-char *cell_type = "unsigned char";
+char *cell_type = "C";
 
 FILE * ifd;
 char * curfile = 0;
@@ -325,7 +326,7 @@ main(int argc, char ** argv)
 	opt_level = 2;
 
     if (do_asm || (cell_size == 0 && do_run)) {
-	cell_size = 8; cell_mask = 0xFF; cell_type = "unsigned char";
+	cell_size = 8; cell_mask = 0xFF; cell_type = "char";
     }
 
 #ifdef USEHUGERAM
@@ -498,7 +499,6 @@ pt(FILE* ofd, int indent, struct bfi * n)
 void
 print_c_header(FILE * ofd)
 {
-    char * cell_t = "C";
     char *main_name = "main";
     int use_full = 0;
     int memsize = 60000;
@@ -518,10 +518,9 @@ print_c_header(FILE * ofd)
     fprintf(ofd, "#include <stdlib.h>\n");
     if (cell_size == 0) {
 	fprintf(ofd, "# ifndef C\n");
-	fprintf(ofd, "# define C %s\n", cell_type);
+	fprintf(ofd, "# define C char\n");
 	fprintf(ofd, "# endif\n");
-    } else
-	cell_t = cell_type;
+    }
 
     if (enable_trace)
 	fputs(	"#define t(p1,p2,p3,p4) fprintf(stderr, \"P(%d,%d)=%s"
@@ -537,7 +536,7 @@ print_c_header(FILE * ofd)
 	    memsize = max_pointer-min_pointer+1;
 	}
     }
-    if (opt_level >= 3) {
+    if (opt_level > 3) {
 	memsize -= most_negative_mov;
 	memoffset -= most_negative_mov;
     }
@@ -546,17 +545,24 @@ print_c_header(FILE * ofd)
 
     if (node_type_counts[T_MOV] == 0) {
 	if (memoffset == 0)
-	    fprintf(ofd, "%s m[%d];\n", cell_t, memsize);
+	    fprintf(ofd, "%s m[%d];\n", cell_type, memsize);
 	else {
-	    fprintf(ofd, "%s mem[%d];\n", cell_t, memsize);
+	    fprintf(ofd, "%s mem[%d];\n", cell_type, memsize);
 	    fprintf(ofd, "#define m (mem+%d)\n", memoffset);
 	}
     } else
-	fprintf(ofd, "%s *mem;\n", cell_t);
+	fprintf(ofd, "%s *mem;\n", cell_type);
     fprintf(ofd, "int %s(){\n", main_name);
 
     if (node_type_counts[T_MOV] != 0) {
-	fprintf(ofd, "  %s*m=mem = calloc(%d,sizeof*m);\n", cell_t, memsize);
+
+	fprintf(ofd, "#if defined(__GNUC__) && defined(__i386__)\n");
+	fprintf(ofd, "  %s * m asm (\"edx\");\n", cell_type);
+	fprintf(ofd, "  m = mem = calloc(%d,sizeof*m);\n", memsize);
+	fprintf(ofd, "#else\n");
+	fprintf(ofd, "  %s*m = mem = calloc(%d,sizeof*m);\n",
+			cell_type, memsize);
+	fprintf(ofd, "#endif\n");
 	if (memoffset > 0)
 	    fprintf(ofd, "  m += %d;\n", memoffset);
     }
@@ -810,7 +816,14 @@ printccode(FILE * ofd)
 	    }
 #endif
 	    pt(ofd, indent,n);
-	    fprintf(ofd, "while(m[%d]) { /*railrunner*/\n", n->offset);
+	    if (n->next->next != n->last) {
+		fprintf(ofd, "while(m[%d]) { /*railrunner?*/\n", n->offset);
+	    } else {
+		fprintf(ofd, "while(m[%d]) { m += %d; }",
+		    n->offset, n->next->count);
+		n=n->last;
+		fprintf(ofd, " /*railrunner*/\n", n->offset);
+	    }
 	    break;
 	case T_WHL:
 	    pt(ofd, indent,n);
@@ -973,6 +986,7 @@ process_file(void)
 		(tv_end.tv_usec - tv_step.tv_usec)/1000000.0);
 	}
 	if (opt_level>=2) {
+	    calculate_stats();
 	    if (verbose>5) printtree();
 	    if (verbose>2) gettimeofday(&tv_step, 0);
 	    invariants_scan(); /**/
@@ -1478,7 +1492,7 @@ invariants_scan(void)
 
 	case T_EQU:
 	case T_ADD:
-	case T_WHL: case T_IF: case T_MULT: case T_CMULT: case T_FOR:
+	case T_WHL:
 	    node_changed = find_known_state(n);
 	    break;
 
@@ -1487,9 +1501,9 @@ invariants_scan(void)
 	    node_changed = find_known_state(n2);
 	    if (!node_changed)
 		node_changed = find_known_state(n);
-	    if (!node_changed && opt_level >= 3)
+	    if (!node_changed)
 		node_changed = classify_loop(n2);
-	    if (!node_changed && (n2->type == T_MULT || n2->type == T_CMULT))
+	    if (!node_changed)
 		node_changed = flatten_multiplier(n2);
 
 	    if (node_changed)
@@ -1592,6 +1606,13 @@ find_known_state(struct bfi * v)
 		const_found = 1;
 		goto break_break;
 	    }
+	    break;
+
+	case T_SET:
+	    if (n->offset == v->offset)
+		goto break_break;
+	    if (n->offset2 == v->offset || n->offset3 == v->offset)
+		n_used = 1;
 	    break;
 
 	case T_PRT:
@@ -1858,6 +1879,7 @@ classify_loop(struct bfi * v)
     int has_negoff = 0;
     int complex_loop = 0;
 
+    if (opt_level < 3) return 0;
     if (!v || v->orgtype != T_WHL) return 0;
     typewas = v->type;
     n = v->next;
@@ -1925,8 +1947,13 @@ classify_loop(struct bfi * v)
     } else {
 	v->type = T_CMULT;
 	/* Without T_EQU if all offsets >= Loop offset we don't need the if. */
-	if (!has_set && (!has_belowloop || opt_level>5) ) {
-	    v->type = T_MULT;
+	/* BUT: Any access below the loop can possibly by before the start
+	 * of the tape IF we've got a T_MOV! */
+	if (!has_set) {
+	    if (!has_belowloop || opt_level>3)
+		v->type = T_MULT;
+	    else if (!has_negoff && node_type_counts[T_MOV] == 0)
+		v->type = T_MULT;
 	}
     }
     return (v->type != typewas);
@@ -1936,7 +1963,6 @@ int
 flatten_multiplier(struct bfi * v)
 {
     struct bfi *n;
-    if (opt_level < 4) return 0;
     if (v->type != T_MULT && v->type != T_CMULT) return 0;
 
     n = v->next;
@@ -1978,6 +2004,7 @@ flatten_multiplier(struct bfi * v)
     return 1;
 }
 
+#if 0
 void
 print_asm_string(char * charmap, char * strbuf, int strsize)
 {
@@ -2031,6 +2058,72 @@ static int textno = 0;
 	printf("\tpop ecx\n");
     }
 }
+#endif
+
+void
+print_asm_string(char * charmap, char * strbuf, int strsize)
+{
+static int textno = -1;
+    if (textno == -1) {
+	textno++;
+
+	printf("section .data\n");
+	printf("putchbuf: db 0\n");
+	printf("section .textlib\n");
+	printf("putch:\n");
+        printf("\tpush ecx\n");
+        printf("\tmov ecx,putchbuf\n");
+        printf("\tmov byte [ecx],al\n");
+        printf("\tjmp syswrite\n");
+	printf("prttext:\n");
+        printf("\tpush ecx\n");
+        printf("\tmov ecx,eax\n");
+	printf("syswrite:\n");
+        printf("\txor eax,eax\n");
+        printf("\tmov ebx,eax\n");
+        printf("\tinc ebx\n");
+        printf("\tmov al, 4\n");
+        printf("\tint 0x80\t; write(ebx, ecx, edx);\n");
+        printf("\txor eax, eax\n");
+        printf("\tcdq\n");
+        printf("\tinc edx\n");
+        printf("\tpop ecx\n");
+        printf("\tret\n");
+	printf("section .text\n");
+    }
+
+    if (strsize <= 0) return;
+    if (strsize == 1) {
+	int ch = *strbuf & 0xFF;
+	if (charmap[ch] == 0) {
+	    charmap[ch] = 1;
+	    printf("section .textlib\n");
+	    printf("litprt_%02x:\n", ch);
+	    printf("\tmov al,0x%02x\n", ch);
+	    printf("\tjmp putch\n");
+	    printf("section .text\n");
+	}
+	printf("\tcall litprt_%02x\n", ch);
+    } else {
+	int i;
+	textno++;
+	printf("section .data\n");
+	printf("text_%d:\n", textno);
+	for(i=0; i<strsize; i++) {
+	    if (i%8 == 0) {
+		if (i) printf("\n");
+		printf("\tdb ");
+	    } else
+		printf(", ");
+	    printf("0x%02x", (strbuf[i] & 0xFF));
+	}
+	printf("\n");
+	printf("section .text\n");
+	printf("\tmov eax,text_%d\n", textno);
+	printf("\tmov edx,%d\n", strsize);
+	printf("\tcall prttext\n");
+    }
+}
 
 void 
 print_asm()
@@ -2038,7 +2131,7 @@ print_asm()
     struct bfi * n = bfprog;
     char string_buffer[300], *sp = string_buffer;
     char charmap[256];
-    int done_putch = 0, m = 0xFF;
+    int m = 0xFF;
     memset(charmap, 0, sizeof(charmap));
 
     if (verbose)
@@ -2059,7 +2152,7 @@ print_asm()
     eax = 0x000000xx, only AL is loaded on syscall.
     ebx = unknown, always reset.
     ecx = current pointer.
-    edx = 1
+    edx = 1, dh used for loop cmp.
 */
 
     if (!noheader) {
@@ -2138,55 +2231,60 @@ print_asm()
 	switch(n->type)
 	{
 	case T_MOV:
-	    if (n->count < 0)
-		printf("\tsub ecx,%d\n", -n->count);
-	    else if (n->count > 0)
+	    if (n->count == 0)
+		;
+	    else if (n->count >= -128)
 		printf("\tadd ecx,%d\n", n->count);
+	    else
+		printf("\tsub ecx,%d\n", -n->count);
 
 	    if(n->offset != 0 || n->count == 0)
 		fprintf(stderr, "WARN: T_MOV found with offset=%d, count=%d!\n",
 			n->offset, n->count);
 	    break;
 	case T_ADD:
-	    if(n->offset == 0) {
-		if (n->count < 0)
-		    printf("\tsub byte [ecx],%d\n", m& (-n->count));
-		else if (n->count > 0)
-		    printf("\tadd byte [ecx],%d\n", m& (n->count));
-	    } else {
-		if (n->count < 0)
-		    printf("\tsub byte [ecx+%d],%d\n", n->offset, m&(-n->count));
-		else if (n->count > 0)
-		    printf("\tadd byte [ecx+%d],%d\n", n->offset, m&(n->count));
-	    }
+	    if (n->count != 0)
+		printf("\tadd byte [ecx+%d],%d\n", n->offset, m&(n->count));
 	    break;
 	    
 	case T_EQU:
-	    if(n->offset == 0)
-		printf("\tmov byte [ecx],%d\n", m&(n->count));
-	    else
-		printf("\tmov byte [ecx+%d],%d\n", n->offset, m&(n->count));
+	    printf("\tmov byte [ecx+%d],%d\n", n->offset, m&(n->count));
 	    break;
 	    
 	case T_SET:
-	    if (1|| enable_trace) {
-		printf("; ");
-		printf("[ecx+%d] = %d", n->offset, n->count);
-		printf(" + [ecx+%d]*%d + [ecx+%d]*%d",
-		    n->offset2, n->count2, n->offset3, n->count3);
-		printf("\n");
+	    if (0) {
+		printf("; SET [ecx+%d] = %d + [ecx+%d]*%d + [ecx+%d]*%d\n",
+			n->offset, n->count,
+			n->offset2, n->count2,
+			n->offset3, n->count3);
 	    }
-	    if (n->count2 == 1) {
-		printf("\tmovzx ebx,byte [ecx+%d]\n", n->offset2);
+	    if (n->count2 == 1 && n->count3 == 0) {
+		/* m[1] = m[2]*1 + m[3]*0 */
+		printf("\tmov bl,byte [ecx+%d]\n", n->offset2);
+		printf("\tmov byte [ecx+%d],bl\n", n->offset);
+	    } else if (n->count2 == 1 && n->offset2 == n->offset) {
+		/* m[1] = m[1]*1 + m[3]*n */
+		if (n->count3 == -1) {
+		    printf("\tmov al,byte [ecx+%d]\n", n->offset3);
+		    printf("\tsub byte [ecx+%d],al\n", n->offset);
+		} else if (n->count3 == 1) {
+		    printf("\tmov al,byte [ecx+%d]\n", n->offset3);
+		    printf("\tadd byte [ecx+%d],al\n", n->offset);
+		} else {
+		    printf("\tmov byte al,[ecx+%d]\n", n->offset3);
+		    printf("\timul ebx,eax,%d\n", m&n->count3);
+		    printf("\tadd byte [ecx+%d],bl\n", n->offset);
+		}
 	    } else {
-		printf("\tmovzx eax,byte [ecx+%d]\n", n->offset2);
-		printf("\timul ebx,eax,%d\n", n->count2);
+		printf("\t; Full multiply\n");
+		printf("\tmov bl,byte [ecx+%d]\n", n->offset2);
+		printf("\timul bx,ax,%d\n", m&n->count2);
+		printf("\tmov byte [ecx+%d],bl\n", n->offset);
+		printf("\tmov byte al,[ecx+%d]\n", n->offset3);
+		printf("\timul ebx,eax,%d\n", m&n->count3);
+		printf("\tadd byte [ecx+%d],bl\n", n->offset);
 	    }
-	    printf("\tmov byte [ecx+%d],bl\n", n->offset);
-	    printf("\tmov byte al,[ecx+%d]\n", n->offset3);
-	    printf("\tmovzx eax,byte [ecx+%d]\n", n->offset3);
-	    printf("\timul ebx,eax,%d\n", n->count3);
-	    printf("\tadd byte [ecx+%d],bl\n", n->offset);
+
 	    if (m& (n->count))
 		printf("\tadd byte [ecx+%d],%d\n", n->offset, m& (n->count));
 	    break;
@@ -2196,47 +2294,11 @@ print_asm()
 		*sp++ = n->count;
 		break;
 	    }
-	    if (n->offset == 0 && n->count == -1) {
-		printf("\tmov al, 4\n");
-		printf("\tmov ebx, edx\n");
-		printf("\tint 0x80\n");
-	    } else if (n->count == -1) {
-#if 0
-		printf("push ecx\n");
-		if (n->offset < 0)
-		    printf("sub ecx,%d\n", -n->offset);
-		else if (n->offset > 0)
-		    printf("add ecx,%d\n", n->offset);
-		printf("mov al, 4\n");
-		printf("mov ebx, edx\n");
-		printf("int 0x80\n");
-		printf("pop ecx\n");
-#else
-		if (!done_putch) { done_putch=1;
-		    printf("section .data\n");
-		    printf("putchbuf: db 0\n");
-		    printf("section .textlib\n");
-		    printf("putch:\n");
-		    printf("\tpush ecx\n");
-		    printf("\tmov ecx,putchbuf\n");
-		    printf("\tmov byte [ecx],al\n");
-		    printf("\txor eax,eax\n");
-		    printf("\tcdq\n");
-		    printf("\tinc edx\n");
-		    printf("\tmov al, 4\n");
-		    printf("\tmov ebx, edx\n");
-		    printf("\tint 0x80\t; write(ebx, ecx, edx);\n");
-		    printf("\tpop ecx\n");
-		    printf("\tret\n");
-		    printf("section .text\n");
-		}
-		if (n->offset >= 0) {
-		    printf("\tmov al,[ecx+%d]\n", n->offset);
-		} else {
-		    printf("\tmov al,[ecx-%d]\n", -n->offset);
-		}
+
+	    if (n->count == -1) {
+		print_asm_string(0,0,0);
+		printf("\tmov al,[ecx+%d]\n", n->offset);
 		printf("\tcall putch\n");
-#endif
 	    } else {
 		*string_buffer = n->count;
 		print_asm_string(charmap, string_buffer, 1);
@@ -2246,84 +2308,27 @@ print_asm()
 	case T_INP:
 	    if (n->offset != 0) {
 		printf("\tpush ecx\n");
-		if (n->offset < 0)
-		    printf("\tsub ecx,%d\n", -n->offset);
-		else if (n->offset > 0)
-		    printf("\tadd ecx,%d\n", n->offset);
+		printf("\tadd ecx,%d\n", n->offset);
 	    }
 	    printf("\tmov al, 3\n");
 	    printf("\txor ebx, ebx\n");
-	    printf("\tint 0x80\n");
+	    printf("\tint 0x80\t; read(ebx, ecx, edx);\n");
 	    if (n->offset != 0) {
 		printf("\tpop ecx\n");
 	    }
 	    break;
 
-	case T_MULT:
-	case T_CMULT:
-	    if (n->type == T_CMULT) {
-		if (n->offset == 0)
-		    printf("cmp dh,byte [ecx]\n");
-		else
-		    printf("cmp dh,byte [ecx+%d]\n", n->offset);
-		printf("jz near end_%d\n", n->count);
-	    }
-	    {
-		struct bfi * v = n->next;
-		int done_get = 0, trashed_ax = 0;
-		while(v != n->last) {
-		    switch(v->type) {
-			case T_ADD:
-			    if (n->offset == v->offset) {
-				printf("mov byte [ecx+%d],0\n", v->offset);
-			    } else if (v->count == 1) {
-				if (!done_get)
-				    printf("mov byte al,[ecx+%d]\n", n->offset);
-				done_get = 1;
-				printf("add byte [ecx+%d],al\n", v->offset);
-			    } else if (v->count == -1) {
-				if (!done_get)
-				    printf("mov byte al,[ecx+%d]\n", n->offset);
-				done_get = 1;
-				printf("sub byte [ecx+%d],al\n", v->offset);
-			    } else {
-				if (!done_get)
-				    printf("mov byte al,[ecx+%d]\n", n->offset);
-				done_get = 1;
-				printf("imul ebx,eax,%d\n", v->count);
-				printf("add byte [ecx+%d],bl\n", v->offset);
-			    }
-			    break;
-			case T_EQU:
-			    printf("mov byte [ecx+%d],%d\n", v->offset, v->count);
-			    break;
-			default:
-			    fprintf(stderr, "Bad token %d in Multiply loop at %d:%d\n", 
-				v->type, v->line, v->col);
-			    exit(10);
-		    }
-		    v = v->next;
-		}
-		if (trashed_ax)
-		    printf("xor eax, eax\n");
-		n=n->last;
-	    }
-	    printf("end_%d:\n", n->parent->count);
-	    break;
-
-	case T_ZFIND:
-	case T_ADDWZ:
-	case T_IF:
-	case T_FOR:
+	case T_MULT: case T_CMULT:
+	case T_ZFIND: case T_ADDWZ: case T_IF: case T_FOR:
 	case T_WHL:
+	    if (n->type != T_WHL)
+		printf("; %s\n", tokennames[n->type&0xF]);
 	    if (0 /* Optimise for Space */ )
 		printf("start_%d:\n", n->count);
-	    if (n->offset == 0)
-		printf("\tcmp dh,byte [ecx]\n");
-	    else
-		printf("\tcmp dh,byte [ecx+%d]\n", n->offset);
+	    printf("\tcmp dh,byte [ecx+%d]\n", n->offset);
 	    printf("\tjz near end_%d\n", n->count);
-	    printf("loop_%d:\n", n->count);
+	    if (n->type != T_IF)
+		printf("loop_%d:\n", n->count);
 	    break;
 
 	case T_END: 
@@ -2333,10 +2338,7 @@ print_asm()
 		printf("\tjmp near start_%d\n", n->parent->count);
 		printf("end_%d:\n", n->parent->count);
 	    } else {
-		if (n->parent->offset == 0)
-		    printf("\tcmp dh,byte [ecx]\n");
-		else
-		    printf("\tcmp dh,byte [ecx+%d]\n", n->parent->offset);
+		printf("\tcmp dh,byte [ecx+%d]\n", n->parent->offset);
 		printf("\tjnz near loop_%d\n", n->parent->count);
 		printf("end_%d:\n", n->parent->count);
 	    }
@@ -2501,12 +2503,8 @@ print_adder(void)
 	    last_offset_ok = 1;
 	    break;
 
-	case T_MULT:
-	case T_CMULT:
-	case T_ZFIND:
-	case T_ADDWZ:
-	case T_IF:
-	case T_FOR:
+	case T_MULT: case T_CMULT:
+	case T_ZFIND: case T_ADDWZ: case T_IF: case T_FOR:
 	case T_WHL:
 	    if (n->offset == last_offset && last_offset_ok)
 		printf("loop\n");
@@ -2601,12 +2599,8 @@ print_bf(void)
 	    putchar(',');
 	    break;
 
-	case T_MULT:
-	case T_CMULT:
-	case T_ZFIND:
-	case T_ADDWZ:
-	case T_IF:
-	case T_FOR:
+	case T_MULT: case T_CMULT:
+	case T_ZFIND: case T_ADDWZ: case T_IF: case T_FOR:
 	case T_WHL:
 	    putchar('[');
 	    break;
