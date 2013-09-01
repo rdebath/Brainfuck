@@ -28,7 +28,14 @@ TODO:
     Note: With T_IF loops the condition may depend on the cell size.
 	If so, within the loop the cell size may be known.
 
+    UTF-8 output (just use putwchar() and getwchar() ?).
+
+    New C function on Level 2 end while.
+
     #	Comment if at SOL
+    %	Comment character til EOL
+    //  Comment til EOL.
+
     [.] Comment at start of file.
 */ /*	C comments or REVERSED C comments ?
 
@@ -39,6 +46,8 @@ TODO:
     #	Debugging flag.
 
     !	On stdin for end of program / start of data.
+    @	On stdin for end of program / start of data.
+
     \	Input next character as a literal. ie *m = 'next';
     "..."   Input characters from string on succesive calls. (pointer unchanged!)
 
@@ -60,6 +69,8 @@ TODO:
 #include <sys/time.h>
 #include <sys/mman.h>
 #include <signal.h>
+#include <locale.h>
+#include <langinfo.h>
 
 #ifdef MAP_NORESERVE
 #define USEHUGERAM
@@ -73,8 +84,9 @@ TODO:
 #endif
 
 #ifdef USEHUGERAM
-#define MEMSIZE 2UL*1024*1024*1024
-#define MEMGUARD 16*1024*1024
+#define MEMSIZE	    2UL*1024*1024*1024
+#define MEMGUARD    16UL*1024*1024
+#define MEMSKIP	    1UL*1024*1024
 #else
 #define MEMSIZE 256*1024
 #endif
@@ -90,6 +102,7 @@ int do_bf = 0;
 int opt_level = 3;  /* 4 => Allow unsafe optimisations */
 int output_limit = 0;
 int enable_trace = 0;
+int iostyle = 0;
 
 int cell_size = 0;  /* 0=> 8,16,32 or more. 7 and up are number of bits */
 int cell_mask = 0;
@@ -179,7 +192,12 @@ int min_pointer = 0, max_pointer = 0;
 int most_negative_mov = 0, most_positive_mov = 0;
 double profile_hits = 0.0;
 
+#ifdef USEHUGERAM
+/* Huge tape location */
 void * cell_array_pointer = 0;
+void * cell_array_low_addr = 0;
+size_t cell_array_alloc_len = 0;
+#endif
 
 void open_file(char * fname);
 void process_file(void);
@@ -209,19 +227,27 @@ void Usage(void)
     fprintf(stderr, "Usage: %s [options] [files]\n", program);
     fprintf(stderr, "   -h   This message.\n");
     fprintf(stderr, "   -v   Verbose, repeat for more.\n");
-    fprintf(stderr, "   -r   Run in interpreter. (default) Also run C code.\n");
+    fprintf(stderr, "   -r   Run in interpreter.\n");
     fprintf(stderr, "   -c   Create C code.\n");
     fprintf(stderr, "   -s   Create NASM code.\n");
+    fprintf(stderr, "        Default is to generate & run the C code.\n");
     fprintf(stderr, "   -T   Create trace statements in output C code.\n");
-    fprintf(stderr, "   -H   Remove headers in output code.\n");
-    fprintf(stderr, "   -L n Allow at most 'n' lines of output.\n");
+    fprintf(stderr, "   -H   Remove headers in output code; optimiser cannot see start either.\n");
+    fprintf(stderr, "   -L n Allow at most 'n' lines of output. (Interpreter)\n");
+    fprintf(stderr, "   -u   Unicode I/O%s\n", iostyle?" (default)":"");
+    fprintf(stderr, "   -a   Ascii I/O%s\n", iostyle?"":" (default)");
     fprintf(stderr, "   -m   Minimal processing, use RLE only.\n");
-    fprintf(stderr, "   -On  'Optimisation level' -O0 is -m, default is max.\n");
-    fprintf(stderr, "   -B8  Assume 8 bit cells. (default for -r)\n");
-    fprintf(stderr, "   -B16 Assume 16 bit cells.\n");
-    fprintf(stderr, "   -B32 Assume 32 bit cells.\n");
+    fprintf(stderr, "   -On  'Optimisation level' -O0 is -m\n");
+    fprintf(stderr, "   -O1      Only pointer motion removal.\n");
+    fprintf(stderr, "   -O2      A few simple changes.\n");
+    fprintf(stderr, "   -O3      Maximum normal level, default.\n");
+    fprintf(stderr, "   -O4      Allow some 'unsafe' transformations.\n");
+    fprintf(stderr, "   -B8  Use 8 bit cells.\n");
+    fprintf(stderr, "   -B16 Use 16 bit cells.\n");
+    fprintf(stderr, "   -B32 Use 32 bit cells.\n");
     fprintf(stderr, "        Default for C is 'unknown', ASM can only be 8bit.\n");
     fprintf(stderr, "        Other bitwidths work for the interpreter and C.\n");
+    fprintf(stderr, "        Unicode characters need at least 16 bits.\n");
     exit(1);
 }
 
@@ -244,6 +270,9 @@ main(int argc, char ** argv)
     char * filename = 0;
     program = argv[0];
     if (isatty(STDOUT_FILENO)) setbuf(stdout, NULL);
+    setlocale(LC_ALL, "");
+    if (!strcmp("UTF-8", nl_langinfo(CODESET)))
+	iostyle = 1;
 
     /* Traditional option processing. */
     for(ar=1; ar<argc; ar++) 
@@ -261,6 +290,8 @@ main(int argc, char ** argv)
                     case 'F': do_bf=1; break;
                     case 'm': opt_level=0; break;
                     case 'T': enable_trace=1; break;
+                    case 'u': iostyle=1; break;
+                    case 'a': iostyle=0; break;
 
                     default: 
                         ch = *p;
@@ -319,14 +350,20 @@ main(int argc, char ** argv)
 	exit(255);
     }
 
-    if (!do_asm && !do_C && !do_adder && !do_bf)
-	do_run = 1;
+    if (!do_run && !do_asm && !do_C && !do_adder && !do_bf)
+	do_run = do_C = 1;
 
     if ((do_bf || do_adder) && opt_level > 2)
 	opt_level = 2;
 
-    if (do_asm || (cell_size == 0 && do_run)) {
-	cell_size = 8; cell_mask = 0xFF; cell_type = "char";
+    if (do_asm) { cell_size = 8; cell_mask = 0xFF; cell_type = "char"; }
+
+    if (cell_size == 0 && do_run) {
+	if (iostyle == 1) {
+	    cell_size = 16; cell_mask = 0xFFFF; cell_type = "short";
+	} else {
+	    cell_size = 8; cell_mask = 0xFF; cell_type = "char";
+	}
     }
 
 #ifdef USEHUGERAM
@@ -506,7 +543,7 @@ print_c_header(FILE * ofd)
 
     calculate_stats();
 
-    if (enable_trace || do_run) use_full = 1;
+    if (enable_trace || do_run || iostyle) use_full = 1;
 
     if (total_nodes == node_type_counts[T_PRT] && !use_full) {
 	fprintf(ofd, "#include <stdio.h>\n\n");
@@ -514,11 +551,19 @@ print_c_header(FILE * ofd)
 	return ;
     }
 
+    if (iostyle == 1) {
+	fprintf(ofd, "#include <locale.h>\n");
+	fprintf(ofd, "#include <wchar.h>\n");
+    }
+
     fprintf(ofd, "#include <stdio.h>\n");
     fprintf(ofd, "#include <stdlib.h>\n");
     if (cell_size == 0) {
 	fprintf(ofd, "# ifndef C\n");
-	fprintf(ofd, "# define C char\n");
+	if (iostyle == 1)
+	    fprintf(ofd, "# define C short\n");
+	else
+	    fprintf(ofd, "# define C char\n");
 	fprintf(ofd, "# endif\n");
     }
 
@@ -537,6 +582,10 @@ print_c_header(FILE * ofd)
 	}
     }
     if (opt_level > 3) {
+	if (memoffset == 0 && min_pointer < 0) {
+	    memsize -= min_pointer;
+	    memoffset -= min_pointer;
+	}
 	memsize -= most_negative_mov;
 	memoffset -= most_negative_mov;
     }
@@ -556,19 +605,24 @@ print_c_header(FILE * ofd)
 
     if (node_type_counts[T_MOV] != 0) {
 
+#if 0
 	fprintf(ofd, "#if defined(__GNUC__) && defined(__i386__)\n");
-	fprintf(ofd, "  %s * m asm (\"edx\");\n", cell_type);
+	fprintf(ofd, "static %s * m asm (\"edx\");\n", cell_type);
 	fprintf(ofd, "  m = mem = calloc(%d,sizeof*m);\n", memsize);
 	fprintf(ofd, "#else\n");
+	fprintf(ofd, "#endif\n");
+#endif
 	fprintf(ofd, "  %s*m = mem = calloc(%d,sizeof*m);\n",
 			cell_type, memsize);
-	fprintf(ofd, "#endif\n");
 	if (memoffset > 0)
 	    fprintf(ofd, "  m += %d;\n", memoffset);
     }
 
     if (node_type_counts[T_INP] != 0)
 	fprintf(ofd, "  setbuf(stdout, 0);\n");
+
+    if (iostyle == 1)
+	fprintf(ofd, "  setlocale(LC_ALL, \"\");\n");
 }
 
 void 
@@ -775,7 +829,11 @@ printccode(FILE * ofd)
 		    fprintf(ofd, "m[%d] &= %d;\n", n->offset, add_mask);
 		    pt(ofd, indent, 0);
 		}
-		fprintf(ofd, "putchar(m[%d]);\n", n->offset);
+		if (iostyle == 1)
+		    fprintf(ofd, "printf(\"%%lc\",m[%d]);\n",
+					    n->offset);
+		else
+		    fprintf(ofd, "putchar(m[%d]);\n", n->offset);
 	    } else {
 		int ch = n->count;
 		if (add_mask>0) ch &= add_mask;
@@ -788,13 +846,16 @@ printccode(FILE * ofd)
 		    fprintf(ofd, "putchar('\\t');\n");
 		else if (ch == '\\')
 		    fprintf(ofd, "putchar('\\\\');\n");
+		else if (iostyle == 1 && ch > 127)
+		    fprintf(ofd, "printf(\"%%lc\",0x%02x);\n", ch);
 		else
 		    fprintf(ofd, "putchar(0x%02x);\n", ch);
 	    }
 	    break;
 	case T_INP:
 	    pt(ofd, indent,n);
-	    fprintf(ofd, "m[%d] = getchar();\n", n->offset);
+	    fprintf(ofd, "{int c=get%schar();if(c!=EOF)m[%d]=c;}\n",
+		(iostyle==1?"w":""), n->offset);
 	    if (enable_trace) {
 		pt(ofd, indent,0);
 		fprintf(ofd, "t(%d,%d,\"\",m+ %d)\n", n->line, n->col, n->offset);
@@ -1160,34 +1221,13 @@ run_tree(void)
 			    + n->count3 * p[n->offset3];
 		break;
 
-	    case T_IF:
-	    case T_FOR:
+	    case T_MULT: case T_CMULT:
+	    case T_IF: case T_FOR:
+
 	    case T_WHL: if(M(p[n->offset]) == 0) n=n->last;
 		break;
 
 	    case T_END: if(M(p[n->offset]) != 0) n=n->parent;
-		break;
-
-	    case T_MULT: case T_CMULT:
-		if(M(p[n->offset]) == 0) { n=n->last; break; }
-		else
-		{
-		    int r = p[n->offset];
-		    struct bfi * v = n->next;
-		    while(v != n->last) {
-			switch(v->type) {
-			    case T_ADD: p[v->offset] += v->count * r; break;
-			    case T_EQU: p[v->offset] = v->count; break;
-			    default:
-				fprintf(stderr, "Bad token %d in Multiply loop at %d:%d\n", 
-				    v->type, v->line, v->col);
-				exit(10);
-			}
-			v = v->next;
-		    }
-		    n=n->last;
-		    n->profile++;
-		}
 		break;
 
 	    case T_PRT:
@@ -1197,16 +1237,30 @@ run_tree(void)
 		    fprintf(stderr, "Output limit reached\n");
 		    goto break_break;
 		}
-/*TODO: stop the clock ? */
-		putchar(ch);
+
+		/*TODO: stop the clock ? */
+
+		if (ch > 127 && iostyle == 1)
+		    printf("%lc", ch);
+		else
+		    putchar(ch);
 		break;
 	    }
 
 	    case T_INP:
 		gettimeofday(&tv_pause, 0); /* Stop the clock. */
 
-		c=getchar();
-		if (c!=EOF && c!='\r') p[n->offset] = c;
+		do {
+		    if (iostyle == 1) {
+			wchar_t wch = EOF;
+			if (scanf("%lc", &wch))
+			    c = wch;
+			else
+			    c = EOF;
+		    } else
+			c=getchar();
+		} while(c == '\r');
+		if (c != EOF) p[n->offset] = c;
 
 		gettimeofday(&tv_end, 0);
 		tv_start.tv_usec = tv_start.tv_usec +
@@ -1770,8 +1824,9 @@ break_break:
 	case T_PRT: /* Print literal character. */
 	    if (v->count != -1) break;
 	    if (do_bf) break; /* BF output can't do lits. */
-	    if (known_value < 0)
+	    if (known_value < 0 && iostyle == 0)
 		known_value = (0xFF & known_value);
+	    if (known_value == -1) break;
 	    v->count = known_value;
 	    if (verbose>5) fprintf(stderr, "  Make literal putchar.\n");
 	    return 0; /* No need to rescan or fix this node */
@@ -2634,8 +2689,10 @@ void *
 map_hugeram(void)
 {
     void * mp;
+    cell_array_alloc_len = MEMSIZE + 2*MEMGUARD;
+
     /* Map the memory and two guard regions */
-    mp = mmap(0, MEMSIZE + 2*MEMGUARD,
+    mp = mmap(0, cell_array_alloc_len,
 		PROT_READ+PROT_WRITE,
 		MAP_PRIVATE+MAP_ANONYMOUS+MAP_NORESERVE, -1, 0);
 
@@ -2643,12 +2700,18 @@ map_hugeram(void)
 	fprintf(stderr, "Cannot map memory for cell array\n");
 	exit(1);
     }
+    cell_array_low_addr = mp;
+
     if (MEMGUARD > 0) {
 	/* unmap the guard regions */
 	munmap(mp, MEMGUARD); mp += MEMGUARD;
 	munmap(mp+MEMSIZE, MEMGUARD);
     }
+
     cell_array_pointer = mp;
+    if (opt_level > 3)
+	cell_array_pointer += MEMSKIP;
+
     return cell_array_pointer;
 }
 
