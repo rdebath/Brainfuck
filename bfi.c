@@ -28,8 +28,11 @@ TODO:
     Note: With T_IF loops the condition may depend on the cell size.
 	If so, within the loop the cell size may be known.
 
+    IF Known non-zero at start of loop --> do { } while();
+
     New C function on Level 2 end while.
 
+------------------------------------------------
     #	Comment if at SOL
     %	Comment character til EOL
     //  Comment til EOL.
@@ -59,7 +62,12 @@ TODO:
     Hard 'Easy' mode. Do initial loop read character by character.
 
 */
+#ifdef __STRICT_ANSI__
 #define _POSIX_C_SOURCE 200809UL
+#if __STDC_VERSION__ < 199901L
+#error Please compile using at least the C99 standard.
+#endif
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -83,6 +91,7 @@ TODO:
 #define MEMSKIP	    1UL*1024*1024
 #else
 #define MEMSIZE	    256*1024
+#warning Using small memory
 #endif
 
 #if !defined(__STRICT_ANSI__) && !defined(TCCLIBMISSING)
@@ -101,7 +110,7 @@ int do_C = 0;
 int do_asm = 0;
 int do_adder = 0;
 int do_bf = 0;
-int opt_level = 3;  /* 4 => Allow unsafe optimisations */
+int opt_level = 4;  /* 4 => Allow unsafe optimisations */
 int output_limit = 0;
 int enable_trace = 0;
 int iostyle = 0;
@@ -160,7 +169,13 @@ char *tokennames[] = {
     "T_NOP",
 #define T_DEAD	16
     "T_DEAD",
-#define TCOUNT	17
+#define T_SET2	17
+    "T_SET2",
+#define T_SET3	18
+    "T_SET3",
+#define T_RAILC	19
+    "T_RAILC",
+#define TCOUNT	20
     "T_?"
 };
 
@@ -223,6 +238,7 @@ void print_adder(void);
 void print_bf(void);
 void * map_hugeram(void);
 void trap_sigsegv(void);
+void convert_tree_to_runarray(void);
 
 void Usage(void)
 {
@@ -362,11 +378,7 @@ main(int argc, char ** argv)
     if (do_asm) { cell_size = 8; cell_mask = 0xFF; cell_type = "char"; }
 
     if (cell_size == 0 && do_run) {
-	if (iostyle == 1) {
-	    cell_size = 16; cell_mask = 0xFFFF; cell_type = "short";
-	} else {
-	    cell_size = 8; cell_mask = 0xFF; cell_type = "char";
-	}
+	cell_size = 8; cell_mask = 0xFF; cell_type = "char";
     }
 
 #ifdef USEHUGERAM
@@ -635,7 +647,6 @@ printccode(FILE * ofd)
     struct bfi * n = bfprog;
     char string_buffer[180], *sp = string_buffer, lastspch = 0;
     int ok_for_printf = 0, spc = 0;
-    int multiply_mode = 0, multiply_cell = 0;
     int add_mask = 0;
     if (cell_size > 0 &&
 	cell_size != sizeof(int)*8 &&
@@ -697,27 +708,8 @@ printccode(FILE * ofd)
 		fprintf(ofd, "m += %d;\n", n->count);
 	    break;
 	case T_ADD:
-	    pt(ofd, indent-(multiply_mode ==2),n);
-	    if(multiply_mode) 
-	    {
-		fprintf(ofd, "/*MM: m[%d] += m[%d] * %d; */ ",
-			n->offset, multiply_cell, n->count);
-
-		if (n->offset == multiply_cell && n->count == -1 )
-		    fprintf(ofd, "m[%d] = 0;\n", n->offset);
-		else if (n->count == 1)
-		    fprintf(ofd, "m[%d] += m[%d];\n", n->offset, multiply_cell);
-		else if (n->count == -1)
-		    fprintf(ofd, "m[%d] -= m[%d];\n", n->offset, multiply_cell);
-		else if (n->count > 0)
-		    fprintf(ofd, "m[%d] += m[%d] * %d;\n",
-			n->offset, multiply_cell, n->count);
-		else if (n->count < 0)
-		    fprintf(ofd, "m[%d] -= m[%d] * %d;\n",
-			n->offset, multiply_cell, -n->count);
-		else
-		    fprintf(ofd, ";\n");
-	    } else if(n->offset == 0) {
+	    pt(ofd, indent,n);
+	    if(n->offset == 0) {
 		if (n->count < 0)
 		    fprintf(ofd, "*m -= %d;\n", -n->count);
 		else if (n->count > 0)
@@ -738,8 +730,7 @@ printccode(FILE * ofd)
 	    }
 	    break;
 	case T_EQU:
-	    pt(ofd, indent-(multiply_mode ==2),n);
-	    if (multiply_mode) fprintf(ofd, "/*MM*/ ");
+	    pt(ofd, indent,n);
 	    if(n->offset == 0)
 		fprintf(ofd, "*m = %d;\n", n->count);
 	    else
@@ -891,7 +882,10 @@ printccode(FILE * ofd)
 		fprintf(ofd, " /*railrunner*/\n");
 	    }
 	    break;
+
 	case T_WHL:
+	case T_CMULT:
+	case T_MULT:
 	    pt(ofd, indent,n);
 	    fprintf(ofd, "while(m[%d]) {\n", n->offset);
 	    break;
@@ -903,22 +897,10 @@ printccode(FILE * ofd)
 	    pt(ofd, indent,n);
 	    fprintf(ofd, "for(;m[%d];) {\n", n->offset);
 	    break;
-	case T_CMULT:
-	    multiply_mode = 1;
-	    multiply_cell = n->offset;
-	    pt(ofd, indent,n);
-	    fprintf(ofd, "if(m[%d]) {\n", n->offset);
-	    break;
-	case T_MULT:
-	    multiply_mode = 2;
-	    multiply_cell = n->offset;
-	    break;
+
 	case T_END: 
-	    if (multiply_mode != 2 ) {
-		pt(ofd, indent,n);
-		fprintf(ofd, "}\n");
-	    }
-	    multiply_mode = 0;
+	    pt(ofd, indent,n);
+	    fprintf(ofd, "}\n");
 	    break;
 	case T_STOP: 
 	    pt(ofd, indent,n);
@@ -1097,7 +1079,7 @@ process_file(void)
 #endif
     } else {
 	if (do_C) printccode(stdout);
-	if (do_run) run_tree();
+	if (do_run) convert_tree_to_runarray();
 	if (do_adder) print_adder();
 	if (do_bf) print_bf();
     }
@@ -1208,10 +1190,6 @@ run_tree(void)
     oldp = p = map_hugeram();
 #else
     p = oldp = tcalloc(MEMSIZE, sizeof*p);
-    if (p == 0) {
-	fprintf(stderr, "Cannot allocate memory for cell array\n");
-	exit(1);
-    }
     use_free = 1;
 #endif
 
@@ -1353,6 +1331,7 @@ break_break:;
     if (use_free) free(oldp);
 
 #undef icell
+#undef M
 }
 
 void
@@ -1580,6 +1559,8 @@ invariants_scan(void)
 
 	case T_SET:
 	    node_changed = find_known_set_state(n);
+	    if (node_changed && n->prev)
+		n = n->prev;
 	    break;
 
 	case T_END:
@@ -2098,8 +2079,10 @@ find_known_set_state(struct bfi * v)
     int const_found1 = 0, known_value1 = 0, non_zero_unsafe1 = 0;
     struct bfi *n2 = 0;
     int const_found2 = 0, known_value2 = 0, non_zero_unsafe2 = 0;
+    int n2_valid = 0;
     struct bfi *n3 = 0;
     int const_found3 = 0, known_value3 = 0, non_zero_unsafe3 = 0;
+    int n3_valid = 0;
 
     if(v == 0) return 0;
     if (v->type != T_SET) return 0;
@@ -2121,6 +2104,19 @@ find_known_set_state(struct bfi * v)
 	}
     }
 
+    if (v->count3 == 1 && v->offset != v->offset2 && v->offset == v->offset3) {
+	/* Swap them so += looks nice */
+	int t;
+
+	t = v->offset2;
+	v->offset2 = v->offset3;
+	v->offset3 = t;
+	t = v->count2;
+	v->count2 = v->count3;
+	v->count3 = t;
+	rv = 1;
+    }
+
     if (v->count2 && v->count3 && v->offset2 == v->offset3) {
 	/* Humm, shouldn't this have been done already ? */
 	v->count2 += v->count3;
@@ -2128,18 +2124,23 @@ find_known_set_state(struct bfi * v)
 	rv = 1;
     }
 
-    if (v->count2)
+    if (v->count2) {
 	find_known_value(v->prev, v->offset2, &n2, 
 		    &const_found2, &known_value2, &non_zero_unsafe2);
+	n2_valid = 1;
+    }
 
-    if (v->count3)
+    if (v->count3) {
 	find_known_value(v->prev, v->offset3, &n3, 
 		    &const_found3, &known_value3, &non_zero_unsafe3);
+	n3_valid = 1;
+    }
 
     if (const_found2) {
 	v->count += v->count2 * known_value2;
 	v->count2 = 0;
 	rv = 1;
+	n2_valid = 0;
     }
 
     if (const_found3) {
@@ -2157,10 +2158,11 @@ find_known_set_state(struct bfi * v)
 	n2 = n3;
 	v->count3 = 0;
 	rv = 1;
+	n2_valid = n3_valid;
+	n3_valid = 0;
     }
 
-#if 1
-    if (n2 && n2->type == T_SET &&
+    if (n2 && n2->type == T_SET && n2_valid &&
 	    v->count2 == 1 && v->count3 == 0 && v->count == 0) {
 	/* A direct assignment from n2 but not a constant */
 	/* plus n2 seems safe to delete. */
@@ -2191,7 +2193,27 @@ find_known_set_state(struct bfi * v)
 		n2 = 0;
 	    }
 	    rv = 1;
+	    n2_valid = 0;
 	}
+    }
+
+#if 1
+    if (n2 && n2->type == T_SET && n2_valid &&
+	    v->count2 == 1 && v->count3 == 0 && v->count == 0 &&
+	    n2->next == v && 
+	    v->next && v->next->type == T_EQU && v->next->offset == n2->offset) {
+	/* A direct assignment from n2 and it's the previous node and the next
+	 * node wipes it. */
+	/* This is a BF standard form. */
+
+	int t;
+	t = n2->offset;
+	n2->offset = v->offset;
+	v->offset = t;
+	v->offset2 = n2->offset;
+	v->type = T_NOP;
+	n2_valid = 0;
+	rv = 1;
     }
 #endif
 
@@ -2850,10 +2872,6 @@ run_ccode(void)
     func();
     free(image);
 }
-#else
-#ifndef __STRICT_ANSI__
-#warning Please add -include libtcc.h, -ltcc and -ldl on the compile command to enable -rc.
-#endif
 #endif
 
 void 
@@ -3167,3 +3185,247 @@ trap_sigsegv(void)
 	perror("Error trapping SIGSEGV, ignoring");
 }
 #endif
+
+#if MASK == 0xFF
+#define icell	unsigned char
+#define M(x) x
+#elif MASK == 0xFFFF
+#define icell	unsigned short
+#define M(x) x
+#else
+#define icell	int
+#endif
+void
+convert_tree_to_runarray(void)
+{
+    struct bfi * n = bfprog;
+    int arraylen = 0;
+    int * progarray = 0;
+    int * p;
+    int last_offset = 0;
+    icell * m;
+#ifndef USEHUGERAM
+    void * freep;
+#endif
+#ifdef M
+    if (sizeof(*m)*8 != cell_size && cell_size>0) {
+	fprintf(stderr, "Sorry, the interpreter has been configured with a fixed cell size of %d bits\n", sizeof(icell)*8);
+	exit(1);
+    }
+#else
+    int icell_mask;
+    if (cell_size == 0) icell_mask = 0xFF;
+    else if (cell_size >= sizeof(*m)*8) 
+	icell_mask = -1;
+    else
+	icell_mask = (1 << cell_size) - 1;
+#define M(x) ((x)&icell_mask)
+#endif
+
+#ifdef USEHUGERAM
+    m = map_hugeram();
+#else
+    m = freep = tcalloc(MEMSIZE, sizeof*p);
+#endif
+
+    while(n)
+    {
+	switch(n->type)
+	{
+	case T_MOV: case T_INP:
+	    arraylen += 3;
+	    break;
+
+	case T_PRT: case T_ADD: case T_EQU: case T_END:
+	case T_WHL: case T_MULT: case T_CMULT:
+	case T_ZFIND: case T_ADDWZ: case T_FOR: case T_IF:
+	    arraylen += 3;
+	    break;
+
+	case T_SET:
+	    arraylen += 7;
+	    break;
+
+	default:
+	    fprintf(stderr, "Invalid node type found = %d\n", n->type);
+	    exit(1);
+	}
+	n = n->next;
+    }
+
+    p = progarray = calloc(arraylen+2, sizeof*progarray);
+    if (!progarray) { perror(program); exit(1); }
+    n = bfprog;
+
+    last_offset = 0;
+    while(n)
+    {
+	if (n->type != T_MOV) {
+	    *p++ = (n->offset - last_offset);
+	    last_offset = n->offset;
+	}
+	else {
+	    last_offset -= n->count;
+	    n = n->next;
+	    continue;
+	}
+
+	*p++ = n->type;
+	switch(n->type)
+	{
+	case T_MOV: 
+	    *p++ = n->count;
+	    break;
+
+	case T_INP:
+	    break;
+
+	case T_PRT: case T_ADD: case T_EQU:
+	    *p++ = n->count;
+	    break;
+
+	case T_ADDWZ:
+	    *p++ = n->next->offset - last_offset;
+	    *p++ = n->next->count;
+	    *p++ = n->next->next->count;
+	    n = n->last;
+	    break;
+
+	case T_ZFIND:
+	    *p++ = n->next->count;
+	    n = n->last;
+	    break;
+
+	case T_WHL: case T_MULT: case T_CMULT:
+	case T_FOR: case T_IF:
+	    p[-1] = T_WHL;
+	    n->last->count = p-progarray;
+	    *p++ = 0;
+	    break;
+
+	case T_END:
+	    progarray[n->count] = (p-progarray) - n->count;
+	    *p++ = -progarray[n->count];
+	    break;
+
+	case T_SET:
+	    if (n->count3 == 0) {
+		p[-1] = T_SET2;
+		*p++ = n->count;
+		*p++ = n->offset2 - last_offset;
+		*p++ = n->count2;
+	    } else if ( n->count == 0 && n->count2 == 1 && n->offset == n->offset2 ) {
+	    //  m[41] = 0 + m[41]*1 + m[40]*5
+		p[-1] = T_SET3;
+		*p++ = n->offset3 - last_offset;
+		*p++ = n->count3;
+	    } else {
+		*p++ = n->count;
+		*p++ = n->offset2 - last_offset;
+		*p++ = n->count2;
+		*p++ = n->offset3 - last_offset;
+		*p++ = n->count3;
+	    }
+	    break;
+	}
+	n = n->next;
+    }
+    *p++ = 0;
+    *p++ = T_STOP;
+
+    p = progarray;
+
+    for(;;) {
+	m += *p++;
+	switch(*p)
+	{
+	case T_MOV: m += p[1]; p += 2; break;
+	case T_ADD: *m += p[1]; p += 2; break;
+	case T_EQU: *m = p[1]; p += 2; break;
+
+	case T_END: if(M(*m) != 0) p += p[1];
+	    p += 2;
+	    break;
+
+	case T_WHL:
+	    if(M(*m) == 0) p += p[1];
+	    p += 2;
+	    break;
+
+	case T_ADDWZ:
+	    /* This is a running add. */
+	    while(M(*m)) {
+		m[p[1]] += p[2];
+		m += p[3];
+	    }
+	    p += 4;
+	    break;
+
+	case T_ZFIND:
+	    while(M(*m)) {
+		m += p[1];
+	    }
+	    p += 2;
+	    break;
+
+	case T_SET:
+	    *m = p[1] + m[p[2]] * p[3] + m[p[4]] * p[5];
+	    p += 6;
+	    break;
+
+	case T_SET2:
+	    *m = p[1] + m[p[2]] * p[3];
+	    p += 4;
+	    break;
+
+	case T_SET3:
+	    *m += m[p[1]] * p[2];
+	    p += 3;
+	    break;
+
+	case T_INP:
+	    {
+		int c;
+		do {
+		    if (iostyle == 1) {
+			wchar_t wch = EOF;
+			if (scanf("%lc", &wch))
+			    c = wch;
+			else
+			    c = EOF;
+		    } else
+			c=getchar();
+		} while(c == '\r');
+		if (c != EOF) *m = c;
+	    }
+	    p += 1;
+	    break;
+
+	case T_PRT:
+	    {
+		int ch = M(p[1] == -1?*m:p[1]);
+		if (ch == '\n' && output_limit && --output_limit == 0) {
+		    fprintf(stderr, "Output limit reached\n");
+		    goto break_break;
+		}
+
+		if (ch > 127 && iostyle == 1)
+		    printf("%lc", ch);
+		else
+		    putchar(ch);
+	    }
+	    p += 2;
+	    break;
+
+	case T_STOP:
+	    goto break_break;
+	}
+    }
+break_break:;
+    free(progarray);
+#ifndef USEHUGERAM
+    free(freep);
+#endif
+#undef icell
+#undef M
+}
