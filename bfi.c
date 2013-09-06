@@ -381,9 +381,6 @@ main(int argc, char ** argv)
     if (!do_run && !do_asm && !do_C && !do_adder && !do_bf)
 	do_run = do_C = 1;
 
-    if ((do_bf || do_adder) && opt_level > 2)
-	opt_level = 2;
-
     if (do_asm) { cell_size = 8; cell_mask = 0xFF; cell_type = "char"; hard_left_limit =1; }
 
     if (cell_size == 0 && do_run) {
@@ -440,68 +437,51 @@ printtreecell(FILE * efd, int indent, struct bfi * n)
     while(indent-->0) 
 	fprintf(efd, " ");
     if (n == 0 ) {fprintf(efd, "NULL Cell"); return; }
-    fprintf(efd, "Cell 0x%04x: ", CN(n));
+    fprintf(efd, "%s", tokennames[n->type]);
     switch(n->type)
     {
     case T_MOV:
 	if(n->offset == 0)
-	    fprintf(efd, "T_MOV(%d), ", n->count);
+	    fprintf(efd, " %d ", n->count);
 	else
-	    fprintf(efd, "T_MOV(%d,off=%d), ", n->count, n->offset);
+	    fprintf(efd, " %d,(off=%d), ", n->count, n->offset);
 	break;
-    case T_ADD:
-	fprintf(efd, "T_ADD[%d]+%d, ", n->offset, n->count);
-	break;
-    case T_EQU:
-	fprintf(efd, "T_EQU[%d]=%d, ", n->offset, n->count);
+    case T_ADD: case T_EQU:
+	fprintf(efd, "[%d]:%d, ", n->offset, n->count);
 	break;
     case T_SET:
-	fprintf(efd, "T_SET[%d]=%d+[%d]*%d+[%d]*%d, ",
+	fprintf(efd, "[%d]=%d+[%d]*%d+[%d]*%d, ",
 	    n->offset, n->count, n->offset2, n->count2, n->offset3, n->count3);
 	break;
     case T_PRT:
 	if (n->count == -1 )
-	    fprintf(efd, "putch([%d]), ", n->offset);
+	    fprintf(efd, "[%d], ", n->offset);
 	else {
 	    if (n->count >= ' ' && n->count <= '~' && n->count != '"')
-		fprintf(efd, "putch('%c'), ", n->count);
+		fprintf(efd, "'%c', ", n->count);
 	    else
-		fprintf(efd, "putch(0x%02x), ", n->count);
+		fprintf(efd, "0x%02x, ", n->count);
 	}
 	break;
-    case T_INP: fprintf(efd, "[%d]=getch(), ", n->offset); break;
+    case T_INP: fprintf(efd, "[%d], ", n->offset); break;
     case T_DEAD: fprintf(efd, "if(0) id=%d, ", n->count); break;
-    case T_END: fprintf(efd, "end[%d] id=%d, ", n->offset, n->parent->count); break;
-    case T_STOP: fprintf(efd, "stop[%d], ", n->offset); break;
+    case T_END: fprintf(efd, "[%d] id=%d, ", n->offset, n->parent->count); break;
+    case T_STOP: fprintf(efd, "[%d], ", n->offset); break;
 
-    case T_ZFIND:
-	fprintf(efd, "begin_zfind[%d],id=%d, ", n->offset, n->count);
-	break;
-    case T_ADDWZ:
-	fprintf(efd, "begin_addw[%d],id=%d, ", n->offset, n->count);
-	break;
+    case T_ZFIND: case T_ADDWZ:
+    case T_FOR: case T_IF: case T_MULT: case T_CMULT:
     case T_WHL:
-	fprintf(efd, "begin_std[%d],id=%d, ", n->offset, n->count);
+	fprintf(efd, "[%d],id=%d, ", n->offset, n->count);
 	break;
-    case T_FOR:
-	fprintf(efd, "begin_for[%d],id=%d, ", n->offset, n->count);
-	break;
-    case T_IF:
-	fprintf(efd, "begin_if[%d],id=%d, ", n->offset, n->count);
-	break;
-    case T_MULT:
-	fprintf(efd, "begin_mult[%d],id=%d, ", n->offset, n->count);
-	break;
-    case T_CMULT:
-	fprintf(efd, "begin_ifmult[%d],id=%d, ", n->offset, n->count);
-	break;
+
     default:
-	fprintf(efd, "type %d:", n->type);
-	if(n->offset) 
-	    fprintf(efd, "ptr+%d, ", n->offset);
-	if(n->count != 1)
-	    fprintf(efd, "*%d, ", n->count);
+	fprintf(efd, "[%d]:%d, ", n->offset, n->count);
+	if (n->offset2 != 0 || n->count2 != 0)
+	    fprintf(efd, "x2[%d]:%d, ", n->offset2, n->count2);
+	if (n->offset3 != 0 || n->count3 != 0)
+	    fprintf(efd, "x3[%d]:%d, ", n->offset3, n->count3);
     }
+    fprintf(efd, "cell 0x%04x: ", CN(n));
     if(n->next == 0) 
 	fprintf(efd, "next 0, ");
     else if(n->next->prev != n) 
@@ -1056,6 +1036,7 @@ process_file(void)
     gettimeofday(&tv_start, 0);
     if (verbose>5) printtree();
     if (opt_level>=1) {
+
 	if (verbose>2) gettimeofday(&tv_step, 0);
 	pointer_scan(); /**/
 	if (verbose>2) {
@@ -1064,16 +1045,16 @@ process_file(void)
 		(tv_end.tv_sec - tv_step.tv_sec) +
 		(tv_end.tv_usec - tv_step.tv_usec)/1000000.0);
 	}
-	if (!do_adder) {
-	    if (verbose>2) gettimeofday(&tv_step, 0);
-	    quick_scan(); /**/
-	    if (verbose>2) {
-		gettimeofday(&tv_end, 0);
-		fprintf(stderr, "Time for quick scan %.3f\n", 
-		    (tv_end.tv_sec - tv_step.tv_sec) +
-		    (tv_end.tv_usec - tv_step.tv_usec)/1000000.0);
-	    }
+
+	if (verbose>2) gettimeofday(&tv_step, 0);
+	quick_scan(); /**/
+	if (verbose>2) {
+	    gettimeofday(&tv_end, 0);
+	    fprintf(stderr, "Time for quick scan %.3f\n", 
+		(tv_end.tv_sec - tv_step.tv_sec) +
+		(tv_end.tv_usec - tv_step.tv_usec)/1000000.0);
 	}
+
 	if (opt_level>=2) {
 	    calculate_stats();
 	    if (verbose>5) printtree();
@@ -1085,14 +1066,16 @@ process_file(void)
 		    (tv_end.tv_sec - tv_step.tv_sec) +
 		    (tv_end.tv_usec - tv_step.tv_usec)/1000000.0);
 	    }
-	    if (verbose>2) gettimeofday(&tv_step, 0);
-	    if (!noheader)
+
+	    if (!noheader) {
+		if (verbose>2) gettimeofday(&tv_step, 0);
 		trim_trailing_sets(); /**/
-	    if (verbose>2) {
-		gettimeofday(&tv_end, 0);
-		fprintf(stderr, "Time for trailing scan %.3f\n", 
-		    (tv_end.tv_sec - tv_step.tv_sec) +
-		    (tv_end.tv_usec - tv_step.tv_usec)/1000000.0);
+		if (verbose>2) {
+		    gettimeofday(&tv_end, 0);
+		    fprintf(stderr, "Time for trailing scan %.3f\n", 
+			(tv_end.tv_sec - tv_step.tv_sec) +
+			(tv_end.tv_usec - tv_step.tv_usec)/1000000.0);
+		}
 	    }
 	}
 	if (verbose>5) printtree();
@@ -2305,6 +2288,7 @@ flatten_multiplier(struct bfi * v)
 {
     struct bfi *n;
     if (v->type != T_MULT && v->type != T_CMULT) return 0;
+    if (do_bf) return 0;
 
     n = v->next;
     while(n != v->last)
@@ -2527,7 +2511,7 @@ print_asm()
 	    }
 	}
 
-	if (1 || enable_trace) {
+	if (enable_trace) {
 	    printf("; "); printtreecell(stdout, 0, n); printf("\n");
 	}
 
@@ -2875,6 +2859,11 @@ print_adder(void)
 	    last_offset_ok = 1;
 	    break;
 
+	case T_SET:
+	    printf("set [%d]=%d+[%d]*%d+[%d]*%d\n",
+		n->offset, n->count, n->offset2, n->count2, n->offset3, n->count3);
+	    break;
+
 	case T_PRT:
 	    if (n->count > -1) {
 		printf("outchar %d\n", n->count);
@@ -2947,61 +2936,75 @@ pint(int v)
 void 
 print_bf(void)
 {
-    struct bfi * n = bfprog;
+    struct bfi *v, *n = bfprog;
     int last_offset = 0;
-    int i;
+    int i, nocr = 0;
 
     if (verbose)
 	fprintf(stderr, "Generating brainfuck code.\n");
 
     while(n)
     {
-	if (enable_trace) { /* Sort of! */
-	    printf("// %s", tokennames[n->type&0xF]);
-	    printf(" O="); pint(n->offset);
-	    switch(n->type) {
-	    case T_WHL: case T_ZFIND: case T_ADDWZ:
-		printf(" ID="); pint(n->count);
-		break;
-	    case T_END:
-		printf(" ID="); pint(n->parent->count);
-		if (n->count != 0) { printf(" C="); pint(n->count); }
-		break;
-	    case T_ADD:
-		printf(" V="); pint(n->count);
-		break;
-	    case T_EQU:
-		printf(" ="); pint(n->count);
-		break;
-	    default:
-		printf(" C="); pint(n->count);
-		break;
+	if (enable_trace && !nocr) { /* Sort of! */
+	    v = n;
+
+	    do 
+	    {
+		printf("// %s", tokennames[v->type&0xF]);
+		printf(" O="); pint(v->offset);
+		switch(v->type) {
+		case T_WHL: case T_ZFIND: case T_ADDWZ:
+		    printf(" ID="); pint(v->count);
+		    break;
+		case T_END:
+		    printf(" ID="); pint(v->parent->count);
+		    if (v->count != 0) { printf(" C="); pint(v->count); }
+		    break;
+		case T_ADD:
+		    printf(" V="); pint(v->count);
+		    break;
+		case T_EQU:
+		    printf(" ="); pint(v->count);
+		    break;
+		default:
+		    printf(" C="); pint(v->count);
+		    break;
+		}
+		if (v->count2 != 0) {
+		    printf(" O2="); pint(v->offset2);
+		    printf(" C="); pint(v->count2);
+		}
+		if (v->count3 != 0) {
+		    printf(" O3="); pint(v->offset3);
+		    printf(" C="); pint(v->count3);
+		}
+		printf(" @%d;%d", v->line, v->col);
+		printf("\n");
+		v=v->next;
 	    }
-	    if (n->count2 != 0) {
-		printf(" O2="); pint(n->offset2);
-		printf(" C="); pint(n->count2);
-	    }
-	    if (n->count3 != 0) {
-		printf(" O3="); pint(n->offset3);
-		printf(" C="); pint(n->count3);
-	    }
-	    printf("\n");
+	    while(v && v->prev->type != T_END && (
+		n->type == T_MULT ||
+		n->type == T_CMULT ||
+		n->type == T_ADDWZ ||
+		n->type == T_IF ||
+		n->type == T_FOR));
 	}
 
-	if (n->type != T_MOV && n->offset!=last_offset ) {
+	if (n->type == T_MOV) {
+	    last_offset -= n->count;
+	    n = n->next;
+	    continue;
+	}
+
+	if (n->offset!=last_offset) {
 	    while(n->offset>last_offset) { putchar('>'); last_offset++; };
 	    while(n->offset<last_offset) { putchar('<'); last_offset--; };
-	    printf("\n");
+	    if (!nocr)
+		printf("\n");
 	}
 
 	switch(n->type)
 	{
-	case T_MOV:
-	    i = n->count;
-	    while(i>0) { putchar('>'); i--; }
-	    while(i<0) { putchar('<'); i++; }
-	    break;
-
 	case T_EQU:
 	    printf("[-]");
 	    i = n->count;
@@ -3048,6 +3051,7 @@ print_bf(void)
 
 	case T_MULT: case T_CMULT:
 	case T_ADDWZ: case T_IF: case T_FOR:
+	    nocr = 1;
 	case T_WHL:
 	    putchar('[');
 	    // BFBasic
@@ -3056,6 +3060,7 @@ print_bf(void)
 
 	case T_END: 
 	    putchar(']');
+	    nocr = 0;
 	    break;
 
 	case T_NOP: 
@@ -3072,7 +3077,8 @@ print_bf(void)
 		    n->type, n->offset, n->count);
 	    break;
 	}
-	putchar('\n');
+	if (!nocr)
+	    putchar('\n');
 	n=n->next;
     }
 }
