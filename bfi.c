@@ -55,6 +55,9 @@ TODO:
     If first 2 characters are '#!' allow comments beginning with '#'
 	-- Poss if first character is a '#'
 ------------------------------------------------
+
+    Define comment start on command line. eg: "bfi -C //"
+
     #!	Comment if at start of FILE
     #	Comment if at SOL
     %	Comment character til EOL
@@ -149,6 +152,7 @@ char *cell_type = "C";
 char * curfile = 0;
 int curr_line = 0, curr_col = 0;
 int cmd_line = 0, cmd_col = 0;
+int bfi_num = 0;
 
 #define TOKEN_LIST(Mac) \
     Mac(MOV) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
@@ -180,6 +184,7 @@ struct bfi
     int profile;
     int line, col;
     int inum;
+    int ipos;
 
     int orgtype;
     struct bfi *prev;
@@ -299,7 +304,8 @@ main(int argc, char ** argv)
                     case 's': do_codestyle = c_asm; break;
                     case 'A': do_codestyle = c_adder; break;
                     case 'F': do_codestyle = c_bf; break;
-                    case 'm': opt_level=0; disable_rle = 1; break;
+                    case 'm': opt_level=0; break;
+                    case 'R': opt_level=0; disable_rle = 1; break;
                     case 'T': enable_trace=1; break;
                     case 'u': iostyle=1; break;
                     case 'a': iostyle=0; break;
@@ -407,6 +413,7 @@ open_file(char * fname)
 	    }
 	    n = tcalloc(1, sizeof*n);
 	    loaded_nodes++;
+	    n->inum = bfi_num++;
 	    if (p) { p->next = n; n->prev = p; } else bfprog = n;
 	    n->type = ch; p = n;
 	    n->line = curr_line; n->col = curr_col;
@@ -449,19 +456,6 @@ open_file(char * fname)
 	    default: n->type = T_NOP; break;
 	}
 	n->orgtype = n->type;
-#ifndef NO_RLE
-	/* Merge '<' with '>' and '+' with '-' */
-	if (!disable_rle && n->prev && n->prev->type == n->type &&
-		(n->type == T_MOV || n->type == T_ADD)) {
-	    n->prev->next = n->next;
-	    if (n->next) n->next->prev = n->prev;
-	    n->prev->count += n->count;
-	    p = n->prev;
-	    free(n);
-	    total_nodes--;
-	    n = p;
-	}
-#endif
     }
 }
 
@@ -479,7 +473,6 @@ tcalloc(size_t nmemb, size_t size)
 void 
 printtreecell(FILE * efd, int indent, struct bfi * n)
 {
-#define CN(pv) ((int)(((int)(pv) - (int)bfbase) / sizeof(struct bfi)))
     while(indent-->0) 
 	fprintf(efd, " ");
     if (n == 0 ) {fprintf(efd, "NULL Cell"); return; }
@@ -527,24 +520,23 @@ printtreecell(FILE * efd, int indent, struct bfi * n)
 	if (n->offset3 != 0 || n->count3 != 0)
 	    fprintf(efd, "x3[%d]:%d, ", n->offset3, n->count3);
     }
-    fprintf(efd, "cell 0x%04x: ", CN(n));
+    fprintf(efd, "$%d, ", n->inum);
     if(n->next == 0) 
 	fprintf(efd, "next 0, ");
     else if(n->next->prev != n) 
-	fprintf(efd, "next 0x%04x, ", CN(n->next));
+	fprintf(efd, "next $%d, ", n->next->inum);
     if(n->prev == 0)
 	fprintf(efd, "prev 0, ");
     else if(n->prev->next != n) 
-	fprintf(efd, "prev 0x%04x, ", CN(n->prev));
+	fprintf(efd, "prev $%d, ", n->prev->inum);
     if(n->jmp) 
-	fprintf(efd, "jmp 0x%04x, ", CN(n->jmp));
+	fprintf(efd, "jmp $%d, ", n->jmp->inum);
     if(n->profile) 
 	fprintf(efd, "prof %d, ", n->profile);
     if(n->line || n->col)
 	fprintf(efd, "@(%d,%d)", n->line, n->col);
     else
 	fprintf(efd, "@new");
-#undef CN
 }
 
 void
@@ -646,8 +638,8 @@ print_c_header(FILE * ofd)
 
     if (enable_trace)
 	fputs(	"#define t(p1,p2,p3,p4) fprintf(stderr, \"P(%d,%d)=%s"
-		" -> %d%s\\n\", p1, p2, p3,"
-		" (p4>=mem?*(p4):0), p4>mem?\"\":\" SIGSEG\");\n",
+		" -> mem[%d]=%d%s\\n\", p1, p2, p3,"
+		" p4-mem, (p4>=mem?*(p4):0), p4>=mem?\"\":\" SIGSEG\");\n",
 	    ofd);
 
     if (node_type_counts[T_MOV] == 0) {
@@ -924,23 +916,26 @@ print_ccode(FILE * ofd)
 	    fprintf(ofd, "if(m[%d]) {\n", n->offset);
 	    break;
 	case T_ZFIND:
-#if 0
-	    if (n->next->count == 1 && add_mask <= 0) {
+	    /* TCCLIB generates a slow 'strlen' */
+	    if (do_run && cell_size == 8 && add_mask <= 0 &&
+		    n->next->next == n->jmp && n->next->count == 1) {
 		pt(ofd, indent,n);
-		fprintf(ofd, "if (sizeof*m == 1) {\n");
-		pt(ofd, indent+1,n);
-		fprintf(ofd, "m += strlen((char*)m + %d);\n", n->offset);
-		pt(ofd, indent,n);
-		fprintf(ofd, "} else\n");
-	    }
-#endif
-	    pt(ofd, indent,n);
-	    if (n->next->next != n->jmp) {
-		fprintf(ofd, "while(m[%d]){\n", n->offset);
-	    } else {
-		fprintf(ofd, "while(m[%d]){m+=%d;}\n",
-		    n->offset, n->next->count);
+		if (n->offset)
+		    fprintf(ofd, "m += strlen(m + %d);\n", n->offset);
+		else
+		    fprintf(ofd, "m += strlen(m);\n");
 		n=n->jmp;
+	    }
+	    else
+	    {
+		pt(ofd, indent,n);
+		if (n->next->next != n->jmp) {
+		    fprintf(ofd, "while(m[%d]){\n", n->offset);
+		} else {
+		    fprintf(ofd, "while(m[%d]){m += %d;}\n",
+			n->offset, n->next->count);
+		    n=n->jmp;
+		}
 	    }
 	    break;
 
@@ -1110,7 +1105,6 @@ calculate_stats(void)
     {
 	int t = n->type;
 	total_nodes ++;
-	n->inum = total_nodes;
 	if (t < 0 || t >= TCOUNT) 
 	    node_type_counts[TCOUNT] ++;
 	else
@@ -1392,6 +1386,7 @@ pointer_scan(void)
 		n2->offset += n->count;
 		n3 = n2->next;
 		n4 = tcalloc(1, sizeof*n);
+		n4->inum = bfi_num++;
 		n4->line = n2->line;
 		n4->col = n2->col;
 		n2->next = n4;
@@ -1405,6 +1400,7 @@ pointer_scan(void)
 		n2 = n->next->jmp->prev;
 		n3 = n2->next;
 		n4 = tcalloc(1, sizeof*n);
+		n4->inum = bfi_num++;
 		n4->line = n3->line;
 		n4->col = n3->col;
 		n2->next = n4;
@@ -1628,6 +1624,7 @@ trim_trailing_sets(void) {
 
     if (lastn) {
 	n = tcalloc(1, sizeof*n);
+	n->inum = bfi_num++;
 	lastn->next = n;
 
 	for(i=min_pointer; i<= max_pointer; i++) {
@@ -1956,7 +1953,7 @@ find_known_state(struct bfi * v)
 }
 
 int
-search_from_a_to_b_for_update_of_offset(struct bfi *n, struct bfi *v, int n_offset)
+search_for_update_of_offset(struct bfi *n, struct bfi *v, int n_offset)
 {
     while(n!=v && n)
     {
@@ -2076,10 +2073,10 @@ find_known_set_state(struct bfi * v)
 	int is_ok = 1;
 
 	if (is_ok && n2->count2)
-	    is_ok = search_from_a_to_b_for_update_of_offset(n2, v, n2->offset2);
+	    is_ok = search_for_update_of_offset(n2, v, n2->offset2);
 
 	if (is_ok && n2->count3)
-	    is_ok = search_from_a_to_b_for_update_of_offset(n2, v, n2->offset3);
+	    is_ok = search_for_update_of_offset(n2, v, n2->offset3);
 
 	if (is_ok) {
 	    v->count = n2->count;
@@ -2411,6 +2408,7 @@ print_asm()
     char string_buffer[300], *sp = string_buffer;
     char charmap[256];
     char * neartok = "";
+    int i;
 
     memset(charmap, 0, sizeof(charmap));
     curr_line = -1;
@@ -2508,6 +2506,21 @@ print_asm()
 	printf("\n");
     }
 
+    /* Scan the nodes so we get an APPROXIMATE distance measure */
+    for(i=0, n = bfprog; n; n=n->next) {
+	n->ipos = i;
+	switch(n->type) {
+	case T_MOV: i++; break;
+	case T_ADD: i+=3; break;
+	case T_EQU: i+=3; break;
+	case T_SET: i+=6; break;
+	case T_PRT: i+=9; break;
+	case T_INP: i+=9; break;
+	default: i+=6; break;
+	}
+    }
+
+    n = bfprog;
     while(n)
     {
 	if (sp != string_buffer) {
@@ -2699,10 +2712,9 @@ print_asm()
 	     * nasm is VERY slow at working out which sort of jump to use 
 	     * without the hint. But we can't be sure exactly what number to
 	     * put here without being a lot more detailed about the
-	     * instructions we use.
-	     * Thiry seems to give a "not too slow" compile of LostKng.b
+	     * instructions we use so we don't force short jumps.
 	     */
-	    if (abs(n->inum - n->jmp->inum) > 30)
+	    if (abs(n->ipos - n->jmp->ipos) > 120)
 		neartok = " near";
 	    else
 		neartok = "";
@@ -2722,7 +2734,7 @@ print_asm()
 	    break;
 
 	case T_END: 
-	    if (abs(n->inum - n->jmp->inum) > 120)
+	    if (abs(n->ipos - n->jmp->ipos) > 120)
 		neartok = " near";
 	    else
 		neartok = "";
@@ -3260,7 +3272,7 @@ trap_sigsegv(void)
 #endif
 void
 #ifdef __GNUC__
-__attribute((optimize(3),hot))
+__attribute((optimize(3),hot,aligned(64)))
 #endif
 convert_tree_to_runarray(void)
 {
@@ -3285,17 +3297,17 @@ convert_tree_to_runarray(void)
 #ifdef USEHUGERAM
     m = map_hugeram();
 #else
-    m = freep = tcalloc(MEMSIZE, sizeof*p);
+    m = freep = tcalloc(MEMSIZE, sizeof*m);
 #endif
 
     while(n)
     {
 	switch(n->type)
 	{
-	case T_MOV: case T_INP:
-	    arraylen += 3;
+	case T_MOV:
 	    break;
 
+	case T_INP:
 	case T_PRT: case T_ADD: case T_EQU: case T_END:
 	case T_WHL: case T_MULT: case T_CMULT:
 	case T_ZFIND: case T_ADDWZ: case T_FOR: case T_IF:
@@ -3335,7 +3347,7 @@ convert_tree_to_runarray(void)
 	switch(n->type)
 	{
 	case T_MOV: 
-	    *p++ = n->count;
+	    p--;
 	    break;
 
 	case T_INP:
@@ -3413,7 +3425,6 @@ convert_tree_to_runarray(void)
 	m += *p++;
 	switch(*p)
 	{
-	case T_MOV: m += p[1]; p += 2; break;
 	case T_ADD: *m += p[1]; p += 2; break;
 	case T_EQU: *m = p[1]; p += 2; break;
 
