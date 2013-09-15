@@ -1,34 +1,31 @@
 /*****************************************************************************
 This is an interpreter for the "brainfuck" language.
 
-It simply takes the original code, runlength encodes it and adds a couple
-of minor instruction tweaks.
+It simply takes the original code, runlength encodes it, adds a couple
+of minor instruction tweaks and saves it as an array.
 
 It runs embarrassingly quickly.
 
 But please do compile it with an optimising compiler; the interpretation 
 loop is only a good start not perfect assembler.
 
-gcc -O3 -Wall -pedantic -ansi -o bf bf.c
+    gcc -O3 -Wall -pedantic -ansi -o bf bf.c
+
+This is, a little, better with GCC if you do this.
+
+    gcc -O3 -o bf -Wall -fprofile-generate bf.c
+    echo 80 | bf prime.b >/dev/null
+    gcc -O3 -o bf -fprofile-use bf.c
 
 *****************************************************************************/
 
 /*
 TODO:
-    Load multiple files into single memory image
     Strip image: Replace all "[...]" sequences after a Start or "]" with spaces
     "!" processing, if data from stdin stop reading on "!"
-    Force "[]" to balance, replace unbalanced ones by "{}"
-    Strip lines that match "^[\t ]*#.*$"
-    Inplace update to bytecode, check the pointers don't collide; if they do
-	do the copy to a new calloc()d array.
-
-    Use sigaction and mmap to make the "tape" infinite.
-	Add "ADD(0)" tokens evey few kb of tape movement.
-	Only create file if memory exceeds N Mb
+    Strip characters that match "//.*$"
 */
 
-#ifdef __STDC__
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -37,37 +34,79 @@ TODO:
 #include <fcntl.h>
 #include <string.h>
 
-#define XTRAINST
-#define NO_ALIGNTO sizeof(int)
-
+#ifndef M
 typedef unsigned char cell; /* The type of the cell for the 'tape' */
+#define MASK(x) x	    /* Mask for putchar & while */
+#elif M == -1
+typedef int cell;	    /* The type of the cell for the 'tape' */
+#define MASK(x) x	    /* Mask for putchar & while */
+#else
+typedef int cell;	    /* The type of the cell for the 'tape' */
+#define MASK(x) ((x)&M)	    /* Mask for putchar & while */
+#endif
 
 void read_image(char * imagename);
 void process_image(void);
 void run_image(void);
+
 void hex_image(void);
-void set_alignment_trap(void);
+void dump_prog(void);
+void dump_c(void);
+
+struct pgm {
+    int mov;
+    int op;
+    int arg;
+#ifdef PROFILE
+    int profile;
+#endif
+} * prog;
 
 unsigned char * image;
-int imagelen;
 cell * mem;
-int memlen = 128*1024;
+int imagelen, proglen, memlen = 129*1024;
+
+int opt_dump_prog = 0;
+int opt_no_xtras = 0;
+
+char *opcodes[] = {
+    "stop", "add", "out", "in", "jz", "jnz", "6", "7",
+    "set", "findz", "findm1", "arrayz", "save", "mul", "qset", "F"
+};
 
 int
 main(int argc, char **argv)
 {
-    set_alignment_trap();
-
+    for(;;) {
+	if (argc>1 && strcmp(argv[1], "-d") == 0) {
+	    opt_dump_prog++; argc--; argv++;
+	} else
+	if (argc>1 && strcmp(argv[1], "-c") == 0) {
+	    opt_dump_prog+=2; argc--; argv++;
+	} else
+	if (argc>1 && strcmp(argv[1], "-x") == 0) {
+	    opt_no_xtras++; argc--; argv++;
+	} else break;
+    }
     if(argc < 2) {
-	fprintf(stderr, "Usage: %s filename\n", argv[0]);
-	exit(24);
+	fprintf(stderr, "Usage: %s [-d][-x] filename\n", argv[0]);
+	exit(1);
     }
     read_image(argv[1]);
     process_image();
-    run_image();
-    /*
-    hex_image();
-    */
+
+    if (opt_dump_prog) {
+	if (opt_dump_prog&1)
+	    dump_prog();
+	else
+	    dump_c();
+    } else {
+	mem = calloc(memlen,sizeof*mem);
+	run_image();
+#ifdef PROFILE
+	dump_prog();
+#endif
+    }
 
     if(image) free(image); image = 0; imagelen = 0;
     if(mem) free(mem); mem = 0; memlen = 0;
@@ -77,181 +116,332 @@ main(int argc, char **argv)
 void
 read_image(char * imagename)
 {
-   int fd = -1;
-   struct stat st;
+    int fd = -1;
+    int loaded = 0;
+    struct stat st;
+    if (image) {free(image); image=0; imagelen=0; }
 
-   fd = open(imagename, 0);
-   if( fstat(fd, &st) < 0 )
-   {
-      fprintf(stderr, "Cannot stat file %s\n", imagename);
-      exit(9);
-   }
-   imagelen=st.st_size;
+    if (strcmp(imagename, "-") == 0)
+	fd = 0;
+    else
+	if ((fd = open(imagename, 0)) < 0) goto error;
+    if( fstat(fd, &st) < 0 ) goto error;
 
-   if( imagelen!=st.st_size || (image = malloc(imagelen)) == 0 )
-   {
-      fprintf(stderr, "Out of memory\n");
-      exit(7);
-   }
+    if (S_ISREG(st.st_mode) && (int)st.st_size == st.st_size && st.st_size>0) {
+	imagelen = st.st_size;
 
-   if( read(fd, image, imagelen) != imagelen )
-   {
-      fprintf(stderr, "Read error reading %s\n", imagename);
-      exit(7);
-   }
-   if (fd > 2) close(fd);
+	if( (image = malloc(imagelen)) == 0 ) goto error;
+
+	if( (loaded = read(fd, image, imagelen)) == imagelen ) {
+	    if (fd>2) close(fd);
+	    return;
+	}
+    } else imagelen = 0;
+
+    for(;;)
+    {
+	int cc;
+	if (imagelen < loaded + BUFSIZ) 
+	    if ((image = realloc(image, imagelen = (loaded+BUFSIZ))) == 0)
+		goto error;
+
+	if ((cc = read(fd, image+loaded, imagelen-loaded)) < 0)
+	    goto error;
+	if (cc == 0) {
+	    if (fd>2) close(fd);
+	    imagelen = loaded;
+	    image = realloc(image, loaded);
+	    return;
+	}
+	loaded += cc;
+    }
+
+error:
+    perror(imagename);
+    exit(7);
 }
 
 void
 process_image(void)
 {
     int i, p;
-    int c, lastc = ']', lastcount = 0;
-    int len = 0, newimagelen;
-    unsigned char * newimage = 0;
+    int c, lastc = ']';
+    int len = 0;
     int depth = 0, maxdepth = 0;
     int * stack;
 
+    /* First calculate the max length of the program after RLE */
+    /* Second compact the array removing blank space */
     for(p=i=0; i<imagelen; i++) {
 	switch(c = image[i])
 	{
-	    case '<': case '>': case '+': case '-':
-		if (c == lastc) lastcount++;
-		else {
-		    lastc = c;
-		    lastcount=1;
-		    len++;
-		}
-		if (lastcount == 31)
-		    lastc = 0;
+	    case '+': case '-':
+		if (c != lastc) len++;
+	    case '<': case '>':
 		image[p++] = c;
+		lastc = c;
 		break;
 
 	    case '.': case ',':
 		lastc = c;
-		lastcount=1;
 		len++;
 		image[p++] = c;
 		break;
 	    case '[': case ']':
 		lastc = c;
-		lastcount=1;
-#ifdef ALIGNTO
-		while (len % ALIGNTO != ALIGNTO-1) 
-		    len++;
-#endif
-		len += 1+sizeof(int);
+		len ++;
 		if (c == '[') {
 		    depth++;
 		    if (depth > maxdepth) maxdepth = depth;
-		} else if (depth>0)
+		    image[p++] = c;
+		} else if (depth>0) { /* Ignore too many ']' */
 		    depth --;
-		image[p++] = c;
+		    image[p++] = c;
+		}
 		break;
 	}
     }
+    /* All the whitespace we removed to the end of the image */
     while(p<imagelen) image[p++] = 0;
 
-    newimagelen = len+8;
-    newimage = calloc(newimagelen, 1);
+    proglen = len+1;
+    prog = calloc(proglen, sizeof*prog);
     stack = calloc(maxdepth+1, sizeof*stack);
 
     lastc = 0;
     for(p=i=0; i<imagelen; i++) {
 	switch(c = image[i])
 	{
-	    case '<': case '>': case '+': case '-':
-		if (c == lastc) {
-		    lastcount++;
-		    newimage[p-1]++;
-		} else {
-		    switch (c) {
-			case '>': newimage[p++] = (0<<4) + 1; break;
-			case '<': newimage[p++] = (2<<4) + 1; break;
-			case '+': newimage[p++] = (4<<4) + 1; break;
-			case '-': newimage[p++] = (6<<4) + 1; break;
+	    case '<': case '>':
+		if (c != lastc) {
+		    if (prog[p].op)
+			p++;
+		    lastc = c;
+		}
+		if (c == '>')
+		    prog[p].mov ++;
+		else
+		    prog[p].mov --;
+		break;
+	    
+	    case '+': case '-':
+		if (c != lastc) {
+		    int op2 = 1;
+		    if (p==0 || prog[p-1].op != op2 || prog[p].mov) {
+			prog[p].op = op2;
+			p++;
 		    }
 		    lastc = c;
-		    lastcount=1;
 		}
-		if (lastcount == 31)
+		if (c == '+')
+		    prog[p-1].arg ++;
+		else
+		    prog[p-1].arg --;
+		if (prog[p-1].arg == 0) {
+		    p--;
 		    lastc = 0;
+		}
 		break;
 
 	    case '.': case ',':
 		lastc = c;
-		lastcount=1;
-		newimage[p++] = (10<<4) + (c == ',');
+		prog[p++].op = 2 + (c == ',');
 		break;
+
 	    case '[': case ']':
 		lastc = c;
-		lastcount=1;
-#ifdef XTRAINST
-		if (image[i] == '[' && image[i+2] == ']') {
-		    if (image[i+1] == '-' || image[i+1] == '+'){
-			newimage[p++] = 0xB0;
-			i+=2;
-			break;
+
+		if (!opt_no_xtras) {
+		    /* [-] or [+] -- set to zero, followed by string of +/- */
+		    if (image[i] == '[' && image[i+2] == ']') {
+			if (image[i+1] == '-' || image[i+1] == '+'){
+			    prog[p++].op = 8;
+			    i+=2;
+			    while (image[i+1] == '-' || image[i+1] == '+') {
+				if (image[i+1] == '+')
+				    prog[p-1].arg ++;
+				else
+				    prog[p-1].arg --;
+				i++;
+			    }
+			    break;
+			}
+		    }
+
+		    /* [<<<<<] or [>>>>>] -- search for a zero. */
+		    if (image[i] == '[' && (image[i+1] == '>' || image[i+1] == '<'))
+		    {
+			int v;
+			for(v=2; ; v++) {
+			    if (image[i+v] != image[i+1])
+				break;
+			}
+			if (image[i+v] == ']') {
+			    prog[p].op = 9;
+			    prog[p].arg = v-1;
+			    if (image[i+1] == '<') prog[p].arg = -prog[p].arg;
+			    p++;
+			    i+=v;
+			    break;
+			}
+		    }
+
+		    /* [-<<<<<+] or [->>>>>+] -- search for a minus one. */
+		    if (image[i] == '[' && image[i+1] == '-' &&
+			(image[i+2] == '>' || image[i+2] == '<'))
+		    {
+			int v;
+			for(v=3; ; v++) {
+			    if (image[i+v] != image[i+2])
+				break;
+			}
+			if (image[i+v] == '+' && image[i+v+1] == ']') {
+			    prog[p].op = 10;
+			    prog[p].arg = v-2;
+			    if (image[i+2] == '<') prog[p].arg = -prog[p].arg;
+			    p++;
+			    i+=v+1;
+			    break;
+			}
+		    }
+
+		    /* [-<<] [->>]  Zip along an array clearing the flag column. */
+		    if (image[i] == '[' && image[i+1] == '-' &&
+			(image[i+2] == '>' || image[i+2] == '<'))
+		    {
+			int v;
+			for(v=3; ; v++) {
+			    if (image[i+v] != image[i+2])
+				break;
+			}
+			if (image[i+v] == ']') {
+			    prog[p].op = 11;
+			    prog[p].arg = v-2;
+			    if (image[i+2] == '<') prog[p].arg = -prog[p].arg;
+			    p++;
+			    i+=v;
+			    break;
+			}
+		    }
+
+		    /* [->>>+>>>+<<<<<<]   Multiply or move loop. */
+		    if (image[i] == ']' && depth > 0) {
+			/* There will be just ADDs in the loop, with the
+			 * total of the 'MOV' fields being zero.
+			 * But allow a set too.
+			 */
+			int v, movsum = prog[p].mov, incby = 0;
+			for(v=p-1; prog[v].op == 1 || prog[v].op == 8 ; v--) {
+			    if (movsum == 0)
+				incby += prog[v].arg;
+			    movsum += prog[v].mov;
+			}
+
+			if (movsum == 0 && incby == -1 && prog[v].op == 4) {
+			    prog[v].op = 12;
+			    prog[v].arg = 0;
+			    v++;
+			    for(;v != p; v++)
+			    {
+				movsum += prog[v].mov;
+				if (movsum == 0) {
+				    prog[v].op = 8;
+				    prog[v].arg = 0;
+				} else if (prog[v].op == 1) {
+				    /* Is another case for arg==1 useful?  */
+				    prog[v].op = 13;
+				} else
+				    prog[v].op = 14;
+			    }
+			    depth --;
+			    break;
+			}
 		    }
 		}
 
-		/* [>>>>>>>>>>>>>>>>] */
-		/* 0123456789abcdefg  */
-		/*                 v  */
-		if (image[i] == '[' && (image[i+1] == '>' || image[i+1] == '<'))
-		{
-		    int v;
-		    for(v=2; v<17; v++) {
-			if (image[i+v] != image[i+1])
-			    break;
-		    }
-		    if (image[i+v] == ']') {
-			newimage[p++] = 
-			    ((12+(image[i+1] == '<'))<<4) +
-			    v-2;
-			i+=v;
-			break;
-		    }
-		}
-#endif
-#ifdef ALIGNTO
-		while (p % ALIGNTO != ALIGNTO-1) 
-		    newimage[p++] = 0x20;
-#endif
-		newimage[p] = ((8 + (c == ']')) << 4);
+		prog[p].op = 4 + (c == ']');
 
 		if (c == '[') {
 		    stack[depth] = p;
 		    depth++;
 		    if (depth > maxdepth) maxdepth = depth;
-		    *((int*)(newimage+(p+1))) = sizeof(int);
 		} else if (depth>0) {
-		    /* WARNING: Unaligned access to ints.
-		     * If your machine can't cope you need to define the
-		     * ALIGNTO macro with the alignment you need.
-		     */
 		    depth --;
-		    *((int*)(newimage+(stack[depth]+1))) =
-			    sizeof(int) + p - stack[depth];
-
-		    *((int*)(newimage+(p+1))) = stack[depth] - (p+1);
-		} else
-		    *((int*)(newimage+(p+1))) = sizeof(int);
-
-		p += 1+sizeof(int);
+		    prog[stack[depth]].arg = p - stack[depth];
+		    prog[p].arg = stack[depth] - p;
+		}
+		p++;
 		break;
 	}
     }
-    newimage[p++] = 0;
-    if (p>newimagelen)
-	fprintf(stderr, "Memory overun, conversion to byte code was longer than expected!!\n");
+    prog[p++].op = 0;
+    if (p>proglen)
+	fprintf(stderr, "Memory overun, conversion of program was longer than expected by %d bytes!\n", p-proglen);
 
-    newimagelen = p;
-
+    proglen = p;
     free(stack);
     free(image);
-    image = newimage;
-    imagelen = newimagelen;
+    image = 0;
+    imagelen = 0;
+}
+
+void
+dump_prog(void)
+{
+    int i;
+    for(i=0; i<proglen; i++) {
+#ifdef PROFILE
+	if (prog[i].profile == 0) continue;
+	printf("%-10d ", prog[i].profile);
+#endif
+	if (prog[i].mov)
+	    printf("mov %d, ", prog[i].mov);
+	printf("%s %d\n", opcodes[prog[i].op & 0xF], prog[i].arg);
+    }
+}
+
+void
+dump_c(void)
+{
+    int i;
+    printf("#include <stdio.h>\n");
+    printf("int mem[60000];\n");
+    printf("int main(void){int*m=mem+1024,a;\n");
+    for(i=0; i<proglen; i++) {
+	if (prog[i].mov) {
+	    if (prog[i].op == 1) {
+		printf("*(m+=%d)+=%d;\n", prog[i].mov, prog[i].arg);
+		continue;
+	    } else
+		printf("m+=%d;", prog[i].mov);
+	}
+	switch(prog[i].op) {
+	case 0: printf("return %d;}\n", prog[i].arg); break;
+	case 1: printf("*m+=%d;\n", prog[i].arg); break;
+	case 2: printf("putchar(*m);\n"); break;
+	case 3: printf("a=getchar();if(a!=EOF)*m=a;\n"); break;
+	case 4: printf("while(*m){\n"); break;
+	case 5: printf("}\n"); break;
+	case 8: printf("*m= %d;\n", prog[i].arg); break;
+	case 9: printf("while(*m)m+=%d;\n", prog[i].arg); break;
+	case 10: printf("(*m)--;");
+		 printf("while(*m+1)m+=%d;", prog[i].arg);
+		 printf("(*m)++;\n");
+		 break;
+	case 11: printf("while(*m){*m-=1;m+=%d;}\n", prog[i].arg); break;
+	case 12: printf("a= *m;\n"); break;
+	case 13: if (prog[i].arg == 1) 
+		    printf("*m+=a;\n");
+		else if (prog[i].arg == -1)
+		    printf("*m-=a;\n");
+		else
+		    printf("*m+=a*%d;\n", prog[i].arg);
+		break;
+	case 14: printf("if(a)*m= %d;\n", prog[i].arg); break;
+
+	default: printf("/*%s %d*/\n", opcodes[prog[i].op & 0xF], prog[i].arg);
+	}
+    }
 }
 
 void
@@ -277,22 +467,15 @@ static int pos = 0, addr = 0;
         else    linebuf[50+pos] = '.';
         pos = ((pos+1) & 0xF);
         if( pos == 0 ) {
-			fprintf(ofd, "%06x:  %.66s\n", addr, linebuf);
-			addr += 16;
-		}
+	    fprintf(ofd, "%06x:  %.66s\n", addr, linebuf);
+	    addr += 16;
+	}
     }
 }
 
 void hex_image(void)
 {
     int     i, j = 0;
-    if (image) {
-	for (i = 0; i < imagelen; i++)
-	    hex_output(stdout, image[i]);
-	hex_output(stdout, EOF);
-	putchar('\n');
-    }
-
     if (mem) {
 	for (i = 0; i < memlen; i++)
 	    if (mem[i])
@@ -304,122 +487,7 @@ void hex_image(void)
     }
 }
 
-/* Byte code interpreter.	(TODO)
- * 
- * Byte		Code
- * 00000000	End
- * 00100000	NOP
- *
- * 000xxxxx	m += x
- * 001xxxxx	m -= x
- * 010xxxxx	m[0] += x
- * 011xxxxx	m[0] -= x
- *
- * 10000000	jz [i]
- * 10010000	jnz [i]
- *
- * 10100000	print m[0]
- * 10100001	input m[0]
- * 10100010			SET *m = 0-255
- * 10100011
- * 10100100			ADD *m += 0-255
- * 10100101			SUB *m -= 0-255
- * 10100110			ADD  m += 0-255
- * 10100111			SUB  m -= 0-255
- *
- * 11110000	[-] or [+]	extend: [<+>-]
- * 11000000	[>*x] x=1..16
- * 11010000	[<*x] x=1..16
- *
- * 11100000
- * 11110000	
- */
-
-void run_image(void)
-{
-    unsigned char *p;
-    cell * m;
-    int c;
-
-    m = mem = calloc(memlen,sizeof*m);
-    p = image;
-#if DEBUG
-    fprintf(stderr, "p=0x%08x+%d, m=0x%08x+%d\n",
-		    image, imagelen, mem, memlen);
-#endif
-
-    while((c = *p++)) 
-    {
-#if DEBUG
-	fprintf(stderr, "p=%d, m=%d, *m=%d, c=0x%02x\n",
-		p-image-1, m-mem, *m, c);
-#endif
-	switch(c>>4)
-	{
-	    case 0: case 1:  m += (c & 0x1F); break;
-	    case 2: case 3:  m -= (c & 0x1F); break;
-	    case 4: case 5: *m += (c & 0x1F); break;
-	    case 6: case 7: *m -= (c & 0x1F); break;
-
-	    case 8:
-		if (*m)	p += sizeof(int);
-		else	p = p + *((int*)p);
-		break;
-	    case 9:
-		if (*m)	p = p + *((int*)p);
-		else	p += sizeof(int);
-		break;
-
-	    case 10: 
-		switch(c & 0xF)
-		{
-		    case 0: write(1,m,1); break;
-		    case 1: read(0,m,1); break;
-		}
-		break;
-
-#ifdef XTRAINST
-	    case 11:
-		*m = 0;
-		break;
-
-	    case 12:
-		{
-		    int v = ((c&0xF) + 1);
-		    while(*m) m += v;
-		}
-		break;
-	    case 13:
-		{
-		    int v = ((c&0xF) + 1);
-		    while(*m) m -= v;
-		}
-		break;
-#endif
-	}
-#if DEBUG
-	fprintf(stderr, "p=%d, m=%d, *m=%d\n", p-image, m-mem, *m);
-#endif
-    }
-}
-
-void
-set_alignment_trap(void)
-{
-#ifdef ALIGNTO
-/* This triggers a Bus Error on an unaligned access. */
-#if defined(__GNUC__)
-# if defined(__i386__)
-    /* Enable Alignment Checking on x86 */
-    __asm__("pushf\norl $0x40000,(%esp)\npopf");
-# elif defined(__x86_64__) 
-     /* Enable Alignment Checking on x86_64 */
-    __asm__("pushf\norl $0x40000,(%rsp)\npopf");
-# endif
-#endif
-#endif
-}
-
+#ifndef EXTERNAL_RUNNER
 #ifdef  __GNUC__
 #ifndef __OPTIMIZE__
 #warning The interpreter should be optimised for best performance.
@@ -428,21 +496,123 @@ set_alignment_trap(void)
 #ifdef  __TINYC__
 #warning Beware TCC does NOT optimise and the interpreter should be optimised for best performance.
 #ifdef __BOUNDS_CHECKING_ON
-#warning and is even slower with bounds checking!
-#endif
+#warning and it is even slower with bounds checking!
 #endif
 #endif
 
-/*
-struct sigaction saSegf;
-struct sigaction oldAct;
-     
-saSegf.sa_sigaction = sighandler;
-sigemptyset(&saSegf.sa_mask);
-saSegf.sa_flags = SA_SIGINFO;
-     
-     
-if(0 > sigaction(SIGSEGV, &saSegf, NULL)) //&oldAct))
-    perror("Error SigAction SIGSEG");
+#ifndef NOPCOUNT
+/* 12, 8, 16, 20
+#define NOPCOUNT 0
+ */
+#endif
 
-*/
+/* Interpreter.
+ */
+
+void run_image(void)
+{
+    struct pgm *p = prog;
+    cell * m = mem+1024;
+    int a = 0;
+#if DEBUG
+    fprintf(stderr, "p=0x%08x+%d, m=0x%08x+%d\n", prog, proglen, mem, memlen);
+#endif
+
+#ifndef __STRICT_ANSI__
+#ifdef __GNUC__
+    asm(".p2align 6");
+#endif
+
+#ifdef NOPCOUNT
+#include "nops.h"
+#endif
+#endif
+
+    p--;
+    for(;;)
+    {
+	p++;
+#ifdef PROFILE
+	p->profile++;
+#endif
+	m += p->mov;
+#if DEBUG
+	fprintf(stderr, "p=%d, m=%d, *m=%d, %s %d\n",
+		p-prog, m-mem, *m, opcodes[p->op & 0xF], p->arg);
+#endif
+	switch(p->op)
+	{
+	    case 0: goto break_break;
+
+	    case 1: *m += p->arg; break;
+
+	    case 2:
+		{   unsigned char buf[4];
+		    buf[0] = MASK(*m);
+		    write(1,buf,1);
+		}
+		break;
+
+	    case 3:
+		{   unsigned char buf[4];
+		    if (read(0,buf,1) == 1)
+			*m = *buf;
+		}
+		break;
+
+	    case 4:
+		if (!MASK(*m))
+		    p += p->arg;
+		break;
+
+	    case 5:
+		if (MASK(*m))
+		    p += p->arg;
+		break;
+
+	    /* [-] or [+] -- set to zero, plus any +/- after. */
+	    case 8:
+		*m = p->arg;
+		break;
+
+	    /* [<<<<<] or [>>>>>] -- search for a zero. */
+	    case 9:
+		while(MASK(*m)) m += p->arg;
+		break;
+
+	    /* [-<<<<<+] or [->>>>>+] -- search for a minus one. */
+	    case 10:
+		(*m)--;
+		while(MASK(*m) != MASK((cell)-1)) m += p->arg;
+		(*m)++;
+		break;
+
+	    /* [-<<] [->>]  Zip along an array clearing the flag column. */
+	    case 11:
+		while(m[0]) {
+		    *m -= 1;
+		    m += p->arg;
+		}
+
+	    /* [->>>+>>>+<<<<<<]  Save the loop value at the start. */
+	    case 12:
+		a = *m;
+		break;
+
+	    /* [->>>+>>>+<<<<<<]  Multiply and add. */
+	    case 13:
+		*m += a * p->arg;
+		break;
+
+	    /* [->>>+>>>+<<<<<<]  Test and set. */
+	    case 14:
+		if (a) *m = p->arg;
+		break;
+	}
+#if DEBUG
+	fprintf(stderr, "p=%d, m=%d, *m=%d\n", p-prog, m-mem, *m);
+#endif
+    }
+    break_break:;
+}
+#endif
