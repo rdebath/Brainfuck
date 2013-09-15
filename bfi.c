@@ -12,6 +12,7 @@ In the simple case the C conversions are:
 
 Or
     [   becomes   if(!*p) goto match;	]   becomes   if(*p) goto match;
+    .   becomes   write(1,*p,1);	,   becomes   read(0,*p,1);
 
 For best speed you should use an optimising C compiler like GCC, the 
 interpreter loop especially requires perfect code generation for best speed.
@@ -19,7 +20,7 @@ interpreter loop especially requires perfect code generation for best speed.
 The generated C code isn't quite so sensitve to the compiler used to
 run it as some of the simple optimisations have already been done.
 So reasonable performance can be got with TCC. GCC does, however, still
-compile some constructs better.
+compile some constructs much better.
 
 Note: Telling this program the Cell size you will be using allows it 
 to generate better code.
@@ -40,10 +41,10 @@ TODO:
 
     New C function on Level 2 end while.
 
-    T_PRT, add string print to tree.
-
     T_HINT(offset), save results of known value search.
 	-- Problem, values become known as the code simplifies.
+	-- Manually added hints in a hash array?
+	-- Only use the manual hints "sometimes" eg: T_PRT.
 
     Add T_ENDIF, will never loop. Move loop variable reset out of loop.
 
@@ -75,13 +76,6 @@ TODO:
     \	Input next character as a literal. ie *m = 'next';
     "..."   Input characters from string on succesive calls.
 
-    'Easy' mode, read from stdin single BF commands.
-	"+-<>,." are executed immediatly.
-	"]" is ignored.
-	"[" reads source until matching "]" and optimises and executes loop.
-	    Or discards it if it's a comment.
-
-    Hard 'Easy' mode. Do initial loop read character by character.
 */
 
 #ifdef __STRICT_ANSI__
@@ -105,22 +99,27 @@ TODO:
 #include <langinfo.h>
 #include <wchar.h>
 
+#include "bfi.tree.h"
+#ifndef NO_ASM
+#include "bfi.nasm.h"
+#endif
+
 #ifdef MAP_NORESERVE
 #define USEHUGERAM
 #endif
-
-#define USEPRINTF
 
 #ifdef USEHUGERAM
 #define MEMSIZE	    2UL*1024*1024*1024
 #define MEMGUARD    16UL*1024*1024
 #define MEMSKIP	    1UL*1024*1024
 #else
+#ifndef MEMSIZE
 #define MEMSIZE	    256*1024
-#warning Using small memory
+#endif
+#warning Using small memory, define MEMSIZE to increase.
 #endif
 
-#if !defined(__STRICT_ANSI__) && !defined(TCCLIBMISSING)
+#if !defined(__STRICT_ANSI__) && !defined(NO_TCCLIB)
 #define USETCCLIB
 #endif
 
@@ -149,46 +148,19 @@ char *cell_type = "C";
 #define SM(vx) (( ((int)(vx)) <<(32-cell_size))>>(32-cell_size))
 #define UM(vx) ((vx) & cell_mask)
 
+/* How far to search for constants. */
+#define SEARCHDEPTH	10
+#define SEARCHRANGE	10000
+
 char * curfile = 0;
 int curr_line = 0, curr_col = 0;
 int cmd_line = 0, cmd_col = 0;
 int bfi_num = 0;
 
-#define TOKEN_LIST(Mac) \
-    Mac(MOV) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
-    Mac(EQU) Mac(SET) \
-    Mac(ZFIND) Mac(MFIND) Mac(ADDWZ) \
-    Mac(IF) Mac(MULT) Mac(CMULT) Mac(FOR) \
-    Mac(RAILC) Mac(SET2) Mac(SET3) \
-    Mac(STOP) Mac(NOP) Mac(DEAD)
-
-#define GEN_TOK_ENUM(NAME) T_ ## NAME,
-enum token { TOKEN_LIST(GEN_TOK_ENUM) TCOUNT};
-
 #define GEN_TOK_STRING(NAME) "T_" #NAME,
 const char* tokennames[] = { TOKEN_LIST(GEN_TOK_STRING) };
 
-struct bfi
-{
-    struct bfi *next;
-    int type;
-    int count;
-    int offset;
-    struct bfi *jmp;
-
-    int count2;
-    int offset2;
-    int count3;
-    int offset3;
-
-    int profile;
-    int line, col;
-    int inum;
-    int ipos;
-
-    int orgtype;
-    struct bfi *prev;
-} *bfprog = 0, *bfbase = 0;
+struct bfi *bfprog = 0;
 
 /* Stats */
 double run_time = 0;
@@ -209,9 +181,11 @@ size_t cell_array_alloc_len = 0;
 void open_file(char * fname);
 void process_file(void);
 void print_tree_stats(void);
+void printtreecell(FILE * efd, int indent, struct bfi * n);
+void printtree(void);
 void run_tree(void);
+void delete_tree(void);
 void run_ccode(void);
-void print_asm();
 void print_ccode(FILE * ofd);
 void calculate_stats(void);
 void pointer_scan(void);
@@ -223,12 +197,14 @@ int find_known_set_state(struct bfi * v);
 int flatten_loop(struct bfi * v, int constant_count);
 int classify_loop(struct bfi * v);
 int flatten_multiplier(struct bfi * v);
+void build_string_in_tree(struct bfi * v);
 void * tcalloc(size_t nmemb, size_t size);
 void print_adder(void);
 void print_bf(void);
 void * map_hugeram(void);
 void trap_sigsegv(void);
-int get_char(void);
+int getch(int oldch);
+void putch(int oldch);
 void set_cell_size(int cell_bits);
 void convert_tree_to_runarray(void);
 
@@ -240,24 +216,27 @@ void Usage(void)
     fprintf(stderr, "   -v   Verbose, repeat for more.\n");
     fprintf(stderr, "   -r   Run in interpreter.\n");
     fprintf(stderr, "   -c   Create C code.\n");
+#ifdef _BFI_NASM_H
     fprintf(stderr, "   -s   Create NASM code.\n");
+#endif
     fprintf(stderr, "        Default is to generate & run the C code.\n");
     fprintf(stderr, "   -T   Create trace statements in output C code.\n");
     fprintf(stderr, "   -H   Remove headers in output code; optimiser cannot see start either.\n");
-    fprintf(stderr, "   -u   Unicode I/O%s\n", iostyle?" (default)":"");
+    fprintf(stderr, "   -u   Wide character (unicode) I/O%s\n", iostyle?" (default)":"");
     fprintf(stderr, "   -a   Ascii I/O%s\n", iostyle?"":" (default)");
     fprintf(stderr, "   -On  'Optimisation level'\n");
     fprintf(stderr, "   -O0      Turn off all optimisation, just leave RLE.\n");
     fprintf(stderr, "   -O1      Only pointer motion removal.\n");
     fprintf(stderr, "   -O2      A few simple changes.\n");
     fprintf(stderr, "   -O3      Maximum normal level, default.\n");
-    fprintf(stderr, "   -m   Minimal processing, -O0 and disable RLE.\n");
+    fprintf(stderr, "   -m   Minimal processing; same as -O0\n");
+    fprintf(stderr, "   -R   Like -m but disable RLE too.\n");
     fprintf(stderr, "   -B8  Use 8 bit cells.\n");
     fprintf(stderr, "   -B16 Use 16 bit cells.\n");
     fprintf(stderr, "   -B32 Use 32 bit cells.\n");
     fprintf(stderr, "        Default for C is 'unknown', ASM can only be 8bit.\n");
     fprintf(stderr, "        Other bitwidths work (including 7) for the interpreter and C.\n");
-    fprintf(stderr, "        Unicode characters need at least 16 bits.\n");
+    fprintf(stderr, "        Full Unicode characters need 21 bits.\n");
     fprintf(stderr, "   -E0  One of the other options; choose later.\n");
     fprintf(stderr, "   -E1  End of file gives no change for ',' command.\n");
     fprintf(stderr, "   -E2  End of file gives -1.\n");
@@ -301,7 +280,9 @@ main(int argc, char ** argv)
                     case 'H': noheader=1; break;
                     case 'r': do_run=1; break;
                     case 'c': do_codestyle = c_c; break;
+#ifdef _BFI_NASM_H
                     case 's': do_codestyle = c_asm; break;
+#endif
                     case 'A': do_codestyle = c_adder; break;
                     case 'F': do_codestyle = c_bf; break;
                     case 'm': opt_level=0; break;
@@ -344,6 +325,7 @@ main(int argc, char ** argv)
                 filename = argv[ar];
         }
 
+#ifdef _BFI_NASM_H
     if (do_codestyle == c_asm)
     {
 	if (do_run || (cell_size && cell_size != 8)) {
@@ -352,6 +334,7 @@ main(int argc, char ** argv)
 	}
 	set_cell_size(8);
     }
+#endif
 
     if (!do_run && do_codestyle == c_default)
 	do_run = 1;
@@ -429,7 +412,6 @@ open_file(char * fname)
 
     while (j) { n = j; j = j->jmp; n->type = '('; n->jmp = 0; }
 
-    bfbase=bfprog;
     total_nodes = loaded_nodes;
 
     for(n=bfprog; n; n=n->next) {
@@ -475,8 +457,11 @@ printtreecell(FILE * efd, int indent, struct bfi * n)
 {
     while(indent-->0) 
 	fprintf(efd, " ");
-    if (n == 0 ) {fprintf(efd, "NULL Cell"); return; }
-    fprintf(efd, "%s", tokennames[n->type]);
+    if (n == 0) {fprintf(efd, "NULL Cell"); return; }
+    if (n->type >= 0 && n->type < TCOUNT)
+	fprintf(efd, "%s", tokennames[n->type]);
+    else
+	fprintf(efd, "TOKEN(%d)", n->type);
     switch(n->type)
     {
     case T_MOV:
@@ -531,6 +516,8 @@ printtreecell(FILE * efd, int indent, struct bfi * n)
 	fprintf(efd, "prev $%d, ", n->prev->inum);
     if(n->jmp) 
 	fprintf(efd, "jmp $%d, ", n->jmp->inum);
+    if(n->prevskip)
+	fprintf(efd, "skip $%d, ", n->prevskip->inum);
     if(n->profile) 
 	fprintf(efd, "prof %d, ", n->profile);
     if(n->line || n->col)
@@ -547,7 +534,9 @@ printtree(void)
     fprintf(stderr, "Whole tree dump...\n");
     while(n)
     {
+	fprintf(stderr, " ");
 	if (indent>0 && n->orgtype == T_END) indent--;
+	fprintf(stderr, " ");
 	printtreecell(stderr, indent, n);
 	fprintf(stderr, "\n");
 	if (n->orgtype == T_WHL) indent++;
@@ -575,7 +564,7 @@ pt(FILE* ofd, int indent, struct bfi * n)
 }
 
 void
-print_c_header(FILE * ofd)
+print_c_header(FILE * ofd, int * minimal_p)
 {
     int use_full = 0;
     int memsize = 60000;
@@ -583,29 +572,58 @@ print_c_header(FILE * ofd)
 
     calculate_stats();
 
-    if (enable_trace || do_run) use_full = 1;
+    if (enable_trace || do_run || !minimal_p) use_full = 1;
 
     if (total_nodes == node_type_counts[T_PRT] && !use_full) {
 	fprintf(ofd, "#include <stdio.h>\n\n");
 	fprintf(ofd, "int main(void)\n{\n");
+	*minimal_p = 1;
 	return ;
     }
 
-    if (iostyle == 1) {
+    if (node_type_counts[T_INP] != 0 && !do_run) {
+	fprintf(ofd, "#ifdef WIDECHAR\n");
 	fprintf(ofd, "#include <locale.h>\n");
 	fprintf(ofd, "#include <wchar.h>\n");
+	fprintf(ofd, "#endif\n\n");
     }
 
     fprintf(ofd, "#include <stdio.h>\n");
-    fprintf(ofd, "#include <stdlib.h>\n");
+    fprintf(ofd, "#include <stdlib.h>\n\n");
+
     if (cell_size == 0) {
 	fprintf(ofd, "# ifndef C\n");
 	fprintf(ofd, "# define C int\n");
-	fprintf(ofd, "# endif\n");
+	fprintf(ofd, "# endif\n\n");
     }
 
-    if (node_type_counts[T_INP] != 0)
+    if (node_type_counts[T_INP] != 0 && !do_run)
     {
+	fprintf(ofd, "static int \n");
+	fprintf(ofd, "getch(int oldch)\n");
+	fprintf(ofd, "{\n");
+	fprintf(ofd, "    int ch;\n");
+	fprintf(ofd, "#ifdef WIDECHAR\n");
+	fprintf(ofd, "    ch = getwchar();\n");
+	fprintf(ofd, "#else\n");
+	fprintf(ofd, "    ch = getchar();\n");
+	fprintf(ofd, "#endif\n");
+	fprintf(ofd, "#ifndef EOFCELL\n");
+	fprintf(ofd, "    if (ch != EOF) return ch;\n");
+	fprintf(ofd, "    return oldch;\n");
+	fprintf(ofd, "#else\n");
+	fprintf(ofd, "#if EOFCELL == EOF\n");
+	fprintf(ofd, "    return ch;\n");
+	fprintf(ofd, "#else\n");
+	fprintf(ofd, "    if (ch != EOF) return ch;\n");
+	fprintf(ofd, "    return EOFCELL;\n");
+	fprintf(ofd, "#endif\n");
+	fprintf(ofd, "#endif\n");
+	fprintf(ofd, "}\n\n");
+    }
+
+#if 0
+    if (node_type_counts[T_INP] != 0 && !do_run) {
 	if (eofcell == 0) {
 	    fprintf(ofd, "#ifndef EOFCELL\n");
 	    fprintf(ofd, "# define save(vn,gf) {int ch=gf; if(ch!=EOF) vn=ch;}\n");
@@ -635,6 +653,20 @@ print_c_header(FILE * ofd)
 	if (!do_run || iostyle != 1)
 	    fprintf(ofd, "#define get_char() get%schar()\n", (iostyle==1?"w":""));
     }
+#endif
+
+    if (node_type_counts[T_PRT] != 0 && !do_run) {
+	fprintf(ofd, "#ifdef WIDECHAR\n");
+	fprintf(ofd, "#define putch(ch) printf(\"%%lc\",ch)\n");
+	fprintf(ofd, "#else\n");
+	fprintf(ofd, "#define putch(ch) putchar(ch);\n");
+	fprintf(ofd, "#endif\n\n");
+    }
+
+    if (do_run) {
+	fprintf(ofd, "extern void putch(int ch);\n");
+	fprintf(ofd, "extern int getch(int ch);\n");
+    }
 
     if (enable_trace)
 	fputs(	"#define t(p1,p2,p3,p4) fprintf(stderr, \"P(%d,%d)=%s"
@@ -662,7 +694,7 @@ print_c_header(FILE * ofd)
     }
 
     if (node_type_counts[T_MOV] == 0 && memoffset == 0) {
-	fprintf(ofd, "%s m[%d];\n", cell_type, memsize);
+	fprintf(ofd, "%s m[%d];\n", cell_type, max_pointer+1);
 	fprintf(ofd, "int main(){\n");
     } else {
 	if (!do_run)
@@ -686,11 +718,12 @@ print_c_header(FILE * ofd)
 	    fprintf(ofd, "  m = mem;\n");
     }
 
-    if (node_type_counts[T_INP] != 0)
+    if (node_type_counts[T_INP] != 0) {
 	fprintf(ofd, "  setbuf(stdout, 0);\n");
-
-    if (iostyle == 1)
+	fprintf(ofd, "#ifdef WIDECHAR\n");
 	fprintf(ofd, "  setlocale(LC_ALL, \"\");\n");
+	fprintf(ofd, "#endif\n");
+    }
 }
 
 void 
@@ -700,6 +733,7 @@ print_ccode(FILE * ofd)
     struct bfi * n = bfprog;
     char string_buffer[180], *sp = string_buffer, lastspch = 0;
     int ok_for_printf = 0, spc = 0;
+    int minimal = 0;
     int add_mask = 0;
     if (cell_size > 0 &&
 	cell_size != sizeof(int)*8 &&
@@ -711,18 +745,13 @@ print_ccode(FILE * ofd)
 	fprintf(stderr, "Generating C Code.\n");
 
     if (!noheader)
-	print_c_header(ofd);
+	print_c_header(ofd, &minimal);
 
     while(n)
     {
 	if (n->type == T_PRT) 
-	    ok_for_printf = (
-		(
-		    n->count >= ' ' && n->count <= '~'
-#ifdef USEPRINTF
-		    && n->count != '%'
-#endif
-		) || (n->count == '\n') || (n->count == '\033'));
+	    ok_for_printf = ( ( n->count >= ' ' && n->count <= '~') ||
+				(n->count == '\n') || (n->count == '\033'));
 
 	if (sp != string_buffer) {
 	    if ((n->type != T_EQU && n->type != T_ADD && n->type != T_PRT) ||
@@ -732,11 +761,11 @@ print_ccode(FILE * ofd)
 	       ) {
 		*sp++ = 0;
 		pt(ofd, indent,0);
-#ifdef USEPRINTF
-		fprintf(ofd, "printf(\"%s\");\n", string_buffer);
-#else
-		fprintf(ofd, "fwrite(\"%s\", 1, %d, stdout);\n", string_buffer, spc);
-#endif
+		if (strchr(string_buffer, '%') == 0 )
+		    fprintf(ofd, "printf(\"%s\");\n", string_buffer);
+		else	
+		    fprintf(ofd, "fwrite(\"%s\", 1, %d, stdout);\n",
+			    string_buffer, spc);
 		sp = string_buffer; spc = 0;
 	    }
 	}
@@ -860,8 +889,6 @@ print_ccode(FILE * ofd)
 		    lastspch &= add_mask;
 		if (lastspch == '\n') {
 		    *sp++ = '\\'; *sp++ = 'n';
-		} else if (lastspch == '%') {
-		    *sp++ = '%'; *sp++ = '%';
 		} else if (lastspch == '\\' || lastspch == '"') {
 		    *sp++ = '\\'; *sp++ = lastspch;
 		} else if (lastspch >= ' ' && lastspch <= '~') {
@@ -880,32 +907,34 @@ print_ccode(FILE * ofd)
 		    fprintf(ofd, "m[%d] &= %d;\n", n->offset, add_mask);
 		    pt(ofd, indent, 0);
 		}
-		if (iostyle == 1)
-		    fprintf(ofd, "printf(\"%%lc\",m[%d]);\n",
-					    n->offset);
+		if (minimal)
+		    fprintf(ofd, "printf(\"%%lc\", m[%d]);\n", n->offset);
 		else
-		    fprintf(ofd, "putchar(m[%d]);\n", n->offset);
+		    fprintf(ofd, "putch(m[%d]);\n", n->offset);
 	    } else {
 		int ch = n->count;
 		if (add_mask>0) ch &= add_mask;
-		if (ch >= ' ' && ch <= '~' &&
+		if (minimal) {
+		    if (ch < 128)
+			fprintf(ofd, "putchar(%d);\n", ch);
+		    else
+			fprintf(ofd, "printf(\"%%lc\",%d);\n", ch);
+		} else if (ch >= ' ' && ch <= '~' &&
 		    ch != '\'' && ch != '\\')
-		    fprintf(ofd, "putchar('%c');\n", ch);
+		    fprintf(ofd, "putch('%c');\n", ch);
 		else if (ch == '\n')
-		    fprintf(ofd, "putchar('\\n');\n");
+		    fprintf(ofd, "putch('\\n');\n");
 		else if (ch == '\t')
-		    fprintf(ofd, "putchar('\\t');\n");
+		    fprintf(ofd, "putch('\\t');\n");
 		else if (ch == '\\')
-		    fprintf(ofd, "putchar('\\\\');\n");
-		else if (iostyle == 1 && ch > 127)
-		    fprintf(ofd, "printf(\"%%lc\",0x%02x);\n", ch);
+		    fprintf(ofd, "putch('\\\\');\n");
 		else
-		    fprintf(ofd, "putchar(0x%02x);\n", ch);
+		    fprintf(ofd, "putch(%d);\n", ch);
 	    }
 	    break;
 	case T_INP:
 	    pt(ofd, indent,n);
-	    fprintf(ofd, "getch(m+%d);\n", n->offset);
+	    fprintf(ofd, "m[%d] = getch(m[%d]);\n", n->offset, n->offset);
 	    if (enable_trace) {
 		pt(ofd, indent,0);
 		fprintf(ofd, "t(%d,%d,\"\",m+ %d)\n", n->line, n->col, n->offset);
@@ -916,7 +945,7 @@ print_ccode(FILE * ofd)
 	    fprintf(ofd, "if(m[%d]) {\n", n->offset);
 	    break;
 	case T_ZFIND:
-	    /* TCCLIB generates a slow 'strlen' */
+	    /* TCCLIB generates a slow 'strlen', even with overheads libc is better. */
 	    if (do_run && cell_size == 8 && add_mask <= 0 &&
 		    n->next->next == n->jmp && n->next->count == 1) {
 		pt(ofd, indent,n);
@@ -932,7 +961,7 @@ print_ccode(FILE * ofd)
 		if (n->next->next != n->jmp) {
 		    fprintf(ofd, "while(m[%d]){\n", n->offset);
 		} else {
-		    fprintf(ofd, "while(m[%d]){m += %d;}\n",
+		    fprintf(ofd, "while(m[%d]) m += %d;\n",
 			n->offset, n->next->count);
 		    n=n->jmp;
 		}
@@ -983,11 +1012,11 @@ print_ccode(FILE * ofd)
 
     if(sp != string_buffer) {
 	*sp++ = 0;
-#ifdef USEPRINTF
-	fprintf(ofd, "  printf(\"%s\");\n", string_buffer);
-#else
-	fprintf(ofd, "  fwrite(\"%s\", 1, %d, stdout);\n", string_buffer, spc);
-#endif
+	if (strchr(string_buffer, '%') == 0 )
+	    fprintf(ofd, "  printf(\"%s\");\n", string_buffer);
+	else
+	    fprintf(ofd, "  fwrite(\"%s\", 1, %d, stdout);\n",
+		    string_buffer, spc);
     }
     if (!noheader)
 	fprintf(ofd, "  return 0;\n}\n");
@@ -1031,6 +1060,7 @@ process_file(void)
 		    (tv_end.tv_sec - tv_step.tv_sec) +
 		    (tv_end.tv_usec - tv_step.tv_usec)/1000000.0);
 	    }
+	    if (verbose>5) printtree();
 
 	    if (!noheader) {
 		if (verbose>2) gettimeofday(&tv_step, 0);
@@ -1049,6 +1079,7 @@ process_file(void)
 	print_tree_stats();
 
     if (do_run) {
+	if (verbose) print_tree_stats();
 	if (do_codestyle == c_c) {
 #ifdef USETCCLIB
 	    run_ccode();
@@ -1068,9 +1099,11 @@ process_file(void)
 	case c_c:
 	    print_ccode(stdout);
 	    break;
+#ifdef _BFI_NASM_H
 	case c_asm:
 	    print_asm();
 	    break;
+#endif
 	case c_bf:
 	    print_bf();
 	    break;
@@ -1079,8 +1112,6 @@ process_file(void)
 	    break;
     }
 
-    if (verbose && do_run)
-	print_tree_stats();
     if (verbose>2 && (do_run || verbose<6))
 	printtree();
 }
@@ -1165,7 +1196,6 @@ run_tree(void)
     icell *p, *oldp;
     int use_free = 0;
     struct bfi * n = bfprog;
-    int c;
     struct timeval tv_start, tv_end, tv_pause;
 #ifdef M
     if (sizeof(*p)*8 != cell_size && cell_size>0) {
@@ -1221,19 +1251,14 @@ run_tree(void)
 		}
 
 		/*TODO: stop the clock ? */
-
-		if (ch > 127 && iostyle == 1)
-		    printf("%lc", ch);
-		else
-		    putchar(ch);
+		putch(ch);
 		break;
 	    }
 
 	    case T_INP:
 		gettimeofday(&tv_pause, 0); /* Stop the clock. */
 
-		c = get_char();
-		if (c != EOF) p[n->offset] = c;
+		p[n->offset] = getch(p[n->offset]);
 
 		gettimeofday(&tv_end, 0);
 		tv_start.tv_usec = tv_start.tv_usec +
@@ -1312,6 +1337,14 @@ break_break:;
 
 #undef icell
 #undef M
+}
+
+void
+delete_tree(void)
+{
+    struct bfi * n = bfprog, *p;
+    bfprog = 0;
+    while(n) { p = n; n=n->next; free(p); }
 }
 
 void
@@ -1548,6 +1581,11 @@ invariants_scan(void)
 	case T_PRT:
 	    if (n->count == -1)
 		node_changed = find_known_state(n);
+	    if (node_changed) {
+		n2 = n;
+		n = n->next;
+		build_string_in_tree(n2);
+	    }
 	    break;
 
 	case T_EQU:
@@ -1640,6 +1678,7 @@ trim_trailing_sets(void) {
 		}
 		return;
 	    }
+	    lastn = n->prev;
 	}
 	lastn->next = 0;
 	free(n);
@@ -1648,25 +1687,35 @@ trim_trailing_sets(void) {
 
 void
 find_known_value(struct bfi * n, int v_offset, int allow_recursion,
+		struct bfi * n_stop, 
 		struct bfi ** n_found, 
-		int * const_found_p, int * known_value_p, int * unsafe_p)
+		int * const_found_p, int * known_value_p, int * unsafe_p,
+		int * hit_stop_node_p)
 {
     /*
      * n		Node to start the search
      * v_offset		Which offset are we interested in
      * allow_recursion  If non-zero we can split on a loop.
+     * n_stop		Node to stop the search
+     *
      * n_found		Node we found IF it's safe to change/delete
      * const_found_p	True if we found a known value
      * known_value_p	The known value.
      * unsafe_p		True if this value is unsuitable for loop deletion.
+     * hit_stop_node_p	True if we found n_stop.
      */
     int unmatched_ends = 0;
-    int const_found = 0, known_value = 0, non_zero_unsafe = 0;
+    int const_found = 0, known_value = 0, non_zero_unsafe = 0, hit_stop = 0;
     int n_used = 0;
     int distance = 0;
 
+    if (opt_level < 3) allow_recursion = 0;
+
+    if (hit_stop_node_p) *hit_stop_node_p = 0;
+
     if (verbose>5) {
-	fprintf(stderr, "Checking value for offset %d starting: ", v_offset);
+	fprintf(stderr, "%d: Checking value for offset %d starting: ",
+		SEARCHDEPTH-allow_recursion, v_offset);
 	printtreecell(stderr, 0,n);
 	fprintf(stderr, "\n");
     }
@@ -1726,6 +1775,43 @@ find_known_value(struct bfi * n, int v_offset, int allow_recursion,
 		n_used = 1;
 		goto break_break;
 	    }
+
+#if 1
+	    // Check both n->jmp and n->prev
+	    // If they are compatible we may still have a known value.
+	    if (allow_recursion) {
+		int known_value2 = 0, non_zero_unsafe2 = 0;
+
+		if (verbose>5) fprintf(stderr, "%d: END: searching for double known\n", __LINE__);
+		find_known_value(n->prev, v_offset, allow_recursion-1, n,
+		    0, &const_found, &known_value2, &non_zero_unsafe2, &hit_stop);
+		if (const_found) {
+		    if (verbose>5) fprintf(stderr, "%d: Const found in loop.\n", __LINE__);
+		    hit_stop = 0;
+		    find_known_value(n->jmp->prev, v_offset, allow_recursion-1, n_stop,
+			0, &const_found, &known_value, &non_zero_unsafe, &hit_stop);
+
+		    if (hit_stop) {
+			const_found = 1;
+			known_value = known_value2;
+			non_zero_unsafe = non_zero_unsafe2;
+		    } else if (known_value != known_value2) {
+			if (verbose>5) fprintf(stderr, "%d: Two know values found %d != %d\n", __LINE__, 
+				known_value, known_value2);
+			const_found = 0;
+		    }
+		} else if (hit_stop) {
+		    if (verbose>5) fprintf(stderr, "%d: Nothing found in loop; continuing.\n", __LINE__);
+
+		    n = n->jmp;
+		    break;
+		}
+		else if (verbose>5) fprintf(stderr, "%d: Nothing found.\n", __LINE__);
+
+		n = 0;
+	    }
+	    goto break_break;
+#endif
 	    unmatched_ends++;
 	    break;
 
@@ -1750,21 +1836,31 @@ find_known_value(struct bfi * n, int v_offset, int allow_recursion,
 
 #if 1
 	    // Check both n->jmp and n->prev
-	    // If they are both known we still have a known value.
+	    // If they are compatible we may still have a known value.
 	    if (allow_recursion) {
-		// fprintf(stderr, "%d: searching for double known\n", __LINE__);
-		find_known_value(n->prev, v_offset, allow_recursion-1,
-		    0, &const_found, &known_value, &non_zero_unsafe);
-		if (const_found) {
-		    int known_value2, non_zero_unsafe2;
-		// fprintf(stderr, "%d: direct was known. %d\n", __LINE__, known_value);
+		int known_value2 = 0, non_zero_unsafe2 = 0;
 
-		    find_known_value(n->jmp->prev, v_offset, allow_recursion-1,
-			0, &const_found, &known_value2, &non_zero_unsafe2);
-		// fprintf(stderr, "%d: jmp was %sknown. %d\n", __LINE__, const_found?"":"un", known_value2);
-		    if (known_value != known_value2)
+		if (verbose>5) fprintf(stderr, "%d: WHL: searching for double known\n", __LINE__);
+		find_known_value(n->jmp->prev, v_offset, allow_recursion-1, n,
+		    0, &const_found, &known_value2, &non_zero_unsafe2, &hit_stop);
+		if (const_found) {
+		    if (verbose>5) fprintf(stderr, "%d: Const found in loop.\n", __LINE__);
+		    find_known_value(n->prev, v_offset, allow_recursion-1, 0,
+			0, &const_found, &known_value, &non_zero_unsafe, 0);
+
+		    if (known_value != known_value2) {
+			if (verbose>5) fprintf(stderr, "%d: Two know values found %d != %d\n", __LINE__, 
+				known_value, known_value2);
 			const_found = 0;
+		    }
+		} else if (hit_stop) {
+		    if (verbose>5) fprintf(stderr, "%d: Nothing found in loop; continuing.\n", __LINE__);
+
+		    find_known_value(n->prev, v_offset, allow_recursion-1, 0,
+			0, &const_found, &known_value, &non_zero_unsafe, 0);
 		}
+		else if (verbose>5) fprintf(stderr, "%d: Nothing found.\n", __LINE__);
+
 		n = 0;
 	    }
 #endif
@@ -1773,10 +1869,20 @@ find_known_value(struct bfi * n, int v_offset, int allow_recursion,
 	default:
 	    goto break_break;
 	}
-	n=n->prev;
+	if (n->prevskip)
+	    n=n->prevskip;
+	else
+	    n=n->prev;
+
+	if (n_stop && n_stop == n) {
+	    /* Hit the 'stop' node */
+	    *hit_stop_node_p = 1;
+	    n = 0;
+	    goto break_break;
+	}
 
 	/* How did we get this far! */
-	if (++distance > 200) goto break_break;
+	if (++distance > SEARCHRANGE) goto break_break;
     }
 
     known_value = 0;
@@ -1800,7 +1906,7 @@ break_break:
     *unsafe_p = non_zero_unsafe;
     if (n_found) {
 	/* If "n" is safe to modify return it too. */
-	if (n==0 || n_used || unmatched_ends || distance > 100)
+	if (n==0 || n_used || unmatched_ends || distance > SEARCHRANGE/4*3)
 	    *n_found = 0;
 	else
 	    *n_found = n;
@@ -1808,10 +1914,12 @@ break_break:
 
     if (verbose>5) {
 	if (const_found)
-	    fprintf(stderr, "Known value is %d%s",
-		    known_value, non_zero_unsafe?" (unsafe zero)":"");
+	    fprintf(stderr, "%d: Known value is %d%s",
+		    SEARCHDEPTH-allow_recursion, known_value,
+		    non_zero_unsafe?" (unsafe zero)":"");
 	else
-	    fprintf(stderr, "Unknown value for offset %d", v_offset);
+	    fprintf(stderr, "%d: Unknown value for offset %d",
+		    SEARCHDEPTH-allow_recursion, v_offset);
 	fprintf(stderr, "\n  From ");
 	printtreecell(stderr, 0,n);
 	fprintf(stderr, "\n");
@@ -1832,8 +1940,8 @@ find_known_state(struct bfi * v)
 	fprintf(stderr, "\n");
     }
 
-    find_known_value(v->prev, v->offset, 3, &n, 
-		&const_found, &known_value, &non_zero_unsafe);
+    find_known_value(v->prev, v->offset, SEARCHDEPTH, 0,
+		&n, &const_found, &known_value, &non_zero_unsafe, 0);
 
     if (!const_found) {
 	switch(v->type) {
@@ -1901,12 +2009,12 @@ find_known_state(struct bfi * v)
 	case T_PRT: /* Print literal character. */
 	    if (v->count != -1) break;
 	    if (do_codestyle == c_bf) break; /* BF output can't do lits. */
-	    if (known_value < 0 && iostyle == 0)
-		known_value = (0xFF & known_value);
+
+	    known_value = UM(known_value);
 	    if (known_value == -1) break;
 	    v->count = known_value;
 	    if (verbose>5) fprintf(stderr, "  Make literal putchar.\n");
-	    return 0; /* No need to rescan or fix this node */
+	    return 1;
 
 	case T_IF:
 	case T_FOR:
@@ -1957,7 +2065,6 @@ search_for_update_of_offset(struct bfi *n, struct bfi *v, int n_offset)
 {
     while(n!=v && n)
     {
-// fprintf(stderr, "Checking: "); printtreecell(stderr, 0, n); fprintf(stderr, "\n");
 	switch(n->type)
 	{
 	case T_IF: case T_FOR: case T_MULT: case T_CMULT: case T_WHL:
@@ -1993,8 +2100,8 @@ find_known_set_state(struct bfi * v)
 
     if ((v->count2 == 0 || v->offset2 != v->offset) &&
         (v->count3 == 0 || v->offset3 != v->offset)) {
-	find_known_value(v->prev, v->offset, 3, &n1, 
-		    &const_found1, &known_value1, &non_zero_unsafe1);
+	find_known_value(v->prev, v->offset, SEARCHDEPTH, 0,
+		    &n1, &const_found1, &known_value1, &non_zero_unsafe1, 0);
 	if (n1 && (n1->type == T_ADD || n1->type == T_EQU)) {
 	    /* Overidden change, delete it */
 	    struct bfi *n4;
@@ -2029,14 +2136,14 @@ find_known_set_state(struct bfi * v)
     }
 
     if (v->count2) {
-	find_known_value(v->prev, v->offset2, 3, &n2, 
-		    &const_found2, &known_value2, &non_zero_unsafe2);
+	find_known_value(v->prev, v->offset2, SEARCHDEPTH, 0,
+		    &n2, &const_found2, &known_value2, &non_zero_unsafe2, 0);
 	n2_valid = 1;
     }
 
     if (v->count3) {
-	find_known_value(v->prev, v->offset3, 3, &n3, 
-		    &const_found3, &known_value3, &non_zero_unsafe3);
+	find_known_value(v->prev, v->offset3, SEARCHDEPTH, 0, 
+		    &n3, &const_found3, &known_value3, &non_zero_unsafe3, 0);
 	n3_valid = 1;
     }
 
@@ -2141,6 +2248,10 @@ find_known_set_state(struct bfi * v)
     return rv;
 }
 
+/*
+ * This function will remove very simple loops that have a constant loop
+ * variable on entry.
+ */
 int
 flatten_loop(struct bfi * v, int constant_count)
 {
@@ -2201,6 +2312,7 @@ classify_loop(struct bfi * v)
     int complex_loop = 0;
 
     if (opt_level < 3) return 0;
+
     if (!v || v->orgtype != T_WHL) return 0;
     typewas = v->type;
     n = v->next;
@@ -2280,11 +2392,16 @@ classify_loop(struct bfi * v)
     return (v->type != typewas);
 }
 
+/*
+ * This function will generate T_SET tokens for simple multiplication loops.
+ */
 int
 flatten_multiplier(struct bfi * v)
 {
     struct bfi *n;
     if (v->type != T_MULT && v->type != T_CMULT) return 0;
+
+    if (opt_level<3) return 0;
     if (do_codestyle == c_bf) return 0;
 
     n = v->next;
@@ -2326,474 +2443,44 @@ flatten_multiplier(struct bfi * v)
     return 1;
 }
 
+/*
+ * This moves literal T_PRT nodes back up the list to join to the previous
+ * group of similar T_PRT nodes. An additional pointer (prevskip) is set 
+ * so that they all point at the first in the growing 'string'.
+ *
+ * This allows the constant searching to disregard these nodes in one step.
+ *
+ * Because the nodes are all together it can also help the code generators 
+ * build "printf" commands.
+ */
 void
-print_asm_string(char * charmap, char * strbuf, int strsize)
+build_string_in_tree(struct bfi * v)
 {
-static int textno = -1;
-    int saved_line = curr_line;
-    if (textno == -1) {
-	textno++;
-
-	printf("%%line 1 lib_string.s\n");
-	curr_line = -1;
-	printf("section .data\n");
-	printf("putchbuf: db 0\n");
-	printf("section .textlib\n");
-	printf("putch:\n");
-        printf("\tpush ecx\n");
-        printf("\tmov ecx,putchbuf\n");
-        printf("\tmov byte [ecx],al\n");
-        printf("\tjmp syswrite\n");
-	printf("prttext:\n");
-        printf("\tpush ecx\n");
-        printf("\tmov ecx,eax\n");
-	printf("syswrite:\n");
-        printf("\txor eax,eax\n");
-        printf("\tmov ebx,eax\n");
-        printf("\tinc ebx\n");
-        printf("\tmov al, 4\n");
-        printf("\tint 0x80\t; write(ebx, ecx, edx);\n");
-        printf("\txor eax, eax\n");
-        printf("\tcdq\n");
-        printf("\tinc edx\n");
-        printf("\tpop ecx\n");
-        printf("\tret\n");
-	printf("section .text\n");
-    }
-
-    if (strsize <= 0) return;
-    if (strsize == 1) {
-	int ch = *strbuf & 0xFF;
-	if (charmap[ch] == 0) {
-	    charmap[ch] = 1;
-	    printf("%%line 1 lib_putch_%02x.s\n", ch);
-	    printf("section .textlib\n");
-	    printf("litprt_%02x:\n", ch);
-	    printf("\tmov al,0x%02x\n", ch);
-	    printf("\tjmp putch\n");
-	    printf("section .text\n");
-	    printf("%%line %d+0 %s\n", saved_line, curfile);
-	    curr_line = saved_line;
-	}
-	printf("\tcall litprt_%02x\n", ch);
-    } else {
-	int i;
-	textno++;
-	if (saved_line != curr_line) {
-	    printf("%%line %d+0 %s\n", saved_line, curfile);
-	    curr_line = saved_line;
-	}
-	printf("section .data\n");
-	printf("text_%d:\n", textno);
-	for(i=0; i<strsize; i++) {
-	    if (i%8 == 0) {
-		if (i) printf("\n");
-		printf("\tdb ");
-	    } else
-		printf(", ");
-	    printf("0x%02x", (strbuf[i] & 0xFF));
-	}
-	printf("\n");
-	printf("section .text\n");
-	printf("\tmov eax,text_%d\n", textno);
-	printf("\tmov edx,%d\n", strsize);
-	printf("\tcall prttext\n");
-    }
-}
-
-void 
-print_asm()
-{
-    struct bfi * n = bfprog;
-    char string_buffer[300], *sp = string_buffer;
-    char charmap[256];
-    char * neartok = "";
-    int i;
-
-    memset(charmap, 0, sizeof(charmap));
-    curr_line = -1;
-
-    if (verbose)
-	fprintf(stderr, "Generating NASM Code.\n");
-
-/* System calls used ...
-    int 0x80: %eax is the syscall number; %ebx, %ecx, %edx, %esi, %edi and %ebp
-    eax
-    1	exit(ebx);		Used.
-    2	fork(
-    3	read(ebx,ecx,edx);	Used.
-    4	write(ebx,ecx,edx);	Used.
-    5	open(
-    6	close(
-    7 ...
-
-    Register allocation.
-    eax = 0x000000xx, only AL is loaded on syscall.
-    ebx = unknown, always reset.
-    ecx = current pointer.
-    edx = 1, dh used for loop cmp.
-
-    Sigh ...
-    Modern processors don't seem to have a true assembly language; this one
-    is so full of old junk that it's impossible to optimise without full and
-    complete documentation on the specific processor variant.
-
-    In a real assembly language the only reason for there to be more limited
-    versions of instructions is because they're better in some way. perhaps
-    faster, perhaps they don't touch the CC register.
-
-    This processor doesn't run x86 machine code; it translates it on the fly
-    to it's real internal machine code.
-
-    I need an assembler for *that* machine code, obviously to run it the 
-    assembler will have to do a reverse translation to x86 machine code
-    though.
-*/
-
-    if (!noheader) {
-	calculate_stats();
-
-	printf("; %s, asmsyntax=nasm\n", curfile);
-	printf("; nasm -f bin -Ox brainfuck.asm ; chmod +x brainfuck\n");
-	printf("\n");
-	printf("BITS 32\n");
-	printf("\n");
-	printf("memsize\tequ\t0x10000\n");
-	printf("orgaddr\tequ\t0x08048000\n");
-	printf("\torg\torgaddr\n");
-	printf("\n");
-	printf("; A nice legal ELF header here, bit short, but that's okay.\n");
-	printf("ehdr:\t\t\t\t\t\t; Elf32_Ehdr\n");
-	printf("\tdb\t0x7F, \"ELF\", 1, 1, 1, 0\t\t;   e_ident\n");
-	printf("\ttimes 8 db\t0\n");
-	printf("\tdw\t2\t\t\t\t;   e_type\n");
-	printf("\tdw\t3\t\t\t\t;   e_machine\n");
-	printf("\tdd\t1\t\t\t\t;   e_version\n");
-	printf("\tdd\t_start\t\t\t\t;   e_entry\n");
-	printf("\tdd\tphdr - $$\t\t\t;   e_phoff\n");
-	printf("\tdd\t0\t\t\t\t;   e_shoff\n");
-	printf("\tdd\t0\t\t\t\t;   e_flags\n");
-	printf("\tdw\tehdrsize\t\t\t;   e_ehsize\n");
-	printf("\tdw\tphdrsize\t\t\t;   e_phentsize\n");
-	printf("\tdw\t1\t\t\t\t;   e_phnum\n");
-	printf("\tdw\t0\t\t\t\t;   e_shentsize\n");
-	printf("\tdw\t0\t\t\t\t;   e_shnum\n");
-	printf("\tdw\t0\t\t\t\t;   e_shstrndx\n");
-	printf("\n");
-	printf("ehdrsize      equ     $ - ehdr\n");
-	printf("\n");
-	printf("phdr:\t\t\t\t\t\t; Elf32_Phdr\n");
-	printf("\tdd\t1\t\t\t\t;   p_type\n");
-	printf("\tdd\t0\t\t\t\t;   p_offset\n");
-	printf("\tdd\t$$\t\t\t\t;   p_vaddr\n");
-	printf("\tdd\t$$\t\t\t\t;   p_paddr\n");
-	printf("\tdd\tfilesize\t\t\t;   p_filesz\n");
-	printf("\tdd\tfilesize+memsize\t\t;   p_memsz\n");
-	printf("\tdd\t7\t\t\t\t;   p_flags\n");
-	printf("\tdd\t0x1000\t\t\t\t;   p_align\n");
-	printf("\n");
-	printf("phdrsize      equ     $ - phdr\n");
-	printf("\n");
-	printf("_start:\n");
-	printf("\txor\teax, eax\t; EAX = 0 ;don't change high bits.\n");
-	printf("\tcdq\t\t\t; EDX = 0 ;sign bit of EAX\n");
-	printf("\tinc\tedx\t\t; EDX = 1 ;ARG4 for system calls\n");
-	printf("\tmov\tecx,mem\n");
-	if (node_type_counts[T_MOV] != 0)
-	    printf("\talign 64\n");
-	printf("\tsection\t.textlib align=64\n");
-	printf("\tsection\t.text\n");
-	printf("\n");
-    }
-
-    /* Scan the nodes so we get an APPROXIMATE distance measure */
-    for(i=0, n = bfprog; n; n=n->next) {
-	n->ipos = i;
-	switch(n->type) {
-	case T_MOV: i++; break;
-	case T_ADD: i+=3; break;
-	case T_EQU: i+=3; break;
-	case T_SET: i+=6; break;
-	case T_PRT: i+=9; break;
-	case T_INP: i+=9; break;
-	default: i+=6; break;
-	}
-    }
-
-    n = bfprog;
-    while(n)
-    {
-	if (sp != string_buffer) {
-	    if ((n->type != T_EQU && n->type != T_ADD && n->type != T_PRT) ||
-		(n->type == T_PRT && n->count == -1) ||
-		(sp >= string_buffer + sizeof(string_buffer) - 2)
-	       ) {
-		print_asm_string(charmap, string_buffer, sp-string_buffer);
-		sp = string_buffer;
-	    }
-	}
-
-	if (enable_trace) {
-	    printf("; "); printtreecell(stdout, 0, n); printf("\n");
-	}
-
-	if (n->line != 0 && n->line != curr_line && n->type != T_PRT) {
-	    printf("%%line %d+0 %s\n", n->line, curfile);
-	    curr_line = n->line;
-	}
-
-	switch(n->type)
-	{
-	case T_MOV:
-#if 1
-	    if (n->count == 1)
-		printf("\tinc ecx\n");
-	    else if (n->count == -1)
-		printf("\tdec ecx\n");
-	    else if (n->count == 2)
-		printf("\tinc ecx\n" "\tinc ecx\n");
-	    else if (n->count == -2)
-		printf("\tdec ecx\n" "\tdec ecx\n");
-	    else if (n->count < -128)
-		printf("\tsub ecx,%d\n", -n->count);
-	    else
-#endif
-	    printf("\tadd ecx,%d\n", n->count);
+    struct bfi * n = v->prev;
+    while(n) {
+	switch (n->type) {
+	default: return; /* Nothing to attach to. */
+	case T_MOV: case T_ADD: case T_SET: case T_EQU: /* Safe */
 	    break;
 
-	case T_ADD:
-#if 1
-	    if (n->count == 1 && n->offset == 0)
-		printf("\tinc byte [ecx]\n");
-	    else if (n->count == -1 && n->offset == 0)
-		printf("\tdec byte [ecx]\n");
-	    else if (n->count < -128 && n->offset == 0)
-		printf("\tsub byte [ecx],%d\n", -n->count);
-	    else if (n->count == 1)
-		printf("\tinc byte [ecx+%d]\n", n->offset);
-	    else if (n->count == -1)
-		printf("\tdec byte [ecx+%d]\n", n->offset);
-	    else if (n->count < -128)
-		printf("\tsub byte [ecx+%d],%d\n", n->offset, -n->count);
-	    else
-#endif
-	    printf("\tadd byte [ecx+%d],%d\n", n->offset, SM(n->count));
-	    break;
-	    
-	case T_EQU:
-	    printf("\tmov byte [ecx+%d],%d\n", n->offset, SM(n->count));
-	    break;
-	    
-	case T_SET:
-	    if (0) {
-		printf("; SET [ecx+%d] = %d + [ecx+%d]*%d + [ecx+%d]*%d\n",
-			n->offset, n->count,
-			n->offset2, n->count2,
-			n->offset3, n->count3);
-	    }
-
-	    if (n->count2 == 1 && n->count3 == 0) {
-		/* m[1] = m[2]*1 + m[3]*0 */
-		printf("\tmov bl,byte [ecx+%d]\n", n->offset2);
-		printf("\tmov byte [ecx+%d],bl\n", n->offset);
-	    } else if (n->count2 == 1 && n->offset2 == n->offset) {
-		/* m[1] = m[1]*1 + m[3]*n */
-		if (n->count3 == -1) {
-		    printf("\tmov al,byte [ecx+%d]\n", n->offset3);
-		    printf("\tsub byte [ecx+%d],al\n", n->offset);
-		} else if (n->count3 == 1) {
-		    printf("\tmov al,byte [ecx+%d]\n", n->offset3);
-		    printf("\tadd byte [ecx+%d],al\n", n->offset);
-		} else {
-		    printf("\tmov byte al,[ecx+%d]\n", n->offset3);
-		    printf("\timul ebx,eax,%d\n", SM(n->count3));
-		    printf("\tadd byte [ecx+%d],bl\n", n->offset);
-		}
-	    } else if (n->count2 == 1 && n->count3 == -1) {
-		printf("\tmov al,byte [ecx+%d]\n", n->offset2);
-		printf("\tsub al,byte [ecx+%d]\n", n->offset3);
-		printf("\tmov byte [ecx+%d],al\n", n->offset);
-	    } else {
-		printf("\t; Full T_SET: [ecx+%d] = %d + [ecx+%d]*%d + [ecx+%d]*%d\n",
-			n->offset, n->count,
-			n->offset2, n->count2,
-			n->offset3, n->count3);
-		if (SM(n->count2) == 0) {
-		    printf("\tmov bl,0\n");
-		} else if (n->count2 == -1 ) {
-		    printf("\tmov bl,byte [ecx+%d]\n", n->offset2);
-		    printf("\tneg bl\n");
-		} else {
-		    printf("\tmov al,byte [ecx+%d]\n", n->offset2);
-		    printf("\timul ebx,eax,%d\n", SM(n->count2));
-		}
-		if (SM(n->count3) != 0) {
-		    printf("\tmov byte al,[ecx+%d]\n", n->offset3);
-		    printf("\timul eax,eax,%d\n", SM(n->count3));
-		    printf("\tadd bl,al\n");
-		}
-		printf("\tmov byte [ecx+%d],bl\n", n->offset);
-	    }
-
-	    if (SM(n->count))
-		printf("\tadd byte [ecx+%d],%d\n", n->offset, SM(n->count));
-	    break;
-	    
 	case T_PRT:
-	    if (n->count > -1) {
-		*sp++ = n->count;
-		break;
-	    }
+	    if (n->count == -1) return; /* Not a string */
 
-	    if (n->count == -1) {
-		print_asm_string(0,0,0);
-		if (n->line != 0 && n->line != curr_line) {
-		    printf("%%line %d+0 %s\n", n->line, curfile);
-		    curr_line = n->line;
-		}
-		printf("\tmov al,[ecx+%d]\n", n->offset);
-		printf("\tcall putch\n");
-	    } else {
-		*string_buffer = n->count;
-		print_asm_string(charmap, string_buffer, 1);
-	    }
-	    break;
+	    v->prev->next = v->next;
+	    if (v->next) v->next->prev = v->prev;
+	    v->next = n->next;
+	    v->prev = n;
+	    v->next->prev = v;
+	    v->prev->next = v;
 
-	case T_INP:
-	    if (n->offset != 0) {
-		printf("\tpush ecx\n");
-		printf("\tadd ecx,%d\n", n->offset);
-	    }
-	    printf("\tmov al, 3\n");
-	    printf("\txor ebx, ebx\n");
-	    printf("\tint 0x80\t; read(ebx, ecx, edx);\n");
-	    if (n->offset != 0) {
-		printf("\tpop ecx\n");
-	    }
-	    break;
-
-	case T_ZFIND:
-#if 0
-	    if (n->next->count == 1) {
-		printf("\tlea edi,[ecx+%d]\n",  n->offset);
-
-		printf("\tcmp dh,byte [edi]\n");
-		printf("\tjz end_%d\n", n->count);
-
-		printf("\txor al,al\n");
-		printf("\tmov ebx,ecx\n");
-
-		printf("\txor ecx,ecx\n");
-		printf("\tnot ecx\n");
-		printf("\tcld\n");
-		printf("\trepne	scasb\n");
-		printf("\tnot ecx\n");
-
-		printf("\tadd ecx,ebx\n");
-		printf("\tdec ecx\n");
-		printf("end_%d:\n", n->count);
-		n = n->jmp;
-	    } else
-		goto While_loop_start;
-	    break;
-
-	While_loop_start:;
-#endif
-
-/* LoopClass: condition at 1=> end, 2=>start, 3=>both */
-#define LoopClass 2
-
-	case T_MULT: case T_CMULT:
-	case T_MFIND:
-	case T_ADDWZ: case T_IF: case T_FOR:
-	case T_WHL:
-
-	    /* Need a "near" for jumps that we know are a long way away because
-	     * nasm is VERY slow at working out which sort of jump to use 
-	     * without the hint. But we can't be sure exactly what number to
-	     * put here without being a lot more detailed about the
-	     * instructions we use so we don't force short jumps.
-	     */
-	    if (abs(n->ipos - n->jmp->ipos) > 120)
-		neartok = " near";
+	    /* Skipping past the whole string with prev */
+	    if (n->prevskip)
+		v->prevskip = n->prevskip;
 	    else
-		neartok = "";
-
-	    printf("\t; Loop %d, %s\n", n->count, tokennames[n->type]);
-	    if (n->type == T_IF || (LoopClass & 2) == 2) {
-		if ((LoopClass & 1) == 0)
-		    printf("start_%d:\n", n->count);
-		printf("\tcmp dh,byte [ecx+%d]\n", n->offset);
-		printf("\tjz%s end_%d\n", neartok, n->count);
-		if ((LoopClass & 1) == 1 && n->type != T_IF)
-		    printf("loop_%d:\n", n->count);
-	    } else {
-		printf("\tjmp%s last_%d\n", neartok, n->count);
-		printf("loop_%d:\n", n->count);
-	    }
-	    break;
-
-	case T_END: 
-	    if (abs(n->ipos - n->jmp->ipos) > 120)
-		neartok = " near";
-	    else
-		neartok = "";
-
-	    if (n->jmp->type == T_IF) {
-		printf("end_%d:\n", n->jmp->count);
-	    } else if ((LoopClass & 1) == 0) {
-		printf("\tjmp%s start_%d\n", neartok, n->jmp->count);
-		printf("end_%d:\n", n->jmp->count);
-	    } else {
-		if ((LoopClass & 2) == 0)
-		    printf("last_%d:\n", n->jmp->count);
-		printf("\tcmp dh,byte [ecx+%d]\n", n->jmp->offset);
-		printf("\tjnz%s loop_%d\n", neartok, n->jmp->count);
-		if ((LoopClass & 2) == 2)
-		    printf("end_%d:\n", n->jmp->count);
-	    }
-	    break;
-
-	case T_STOP: 
-	    printf("\tcmp dh,byte [ecx+%d]\n", n->offset);
-	    printf("\tjz near exit_prog\n");
-	    break;
-
-	case T_NOP: 
-	    fprintf(stderr, "Warning on code generation: "
-	           "NOP node: ptr+%d, cnt=%d, @(%d,%d).\n",
-		    n->offset, n->count, n->line, n->col);
-	    break;
-
-	default:
-	    printf("; Bad node: type %d: ptr+%d, cnt=%d.\n",
-		    n->type, n->offset, n->count);
-	    fprintf(stderr, "Error on code generation:\n"
-	           "Bad node: type %d: ptr+%d, cnt=%d.\n",
-		    n->type, n->offset, n->count);
-	    break;
+		v->prevskip = n;
+	    return;
 	}
-	n=n->next;
-    }
-
-    if(sp != string_buffer) {
-	print_asm_string(charmap, string_buffer, sp-string_buffer);
-    }
-
-    if (!noheader) {
-	printf("\n");
-	printf("exit_prog:\n");
-	printf("\tmov\tbl, 0\t\t; Exit status\n");
-	printf("\txor\teax, eax\n");
-	printf("\tinc\teax\t\t; syscall(1, 0 {, ecx, edx} )\n");
-	printf("\tint\t0x80\n");
-	printf("\t;; EXIT ;;\n");
-	printf("\n");
-	printf("filesize equ\tsection..bss.start-orgaddr\n");
-	printf("\tsection\t.bss align=4096\n");
-	if (!hard_left_limit) 
-	    printf("\tresb 4096\n");
-	printf("mem:\n");
+	n = n->prev;
     }
 }
 
@@ -2803,13 +2490,10 @@ run_ccode(void)
 {
     char * ccode;
     size_t ccodelen;
-    int imagesize;
-    void * image = 0;
 
     FILE * ofd;
     TCCState *s;
     int rv;
-    int (*func)(void);
     void * memp;
 
     ofd = open_memstream(&ccode, &ccodelen);
@@ -2835,40 +2519,48 @@ run_ccode(void)
     /* If our code was read from stdin it'll be done in standard mode,
      * the stdio stream is now modal (always a bad idea) so it's been switched
      * to standard mode, stupidly, it's now impossible to switch it back.
+     *
+     * So have the loaded C code use our getch and putch functions.
      */
-    if (iostyle)
-	tcc_add_symbol(s, "get_char", &get_char);
+    tcc_add_symbol(s, "getch", &getch);
+    tcc_add_symbol(s, "putch", &putch);
 
 #if defined(TCC0925) && !defined(TCCDONE)
 #define TCCDONE
 #error "Version specific"
-    imagesize = tcc_relocate(s, 0);
-    if (imagesize <= 0) {
-        fprintf(stderr, "tcc_relocate failed to return code size.\n");
-        exit(1);
-    }
-    image = malloc(imagesize);
-    rv = tcc_relocate(s, image);
-    if (rv) {
-        fprintf(stderr, "tcc_relocate failed error=%d\n", rv);
-        exit(1);
-    }
+    {
+	int (*func)(void);
+	int imagesize;
+	void * image = 0;
 
-    /* This line produces a spurious warning. The issue is that ISO99 C 
-     * provides no way to covert a void* to a function pointer. This is
-     * because on some nasty old machines the pointers are not compatible.
-     * For example 8086 'medium model'.
-     */
-    func = tcc_get_symbol(s, "main");
-    if (!func) {
-        fprintf(stderr, "Could not find compiled code entry point\n");
-        exit(1);
-    }
-    tcc_delete(s);
-    free(ccode);
+	imagesize = tcc_relocate(s, 0);
+	if (imagesize <= 0) {
+	    fprintf(stderr, "tcc_relocate failed to return code size.\n");
+	    exit(1);
+	}
+	image = malloc(imagesize);
+	rv = tcc_relocate(s, image);
+	if (rv) {
+	    fprintf(stderr, "tcc_relocate failed error=%d\n", rv);
+	    exit(1);
+	}
 
-    func();
-    free(image);
+	/* This line produces a spurious warning. The issue is that ISO99 C 
+	 * provides no way to covert a void* to a function pointer. This is
+	 * because on some nasty old machines the pointers are not compatible.
+	 * For example 8086 'medium model'.
+	 */
+	func = tcc_get_symbol(s, "main");
+	if (!func) {
+	    fprintf(stderr, "Could not find compiled code entry point\n");
+	    exit(1);
+	}
+	tcc_delete(s);
+	free(ccode);
+
+	func();
+	free(image);
+    }
 #endif
 
 #if !defined(TCCDONE)
@@ -2884,12 +2576,17 @@ run_ccode(void)
 }
 #endif
 
+/*
+ * This outputs the tree as a flat 'machine code' like language.
+ * In theory this can easily be used directly as macro invocations by any
+ * macro assembler.
+ *
+ * Currently it's just a clean tree dump.
+ */
 void 
 print_adder(void)
 {
     struct bfi * n = bfprog;
-    int last_offset = 0;
-    int last_offset_ok = 0;
 
     if (verbose)
 	fprintf(stderr, "Generating Adding machine code.\n");
@@ -2903,79 +2600,69 @@ print_adder(void)
 	switch(n->type)
 	{
 	case T_MOV:
-	    if (n->next == 0 || n->next->type != T_END) {
-		fprintf(stderr, "Adding machine conversion failed; needs -O1\n");
-		exit(1);
-	    }
+	    printf("pmov\t%d\n", n->count);
 	    break;
 
 	case T_ADD:
-	    if (n->offset == last_offset && last_offset_ok)
-		printf("add %d\n", n->count);
-	    else
-		printf("add %d,%d\n", n->count, n->offset);
-	    last_offset = n->offset;
-	    last_offset_ok = 1;
+	    printf("add\t%d,%d\n", n->offset, n->count);
 	    break;
 
 	case T_EQU:
-	    printf("loop %d\n", n->offset);
-	    printf("add -1\n");
-	    printf("next\n");
-	    if (n->count != 0)
-		printf("add %d\n", n->count);
-	    last_offset = n->offset;
-	    last_offset_ok = 1;
+	    printf("setv\t%d,%d\n", n->offset, n->count);
 	    break;
 
 	case T_SET:
-	    printf("set [%d]=%d+[%d]*%d+[%d]*%d\n",
-		n->offset, n->count, n->offset2, n->count2, n->offset3, n->count3);
+	    if (n->count == 0) {
+		if (n->count3 == 0) {
+		    if (n->count2 == 1) {
+			printf("calc\t%d =[%d]\n",
+			    n->offset, n->offset2);
+		    } else {
+			printf("calc\t%d =[%d]*%d\n",
+			    n->offset, n->offset2, n->count2);
+		    }
+		} else if (n->offset == n->offset2 && n->count2 == 1) {
+		    printf("calc\t%d +=[%d]*%d\n",
+			n->offset, n->offset3, n->count3);
+		} else {
+		    printf("calc\t%d =[%d]*%d+[%d]*%d\n",
+			n->offset, n->offset2, n->count2, n->offset3, n->count3);
+		}
+	    } else {
+		if (n->count3 == 0) {
+		    printf("calc\t%d =%d+[%d]*%d\n",
+			n->offset, n->count, n->offset2, n->count2);
+		} else {
+		    printf("calc\t%d =%d+[%d]*%d+[%d]*%d\n",
+			n->offset, n->count, n->offset2, n->count2, n->offset3, n->count3);
+		}
+	    }
 	    break;
 
 	case T_PRT:
 	    if (n->count > -1) {
-		printf("outchar %d\n", n->count);
+		if (n->count >= ' ' && n->count <= '~' && n->count != '\'')
+		    printf("putchar\t'%c'\n", n->count);
+		else
+		    printf("putchar\t%d\n", n->count);
 		break;
 	    }
-	    if (n->offset == last_offset && last_offset_ok)
-		printf("out\n");
-	    else
-		printf("out %d\n", n->offset);
-	    last_offset = n->offset;
-	    last_offset_ok = 1;
+	    printf("write\t%d\n", n->offset);
 	    break;
 
 	case T_INP:
-	    if (n->offset == last_offset && last_offset_ok)
-		printf("in\n");
-	    else
-		printf("in %d\n", n->offset);
-	    last_offset = n->offset;
-	    last_offset_ok = 1;
+	    printf("read\t%d\n", n->offset);
 	    break;
 
 	case T_MULT: case T_CMULT:
 	case T_MFIND:
 	case T_ZFIND: case T_ADDWZ: case T_IF: case T_FOR:
 	case T_WHL:
-	    if (n->offset == last_offset && last_offset_ok)
-		printf("loop\n");
-	    else
-		printf("loop %d\n", n->offset);
-	    last_offset = n->offset;
-	    last_offset_ok = 1;
+	    printf("loop\t%d\n", n->offset);
 	    break;
 
 	case T_END: 
-	    if (n->prev && n->prev->type == T_MOV) {
-		printf("next %d\n", n->offset + n->prev->count);
-		last_offset_ok = 0;
-	    } else {
-		printf("next\n");
-		last_offset_ok = 1;
-	    }
-	    last_offset = n->jmp->offset;
+	    printf("next\t%d\n", n->jmp->offset);
 	    break;
 
 	case T_NOP: 
@@ -2985,8 +2672,11 @@ print_adder(void)
 	    break;
 
 	default:
-	    printf("# Bad node: type %d: ptr+%d, cnt=%d.\n",
-		    n->type, n->offset, n->count);
+	    printf("%s\t%d,%d,%d,%d,%d,%d\n",
+		tokennames[n->type],
+		    n->offset, n->count,
+		    n->offset2, n->count2,
+		    n->offset3, n->count3);
 	    fprintf(stderr, "Error on code generation:\n"
 	           "Bad node: type %d: ptr+%d, cnt=%d.\n",
 		    n->type, n->offset, n->count);
@@ -3003,6 +2693,13 @@ pint(int v)
     else     printf("%d", v);
 }
 
+/*
+ * Regenerate some BF code.
+ *
+ * NOTE: Most optimised tokens cannot be generated because the code would 
+ * need temp cells on the tape, but the information as to which temps were
+ * used has been discarded.
+ */
 void 
 print_bf(void)
 {
@@ -3153,26 +2850,52 @@ print_bf(void)
 }
 
 int
-get_char(void)
+getch(int oldch)
 {
-    int c;
+    int c = EOF;
     /* The "standard" getwchar() is really dumb, it will refuse to read
      * characters from a stream it getchar() has touched it first.
      * It does this EVEN if this is an ASCII+Unicode machine.
      *
      * So I have to mess around with this...
+     *
+     * But it does give me somewhere to stick the EOF rubbish.
      */
-    do {
-	if (iostyle == 1) {
-	    wchar_t wch = EOF;
-	    if (scanf("%lc", &wch))
-		c = wch;
-	    else
-		c = EOF;
-	} else
-	    c=getchar();
-    } while(c == '\r');
-    return c;
+    if (eofcell != 5)
+	for(;;) {
+	    if (iostyle == 1) {
+		int rv;
+		wchar_t wch = EOF;
+		rv = scanf("%lc", &wch);
+		if (rv == EOF)
+		    c = EOF;
+		else if (rv == 0)
+		    continue;
+		else
+		    c = wch;
+	    } else
+		c = getchar();
+
+	    if (c == '\r') continue;
+	    break;
+	}
+    if (c != EOF) return c;
+    switch(eofcell)
+    {
+    case 2: return -1;
+    case 3: return 0;
+    case 4: return EOF;
+    default: return oldch;
+    }
+}
+
+void
+putch(int ch)
+{
+    if (ch > 127 && iostyle == 1)
+	printf("%lc", ch);
+    else
+	putchar(ch);
 }
 
 void
@@ -3209,15 +2932,27 @@ map_hugeram(void)
 		MAP_PRIVATE+MAP_ANONYMOUS+MAP_NORESERVE, -1, 0);
 
     if (mp == MAP_FAILED) {
+	/* Try half size */
+	cell_array_alloc_len = MEMSIZE/2 + 2*MEMGUARD;
+	mp = mmap(0, cell_array_alloc_len,
+		    PROT_READ+PROT_WRITE,
+		    MAP_PRIVATE+MAP_ANONYMOUS+MAP_NORESERVE, -1, 0);
+    }
+
+    if (mp == MAP_FAILED) {
 	fprintf(stderr, "Cannot map memory for cell array\n");
 	exit(1);
     }
+
+    if (cell_array_alloc_len < MEMSIZE)
+	fprintf(stderr, "Warning: Only able to map part of cell array, continuing.\n");
+
     cell_array_low_addr = mp;
 
     if (MEMGUARD > 0) {
 	/* unmap the guard regions */
 	munmap(mp, MEMGUARD); mp += MEMGUARD;
-	munmap(mp+MEMSIZE, MEMGUARD);
+	munmap(mp+cell_array_alloc_len-2*MEMGUARD, MEMGUARD);
     }
 
     cell_array_pointer = mp;
@@ -3232,7 +2967,8 @@ sigsegv_report(int signo, siginfo_t * siginfo, void * ptr)
 {
     if(cell_array_pointer != 0) {
 	if (siginfo->si_addr > cell_array_pointer - MEMGUARD &&
-	    siginfo->si_addr < cell_array_pointer + MEMSIZE + MEMGUARD) {
+	    siginfo->si_addr <
+		    cell_array_pointer + cell_array_alloc_len - MEMGUARD) {
 
 	    fprintf(stderr, "Tape pointer has moved %s available space\n",
 		    siginfo->si_addr > cell_array_pointer? "above": "below");
@@ -3240,7 +2976,7 @@ sigsegv_report(int signo, siginfo_t * siginfo, void * ptr)
 	}
     }
     if(siginfo->si_addr < (void*)0 + 1024*1024) {
-	fprintf(stderr, "Program fault: NULL Pointer dereference.\n");
+	fprintf(stderr, "Program fault: NULL Pointer dereference. (@%p)\n", siginfo->si_addr);
     } else {
 	fprintf(stderr, "Segmentation violation at unusual address.\n");
     }
@@ -3292,12 +3028,6 @@ convert_tree_to_runarray(void)
     }
 #else
 #define M(x) UM(x)
-#endif
-
-#ifdef USEHUGERAM
-    m = map_hugeram();
-#else
-    m = freep = tcalloc(MEMSIZE, sizeof*m);
 #endif
 
     while(n)
@@ -3419,6 +3149,14 @@ convert_tree_to_runarray(void)
     *p++ = 0;
     *p++ = T_STOP;
 
+    delete_tree();
+
+#ifdef USEHUGERAM
+    m = map_hugeram();
+#else
+    m = freep = tcalloc(MEMSIZE, sizeof*m);
+#endif
+
     p = progarray;
 
     for(;;) {
@@ -3480,10 +3218,7 @@ convert_tree_to_runarray(void)
 	    break;
 
 	case T_INP:
-	    {
-		int c = get_char();
-		if (c != EOF) *m = c;
-	    }
+	    *m = getch(*m);
 	    p += 1;
 	    break;
 
@@ -3494,11 +3229,7 @@ convert_tree_to_runarray(void)
 		    fprintf(stderr, "Output limit reached\n");
 		    goto break_break;
 		}
-
-		if (ch > 127 && iostyle == 1)
-		    printf("%lc", ch);
-		else
-		    putchar(ch);
+		putch(ch);
 	    }
 	    p += 2;
 	    break;
