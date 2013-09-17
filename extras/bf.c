@@ -1,21 +1,33 @@
 /*****************************************************************************
 This is an interpreter for the "brainfuck" language.
 
-It simply takes the original code, runlength encodes it, adds a couple
-of minor instruction tweaks and saves it as an array.
+It simply takes the original code, runlength encodes it and reencodes
+some common sequences into calls of specific C fragments.  Each emulator
+'call' is stored into an array of mov+cmd+arg triples.
 
 It runs embarrassingly quickly.
 
 But please do compile it with an optimising compiler; the interpretation 
 loop is only a good start not perfect assembler.
 
-    gcc -O3 -Wall -pedantic -ansi -o bf bf.c
+The code is pure (old) ansi and compiles with this:
 
-This is, a little, better with GCC if you do this.
+    gcc -O -Wall -pedantic -ansi -o bf bf.c
+
+Performance may be improved if you do this, but you must choose the BF
+that's profiled with a little care.
 
     gcc -O3 -o bf -Wall -fprofile-generate bf.c
     echo 80 | bf prime.b >/dev/null
     gcc -O3 -o bf -fprofile-use bf.c
+
+A BF profile will be dumped after execution if the PROFILE define is set.
+
+Without the PROFILE set the triples can be dumped using '-d' or converted
+into C with '-c'.
+
+The '-x' option disables the "extended" instructions just leaving a pure
+RLE conversion of the BF code.
 
 *****************************************************************************/
 
@@ -49,8 +61,8 @@ void read_image(char * imagename);
 void process_image(void);
 void run_image(void);
 
-void hex_image(void);
-void dump_prog(void);
+void hex_tape(void);
+void dump_prog(int filter);
 void dump_c(void);
 
 struct pgm {
@@ -64,7 +76,7 @@ struct pgm {
 
 unsigned char * image;
 cell * mem;
-int imagelen, proglen, memlen = 129*1024;
+int imagelen, proglen, memlen = 60*1024, memoff = 1024;
 
 int opt_dump_prog = 0;
 int opt_no_xtras = 0;
@@ -89,7 +101,7 @@ main(int argc, char **argv)
 	} else break;
     }
     if(argc < 2) {
-	fprintf(stderr, "Usage: %s [-d][-x] filename\n", argv[0]);
+	fprintf(stderr, "Usage: %s [-d][-c][-x] filename\n", argv[0]);
 	exit(1);
     }
     read_image(argv[1]);
@@ -97,14 +109,15 @@ main(int argc, char **argv)
 
     if (opt_dump_prog) {
 	if (opt_dump_prog&1)
-	    dump_prog();
+	    dump_prog(0);
 	else
 	    dump_c();
     } else {
 	mem = calloc(memlen,sizeof*mem);
 	run_image();
 #ifdef PROFILE
-	dump_prog();
+	dump_prog(1);
+	hex_tape();
 #endif
     }
 
@@ -305,7 +318,7 @@ process_image(void)
 			}
 		    }
 
-		    /* [-<<] [->>]  Zip along an array clearing the flag column. */
+		    /* [-<<] [->>]  Run along a rail clearing the flag column*/
 		    if (image[i] == '[' && image[i+1] == '-' &&
 			(image[i+2] == '>' || image[i+2] == '<'))
 		    {
@@ -327,8 +340,8 @@ process_image(void)
 		    /* [->>>+>>>+<<<<<<]   Multiply or move loop. */
 		    if (image[i] == ']' && depth > 0) {
 			/* There will be just ADDs in the loop, with the
-			 * total of the 'MOV' fields being zero.
-			 * But allow a set too.
+			 * total of the 'mov' fields being zero.
+			 * But allow a set too, it's easy.
 			 */
 			int v, movsum = prog[p].mov, incby = 0;
 			for(v=p-1; prog[v].op == 1 || prog[v].op == 8 ; v--) {
@@ -376,7 +389,7 @@ process_image(void)
     }
     prog[p++].op = 0;
     if (p>proglen)
-	fprintf(stderr, "Memory overun, conversion of program was longer than expected by %d bytes!\n", p-proglen);
+	fprintf(stderr, "Memory overun, conversion of program was longer than expected by %d!\n", p-proglen);
 
     proglen = p;
     free(stack);
@@ -386,17 +399,20 @@ process_image(void)
 }
 
 void
-dump_prog(void)
+dump_prog(int filter)
 {
     int i;
+    putchar('\n');
     for(i=0; i<proglen; i++) {
 #ifdef PROFILE
-	if (prog[i].profile == 0) continue;
+	if (prog[i].profile < filter) continue;
 	printf("%-10d ", prog[i].profile);
 #endif
 	if (prog[i].mov)
 	    printf("mov %d, ", prog[i].mov);
-	printf("%s %d\n", opcodes[prog[i].op & 0xF], prog[i].arg);
+	printf("%s", opcodes[prog[i].op & 0xF]);
+	if (prog[i].arg) printf(" %d", prog[i].arg);
+	printf("\n");
     }
 }
 
@@ -405,23 +421,32 @@ dump_c(void)
 {
     int i;
     printf("#include <stdio.h>\n");
-    printf("int mem[60000];\n");
-    printf("int main(void){int*m=mem+1024,a;\n");
+    printf("int mem[%d];\n", memlen);
+    printf("int main(void){int*m=mem+%d,a;\n", memoff);
+    printf("setbuf(stdout,0);\n");
     for(i=0; i<proglen; i++) {
-	if (prog[i].mov) {
-	    if (prog[i].op == 1) {
-		printf("*(m+=%d)+=%d;\n", prog[i].mov, prog[i].arg);
-		continue;
-	    } else
-		printf("m+=%d;", prog[i].mov);
-	}
+        if (prog[i].mov) {
+            switch (prog[i].op) {
+            case 1:
+                printf("*(m+=%d)+=%d;\n", prog[i].mov, prog[i].arg);
+                continue;
+            case 2:
+                printf("putchar(*(m+=%d));\n", prog[i].mov);
+                continue;
+            case 8:
+                printf("*(m+=%d)= %d;\n", prog[i].mov, prog[i].arg);
+                continue;
+            default:
+                printf("m+=%d;", prog[i].mov);
+            }
+        }
 	switch(prog[i].op) {
 	case 0: printf("return %d;}\n", prog[i].arg); break;
 	case 1: printf("*m+=%d;\n", prog[i].arg); break;
 	case 2: printf("putchar(*m);\n"); break;
 	case 3: printf("a=getchar();if(a!=EOF)*m=a;\n"); break;
-	case 4: printf("while(*m){\n"); break;
-	case 5: printf("}\n"); break;
+	case 4: if(prog[i].arg) printf("while(*m){\n"); break;
+	case 5: if(prog[i].arg) printf("}\n"); break;
 	case 8: printf("*m= %d;\n", prog[i].arg); break;
 	case 9: printf("while(*m)m+=%d;\n", prog[i].arg); break;
 	case 10: printf("(*m)--;");
@@ -444,6 +469,7 @@ dump_c(void)
     }
 }
 
+#ifdef PROFILE
 void
 hex_output(FILE * ofd, int ch)
 {
@@ -473,19 +499,20 @@ static int pos = 0, addr = 0;
     }
 }
 
-void hex_image(void)
+void hex_tape(void)
 {
     int     i, j = 0;
     if (mem) {
-	for (i = 0; i < memlen; i++)
+	for (i = memoff; i < memlen; i++)
 	    if (mem[i])
 		j = i + 1;
 	j = ((j + 15) & ~0xF);
-	for (i = 0; i < j; i++)
+	for (i = memoff; i < j; i++)
 	    hex_output(stdout, mem[i]);
 	hex_output(stdout, EOF);
     }
 }
+#endif
 
 #ifndef EXTERNAL_RUNNER
 #ifdef  __GNUC__
@@ -509,10 +536,13 @@ void hex_image(void)
 /* Interpreter.
  */
 
+#ifdef __GNUC__
+__attribute((optimize(3),hot,aligned(64)))
+#endif
 void run_image(void)
 {
     struct pgm *p = prog;
-    cell * m = mem+1024;
+    cell * m = mem+memoff;
     int a = 0;
 #if DEBUG
     fprintf(stderr, "p=0x%08x+%d, m=0x%08x+%d\n", prog, proglen, mem, memlen);
