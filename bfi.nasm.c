@@ -130,6 +130,10 @@ print_asm()
     I need an assembler for *that* machine code, obviously to run it the 
     assembler will have to do a reverse translation to x86 machine code
     though.
+
+    Perhaps, just programming to GNU lightning would be close enough ...
+    it does seem that most of the changes I make to this code don't actually
+    change performance at all.
 */
 
     if (!noheader) {

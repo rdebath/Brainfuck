@@ -26,11 +26,21 @@ Note: Telling this program the Cell size you will be using allows it
 to generate better code.
 
 TODO:
-    Second and later files are input to BF program.
+    NAME THIS INTERPRETER!
 
-    Move non-C generators into other files.
-	Add GNU Jit variant ?
-	Add i386 binary version ?
+    BF generator to search for temp cells by spotting T_SET and T_EQU.
+	Use for printchar and T_SET.
+
+    Allow generated C code use a expanding realloc'd array.
+	"if ((m+=2) >= memend) m = realloc_mem(m);"
+    For negative too ?
+	Note: makes railrunners very slow.
+
+    Second and later files are input to BF program?
+
+    Move non-C generators (or all ?) into other files.
+	Add GNU Jit variant ? (only 2.0 is x64)
+	Add i386 binary version ? (Register allocation?)
 	Each type has a #define to enable it in this file.
 	Plus an overall one.
 
@@ -40,17 +50,23 @@ TODO:
     IF Known not-zero at start of loop --> do { } while();
 
     New C function on Level 2 end while.
+	Outer while and direct code in main() rest in functions.
 
     T_HINT(offset), save results of known value search.
 	-- Problem, values become known as the code simplifies.
 	-- Manually added hints in a hash array?
-	-- Only use the manual hints "sometimes" eg: T_PRT.
+	-- Only use the manual hints "sometimes", when?
 
     Add T_ENDIF, will never loop. Move loop variable reset out of loop.
 
     Other macros "[>>]" rail runner extensions, array access.
+	Mole style array access has NO prequesites.
 
     Code: "m[0]++; m[1] += !m[0];" 16 bit inc.
+	If T_MOV gcd is 2 this will always be aligned.
+	But code for 16bit inc uses both m[-1] and m[2].
+
+    Sneak ... identify the few BF interpreters. Remove them.
 
 ------------------------------------------------
     If first 2 characters are '#!' allow comments beginning with '#'
@@ -135,12 +151,10 @@ enum codestyle { c_default, c_c, c_asm, c_bf, c_adder };
 int do_codestyle = c_default;
 
 int opt_level = 3;
-int disable_rle = 0;
 int hard_left_limit = 0;
-int output_limit = 0;
 int enable_trace = 0;
 int iostyle = 0; /* 0=ASCII, 1=UTF8 */
-int eofcell = 0; /* 0=> Undecided, 1=> No Change, 2= -1, 3= 0, 4=EOF, 5=No Input. */
+int eofcell = 0; /* 0=> Default, 1=> No Change, 2= -1, 3= 0, 4=EOF, 5=No Input. */
 
 int cell_size = 0;  /* 0=> 8,16,32 or more. 7 and up are number of bits */
 int cell_mask = -1;
@@ -167,6 +181,7 @@ double run_time = 0;
 int loaded_nodes = 0;
 int total_nodes = 0;
 int node_type_counts[TCOUNT+1];
+int node_profile_counts[TCOUNT+1];
 int min_pointer = 0, max_pointer = 0;
 int most_negative_mov = 0, most_positive_mov = 0;
 double profile_hits = 0.0;
@@ -208,42 +223,67 @@ void putch(int oldch);
 void set_cell_size(int cell_bits);
 void convert_tree_to_runarray(void);
 
-void Usage(void)
+void LongUsage(FILE * fd)
 {
-    fprintf(stderr, "%s: Version 0.1.0\n", program);
-    fprintf(stderr, "Usage: %s [options] [files]\n", program);
-    fprintf(stderr, "   -h   This message.\n");
-    fprintf(stderr, "   -v   Verbose, repeat for more.\n");
-    fprintf(stderr, "   -r   Run in interpreter.\n");
-    fprintf(stderr, "   -c   Create C code.\n");
+    fprintf(fd, "%s: Version 0.1.0\n", program);
+    fprintf(fd, "Usage: %s [options] [BF file]\n", program);
+    if (fd != stdout) {
+	fprintf(fd, "   -h   Long help message.\n");
+	fprintf(fd, "   -v   Verbose, repeat for more.\n");
+	fprintf(fd, "   -r   Run in interpreter.\n");
+	fprintf(fd, "   -c   Create C code.\n");
+	exit(1);
+    }
+
+    printf("   -h   This message.\n");
+    printf("   -v   Verbose, repeat for more.\n");
+    printf("        Three -v or more switches to profiling interpreter\n");
+    printf("   -r   Run in interpreter.\n");
+    printf("   -c   Create C code.\n");
 #ifdef _BFI_NASM_H
-    fprintf(stderr, "   -s   Create NASM code.\n");
+    printf("   -s   Create NASM code.\n");
 #endif
-    fprintf(stderr, "        Default is to generate & run the C code.\n");
-    fprintf(stderr, "   -T   Create trace statements in output C code.\n");
-    fprintf(stderr, "   -H   Remove headers in output code; optimiser cannot see start either.\n");
-    fprintf(stderr, "   -u   Wide character (unicode) I/O%s\n", iostyle?" (default)":"");
-    fprintf(stderr, "   -a   Ascii I/O%s\n", iostyle?"":" (default)");
-    fprintf(stderr, "   -On  'Optimisation level'\n");
-    fprintf(stderr, "   -O0      Turn off all optimisation, just leave RLE.\n");
-    fprintf(stderr, "   -O1      Only pointer motion removal.\n");
-    fprintf(stderr, "   -O2      A few simple changes.\n");
-    fprintf(stderr, "   -O3      Maximum normal level, default.\n");
-    fprintf(stderr, "   -m   Minimal processing; same as -O0\n");
-    fprintf(stderr, "   -R   Like -m but disable RLE too.\n");
-    fprintf(stderr, "   -B8  Use 8 bit cells.\n");
-    fprintf(stderr, "   -B16 Use 16 bit cells.\n");
-    fprintf(stderr, "   -B32 Use 32 bit cells.\n");
-    fprintf(stderr, "        Default for C is 'unknown', ASM can only be 8bit.\n");
-    fprintf(stderr, "        Other bitwidths work (including 7) for the interpreter and C.\n");
-    fprintf(stderr, "        Full Unicode characters need 21 bits.\n");
-    fprintf(stderr, "   -E0  One of the other options; choose later.\n");
-    fprintf(stderr, "   -E1  End of file gives no change for ',' command.\n");
-    fprintf(stderr, "   -E2  End of file gives -1.\n");
-    fprintf(stderr, "   -E3  End of file gives 0.\n");
-    fprintf(stderr, "   -E4  End of file gives EOF.\n");
-    fprintf(stderr, "   -E5  Disable ',' command.\n");
+    printf("        Default is to generate & run the C code.\n");
+    printf("   -T   Create trace statements in output C code.\n");
+    printf("\n");
+    printf("   -H   Remove headers in output code\n");
+    printf("        Also prevents optimiser assuming the tape starts blank.\n");
+    printf("   -u   Wide character (unicode) I/O%s\n", iostyle?" (default)":"");
+    printf("   -a   Ascii I/O%s\n", iostyle?"":" (default)");
+    printf("\n");
+    printf("   -On  'Optimisation level'\n");
+    printf("   -O0      Turn off all optimisation, just leave RLE.\n");
+    printf("   -O1      Only enable pointer motion optimisation.\n");
+    printf("   -O2      Allow a few simple optimisations.\n");
+    printf("   -O3      Maximum normal level, default.\n");
+    printf("   -O-1     Turn off all optimisation, disable RLE too.\n");
+    printf("   -m   Minimal processing; same as -O0\n");
+    printf("\n");
+    printf("   -B8  Use 8 bit cells.\n");
+    printf("   -B16 Use 16 bit cells.\n");
+    printf("   -B32 Use 32 bit cells.\n");
+    printf("        Default for C code is 'unknown', ASM can only be 8bit.\n");
+    printf("        Other bitwidths work (including 7) for the interpreter and C.\n");
+    printf("        Full Unicode characters need 21 bits.\n");
+    printf("        The optimiser may work better if this is not unknown.\n");
+    printf("\n");
+    printf("   -En  End of file processing for '-r'.\n");
+    printf("   -E1      End of file gives no change for ',' command.\n");
+    printf("   -E1      End of file gives no change for ',' command.\n");
+    printf("   -E2      End of file gives -1.\n");
+    printf("   -E3      End of file gives 0.\n");
+    printf("   -E4      End of file gives EOF.\n");
+    printf("   -E5      Disable ',' command.\n");
+    printf("\n");
+    printf("   -F       Attempt to regenerate BF code.\n");
+    printf("   -A       Generate taken list output, possibly suitable as a base for a macro assembler.\n");
     exit(1);
+}
+
+void
+Usage(void)
+{
+    LongUsage(stderr);
 }
 
 void
@@ -276,6 +316,7 @@ main(int argc, char ** argv)
                 switch(*p) {
                     char ch, * ap;
                     case '-': opton = 0; break;
+                    case 'h': LongUsage(stdout); break;
                     case 'v': verbose++; break;
                     case 'H': noheader=1; break;
                     case 'r': do_run=1; break;
@@ -286,7 +327,6 @@ main(int argc, char ** argv)
                     case 'A': do_codestyle = c_adder; break;
                     case 'F': do_codestyle = c_bf; break;
                     case 'm': opt_level=0; break;
-                    case 'R': opt_level=0; disable_rle = 1; break;
                     case 'T': enable_trace=1; break;
                     case 'u': iostyle=1; break;
                     case 'a': iostyle=0; break;
@@ -304,7 +344,6 @@ main(int argc, char ** argv)
                         }
                         switch(ch) {
                             case 'O': opt_level = strtol(ap,0,10); break;
-                            case 'L': output_limit=strtol(ap,0,10); break;
                             case 'E': eofcell=strtol(ap,0,10); break;
                             case 'B': set_cell_size(strtol(ap,0,10)); break;
                             default:  Usage();
@@ -336,8 +375,11 @@ main(int argc, char ** argv)
     }
 #endif
 
-    if (!do_run && do_codestyle == c_default)
+    if (!do_run && do_codestyle == c_default) {
 	do_run = 1;
+	if (verbose<3)
+	    do_codestyle = c_c;
+    }
 
     if (cell_size == 0 && do_run) set_cell_size(32);
 
@@ -371,7 +413,7 @@ open_file(char * fname)
 	perror(fname);
 	exit(1);
     }
-    while((ch = getc(ifd)) != EOF && (ifd!=stdin || ch != '!')) {
+    while((ch = getc(ifd)) != EOF && (ifd!=stdin || ch != '!' || !n)) {
 	if (ch == '\n') { curr_line++; curr_col=0; }
 	else curr_col ++;
 
@@ -379,6 +421,9 @@ open_file(char * fname)
 	    ch == '[' || ch == ']' || ch == ',' || ch == '.') {
 #ifndef NO_BFCOMMENT
 	    /* Comment loops, can never be run */
+	    /* This BF code isn't just dead it's been buried in soft peat
+	     * for three months and recycled as firelighters. */
+
 	    if (dld || (ch == '[' && !noheader && (!p || p->type == ']'))) {
 		if (ch == '[') dld ++;
 		if (ch == ']') dld --;
@@ -386,7 +431,7 @@ open_file(char * fname)
 	    }
 #endif
 #ifndef NO_RLE
-	    if (!disable_rle) {
+	    if (opt_level>=0) {
 		/* RLE compacting of instructions. */
 		if (p && ch == p->type && p->count ){
 		    p->count++;
@@ -590,6 +635,7 @@ print_c_header(FILE * ofd, int * minimal_p)
 
     fprintf(ofd, "#include <stdio.h>\n");
     fprintf(ofd, "#include <stdlib.h>\n\n");
+    fprintf(ofd, "#include <stdint.h>\n\n");
 
     if (cell_size == 0) {
 	fprintf(ofd, "# ifndef C\n");
@@ -621,39 +667,6 @@ print_c_header(FILE * ofd, int * minimal_p)
 	fprintf(ofd, "#endif\n");
 	fprintf(ofd, "}\n\n");
     }
-
-#if 0
-    if (node_type_counts[T_INP] != 0 && !do_run) {
-	if (eofcell == 0) {
-	    fprintf(ofd, "#ifndef EOFCELL\n");
-	    fprintf(ofd, "# define save(vn,gf) {int ch=gf; if(ch!=EOF) vn=ch;}\n");
-	    fprintf(ofd, "#else\n");
-	    fprintf(ofd, "# if EOFCELL == EOF\n");
-	    fprintf(ofd, "#  define save(vn,gf) vn=gf\n");
-	    fprintf(ofd, "# else\n");
-	    fprintf(ofd, "#  define save(vn,gf) {int ch=gf; "
-			    "if(ch!=EOF) vn=ch; else vn=EOFCELL;}\n");
-	    fprintf(ofd, "# endif\n");
-	    fprintf(ofd, "#endif\n");
-	    fprintf(ofd, "#define getch(vn) save(*(vn), get_char())\n");
-	} else if (eofcell == 1) {
-	    fprintf(ofd, "#define getch(vn) {int ch=get_char(); "
-			    "if(ch!=EOF) *(vn)=ch;}\n");
-	} else if (eofcell == 2) {
-	    fprintf(ofd, "#define getch(vn) {int ch=get_char(); "
-			    "if(ch!=EOF) *(vn)=ch; else *(vn)=-1;}\n");
-	} else if (eofcell == 3) {
-	    fprintf(ofd, "#define getch(vn) {int ch=get_char(); "
-			    "if(ch!=EOF) *(vn)=ch; else *(vn)=0;}\n");
-	} else if (eofcell == 4) {
-	    fprintf(ofd, "#define getch(vn) *(vn)=get_char()\n");
-	} else
-	    fprintf(ofd, "#define getch(vn)\n");
-
-	if (!do_run || iostyle != 1)
-	    fprintf(ofd, "#define get_char() get%schar()\n", (iostyle==1?"w":""));
-    }
-#endif
 
     if (node_type_counts[T_PRT] != 0 && !do_run) {
 	fprintf(ofd, "#ifdef WIDECHAR\n");
@@ -946,7 +959,7 @@ print_ccode(FILE * ofd)
 	    break;
 	case T_ZFIND:
 	    /* TCCLIB generates a slow 'strlen', even with overheads libc is better. */
-	    if (do_run && cell_size == 8 && add_mask <= 0 &&
+	    if (cell_size == 8 && add_mask <= 0 &&
 		    n->next->next == n->jmp && n->next->count == 1) {
 		pt(ofd, indent,n);
 		if (n->offset)
@@ -990,7 +1003,7 @@ print_ccode(FILE * ofd)
 	    break;
 	case T_STOP: 
 	    pt(ofd, indent,n);
-	    fprintf(ofd, "if(m[%d]) return 1;\n", n->offset);
+	    fprintf(ofd, "return 1;\n");
 	    break;
 	case T_NOP: 
 	    fprintf(stderr, "Warning on code generation: "
@@ -1112,8 +1125,10 @@ process_file(void)
 	    break;
     }
 
-    if (verbose>2 && (do_run || verbose<6))
+    if (verbose>2 && (do_run || verbose<6)) {
+	print_tree_stats();
 	printtree();
+    }
 }
 
 void
@@ -1158,7 +1173,7 @@ calculate_stats(void)
 void
 print_tree_stats(void)
 {
-    int i;
+    int i, has_node_profile = 0;;
     calculate_stats();
 
     fprintf(stderr, "Total nodes %d, loaded %d", total_nodes, loaded_nodes);
@@ -1168,10 +1183,21 @@ print_tree_stats(void)
 	fprintf(stderr, "Run time %.4fs, cycles %.0f, %.3fns/cycle\n",
 	    run_time, profile_hits, 1000000000.0*run_time/profile_hits);
     fprintf(stderr, "Tokens");
-    for(i=0; i<TCOUNT; i++)
+    for(i=0; i<TCOUNT; i++) {
 	if (node_type_counts[i])
 	    fprintf(stderr, ", %s=%d", tokennames[i], node_type_counts[i]);
+	if (node_profile_counts[i])
+	    has_node_profile++;
+    }
     fprintf(stderr, "\n");
+    if (has_node_profile) {
+	fprintf(stderr, "Token profiles");
+	for(i=0; i<TCOUNT; i++) {
+	    if (node_profile_counts[i])
+		fprintf(stderr, ", %s=%d", tokennames[i], node_profile_counts[i]);
+	}
+	fprintf(stderr, "\n");
+    }
 }
 
 #ifndef NOPCOUNT
@@ -1221,6 +1247,7 @@ run_tree(void)
 
     while(n){
 	n->profile++;
+	node_profile_counts[n->type]++;
 	switch(n->type)
 	{
 	    case T_MOV: p += n->count; break;
@@ -1245,11 +1272,6 @@ run_tree(void)
 	    case T_PRT:
 	    {
 		int ch = M(n->count == -1?p[n->offset]:n->count);
-		if (ch == '\n' && output_limit && --output_limit == 0) {
-		    fprintf(stderr, "Output limit reached\n");
-		    goto break_break;
-		}
-
 		/*TODO: stop the clock ? */
 		putch(ch);
 		break;
@@ -1307,12 +1329,9 @@ run_tree(void)
 		break;
 
 	    case T_STOP:
-		if(M(p[n->offset]) != 0) {
-		    if (verbose)
-			fprintf(stderr, "STOP Command executed.\n");
-		    return;
-		}
-		break;
+		if (verbose)
+		    fprintf(stderr, "STOP Command executed.\n");
+		goto break_break;
 
 	    case T_NOP:
 		break;
@@ -1534,6 +1553,7 @@ quick_scan(void)
 	}
 
 	/* Looking for "[-]" or "[+]" */
+	/* The loop classifier won't pick up [+] */
 	if( n->type == T_WHL && n->next && n->next->next &&
 	    n->next->type == T_ADD &&
 	    n->next->next->type == T_END &&
@@ -1547,13 +1567,38 @@ quick_scan(void)
 	    n->type = T_NOP;
 	    n->next->next->type = T_NOP;
 
-	    if(verbose>4 && n->type == T_NOP) {
+	    if(verbose>4) {
 		fprintf(stderr, "Replaced loop with set.\n");
 		printtreecell(stderr, 1, n->next);
 		fprintf(stderr, "\n");
 	    }
 	}
 
+	/* Looking for "[]" Trivial infinite loop, replace it with an abort
+	 * style command.
+	 */
+	if( n->type == T_WHL && n->next &&
+	    n->next->type == T_END ) {
+	    /* Insert a T_STOP */
+
+	    n2 = tcalloc(1, sizeof*n);
+	    n2->inum = bfi_num++;
+	    n2->line = n->line;
+	    n2->col = n->col;
+	    n->next->prev = n2;
+	    n2->next = n->next;
+	    n->next = n2;
+	    n2->prev = n;
+	    n2->type = T_STOP;
+
+	    if(verbose>4) {
+		fprintf(stderr, "Inserted a T_STOP in a [].\n");
+		printtreecell(stderr, 1, n->next);
+		fprintf(stderr, "\n");
+	    }
+	}
+
+	/* Clean up the T_NOPs */
 	if (n && n->type == T_NOP) {
 	    n2 = n; n = n->next;
 	    if(n2->prev) n2->prev->next = n; else bfprog = n;
@@ -2016,10 +2061,8 @@ find_known_state(struct bfi * v)
 	    if (verbose>5) fprintf(stderr, "  Make literal putchar.\n");
 	    return 1;
 
-	case T_IF:
-	case T_FOR:
-	case T_MULT:
-	case T_CMULT:
+	case T_ZFIND: case T_MFIND: case T_ADDWZ:
+	case T_IF: case T_FOR: case T_MULT: case T_CMULT:
 	case T_WHL: /* Change to (possible) constant loop or dead code. */
 	    if (!non_zero_unsafe) {
 		if (known_value == 0) {
@@ -2028,14 +2071,19 @@ find_known_state(struct bfi * v)
 		    return 1;
 		}
 
-		if (v->type == T_IF ) {
+		if (v->type == T_FOR && known_value == 1) {
+		    v->type = T_IF;
+		}
+
+		if (v->type == T_IF) {
 		    v->type = T_NOP;
 		    v->jmp->type = T_NOP;
 		    if (verbose>5) fprintf(stderr, "  Change to If loop.\n");
 		    return 1;
 		}
 	    }
-	    if (v->type != T_IF)
+	    if (v->type == T_MULT || v->type == T_CMULT ||
+		    v->type == T_FOR || v->type == T_WHL)
 		return flatten_loop(v, known_value);
 	    break;
 
@@ -3049,6 +3097,10 @@ convert_tree_to_runarray(void)
 	    arraylen += 7;
 	    break;
 
+	case T_STOP:
+	    arraylen += 2;
+	    break;
+
 	default:
 	    fprintf(stderr, "Invalid node type found = %d\n", n->type);
 	    exit(1);
@@ -3225,10 +3277,6 @@ convert_tree_to_runarray(void)
 	case T_PRT:
 	    {
 		int ch = M(p[1] == -1?*m:p[1]);
-		if (ch == '\n' && output_limit && --output_limit == 0) {
-		    fprintf(stderr, "Output limit reached\n");
-		    goto break_break;
-		}
 		putch(ch);
 	    }
 	    p += 2;
