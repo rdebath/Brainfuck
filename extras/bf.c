@@ -41,27 +41,34 @@ TODO:
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <string.h>
 
-#ifndef M
-typedef unsigned char cell; /* The type of the cell for the 'tape' */
-#define MASK(x) x	    /* Mask for putchar & while */
-#elif M == -1
-typedef int cell;	    /* The type of the cell for the 'tape' */
-#define MASK(x) x	    /* Mask for putchar & while */
+/* The type of the cell for the 'tape' and the mask for putchar & while */
+#if !defined(M) || M == 1
+typedef unsigned char cell;
+#define MASK(x) x
+#elif M == 2
+typedef unsigned short cell;
+#define MASK(x) x
+#elif M == 8
+typedef int64_t cell;
+#define MASK(x) x
+#elif M < 126
+typedef int cell;
+#define MASK(x) x
 #else
-typedef int cell;	    /* The type of the cell for the 'tape' */
-#define MASK(x) ((x)&M)	    /* Mask for putchar & while */
+typedef int cell;
+#define MASK(x) ((x)%(M+1))
 #endif
 
 void read_image(char * imagename);
 void process_image(void);
 void run_image(void);
 
-void hex_tape(void);
 void dump_prog(int filter);
 void dump_c(void);
 
@@ -82,8 +89,9 @@ int opt_dump_prog = 0;
 int opt_no_xtras = 0;
 
 char *opcodes[] = {
-    "stop", "add", "out", "in", "jz", "jnz", "6", "7",
-    "set", "findz", "findm1", "arrayz", "save", "mul", "qset", "F"
+    "stop", "add", "out", "in", "jz", "jnz", "op6", "op7",
+    "set", "findz", "findm1", "arrayz", "save", "mul", "qset", "op15",
+    "nop"
 };
 
 int
@@ -117,7 +125,6 @@ main(int argc, char **argv)
 	run_image();
 #ifdef PROFILE
 	dump_prog(1);
-	hex_tape();
 #endif
     }
 
@@ -343,8 +350,10 @@ process_image(void)
 			 * total of the 'mov' fields being zero.
 			 * But allow a set too, it's easy.
 			 */
-			int v, movsum = prog[p].mov, incby = 0;
+			int v, v2, movsum = prog[p].mov, incby = 0;
 			for(v=p-1; prog[v].op == 1 || prog[v].op == 8 ; v--) {
+			    if (movsum == 0 && prog[v].op == 8)
+				break;
 			    if (movsum == 0)
 				incby += prog[v].arg;
 			    movsum += prog[v].mov;
@@ -353,18 +362,23 @@ process_image(void)
 			if (movsum == 0 && incby == -1 && prog[v].op == 4) {
 			    prog[v].op = 12;
 			    prog[v].arg = 0;
-			    v++;
-			    for(;v != p; v++)
+			    v++; v2=v;
+			    for(;v < p; v++)
 			    {
 				movsum += prog[v].mov;
 				if (movsum == 0) {
-				    prog[v].op = 8;
+				    prog[v].op = 16;
 				    prog[v].arg = 0;
+				    prog[v+1].mov += prog[v].mov;
+				    prog[v].mov = 0;
+				    memmove(prog+v, prog+v+1, sizeof(prog[v])*(p-v+1));
+				    v--;
 				} else if (prog[v].op == 1) {
 				    /* Is another case for arg==1 useful?  */
 				    prog[v].op = 13;
-				} else
+				} else {
 				    prog[v].op = 14;
+				}
 			    }
 			    depth --;
 			    break;
@@ -405,12 +419,11 @@ dump_prog(int filter)
     putchar('\n');
     for(i=0; i<proglen; i++) {
 #ifdef PROFILE
-	if (prog[i].profile < filter) continue;
 	printf("%-10d ", prog[i].profile);
 #endif
 	if (prog[i].mov)
 	    printf("mov %d, ", prog[i].mov);
-	printf("%s", opcodes[prog[i].op & 0xF]);
+	printf("%s", opcodes[prog[i].op]);
 	if (prog[i].arg) printf(" %d", prog[i].arg);
 	printf("\n");
     }
@@ -454,7 +467,7 @@ dump_c(void)
 		 printf("(*m)++;\n");
 		 break;
 	case 11: printf("while(*m){*m-=1;m+=%d;}\n", prog[i].arg); break;
-	case 12: printf("a= *m;\n"); break;
+	case 12: printf("a= *m, *m=0;\n"); break;
 	case 13: if (prog[i].arg == 1) 
 		    printf("*m+=a;\n");
 		else if (prog[i].arg == -1)
@@ -464,55 +477,10 @@ dump_c(void)
 		break;
 	case 14: printf("if(a)*m= %d;\n", prog[i].arg); break;
 
-	default: printf("/*%s %d*/\n", opcodes[prog[i].op & 0xF], prog[i].arg);
+	default: printf("/*%s %d*/\n", opcodes[prog[i].op], prog[i].arg);
 	}
     }
 }
-
-#ifdef PROFILE
-void
-hex_output(FILE * ofd, int ch)
-{
-static char linebuf[80];
-static char buf[20];
-static int pos = 0, addr = 0;
-
-    if( ch == EOF ) {
-        if(pos)
-            fprintf(ofd, "%06x:  %.66s\n", addr, linebuf);
-        pos = 0;
-             addr = 0;
-    } else {
-        if(!pos)
-            memset(linebuf, ' ', sizeof(linebuf));
-        sprintf(buf, "%02x", ch&0xFF);
-        memcpy(linebuf+pos*3+(pos>7), buf, 2);
-
-        if( ch > ' ' && ch <= '~' )
-                linebuf[50+pos] = ch;
-        else    linebuf[50+pos] = '.';
-        pos = ((pos+1) & 0xF);
-        if( pos == 0 ) {
-	    fprintf(ofd, "%06x:  %.66s\n", addr, linebuf);
-	    addr += 16;
-	}
-    }
-}
-
-void hex_tape(void)
-{
-    int     i, j = 0;
-    if (mem) {
-	for (i = memoff; i < memlen; i++)
-	    if (mem[i])
-		j = i + 1;
-	j = ((j + 15) & ~0xF);
-	for (i = memoff; i < j; i++)
-	    hex_output(stdout, mem[i]);
-	hex_output(stdout, EOF);
-    }
-}
-#endif
 
 #ifndef EXTERNAL_RUNNER
 #ifdef  __GNUC__
@@ -543,7 +511,7 @@ void run_image(void)
 {
     struct pgm *p = prog;
     cell * m = mem+memoff;
-    int a = 0;
+    cell a = 0;
 #if DEBUG
     fprintf(stderr, "p=0x%08x+%d, m=0x%08x+%d\n", prog, proglen, mem, memlen);
 #endif
@@ -623,10 +591,11 @@ void run_image(void)
 		    *m -= 1;
 		    m += p->arg;
 		}
+		break;
 
 	    /* [->>>+>>>+<<<<<<]  Save the loop value at the start. */
 	    case 12:
-		a = *m;
+		a = *m; *m = 0;
 		break;
 
 	    /* [->>>+>>>+<<<<<<]  Multiply and add. */
@@ -637,6 +606,7 @@ void run_image(void)
 	    /* [->>>+>>>+<<<<<<]  Test and set. */
 	    case 14:
 		if (a) *m = p->arg;
+		// *m = (-!!a & p->arg) | (-!a & *m);
 		break;
 	}
 #if DEBUG
