@@ -5,10 +5,10 @@ extern int verbose, noheader, enable_trace, hard_left_limit;
 
 #define TOKEN_LIST(Mac) \
     Mac(MOV) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
-    Mac(EQU) Mac(SET) \
+    Mac(SET) Mac(CALC) \
     Mac(ZFIND) Mac(MFIND) Mac(ADDWZ) \
-    Mac(IF) Mac(MULT) Mac(CMULT) Mac(FOR) \
-    Mac(RAILC) Mac(SET2) Mac(SET3) \
+    Mac(IF) Mac(ENDIF) Mac(MULT) Mac(CMULT) Mac(FOR) \
+    Mac(RAILC) Mac(CALC2) Mac(CALC3) \
     Mac(STOP) Mac(NOP) Mac(DEAD)
 
 #define GEN_TOK_ENUM(NAME) T_ ## NAME,
@@ -38,8 +38,12 @@ struct bfi
 };
 
 extern struct bfi *bfprog;
-
+extern const char* tokennames[];
 extern int node_type_counts[TCOUNT+1];
+
+/* How far to search for constants. */
+#define SEARCHDEPTH     10
+#define SEARCHRANGE     10000
 
 void calculate_stats(void);
 void printtreecell(FILE * efd, int indent, struct bfi * n);

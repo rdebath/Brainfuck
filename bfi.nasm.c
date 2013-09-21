@@ -25,6 +25,8 @@ static int textno = -1;
         printf("\tpush ecx\n");
         printf("\tmov ecx,putchbuf\n");
         printf("\tmov byte [ecx],al\n");
+        printf("\txor eax, eax\n");
+        printf("\tmov edx,1\n");
         printf("\tjmp syswrite\n");
 	printf("prttext:\n");
         printf("\tpush ecx\n");
@@ -48,13 +50,15 @@ static int textno = -1;
 	int ch = *strbuf & 0xFF;
 	if (charmap[ch] == 0) {
 	    charmap[ch] = 1;
-	    printf("%%line 1 lib_putch_%02x.s\n", ch);
+	    if (saved_line > 0)
+		printf("%%line 1 lib_putch_%02x.s\n", ch);
 	    printf("section .textlib\n");
 	    printf("litprt_%02x:\n", ch);
 	    printf("\tmov al,0x%02x\n", ch);
 	    printf("\tjmp putch\n");
 	    printf("section .text\n");
-	    printf("%%line %d+0 %s\n", saved_line, curfile);
+	    if (saved_line > 0)
+		printf("%%line %d+0 %s\n", saved_line, curfile);
 	    curr_line = saved_line;
 	}
 	printf("\tcall litprt_%02x\n", ch);
@@ -62,7 +66,8 @@ static int textno = -1;
 	int i;
 	textno++;
 	if (saved_line != curr_line) {
-	    printf("%%line %d+0 %s\n", saved_line, curfile);
+	    if (saved_line > 0)
+		printf("%%line %d+0 %s\n", saved_line, curfile);
 	    curr_line = saved_line;
 	}
 	printf("section .data\n");
@@ -198,8 +203,8 @@ print_asm()
 	switch(n->type) {
 	case T_MOV: i++; break;
 	case T_ADD: i+=3; break;
-	case T_EQU: i+=3; break;
-	case T_SET: i+=6; break;
+	case T_SET: i+=3; break;
+	case T_CALC: i+=6; break;
 	case T_PRT: i+=9; break;
 	case T_INP: i+=9; break;
 	default: i+=6; break;
@@ -210,7 +215,7 @@ print_asm()
     while(n)
     {
 	if (sp != string_buffer) {
-	    if ((n->type != T_EQU && n->type != T_ADD && n->type != T_PRT) ||
+	    if ((n->type != T_SET && n->type != T_ADD && n->type != T_PRT) ||
 		(n->type == T_PRT && n->count == -1) ||
 		(sp >= string_buffer + sizeof(string_buffer) - 2)
 	       ) {
@@ -266,13 +271,13 @@ print_asm()
 	    printf("\tadd byte [ecx+%d],%d\n", n->offset, SM(n->count));
 	    break;
 	    
-	case T_EQU:
+	case T_SET:
 	    printf("\tmov byte [ecx+%d],%d\n", n->offset, SM(n->count));
 	    break;
 	    
-	case T_SET:
+	case T_CALC:
 	    if (0) {
-		printf("; SET [ecx+%d] = %d + [ecx+%d]*%d + [ecx+%d]*%d\n",
+		printf("; CALC [ecx+%d] = %d + [ecx+%d]*%d + [ecx+%d]*%d\n",
 			n->offset, n->count,
 			n->offset2, n->count2,
 			n->offset3, n->count3);
@@ -300,7 +305,7 @@ print_asm()
 		printf("\tsub al,byte [ecx+%d]\n", n->offset3);
 		printf("\tmov byte [ecx+%d],al\n", n->offset);
 	    } else {
-		printf("\t; Full T_SET: [ecx+%d] = %d + [ecx+%d]*%d + [ecx+%d]*%d\n",
+		printf("\t; Full T_CALC: [ecx+%d] = %d + [ecx+%d]*%d + [ecx+%d]*%d\n",
 			n->offset, n->count,
 			n->offset2, n->count2,
 			n->offset3, n->count3);
@@ -346,12 +351,16 @@ print_asm()
 	    break;
 
 	case T_INP:
+
 	    if (n->offset != 0) {
 		printf("\tpush ecx\n");
 		printf("\tadd ecx,%d\n", n->offset);
 	    }
+	    printf("\txor eax,eax\n");
+	    printf("\tmov ebx,eax\n");
+	    printf("\tcdq\n");
+	    printf("\tinc edx\n");
 	    printf("\tmov al, 3\n");
-	    printf("\txor ebx, ebx\n");
 	    printf("\tint 0x80\t; read(ebx, ecx, edx);\n");
 	    if (n->offset != 0) {
 		printf("\tpop ecx\n");
@@ -439,6 +448,10 @@ print_asm()
 	    }
 	    break;
 
+	case T_ENDIF:
+	    printf("end_%d:\n", n->jmp->count);
+	    break;
+
 	case T_STOP: 
 	    printf("\tcmp dh,byte [ecx+%d]\n", n->offset);
 	    printf("\tjz near exit_prog\n");
@@ -470,7 +483,7 @@ print_asm()
 	printf("exit_prog:\n");
 	printf("\tmov\tbl, 0\t\t; Exit status\n");
 	printf("\txor\teax, eax\n");
-	printf("\tinc\teax\t\t; syscall(1, 0 {, ecx, edx} )\n");
+	printf("\tinc\teax\t\t; syscall(1, 0)\n");
 	printf("\tint\t0x80\n");
 	printf("\t;; EXIT ;;\n");
 	printf("\n");
