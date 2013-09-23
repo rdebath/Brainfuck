@@ -234,6 +234,7 @@ int classify_loop(struct bfi * v);
 int flatten_multiplier(struct bfi * v);
 void build_string_in_tree(struct bfi * v);
 void * tcalloc(size_t nmemb, size_t size);
+struct bfi * add_node_after(struct bfi * p);
 void print_adder(void);
 void * map_hugeram(void);
 void trap_sigsegv(void);
@@ -534,6 +535,26 @@ tcalloc(size_t nmemb, size_t size)
 
     fprintf(stderr, "Allocate of %zd*%zd bytes failed, ABORT\n", nmemb, size);
     exit(42);
+}
+
+struct bfi *
+add_node_after(struct bfi * p)
+{ 
+    struct bfi * n = tcalloc(1, sizeof*n);
+    n->inum = bfi_num++;
+    n->type = T_NOP;
+    if (p) {
+	n->line = p->line;
+	n->col = p->col;
+	n->prev = p;
+	n->next = p->next;
+	if (n->next) n->next->prev = n;
+	n->prev->next = n;
+    } else if (bfprog) {
+	fprintf(stderr, "Error in add_node_after()\n");
+    } else bfprog = n;
+
+    return n;
 }
 
 void 
@@ -873,7 +894,7 @@ print_ccode(FILE * ofd)
 		else if (n->count > 0)
 		    fprintf(ofd, "*m += %d;\n", n->count);
 		else
-		    fprintf(ofd, "/* m[%d] += 0; */\n", n->offset);
+		    fprintf(ofd, "/* *m += 0; */\n");
 	    } else {
 		if (n->count < 0)
 		    fprintf(ofd, "m[%d] -= %d;\n", n->offset, -n->count);
@@ -977,6 +998,8 @@ print_ccode(FILE * ofd)
 		}
 		if (minimal)
 		    fprintf(ofd, "printf(\"%%lc\", m[%d]);\n", n->offset);
+		else if (n->offset == 0)
+		    fprintf(ofd, "putch(*m);\n");
 		else
 		    fprintf(ofd, "putch(m[%d]);\n", n->offset);
 	    } else {
@@ -1002,7 +1025,10 @@ print_ccode(FILE * ofd)
 	    break;
 	case T_INP:
 	    pt(ofd, indent,n);
-	    fprintf(ofd, "m[%d] = getch(m[%d]);\n", n->offset, n->offset);
+	    if (n->offset == 0)
+		fprintf(ofd, "*m = getch(*m);\n");
+	    else
+		fprintf(ofd, "m[%d] = getch(m[%d]);\n", n->offset, n->offset);
 	    if (enable_trace) {
 		pt(ofd, indent,0);
 		fprintf(ofd, "t(%d,%d,\"\",m+ %d)\n", n->line, n->col, n->offset);
@@ -1061,7 +1087,10 @@ print_ccode(FILE * ofd)
 	case T_MULT:
 	case T_MFIND:
 	    pt(ofd, indent,n);
-	    fprintf(ofd, "while(m[%d]) {\n", n->offset);
+	    if (n->offset)
+		fprintf(ofd, "while(m[%d]) {\n", n->offset);
+	    else
+		fprintf(ofd, "while(*m) {\n");
 	    break;
 	case T_ADDWZ:
 	    pt(ofd, indent,n);
@@ -1530,6 +1559,11 @@ pointer_scan(void)
 		    /* Insert record at loop start */
 		    n2 = n->next;
 		    n2->offset += n->count;
+
+		    n4 = add_node_after(n2);
+		    n4->type = n->type;
+		    n4->count = n->count;
+#if 0
 		    n3 = n2->next;
 		    n4 = tcalloc(1, sizeof*n);
 		    n4->inum = bfi_num++;
@@ -1541,7 +1575,13 @@ pointer_scan(void)
 		    n4->prev = n2;
 		    n4->type = n->type;
 		    n4->count = n->count;
+#endif
 
+		    n4 = add_node_after(n->next->jmp->prev);
+		    n4->type = n->type;
+		    n4->count = -n->count;
+
+#if 0
 		    /* Insert record at loop end */
 		    n2 = n->next->jmp->prev;
 		    n3 = n2->next;
@@ -1555,6 +1595,7 @@ pointer_scan(void)
 		    n4->prev = n2;
 		    n4->type = n->type;
 		    n4->count = -n->count;
+#endif
 		}
 
 		/* Move this record past loop */
@@ -1669,26 +1710,25 @@ quick_scan(void)
 	    }
 	}
 
-	/* Looking for "[]" Trivial infinite loop, replace it with an abort
-	 * style command.
+	/* Looking for "[]" the Trivial infinite loop, replace it with
+	 * conditional abort.
 	 */
 	if( n->type == T_WHL && n->next &&
 	    n->next->type == T_END ) {
-	    /* Insert a T_STOP */
 
-	    n2 = tcalloc(1, sizeof*n);
-	    n2->inum = bfi_num++;
-	    n2->line = n->line;
-	    n2->col = n->col;
-	    n->next->prev = n2;
-	    n2->next = n->next;
-	    n->next = n2;
-	    n2->prev = n;
+	    /* Insert a T_STOP */
+	    n2 = add_node_after(n);
 	    n2->type = T_STOP;
 
 	    /* With the T_STOP there the 'loop' is now a T_IF */
 	    n->type = T_IF;
 	    n2->next->type = T_ENDIF;
+
+	    /* Insert a T_SET */
+	    n2 = add_node_after(n2->next);
+	    n2->type = T_SET;
+	    n2->offset = n->offset;
+	    n2->count = 0;
 
 	    if(verbose>4) {
 		fprintf(stderr, "Inserted a T_STOP in a [].\n");
@@ -1805,9 +1845,12 @@ trim_trailing_sets(void) {
     if (mov_count || max_pointer - min_pointer > 32) return;
 
     if (lastn) {
+#if 0
 	n = tcalloc(1, sizeof*n);
 	n->inum = bfi_num++;
 	lastn->next = n;
+#endif
+	n = add_node_after(lastn);
 
 	for(i=min_pointer; i<= max_pointer; i++) {
 	    n->prev = lastn;
@@ -2199,9 +2242,25 @@ find_known_state(struct bfi * v)
 		    v->jmp->type = T_IF;
 		    v->type = T_ENDIF;
 
-		    /* Insert T_SET to propagate the known value
-		     * and help remove any T_SET within the loop. */
+		    /*
+		     * Move the set out of the loop, if it won't move duplicate
+		     * it to make searches easier as a T_ENDIF does NOT 
+		     * guarentee it's offset is zero.
+		     */
+		    if (n && n->type == T_SET) {
+			n->type = T_NOP;
+			n2 = n; n = n->prev;
+			if (n) n->next = n2->next; else bfprog = n2->next;
+			if (n2->next) n2->next->prev = n;
+			free(n2);
+		    }
 
+		    n2 = add_node_after(v);
+		    n2->type = T_SET;
+		    n2->count = 0;
+		    n2->offset = v->offset;
+
+#if 0
 		    n2 = tcalloc(1, sizeof*n);
 		    n2->inum = bfi_num++;
 		    n2->type = T_SET;
@@ -2213,6 +2272,7 @@ find_known_state(struct bfi * v)
 		    n2->prev = v;
 		    v->next = n2;
 		    if(n2->next) n2->next->prev = n2;
+#endif
 
 		    if (verbose>5) fprintf(stderr, "  Change to If loop.\n");
 		    return 1;
