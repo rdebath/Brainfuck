@@ -1,14 +1,14 @@
 
 extern char * curfile;
 extern int curr_line, curr_col;
-extern int verbose, noheader, enable_trace, hard_left_limit;
+extern int noheader, enable_trace, hard_left_limit;
 
 #define TOKEN_LIST(Mac) \
     Mac(MOV) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
     Mac(SET) Mac(CALC) \
     Mac(ZFIND) Mac(MFIND) Mac(ADDWZ) \
     Mac(IF) Mac(ENDIF) Mac(MULT) Mac(CMULT) Mac(FOR) \
-    Mac(RAILC) Mac(CALC2) Mac(CALC3) \
+    Mac(CALC2) Mac(CALC3) \
     Mac(STOP) Mac(NOP) Mac(DEAD)
 
 #define GEN_TOK_ENUM(NAME) T_ ## NAME,

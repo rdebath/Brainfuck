@@ -100,9 +100,6 @@ print_asm()
     memset(charmap, 0, sizeof(charmap));
     curr_line = -1;
 
-    if (verbose)
-	fprintf(stderr, "Generating NASM Code.\n");
-
 /* System calls used ...
     int 0x80: %eax is the syscall number; %ebx, %ecx, %edx, %esi, %edi and %ebp
     eax
@@ -367,39 +364,11 @@ print_asm()
 	    }
 	    break;
 
-	case T_ZFIND:
-#if 0
-	    if (n->next->count == 1) {
-		printf("\tlea edi,[ecx+%d]\n",  n->offset);
-
-		printf("\tcmp dh,byte [edi]\n");
-		printf("\tjz end_%d\n", n->count);
-
-		printf("\txor al,al\n");
-		printf("\tmov ebx,ecx\n");
-
-		printf("\txor ecx,ecx\n");
-		printf("\tnot ecx\n");
-		printf("\tcld\n");
-		printf("\trepne	scasb\n");
-		printf("\tnot ecx\n");
-
-		printf("\tadd ecx,ebx\n");
-		printf("\tdec ecx\n");
-		printf("end_%d:\n", n->count);
-		n = n->jmp;
-	    } else
-		goto While_loop_start;
-	    break;
-
-	While_loop_start:;
-#endif
-
 /* LoopClass: condition at 1=> end, 2=>start, 3=>both */
 #define LoopClass 3
 
 	case T_MULT: case T_CMULT:
-	case T_MFIND:
+	case T_MFIND: case T_ZFIND:
 	case T_ADDWZ: case T_IF: case T_FOR:
 	case T_WHL:
 
@@ -453,8 +422,7 @@ print_asm()
 	    break;
 
 	case T_STOP: 
-	    printf("\tcmp dh,byte [ecx+%d]\n", n->offset);
-	    printf("\tjz near exit_prog\n");
+	    printf("\tjmp near exit_prog\n");
 	    break;
 
 	case T_NOP: 

@@ -6,6 +6,13 @@
 
 #include "bfi.tree.h"
 
+void
+find_known_value(struct bfi * n, int v_offset, int allow_recursion,
+                struct bfi * n_stop,
+                struct bfi ** n_found,
+                int * const_found_p, int * known_value_p, int * unsafe_p,
+                int * hit_stop_node_p);
+
 static void
 pint(int v)
 {
@@ -19,6 +26,8 @@ pint(int v)
  * Most optimised tokens cannot be generated because the code would need
  * temp cells on the tape, but the information as to which temps were used
  * has been discarded. However, we can use any cell who's value is known.
+ *
+ * You may have to reduce the optimisation to -O1
  */
 void 
 print_bf(void)
@@ -26,9 +35,6 @@ print_bf(void)
     struct bfi *v, *n = bfprog;
     int last_offset = 0;
     int i, nocr = 0;
-
-    if (verbose)
-	fprintf(stderr, "Generating brainfuck code.\n");
 
     while(n)
     {
@@ -171,8 +177,18 @@ print_bf(void)
 	    // if (n->offset == 2) printf("\n> [-]>[-]>[-]>[-]>[-]>[-]>[-]><<<<<<< <");
 	    break;
 
-	case T_END: case T_ENDIF:
+	case T_END:
 	    putchar(']');
+	    nocr = 0;
+	    break;
+
+	case T_ENDIF:
+	    printf("[-]]");
+	    nocr = 0;
+	    break;
+
+	case T_STOP:
+	    printf("[-]+[]");
 	    nocr = 0;
 	    break;
 
@@ -186,7 +202,7 @@ print_bf(void)
 	    fprintf(stderr, "Error on code generation:\n"
 	           "Bad node: %s ptr+%d, cnt=%d.\n",
 		    tokennames[n->type], n->offset, n->count);
-	    fprintf(stderr, "Optimisation level too high for BF output\n");
+	    fprintf(stderr, "Optimisation level probably too high for BF output\n");
 	    exit(1);
 	}
 	if (!nocr)
