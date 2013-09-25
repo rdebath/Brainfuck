@@ -102,6 +102,25 @@ TODO:
     \	Input next character as a literal. ie *m = 'next';
     "..."   Input characters from string on succesive calls.
 
+
+#ifdef DEBUG
+        case '@': {int a; scanf("%d", &a); m=a;} break;
+        case '=': {int a; scanf("%d", &a); mem[m]=a;} break;
+        case '?': printf("Cell %d has value %d\n", m, mem[m]); break;
+        case '#':
+            {
+                int i,j;
+                printf("Pointer = %d\n", m);
+                for(i=0; i<48; i+=16) {
+                    for(j=0; j<16; j++) {
+                        printf("%s%5d", (i+j)==m?">":" ",mem[i+j]);
+                    }
+                    printf("\n");
+                }
+            }
+            break;
+#endif
+
 */
 
 #ifdef __STRICT_ANSI__
@@ -412,9 +431,14 @@ main(int argc, char ** argv)
 
     if (!do_run && do_codestyle == c_default) {
 	do_run = 1;
+#ifdef _BFI_JIT_H
+	if (verbose<3)
+	    do_codestyle = c_jit;
+#else
 #ifdef USETCCLIB
 	if (verbose<3)
 	    do_codestyle = c_c;
+#endif
 #endif
     }
 
@@ -543,6 +567,7 @@ add_node_after(struct bfi * p)
     struct bfi * n = tcalloc(1, sizeof*n);
     n->inum = bfi_num++;
     n->type = T_NOP;
+    n->orgtype = T_NOP;
     if (p) {
 	n->line = p->line;
 	n->col = p->col;
@@ -1384,7 +1409,6 @@ run_tree(void)
 
 	    case T_MULT: case T_CMULT:
 	    case T_IF: case T_FOR:
-	    case T_MFIND:
 
 	    case T_WHL: if(M(p[n->offset]) == 0) n=n->jmp;
 		break;
@@ -1424,6 +1448,19 @@ run_tree(void)
 		if(M(p[n->offset]) == 0) { n=n->jmp; break; }
 		while(M(p[n->offset]))
 		    p += n->next->count;
+		n=n->jmp;
+		break;
+
+	    case T_MFIND:
+	    /* Search along a rail for a minus 1 */
+		{
+		    int stride = n->jmp->prev->count;
+		    while(M(p[n->offset])) {
+			p[n->offset] -= 1;
+			p += stride;
+			p[n->offset] += 1;
+		    }
+		}
 		n=n->jmp;
 		break;
 
@@ -1563,39 +1600,11 @@ pointer_scan(void)
 		    n4 = add_node_after(n2);
 		    n4->type = n->type;
 		    n4->count = n->count;
-#if 0
-		    n3 = n2->next;
-		    n4 = tcalloc(1, sizeof*n);
-		    n4->inum = bfi_num++;
-		    n4->line = n2->line;
-		    n4->col = n2->col;
-		    n2->next = n4;
-		    n3->prev = n4;
-		    n4->next = n3;
-		    n4->prev = n2;
-		    n4->type = n->type;
-		    n4->count = n->count;
-#endif
 
+		    /* Insert record at loop end */
 		    n4 = add_node_after(n->next->jmp->prev);
 		    n4->type = n->type;
 		    n4->count = -n->count;
-
-#if 0
-		    /* Insert record at loop end */
-		    n2 = n->next->jmp->prev;
-		    n3 = n2->next;
-		    n4 = tcalloc(1, sizeof*n);
-		    n4->inum = bfi_num++;
-		    n4->line = n3->line;
-		    n4->col = n3->col;
-		    n2->next = n4;
-		    n3->prev = n4;
-		    n4->next = n3;
-		    n4->prev = n2;
-		    n4->type = n->type;
-		    n4->count = -n->count;
-#endif
 		}
 
 		/* Move this record past loop */
@@ -1724,7 +1733,7 @@ quick_scan(void)
 	    n->type = T_IF;
 	    n2->next->type = T_ENDIF;
 
-	    /* Insert a T_SET */
+	    /* Insert a T_SET for the const. */
 	    n2 = add_node_after(n2->next);
 	    n2->type = T_SET;
 	    n2->offset = n->offset;
@@ -1831,18 +1840,18 @@ invariants_scan(void)
 void
 trim_trailing_sets(void) {
     struct bfi * n = bfprog, *lastn = 0;
-    int min_pointer = 0, max_pointer = 0, mov_count = 0;
+    int min_pointer = 0, max_pointer = 0;
     int node_changed, i;
     while(n)
     {
-	if (n->type == T_MOV)
-	    mov_count ++;
+	if (n->type == T_MOV) return;
+
 	if (min_pointer > n->offset) min_pointer = n->offset;
 	if (max_pointer < n->offset) max_pointer = n->offset;
 	lastn = n;
 	n=n->next;
     }
-    if (mov_count || max_pointer - min_pointer > 32) return;
+    if (max_pointer - min_pointer > 32) return;
 
     if (lastn) {
 #if 0
@@ -1850,25 +1859,25 @@ trim_trailing_sets(void) {
 	n->inum = bfi_num++;
 	lastn->next = n;
 #endif
+	lastn = add_node_after(lastn);
 	n = add_node_after(lastn);
 
 	for(i=min_pointer; i<= max_pointer; i++) {
-	    n->prev = lastn;
 	    n->type = T_SET;
-	    n->count = 0;
+	    n->count = -1;
 	    n->offset = i;
 	    node_changed = find_known_state(n);
-	    if (n->prev == 0) {
-		if (bfprog == n) {
-		    bfprog = n->next;
-		    free(n);
-		}
-		return;
+	    if (node_changed && n->type != T_SET) {
+		n->type = T_SET;
+		n->count = 1;
+		n->offset = i;
+		node_changed = find_known_state(n);
 	    }
-	    lastn = n->prev;
 	}
 	lastn->next = 0;
 	free(n);
+	if (lastn->prev) lastn->prev->next = 0; else bfprog = 0;
+	free(lastn);
     }
 }
 
@@ -2160,6 +2169,22 @@ find_known_state(struct bfi * v)
 		    return 1;
 		}
 		break;
+	    case T_IF:
+		{
+		    /* Nested T_IF with same condition */
+		    struct bfi *n2 = v;
+		    while(n2->prev &&
+			(n2->prev->type == T_ADD || n2->prev->type == T_SET || n2->prev->type == T_CALC) &&
+			    n2->prev->offset != v->offset)
+			n2 = n2->prev;
+		    if (n2) n2 = n2->prev;
+		    if (n2 && n2->offset == v->offset && ( n2->orgtype == T_WHL ) ) {
+			v->type = T_NOP;
+			v->jmp->type = T_NOP;
+			return 1;
+		    }
+		}
+		break;
 	}
 
 	return 0;
@@ -2199,6 +2224,7 @@ find_known_state(struct bfi * v)
 	case T_PRT: /* Print literal character. */
 	    if (v->count != -1) break;
 	    known_value = UM(known_value);
+	    if (known_value < 0) known_value &= 0xFF;
 	    if (known_value == -1) break;
 	    v->count = known_value;
 	    if (verbose>5) fprintf(stderr, "  Make literal putchar.\n");
@@ -2446,8 +2472,8 @@ find_known_calc_state(struct bfi * v)
 
     if (n2 && n2->type == T_CALC && n2_valid &&
 	    v->count2 == 1 && v->count3 == 0 && v->count == 0 &&
-	    n2->next == v && 
-	    v->next && v->next->type == T_SET && v->next->offset == n2->offset) {
+	    n2->next == v && v->next &&
+	    v->next->type == T_SET && v->next->offset == n2->offset) {
 	/* A direct assignment from n2 and it's the previous node and the next
 	 * node wipes it. */
 	/* This is a BF standard form. */
@@ -2461,6 +2487,31 @@ find_known_calc_state(struct bfi * v)
 	n2_valid = 0;
 	rv = 1;
     }
+
+#if 1
+    if (n2 && n2->type == T_CALC && n2_valid && v->next && v->count2 != 0 &&
+	    n2->count == 0 && n2->count3 == 0 && n2->next == v &&
+	    v->next->offset == n2->offset &&
+	    (v->next->type == T_SET ||
+	      ( v->next->type == T_CALC &&
+		v->next->count3 == 0 &&
+		v->next->offset2 != n2->offset)
+	    )) {
+	/* A simple multiplication from n2 and it's the previous node and the next
+	 * node wipes it. */
+	/* This is a BF standard form. */
+
+	v->offset2 = n2->offset2;
+	v->count2 = v->count2 * n2->count2;
+
+	n2->type = T_NOP;
+	if (n2->prev) n2->prev->next = n2->next; else bfprog = n2->next;
+	if (n2->next) n2->next->prev = n2->prev;
+	free(n2);
+	n2_valid = 0;
+	return 1;
+    }
+#endif
 
     if (v->count2 == 0 && v->count3 == 0) {
 	/* This is now a simple T_SET */
@@ -2665,22 +2716,6 @@ flatten_multiplier(struct bfi * v)
 	    n->count3 = n->count;
 	    n->offset3 = v->offset;
 	    n->count = 0;
-
-	    if (n->offset2 == n->offset3 || n->count3 == 0) {
-		n->count2 += n->count3;
-		n->count3 = 0;
-		n->offset3 = n->offset2;
-	    }
-
-	    if (n->count2 == 0 && n->count3 == 0)
-		n->type = T_SET;
-
-	    if (n->count == 0 && n->count2 == 1 && n->count3 == 0 &&
-		    n->offset2 == n->offset) {
-		n->type = T_NOP;
-		n->count = 0;
-		n->count2 = 0;
-	    }
 	}
 	n = n->next;
     }
@@ -2889,7 +2924,7 @@ print_adder(void)
 	switch(n->type)
 	{
 	case T_MOV:
-	    printf("pmov\t%d\t; p += %d\n", n->count, n->count);
+	    printf("ptradd\t%d\t; p += %d\n", n->count, n->count);
 	    break;
 
 	case T_ADD:
@@ -2899,45 +2934,58 @@ print_adder(void)
 	    break;
 
 	case T_SET:
-	    printf("setv\t%d,%d\t; p[%d] = %d\n",
+	    printf("setci\t%d,%d\t; p[%d] = %d\n",
 		    n->offset, n->count,
 		    n->offset, n->count);
 	    break;
 
 	case T_CALC:
 	    if (n->count == 0) {
+		if (n->offset == n->offset2 && n->count2 == 1 && n->count3 == 1) {
+		    printf("addc\t%d,%d\t; p[%d] += p[%d]\n",
+			    n->offset, n->offset3,
+			    n->offset, n->offset3);
+		    break;
+		}
+
+		if (n->offset == n->offset2 && n->count2 == 1) {
+		    printf("addmul\t%d,%d,%d\t; p[%d] += p[%d]*%d\n",
+			    n->offset, n->offset3, n->count3,
+			    n->offset, n->offset3, n->count3);
+		    break;
+		}
+
 		if (n->count3 == 0) {
 		    if (n->count2 == 1) {
-			printf("copyv\t%d,%d",
+			printf("setc\t%d,%d",
 			    n->offset, n->offset2);
 			printf("\t; p[%d] = p[%d]\n",
 			    n->offset, n->offset2);
 		    } else {
-			printf("cmulv\t%d,%d,%d",
+			printf("setmulc\t%d,%d,%d",
 			    n->offset, n->offset2, n->count2);
 			printf("\t; p[%d] = p[%d]*%d\n",
 			    n->offset, n->offset2, n->count2);
 		    }
-		} else if (n->offset == n->offset2 && n->count2 == 1) {
-		    printf("admul\t%d,%d,%d",
-			n->offset, n->offset3, n->count3);
-		    printf("\t; p[%d] += p[%d]*%d\n",
-			n->offset, n->offset3, n->count3);
-		} else {
-		    printf("calc5\t%d,%d,%d,%d,%d",
-			n->offset, n->offset2, n->count2, n->offset3, n->count3);
-		    printf("\t; p[%d] = p[%d]*%d + p[%d]*%d\n",
-			n->offset, n->offset2, n->count2,
-			n->offset3, n->count3);
+		    break;
 		}
+	    }
+
+	    if (n->offset == n->offset2 && n->count2 == 1) {
+		printf("addmuli\t%d,%d,%d,%d\t; p[%d] += p[%d]*%d + %d\n",
+			n->offset, n->offset3, n->count3, n->count,
+			n->offset, n->offset3, n->count3, n->count);
+		break;
+	    }
+
+	    if (n->count3 == 0) {
+		printf("calc4\t%d,%d,%d,%d",
+		    n->offset, n->count, n->offset2, n->count2);
+		printf("\t; p[%d] = %d + p[%d]*%d\n",
+		    n->offset, n->count, n->offset2, n->count2);
 	    } else {
-		if (n->count3 == 0) {
-		    printf("calc4\t%d,%d,%d,%d",
-			n->offset, n->count, n->offset2, n->count2);
-		} else {
-		    printf("calc6\t%d,%d,%d,%d,%d,%d\n",
-			n->offset, n->count, n->offset2, n->count2, n->offset3, n->count3);
-		}
+		printf("calc6\t%d,%d,%d,%d,%d,%d\n",
+		    n->offset, n->count, n->offset2, n->count2, n->offset3, n->count3);
 		printf("\t; p[%d] = %d + p[%d]*%d + p[%d]*%d\n",
 		    n->offset, n->count, n->offset2, n->count2,
 		    n->offset3, n->count3);
@@ -3004,7 +3052,7 @@ getch(int oldch)
 {
     int c = EOF;
     /* The "standard" getwchar() is really dumb, it will refuse to read
-     * characters from a stream it getchar() has touched it first.
+     * characters from a stream if getchar() has touched it first.
      * It does this EVEN if this is an ASCII+Unicode machine.
      *
      * So I have to mess around with this...
@@ -3115,22 +3163,34 @@ map_hugeram(void)
 void
 sigsegv_report(int signo, siginfo_t * siginfo, void * ptr)
 {
+/*
+ *  A segfault handler is likely to be called from inside library functions so
+ *  I'll avoid calling the standard I/O routines.
+ *
+ *  But it's be pretty much safe once I've checked the failed access is
+ *  within the tape range so I will call exit() rather than _exit() to 
+ *  flush the standard I/O buffers in that case.
+ */
+
+#define estr(x) write(2, x, sizeof(x)-1)
     if(cell_array_pointer != 0) {
 	if (siginfo->si_addr > cell_array_pointer - MEMGUARD &&
 	    siginfo->si_addr <
 		    cell_array_pointer + cell_array_alloc_len - MEMGUARD) {
 
-	    fprintf(stderr, "Tape pointer has moved %s available space\n",
-		    siginfo->si_addr > cell_array_pointer? "above": "below");
+	    if( siginfo->si_addr > cell_array_pointer )
+		estr("Tape pointer has moved above available space\n");
+	    else
+		estr("Tape pointer has moved below available space\n");
 	    exit(1);
 	}
     }
-    if(siginfo->si_addr < (void*)0 + 1024*1024) {
-	fprintf(stderr, "Program fault: NULL Pointer dereference. (@%p)\n", siginfo->si_addr);
+    if(siginfo->si_addr < (void*)0 + 128*1024) {
+	estr("Program fault: NULL Pointer dereference.\n");
     } else {
-	fprintf(stderr, "Segmentation violation at unusual address.\n");
+	estr("Segmentation violation, address not recognised.\n");
     }
-    exit(4);
+    _exit(4);
 }
 
 void
@@ -3140,7 +3200,7 @@ trap_sigsegv(void)
 
     saSegf.sa_sigaction = sigsegv_report;
     sigemptyset(&saSegf.sa_mask);
-    saSegf.sa_flags = SA_SIGINFO;
+    saSegf.sa_flags = SA_SIGINFO|SA_NODEFER|SA_RESETHAND;
 
     if(0 > sigaction(SIGSEGV, &saSegf, NULL))
 	perror("Error trapping SIGSEGV, ignoring");
