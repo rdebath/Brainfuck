@@ -9,7 +9,7 @@
 #define TOKEN_LIST(Mac) \
     Mac(MOV) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
     Mac(SET) Mac(ZFIND) Mac(MFIND) Mac(ADDWZ) \
-    Mac(SAVE) Mac(MUL) Mac(QSET) \
+    Mac(MUL) Mac(IFSAV) Mac(ENDIF) \
     Mac(NOP) Mac(STOP) Mac(ERR)
 
 #define GEN_TOK_ENUM(NAME) T_ ## NAME,
@@ -223,9 +223,7 @@ int main(int argc, char **argv)
 
 		if (movsum == 0 && incby == -1 && v->type == T_WHL) {
 		    n = v;
-		    n->type = T_SAVE;
-		    n->count = 0;
-		    n->jmp = 0;
+		    n->type = T_IFSAV;
 		    for(v=n->next; v->type != T_END; v=v->next) {
 			if (v->type == T_MOV)
 			    movsum += v->count;
@@ -234,10 +232,10 @@ int main(int argc, char **argv)
 			} else if (v->type == T_ADD) {
 			    v->type = T_MUL;
 			} else {
-			    v->type = T_QSET;
+			    v->type = T_SET;
 			}
 		    }
-		    v->type = T_NOP;
+		    v->type = T_ENDIF;
 		}
 	    }
 #endif
@@ -414,14 +412,15 @@ run(void)
 	    break;
 
 #ifndef NO_RLE
-	case T_SAVE:
+	case T_ENDIF:
 	    arraylen += 2;
 	    break;
 
-	case T_SET: case T_QSET:
+	case T_SET:
 	case T_MUL:
 	case T_ZFIND: case T_MFIND:
 	case T_ADDWZ:
+	case T_IFSAV:
 #endif
 	case T_INP: case T_PRT:
 	case T_ADD:
@@ -460,7 +459,7 @@ run(void)
 	    p--;
 	    break;
 
-	case T_INP: case T_SAVE:
+	case T_INP:
 	    break;
 
 	case T_PRT:
@@ -468,14 +467,13 @@ run(void)
 	    break;
 
 	case T_ADD: case T_SET:
-	case T_MUL: case T_QSET:
+	case T_MUL:
 	case T_ZFIND: case T_MFIND:
 	case T_ADDWZ:
 	    *p++ = n->count;
 	    break;
 
-	case T_WHL:
-	    p[-1] = T_WHL;
+	case T_WHL: case T_IFSAV:
 	    /* Storing the location of the instruction in the T_END's count
 	     * field; it's not normally used */
 	    n->jmp->count = p-progarray;
@@ -485,6 +483,10 @@ run(void)
 	case T_END:
 	    progarray[n->count] = (p-progarray) - n->count;
 	    *p++ = -progarray[n->count];
+	    break;
+
+	case T_ENDIF:
+	    progarray[n->count] = (p-progarray) - n->count -1;
 	    break;
 	}
 	n = n->next;
@@ -531,9 +533,17 @@ run(void)
 	    p += 2;
 	    break;
 
-	case T_SAVE: a = *m; *m = 0; p += 1; break;
 	case T_MUL: *m += p[1] * a; p += 2; break;
-	case T_QSET: if(a) *m = p[1]; p += 2; break;
+
+	case T_IFSAV:
+	    if(M(*m) == 0) p += p[1];
+	    a = *m; *m = 0;
+	    p += 2;
+	break;
+
+	case T_ENDIF:
+	    p += 1;
+	    break;
 #endif
 
 	case T_INP:
