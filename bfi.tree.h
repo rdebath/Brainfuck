@@ -9,7 +9,7 @@ extern int noheader, enable_trace, hard_left_limit;
     Mac(ZFIND) Mac(MFIND) Mac(ADDWZ) \
     Mac(IF) Mac(ENDIF) Mac(MULT) Mac(CMULT) Mac(FOR) \
     Mac(CALC2) Mac(CALC3) \
-    Mac(STOP) Mac(NOP) Mac(DEAD)
+    Mac(STOP) Mac(NOP) Mac(DEAD) Mac(ERR)
 
 #define GEN_TOK_ENUM(NAME) T_ ## NAME,
 enum token { TOKEN_LIST(GEN_TOK_ENUM) TCOUNT};

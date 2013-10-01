@@ -221,13 +221,13 @@ print_asm()
 	    }
 	}
 
-	if (enable_trace) {
-	    printf("; "); printtreecell(stdout, 0, n); printf("\n");
-	}
-
 	if (n->line != 0 && n->line != curr_line && n->type != T_PRT) {
 	    printf("%%line %d+0 %s\n", n->line, curfile);
 	    curr_line = n->line;
+	}
+
+	if (enable_trace) {
+	    printf("; "); printtreecell(stdout, 0, n); printf("\n");
 	}
 
 	switch(n->type)

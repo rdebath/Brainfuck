@@ -14,6 +14,8 @@
 
 /* GNU lightning's macros upset GCC a little ... */
 #pragma GCC diagnostic ignored "-Wunused-value"
+#pragma GCC optimize("no-strict-aliasing")
+#pragma GCC optimize(1)
 
 static jit_insn codeBuffer[1024*2048];
 
