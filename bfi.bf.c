@@ -6,13 +6,6 @@
 
 #include "bfi.tree.h"
 
-void
-find_known_value(struct bfi * n, int v_offset, int allow_recursion,
-                struct bfi * n_stop,
-                struct bfi ** n_found,
-                int * const_found_p, int * known_value_p, int * unsafe_p,
-                int * hit_stop_node_p);
-
 static void
 pint(int v)
 {
@@ -122,8 +115,8 @@ print_bf(void)
 		 */
 		{
 		    offset = n->offset;
-		    find_known_value(n->prev, offset, SEARCHDEPTH, 0,
-			0, &const_found, &known_value, &non_zero_unsafe, 0);
+		    find_known_value(n->prev, offset,
+			0, &const_found, &known_value, &non_zero_unsafe);
 		}
 
 		i = offset;

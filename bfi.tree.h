@@ -40,6 +40,7 @@ struct bfi
 extern struct bfi *bfprog;
 extern const char* tokennames[];
 extern int node_type_counts[TCOUNT+1];
+extern int total_nodes;
 
 /* How far to search for constants. */
 #define SEARCHDEPTH     10
@@ -47,4 +48,8 @@ extern int node_type_counts[TCOUNT+1];
 
 void calculate_stats(void);
 void printtreecell(FILE * efd, int indent, struct bfi * n);
+
+void
+find_known_value(struct bfi * n, int v_offset, struct bfi ** n_found,
+		int * const_found_p, int * known_value_p, int * unsafe_p);
 

@@ -8,91 +8,15 @@
 
 #define SM(vx) (( ((int)(vx)) <<((sizeof(int)-1)*8))>>((sizeof(int)-1)*8))
 
-void
-print_asm_string(char * charmap, char * strbuf, int strsize)
-{
-static int textno = -1;
-    int saved_line = curr_line;
-    if (textno == -1) {
-	textno++;
+static void print_asm_string(char * charmap, char * strbuf, int strsize);
 
-	printf("%%line 1 lib_string.s\n");
-	curr_line = -1;
-	printf("section .data\n");
-	printf("putchbuf: db 0\n");
-	printf("section .textlib\n");
-	printf("putch:\n");
-        printf("\tpush ecx\n");
-        printf("\tmov ecx,putchbuf\n");
-        printf("\tmov byte [ecx],al\n");
-        printf("\txor eax, eax\n");
-        printf("\tmov edx,1\n");
-        printf("\tjmp syswrite\n");
-	printf("prttext:\n");
-        printf("\tpush ecx\n");
-        printf("\tmov ecx,eax\n");
-	printf("syswrite:\n");
-        printf("\txor eax,eax\n");
-        printf("\tmov ebx,eax\n");
-        printf("\tinc ebx\n");
-        printf("\tmov al, 4\n");
-        printf("\tint 0x80\t; write(ebx, ecx, edx);\n");
-        printf("\txor eax, eax\n");
-        printf("\tcdq\n");
-        printf("\tinc edx\n");
-        printf("\tpop ecx\n");
-        printf("\tret\n");
-	printf("section .text\n");
-    }
-
-    if (strsize <= 0) return;
-    if (strsize == 1) {
-	int ch = *strbuf & 0xFF;
-	if (charmap[ch] == 0) {
-	    charmap[ch] = 1;
-	    if (saved_line > 0)
-		printf("%%line 1 lib_putch_%02x.s\n", ch);
-	    printf("section .textlib\n");
-	    printf("litprt_%02x:\n", ch);
-	    printf("\tmov al,0x%02x\n", ch);
-	    printf("\tjmp putch\n");
-	    printf("section .text\n");
-	    if (saved_line > 0)
-		printf("%%line %d+0 %s\n", saved_line, curfile);
-	    curr_line = saved_line;
-	}
-	printf("\tcall litprt_%02x\n", ch);
-    } else {
-	int i;
-	textno++;
-	if (saved_line != curr_line) {
-	    if (saved_line > 0)
-		printf("%%line %d+0 %s\n", saved_line, curfile);
-	    curr_line = saved_line;
-	}
-	printf("section .data\n");
-	printf("text_%d:\n", textno);
-	for(i=0; i<strsize; i++) {
-	    if (i%8 == 0) {
-		if (i) printf("\n");
-		printf("\tdb ");
-	    } else
-		printf(", ");
-	    printf("0x%02x", (strbuf[i] & 0xFF));
-	}
-	printf("\n");
-	printf("section .text\n");
-	printf("\tmov eax,text_%d\n", textno);
-	printf("\tmov edx,%d\n", strsize);
-	printf("\tcall prttext\n");
-    }
-}
+static int string_only = 0;
 
 void 
 print_asm()
 {
     struct bfi * n = bfprog;
-    char string_buffer[BUFSIZ], *sp = string_buffer;
+    char string_buffer[BUFSIZ+2], *sp = string_buffer;
     char charmap[256];
     char * neartok = "";
     int i;
@@ -100,8 +24,12 @@ print_asm()
     memset(charmap, 0, sizeof(charmap));
     curr_line = -1;
 
+    calculate_stats();
+    string_only = (total_nodes == node_type_counts[T_PRT]);
+
 /* System calls used ...
     int 0x80: %eax is the syscall number; %ebx, %ecx, %edx, %esi, %edi and %ebp
+
     eax
     1	exit(ebx);		Used.
     2	fork(
@@ -122,6 +50,12 @@ print_asm()
     is so full of old junk that it's impossible to optimise without full and
     complete documentation on the specific processor variant.
 
+    eg:
+	http://www.agner.org/optimize/
+	http://www.agner.org/optimize/optimizing_assembly.pdf
+	http://www.agner.org/optimize/microarchitecture.pdf
+	http://www.agner.org/optimize/instruction_tables.pdf
+
     In a real assembly language the only reason for there to be more limited
     versions of instructions is because they're better in some way. perhaps
     faster, perhaps they don't touch the CC register.
@@ -134,13 +68,11 @@ print_asm()
     though.
 
     Perhaps, just programming to GNU lightning would be close enough ...
-    it does seem that most of the changes I make to this code don't actually
-    change performance at all.
+    it does seem that most of the changes I can make to this code don't
+    actually change performance at all.
 */
 
     if (!noheader) {
-	calculate_stats();
-
 	printf("; %s, asmsyntax=nasm\n", curfile);
 	printf("; nasm -f bin -Ox brainfuck.asm ; chmod +x brainfuck\n");
 	printf("\n");
@@ -182,16 +114,31 @@ print_asm()
 	printf("\n");
 	printf("phdrsize      equ     $ - phdr\n");
 	printf("\n");
-	printf("_start:\n");
-	printf("\txor\teax, eax\t; EAX = 0 ;don't change high bits.\n");
-	printf("\tcdq\t\t\t; EDX = 0 ;sign bit of EAX\n");
-	printf("\tinc\tedx\t\t; EDX = 1 ;ARG4 for system calls\n");
-	printf("\tmov\tecx,mem\n");
-	if (node_type_counts[T_MOV] != 0)
-	    printf("\talign 64\n");
-	printf("\tsection\t.textlib align=64\n");
-	printf("\tsection\t.text\n");
-	printf("\n");
+	if (string_only) {
+	    printf("\tsection\t.bftext\n");
+	    printf("_start:\n");
+	    printf("\n");
+	} else {
+	    printf("_start:\n");
+	    printf("\txor\teax, eax\t; EAX = 0 ;don't change high bits.\n");
+	    printf("\tcdq\t\t\t; EDX = 0 ;sign bit of EAX\n");
+	    printf("\tinc\tedx\t\t; EDX = 1 ;ARG4 for system calls\n");
+	    printf("\tmov\tecx,mem\n");
+	    printf("\tjmp\tbfstart\n");
+	    if (node_type_counts[T_MOV] == 0) {
+		printf("\tsection\t.bftext\n");
+		printf("\tsection\t.textlib\n");
+		printf("\tsection\t.data\n");
+		printf("\tsection\t.rodata\n");
+		printf("\tsection\t.bftext\n");
+	    } else {
+		printf("\tsection\t.rodata\n");
+		printf("\tsection\t.textlib align=64\n");
+		printf("\tsection\t.bftext align=64\n");
+	    }
+	    printf("bfstart:\n");
+	    printf("\n");
+	}
     }
 
     /* Scan the nodes so we get an APPROXIMATE distance measure */
@@ -221,19 +168,20 @@ print_asm()
 	    }
 	}
 
-	if (n->line != 0 && n->line != curr_line && n->type != T_PRT) {
-	    printf("%%line %d+0 %s\n", n->line, curfile);
-	    curr_line = n->line;
-	}
-
 	if (enable_trace) {
+	    if (n->line != 0 && n->line != curr_line && n->type != T_PRT) {
+		printf("%%line %d+0 %s\n", n->line, curfile);
+		curr_line = n->line;
+	    }
+
 	    printf("; "); printtreecell(stdout, 0, n); printf("\n");
 	}
 
 	switch(n->type)
 	{
 	case T_MOV:
-#if 1
+#if 0
+	    /* INC & DEC modify part of the flags register, this can stall. */
 	    if (n->count == 1)
 		printf("\tinc ecx\n");
 	    else if (n->count == -1)
@@ -242,15 +190,17 @@ print_asm()
 		printf("\tinc ecx\n" "\tinc ecx\n");
 	    else if (n->count == -2)
 		printf("\tdec ecx\n" "\tdec ecx\n");
-	    else if (n->count < -128)
-		printf("\tsub ecx,%d\n", -n->count);
 	    else
 #endif
-	    printf("\tadd ecx,%d\n", n->count);
+	    if (n->count < -128)
+		printf("\tsub ecx,%d\n", -n->count);
+	    else
+		printf("\tadd ecx,%d\n", n->count);
 	    break;
 
 	case T_ADD:
-#if 1
+#if 0
+	    /* INC & DEC modify part of the flags register, this can stall. */
 	    if (n->count == 1 && n->offset == 0)
 		printf("\tinc byte [ecx]\n");
 	    else if (n->count == -1 && n->offset == 0)
@@ -261,11 +211,12 @@ print_asm()
 		printf("\tinc byte [ecx+%d]\n", n->offset);
 	    else if (n->count == -1)
 		printf("\tdec byte [ecx+%d]\n", n->offset);
-	    else if (n->count < -128)
-		printf("\tsub byte [ecx+%d],%d\n", n->offset, -n->count);
 	    else
 #endif
-	    printf("\tadd byte [ecx+%d],%d\n", n->offset, SM(n->count));
+	    if (n->count < -128)
+		printf("\tsub byte [ecx+%d],%d\n", n->offset, -n->count);
+	    else
+		printf("\tadd byte [ecx+%d],%d\n", n->offset, SM(n->count));
 	    break;
 	    
 	case T_SET:
@@ -282,24 +233,29 @@ print_asm()
 
 	    if (n->count2 == 1 && n->count3 == 0) {
 		/* m[1] = m[2]*1 + m[3]*0 */
-		printf("\tmov bl,byte [ecx+%d]\n", n->offset2);
-		printf("\tmov byte [ecx+%d],bl\n", n->offset);
+		printf("\tmovzx eax,byte [ecx+%d]\n", n->offset2);
+		printf("\tmov byte [ecx+%d],al\n", n->offset);
 	    } else if (n->count2 == 1 && n->offset2 == n->offset) {
 		/* m[1] = m[1]*1 + m[3]*n */
 		if (n->count3 == -1) {
-		    printf("\tmov al,byte [ecx+%d]\n", n->offset3);
+		    printf("\tmovzx eax,byte [ecx+%d]\n", n->offset3);
 		    printf("\tsub byte [ecx+%d],al\n", n->offset);
 		} else if (n->count3 == 1) {
-		    printf("\tmov al,byte [ecx+%d]\n", n->offset3);
+		    printf("\tmovzx eax,byte [ecx+%d]\n", n->offset3);
+		    printf("\tadd byte [ecx+%d],al\n", n->offset);
+		} else if (n->count3 == 2) {
+		    printf("\tmovzx eax,byte [ecx+%d]\n", n->offset3);
+		    printf("\tadd eax,eax\n");
 		    printf("\tadd byte [ecx+%d],al\n", n->offset);
 		} else {
-		    printf("\tmov byte al,[ecx+%d]\n", n->offset3);
-		    printf("\timul ebx,eax,%d\n", SM(n->count3));
-		    printf("\tadd byte [ecx+%d],bl\n", n->offset);
+		    printf("\tmovzx eax,byte [ecx+%d]\n", n->offset3);
+		    printf("\timul eax,eax,%d\n", SM(n->count3));
+		    printf("\tadd byte [ecx+%d],al\n", n->offset);
 		}
 	    } else if (n->count2 == 1 && n->count3 == -1) {
-		printf("\tmov al,byte [ecx+%d]\n", n->offset2);
-		printf("\tsub al,byte [ecx+%d]\n", n->offset3);
+		printf("\tmovzx eax,byte [ecx+%d]\n", n->offset2);
+		printf("\tmovzx ebx,byte [ecx+%d]\n", n->offset3);
+		printf("\tsub eax,ebx\n");
 		printf("\tmov byte [ecx+%d],al\n", n->offset);
 	    } else {
 		printf("\t; Full T_CALC: [ecx+%d] = %d + [ecx+%d]*%d + [ecx+%d]*%d\n",
@@ -335,7 +291,7 @@ print_asm()
 
 	    if (n->count == -1) {
 		print_asm_string(0,0,0);
-		if (n->line != 0 && n->line != curr_line) {
+		if (enable_trace && n->line != 0 && n->line != curr_line) {
 		    printf("%%line %d+0 %s\n", n->line, curfile);
 		    curr_line = n->line;
 		}
@@ -460,5 +416,93 @@ print_asm()
 	if (!hard_left_limit) 
 	    printf("\tresb 4096\n");
 	printf("mem:\n");
+    }
+}
+
+static void
+print_asm_string(char * charmap, char * strbuf, int strsize)
+{
+static int textno = -1;
+    int saved_line = curr_line;
+    if (textno == -1) {
+	textno++;
+
+	if (enable_trace)
+	    printf("%%line 1 lib_string.s\n");
+	curr_line = -1;
+	if (!string_only) {
+	    printf("section .data\n");
+	    printf("putchbuf: db 0\n");
+	    printf("section .textlib\n");
+	    printf("putch:\n");
+	    printf("\tpush ecx\n");
+	    printf("\tmov ecx,putchbuf\n");
+	    printf("\tmov byte [ecx],al\n");
+	    printf("\txor eax, eax\n");
+	    printf("\tmov edx,1\n");
+	    printf("\tjmp syswrite\n");
+	    printf("prttext:\n");
+	    printf("\tpush ecx\n");
+	} else {
+	    printf("section .textlib\n");
+	    printf("prttext:\n");
+	}
+        printf("\tmov ecx,eax\n");
+	printf("syswrite:\n");
+        printf("\txor eax,eax\n");
+        printf("\tmov ebx,eax\n");
+        printf("\tinc ebx\n");
+        printf("\tmov al, 4\n");
+        printf("\tint 0x80\t; write(ebx, ecx, edx);\n");
+	if (!string_only) {
+	    printf("\txor eax, eax\n");
+	    printf("\tcdq\n");
+	    printf("\tinc edx\n");
+	    printf("\tpop ecx\n");
+	}
+        printf("\tret\n");
+	printf("section .bftext\n");
+    }
+
+    if (strsize <= 0) return;
+    if (strsize == 1 && !string_only) {
+	int ch = *strbuf & 0xFF;
+	if (charmap[ch] == 0) {
+	    charmap[ch] = 1;
+	    if (enable_trace && saved_line > 0)
+		printf("%%line 1 lib_putch_%02x.s\n", ch);
+	    printf("section .textlib\n");
+	    printf("litprt_%02x:\n", ch);
+	    printf("\tmov al,0x%02x\n", ch);
+	    printf("\tjmp putch\n");
+	    printf("section .bftext\n");
+	    if (enable_trace && saved_line > 0)
+		printf("%%line %d+0 %s\n", saved_line, curfile);
+	    curr_line = saved_line;
+	}
+	printf("\tcall litprt_%02x\n", ch);
+    } else {
+	int i;
+	textno++;
+	if (saved_line != curr_line) {
+	    if (enable_trace && saved_line > 0)
+		printf("%%line %d+0 %s\n", saved_line, curfile);
+	    curr_line = saved_line;
+	}
+	printf("section .rodata\n");
+	printf("text_%d:\n", textno);
+	for(i=0; i<strsize; i++) {
+	    if (i%8 == 0) {
+		if (i) printf("\n");
+		printf("\tdb ");
+	    } else
+		printf(", ");
+	    printf("0x%02x", (strbuf[i] & 0xFF));
+	}
+	printf("\n");
+	printf("section .bftext\n");
+	printf("\tmov eax,text_%d\n", textno);
+	printf("\tmov edx,%d\n", strsize);
+	printf("\tcall prttext\n");
     }
 }

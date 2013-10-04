@@ -1,10 +1,10 @@
 
-CFLAGS=-O3 -Wall $(DEFS)
+CFLAGS=-O3 -Wall -DTCC0925 $(DEFS)
 CC=gcc
 
 all:	bfi neutron hydrogen \
-	bf2bf16 bf	\
-	bf.bin/bf32 bf.bin/bf16 bf.bin/bf.tcc \
+	bf2bf16 \
+	bf.bin/bf bf.bin/bf32 bf.bin/bf16 bf.bin/bf.tcc \
 	bf.bin/bfi.tcc \
 	macro/macro
 
@@ -15,7 +15,7 @@ bfi.o:		bfi.c bfi.tree.h bfi.nasm.h bfi.bf.h
 bfi.nasm.o:	bfi.nasm.c bfi.tree.h bfi.nasm.h
 bfi.bf.o:	bfi.bf.c bfi.tree.h bfi.bf.h
 bfi.jit.o:	bfi.jit.c bfi.tree.h bfi.jit.h
-	$(CC) $(CFLAGS) -c -fno-strict-aliasing bfi.jit.c
+	$(CC) $(CFLAGS)   -c -fno-strict-aliasing bfi.jit.c
 
 hydrogen: bf.bin/proton bf.bin/protium bf.bin/deuterium bf.bin/tritium
 	ln -fs bf.bin/tritium hydrogen
@@ -33,9 +33,11 @@ bf.bin/tritium: hydrogen.c
 	$(CC) -DMASK=4 $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 neutron: neutron.c
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	cp -p neutron bf.bin/.
 
-
-bf:	bf.c
+bf.bin/bf:	bf.c
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 bf.bin/bf32:	bf.c
 	$(CC) -DM=-1 $(CFLAGS) -o $@ $^ $(LDFLAGS)

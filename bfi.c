@@ -49,8 +49,6 @@ TODO:
 	Note: makes railrunners very slow.
 
     Move non-C generators (or all ?) into other files.
-	Each type has a #define to enable it in this file.
-	Plus an overall one.
 
     Other macros "[>>]" rail runner extensions, array access.
 	Mole style array access has NO prequesites.
@@ -147,7 +145,10 @@ TODO:
 #ifndef NO_EXT_OUT
 #include "bfi.nasm.h"
 #include "bfi.bf.h"
+
+#ifndef NO_GNULIGHT
 #include "bfi.jit.h"
+#endif
 #endif
 
 #ifdef MAP_NORESERVE
@@ -478,7 +479,7 @@ open_file(char * fname)
 	perror(fname);
 	exit(1);
     }
-    while((ch = getc(ifd)) != EOF && (ifd!=stdin || ch != '!' || !n)) {
+    while((ch = getc(ifd)) != EOF && (ifd!=stdin || ch != '!' || !n || dld || j)) {
 	int c = 0;
 	if (ch == '\n') { curr_line++; curr_col=0; }
 	else curr_col ++;
@@ -786,7 +787,7 @@ print_c_header(FILE * ofd, int * minimal_p)
 	fprintf(ofd, "#endif\n\n");
     }
 
-#if 0
+#ifdef USE_LIBZFIND
     if (node_type_counts[T_ZFIND] != 0 &&
 	    (cell_size == 16 || cell_size == 32)) {
 
@@ -1182,11 +1183,43 @@ print_ccode(FILE * ofd)
 	    fprintf(ofd, "if(m[%d]) {\n", n->offset);
 	    break;
 	case T_ZFIND:
-#if 0
-	    /* TCCLIB generates a slow 'strlen', libc is better, but the 
-	     * function call overhead is a killer.
+#if 1
+#ifdef __i386__
+	    /* TCCLIB generates a slow while() with two jumps in the loop,
+	     * and several memory accesses. This is the assembler we would
+	     * actually prefer.
+	     *
+	     * These prints are really ugly; I need a 'print gas in C'
+	     * function if we have much more.
 	     */
-	    if (cell_size == 8 && add_mask <= 0 &&
+	    if (n->next->next == n->jmp && cell_size == 32 && do_run) {
+		pt(ofd, indent,n);
+		fprintf(ofd, "{ /*ZFIND*/\n");
+		fprintf(ofd, "__asm__ __volatile__ (\n");
+		fprintf(ofd, "\"mov %d(%%%%ecx),%%%%eax\\n\\t\"\n", 4 * n->offset);
+		fprintf(ofd, "\"test %%%%eax,%%%%eax\\n\\t\"\n");
+		fprintf(ofd, "\"je 1f\\n\\t\"\n");
+		fprintf(ofd, "\"2: add $%d,%%%%ecx\\n\\t\"\n", 4* n->next->count);
+		fprintf(ofd, "\"mov %d(%%%%ecx),%%%%eax\\n\\t\"\n", 4 * n->offset);
+		fprintf(ofd, "\"test %%%%eax,%%%%eax\\n\\t\"\n");
+		fprintf(ofd, "\"jne 2b\\n\\t\"\n");
+		fprintf(ofd, "\"1:\\n\\t\"\n");
+		fprintf(ofd, ": \"=c\" (m)\n");
+		fprintf(ofd, ": \"0\"  (m)\n");
+		fprintf(ofd, ": \"eax\"\n");
+		fprintf(ofd, ");\n");
+		pt(ofd, indent,n);
+		fprintf(ofd, "} /*ZFIND*/\n");
+		n=n->jmp;
+	    }
+	    else
+#endif
+#endif
+#if 1
+	    /* TCCLIB generates a slow 'strlen', libc is better, but the 
+	     * function call overhead is horrible.
+	     */
+	    if (cell_size == 8 && add_mask <= 0 && do_run &&
 		    n->next->next == n->jmp && n->next->count == 1) {
 		pt(ofd, indent,n);
 		if (n->offset)
@@ -1195,10 +1228,15 @@ print_ccode(FILE * ofd)
 		    fprintf(ofd, "m += strlen(m);\n");
 		n=n->jmp;
 	    }
-	    else if (n->next->next == n->jmp &&
+	    else
+#endif
+#ifdef USE_LIBZFIND
+	    /* Despite the massive gains in running this function using GCC
+	     * the call overhead is likely to make it a net loss.
+	     */
+	    if (n->next->next == n->jmp &&
 			(cell_size == 16 || cell_size == 32)) {
 		pt(ofd, indent,n);
-		fprintf(ofd, "if(m[%d]) ", n->offset);
 		if (n->offset)
 		    fprintf(ofd, "m = libbf_zfind%d(m + %d, %d) - %d;\n",
 			    cell_size, n->offset, n->next->count, n->offset);
@@ -1206,6 +1244,28 @@ print_ccode(FILE * ofd)
 		    fprintf(ofd, "m = libbf_zfind%d(m, %d);\n",
 			    cell_size, n->next->count);
 		n=n->jmp;
+	    }
+	    else
+#endif
+#if 0
+	    /* TCCLIB generates a slow while() with two jumps in the loop,
+	     * this variant have two conditions but one jump in the loop.
+	     * Many CPUs much prefer this.
+	     * However, it is unlikely there is a net gain because of all
+	     * the memory accesses.
+	     */
+	    if (n->next->next == n->jmp && do_run) {
+		pt(ofd, indent,n);
+		if (n->next->count == 1) {
+		    fprintf(ofd, "if(m[%d]) do ++m; while(m[%d]);\n",
+			n->offset, n->offset);
+		} else
+		if (n->next->count == -1) {
+		    fprintf(ofd, "if(m[%d]) do --m; while(m[%d]);\n",
+			n->offset, n->offset);
+		} else
+		    fprintf(ofd, "if(m[%d]) do m += %d; while(m[%d]);\n",
+			n->offset, n->next->count, n->offset);
 	    }
 	    else
 #endif
@@ -1529,15 +1589,18 @@ run_tree(void)
 		else
 		    fprintf(stderr, "mem[%d]= UNDERFLOW\n", off);
 	    } else {
+		int off2, off3;
+		off2 = (p+n->offset2)-oldp;
+		off3 = (p+n->offset3)-oldp;
 		if (n->offset == n->offset2 && n->count2 == 1) {
 		    if (n->count3 != 0 && p[n->offset3] == 0) 
 			fprintf(stderr, "mem[%d]=%d, BF Skip.\n",
-			    (p+n->offset3)-oldp, p[n->offset3]);
+			    off3, p[n->offset3]);
 		    else {
 			fprintf(stderr, "mem[%d]=%d", off, oldp[off]);
 			if (n->count3 != 0)
 			    fprintf(stderr, ", mem[%d]=%d",
-				(p+n->offset3)-oldp, p[n->offset3]);
+				off3, p[n->offset3]);
 			if (off < 0)
 			    fprintf(stderr, " UNDERFLOW\n");
 			else
@@ -1547,10 +1610,10 @@ run_tree(void)
 		    fprintf(stderr, "mem[%d]=%d", off, oldp[off]);
 		    if (n->count2 != 0)
 			fprintf(stderr, ", mem[%d]=%d",
-			    (p+n->offset2)-oldp, p[n->offset2]);
+			    off2, p[n->offset2]);
 		    if (n->count3 != 0)
 			fprintf(stderr, ", mem[%d]=%d",
-			    (p+n->offset3)-oldp, p[n->offset3]);
+			    off3, p[n->offset3]);
 		    fprintf(stderr, "\n");
 		}
 	    }
@@ -2018,11 +2081,6 @@ trim_trailing_sets(void) {
     if (max_pointer - min_pointer > 32) return;
 
     if (lastn) {
-#if 0
-	n = tcalloc(1, sizeof*n);
-	n->inum = bfi_num++;
-	lastn->next = n;
-#endif
 	lastn = add_node_after(lastn);
 	n = add_node_after(lastn);
 
@@ -2046,11 +2104,14 @@ trim_trailing_sets(void) {
 }
 
 void
-find_known_value(struct bfi * n, int v_offset, int allow_recursion,
-		struct bfi * n_stop, 
+find_known_value_recursion(struct bfi * n, int v_offset,
 		struct bfi ** n_found, 
 		int * const_found_p, int * known_value_p, int * unsafe_p,
-		int * hit_stop_node_p)
+		int allow_recursion,
+		struct bfi * n_stop, 
+		int * hit_stop_node_p,
+		int * n_used_p,
+		int * unknown_found_p)
 {
     /*
      * n		Node to start the search
@@ -2065,22 +2126,32 @@ find_known_value(struct bfi * n, int v_offset, int allow_recursion,
      * hit_stop_node_p	True if we found n_stop.
      */
     int unmatched_ends = 0;
-    int const_found = 0, known_value = 0, non_zero_unsafe = 0, hit_stop = 0;
+    int const_found = 0, known_value = 0, non_zero_unsafe = 0;
     int n_used = 0;
     int distance = 0;
 
     if (opt_level < 3) allow_recursion = 0;
 
     if (hit_stop_node_p) *hit_stop_node_p = 0;
+    if (n_used_p) n_used = *n_used_p;
 
     if (verbose>5) {
-	fprintf(stderr, "%d: Checking value for offset %d starting: ",
+	fprintf(stderr, "Called(%d): Checking value for offset %d starting: ",
 		SEARCHDEPTH-allow_recursion, v_offset);
 	printtreecell(stderr, 0,n);
+	if (hit_stop_node_p) {
+	    fprintf(stderr, ", stopping: ");
+	    printtreecell(stderr, 0,n_stop);
+	}
 	fprintf(stderr, "\n");
     }
     while(n)
     {
+	if (verbose>6) {
+	    fprintf(stderr, "Checking: ");
+	    printtreecell(stderr, 0,n);
+	    fprintf(stderr, "\n");
+	}
 	switch(n->type)
 	{
 	case T_NOP:
@@ -2138,37 +2209,48 @@ find_known_value(struct bfi * n, int v_offset, int allow_recursion,
 	    /*FALLTHROUGH*/
 
 	case T_ENDIF:
+	    if (n->jmp->offset == v_offset) {
+		n_used = 1;
+	    }
+
 #ifndef NO_RECURSION
 	    // Check both n->jmp and n->prev
 	    // If they are compatible we may still have a known value.
 	    if (allow_recursion) {
-		int known_value2 = 0, non_zero_unsafe2 = 0;
+		int known_value2 = 0, non_zero_unsafe2 = 0, hit_stop2 = 0;
 
-		if (verbose>5) fprintf(stderr, "%d: END: searching for double known\n", __LINE__);
-		find_known_value(n->prev, v_offset, allow_recursion-1, n,
-		    0, &const_found, &known_value2, &non_zero_unsafe2, &hit_stop);
+		if (verbose>5) fprintf(stderr, "%d: T_END: searching for double known\n", __LINE__);
+		find_known_value_recursion(n->prev, v_offset,
+		    0, &const_found, &known_value2, &non_zero_unsafe2,
+		    allow_recursion-1, n->jmp, &hit_stop2, &n_used,
+		    unknown_found_p);
 		if (const_found) {
 		    if (verbose>5) fprintf(stderr, "%d: Const found in loop.\n", __LINE__);
-		    hit_stop = 0;
-		    find_known_value(n->jmp->prev, v_offset, allow_recursion-1, n_stop,
-			0, &const_found, &known_value, &non_zero_unsafe, &hit_stop);
+		    hit_stop2 = 0;
+		    find_known_value_recursion(n->jmp->prev, v_offset,
+			0, &const_found, &known_value, &non_zero_unsafe,
+			allow_recursion-1, n_stop, &hit_stop2, &n_used,
+			unknown_found_p);
 
-		    if (hit_stop) {
+		    if (hit_stop2) {
 			const_found = 1;
 			known_value = known_value2;
 			non_zero_unsafe = non_zero_unsafe2;
-		    } else if (known_value != known_value2) {
-			if (verbose>5) fprintf(stderr, "%d: Two know values found %d != %d\n", __LINE__, 
+		    } else if (const_found && known_value != known_value2) {
+			if (verbose>5) fprintf(stderr, "%d: Two known values found %d != %d\n", __LINE__, 
 				known_value, known_value2);
 			const_found = 0;
+			*unknown_found_p = 1;
 		    }
-		} else if (hit_stop) {
+		} else if (hit_stop2) {
 		    if (verbose>5) fprintf(stderr, "%d: Nothing found in loop; continuing.\n", __LINE__);
+
+		    n_used = 1;
 
 		    n = n->jmp;
 		    break;
 		}
-		else if (verbose>5) fprintf(stderr, "%d: Nothing found.\n", __LINE__);
+		else if (verbose>5) fprintf(stderr, "%d: No constant found.\n", __LINE__);
 
 		n = 0;
 	    }
@@ -2200,35 +2282,46 @@ find_known_value(struct bfi * n, int v_offset, int allow_recursion,
 	    // Check both n->jmp and n->prev
 	    // If they are compatible we may still have a known value.
 	    if (allow_recursion) {
-		int known_value2 = 0, non_zero_unsafe2 = 0;
+		int known_value2 = 0, non_zero_unsafe2 = 0, hit_stop2 = 0;
 
 		if (verbose>5) fprintf(stderr, "%d: WHL: searching for double known\n", __LINE__);
-		find_known_value(n->jmp->prev, v_offset, allow_recursion-1, n,
-		    0, &const_found, &known_value2, &non_zero_unsafe2, &hit_stop);
+		find_known_value_recursion(n->jmp->prev, v_offset,
+		    0, &const_found, &known_value2, &non_zero_unsafe2,
+		    allow_recursion-1, n, &hit_stop2, &n_used,
+		    unknown_found_p);
 		if (const_found) {
 		    if (verbose>5) fprintf(stderr, "%d: Const found in loop.\n", __LINE__);
-		    find_known_value(n->prev, v_offset, allow_recursion-1, 0,
-			0, &const_found, &known_value, &non_zero_unsafe, 0);
+		    find_known_value_recursion(n->prev, v_offset,
+			0, &const_found, &known_value, &non_zero_unsafe,
+			allow_recursion-1, 0, 0, &n_used,
+			unknown_found_p);
 
-		    if (known_value != known_value2) {
-			if (verbose>5) fprintf(stderr, "%d: Two know values found %d != %d\n", __LINE__, 
+		    if (const_found && known_value != known_value2) {
+			if (verbose>5) fprintf(stderr, "%d: Two known values found %d != %d\n", __LINE__, 
 				known_value, known_value2);
 			const_found = 0;
+			*unknown_found_p = 1;
 		    }
-		} else if (hit_stop) {
+		} else if (hit_stop2) {
 		    if (verbose>5) fprintf(stderr, "%d: Nothing found in loop; continuing.\n", __LINE__);
 
-		    find_known_value(n->prev, v_offset, allow_recursion-1, 0,
-			0, &const_found, &known_value, &non_zero_unsafe, 0);
+		    break;
 		}
-		else if (verbose>5) fprintf(stderr, "%d: Nothing found.\n", __LINE__);
+		else if (verbose>5) fprintf(stderr, "%d: No constant found.\n", __LINE__);
 
 		n = 0;
 	    }
+	    goto break_break;
 #endif
 
 	case T_MOV:
 	default:
+	    if(verbose>5) {
+		fprintf(stderr, "Search blocked by: ");
+		printtreecell(stderr, 0,n);
+		fprintf(stderr, "\n");
+	    }
+	    *unknown_found_p = 1;
 	    goto break_break;
 	}
 	if (n->prevskip)
@@ -2266,6 +2359,7 @@ break_break:
     *const_found_p = const_found;
     *known_value_p = known_value;
     *unsafe_p = non_zero_unsafe;
+    if (n_used_p) *n_used_p = n_used;
     if (n_found) {
 	/* If "n" is safe to modify return it too. */
 	if (n==0 || n_used || unmatched_ends || distance > SEARCHRANGE/4*3)
@@ -2276,15 +2370,39 @@ break_break:
 
     if (verbose>5) {
 	if (const_found)
-	    fprintf(stderr, "%d: Known value is %d%s",
+	    fprintf(stderr, "Returning(%d): Known value is %d%s",
 		    SEARCHDEPTH-allow_recursion, known_value,
 		    non_zero_unsafe?" (unsafe zero)":"");
 	else
-	    fprintf(stderr, "%d: Unknown value for offset %d",
+	    fprintf(stderr, "Returning(%d): Unknown value for offset %d",
 		    SEARCHDEPTH-allow_recursion, v_offset);
+	if (hit_stop_node_p)
+	    fprintf(stderr, ", hitstop=%d", *hit_stop_node_p);
 	fprintf(stderr, "\n  From ");
 	printtreecell(stderr, 0,n);
 	fprintf(stderr, "\n");
+    }
+}
+
+void
+find_known_value(struct bfi * n, int v_offset,
+		struct bfi ** n_found, 
+		int * const_found_p, int * known_value_p, int * unsafe_p) {
+
+    int unknown_found = 0;
+    find_known_value_recursion(n, v_offset,
+		n_found, const_found_p, known_value_p, unsafe_p,
+		SEARCHDEPTH, 0, 0, 0, &unknown_found);
+
+    if (unknown_found) {
+	if (verbose>5)
+	    fprintf(stderr, "Returning the true unknown for offset %d\n",
+		    v_offset);
+
+	*const_found_p = 0;
+	*known_value_p = 0;
+	*unsafe_p = 1;
+	if (n_found) *n_found = 0;
     }
 }
 
@@ -2302,8 +2420,8 @@ find_known_state(struct bfi * v)
 	fprintf(stderr, "\n");
     }
 
-    find_known_value(v->prev, v->offset, SEARCHDEPTH, 0,
-		&n, &const_found, &known_value, &non_zero_unsafe, 0);
+    find_known_value(v->prev, v->offset,
+		&n, &const_found, &known_value, &non_zero_unsafe);
 
     if (!const_found) {
 	switch(v->type) {
@@ -2470,9 +2588,9 @@ find_known_state(struct bfi * v)
 
 			int const_found2=0, known_value2=0, non_zero_unsafe2=0;
 
-			find_known_value(v->jmp->prev, n->offset, SEARCHDEPTH, 0,
+			find_known_value(v->jmp->prev, n->offset,
 				    0, &const_found2, &known_value2,
-				    &non_zero_unsafe2, 0);
+				    &non_zero_unsafe2);
 
 			if (!const_found2 || non_zero_unsafe2 ||
 			    known_value2 != 0)
@@ -2502,9 +2620,9 @@ find_known_state(struct bfi * v)
 
 			int const_found2=0, known_value2=0, non_zero_unsafe2=0;
 
-			find_known_value(v->jmp->prev, n->offset, SEARCHDEPTH, 0,
+			find_known_value(v->jmp->prev, n->offset,
 				    0, &const_found2, &known_value2,
-				    &non_zero_unsafe2, 0);
+				    &non_zero_unsafe2);
 
 			if (!const_found2 || non_zero_unsafe2 ||
 			    known_value2 != 0)
@@ -2593,8 +2711,8 @@ find_known_calc_state(struct bfi * v)
 
     if ((v->count2 == 0 || v->offset2 != v->offset) &&
         (v->count3 == 0 || v->offset3 != v->offset)) {
-	find_known_value(v->prev, v->offset, SEARCHDEPTH, 0,
-		    &n1, &const_found1, &known_value1, &non_zero_unsafe1, 0);
+	find_known_value(v->prev, v->offset,
+		    &n1, &const_found1, &known_value1, &non_zero_unsafe1);
 	if (n1 &&
 	    (n1->type == T_ADD || n1->type == T_SET || n1->type == T_CALC)) {
 	    /* Overidden change, delete it */
@@ -2610,14 +2728,14 @@ find_known_calc_state(struct bfi * v)
     }
 
     if (v->count2) {
-	find_known_value(v->prev, v->offset2, SEARCHDEPTH, 0,
-		    &n2, &const_found2, &known_value2, &non_zero_unsafe2, 0);
+	find_known_value(v->prev, v->offset2,
+		    &n2, &const_found2, &known_value2, &non_zero_unsafe2);
 	n2_valid = 1;
     }
 
     if (v->count3) {
-	find_known_value(v->prev, v->offset3, SEARCHDEPTH, 0, 
-		    &n3, &const_found3, &known_value3, &non_zero_unsafe3, 0);
+	find_known_value(v->prev, v->offset3,
+		    &n3, &const_found3, &known_value3, &non_zero_unsafe3);
 	n3_valid = 1;
     }
 
@@ -2841,7 +2959,6 @@ classify_loop(struct bfi * v)
     int is_znode = 0;
     int has_equ = 0;
     int has_add = 0;
-    int is_loop_only = 1;
     int typewas;
     int has_belowloop = 0;
     int has_negoff = 0;
@@ -2884,7 +3001,6 @@ classify_loop(struct bfi * v)
 		if (n->offset < 0) has_negoff = 1;
 		if (n->type == T_ADD) has_add = 1;
 		if (n->type == T_SET) has_equ = 1;
-		is_loop_only = 0;
 	    }
 	}
 	n=n->next;
@@ -3126,7 +3242,6 @@ run_ccode(void)
 
 #if defined(TCC0925) && !defined(TCCDONE)
 #define TCCDONE
-#error "Version specific"
     {
 	int (*func)(void);
 	int imagesize;
@@ -3148,6 +3263,8 @@ run_ccode(void)
 	 * provides no way to covert a void* to a function pointer. This is
 	 * because on some nasty old machines the pointers are not compatible.
 	 * For example 8086 'medium model'.
+	 *
+	 * I could push it through a union, but this still works.
 	 */
 	func = tcc_get_symbol(s, "main");
 	if (!func) {
@@ -3162,9 +3279,34 @@ run_ccode(void)
     }
 #endif
 
+#if defined(TCC0926) && !defined(TCCDONE)
+#define TCCDONE
+    {
+	int (*func)(void);
+
+	rv = tcc_relocate(s);
+	if (rv) {
+	    perror("tcc_relocate()");
+	    fprintf(stderr, "tcc_relocate failed return value=%d\n", rv);
+	    exit(1);
+	}
+	func = tcc_get_symbol(s, "main");
+	if (!func) {
+	    fprintf(stderr, "Could not find compiled code entry point\n");
+	    exit(1);
+	}
+	func();
+
+	tcc_delete(s);
+	free(ccode);
+    }
+#endif
+
 #if !defined(TCCDONE)
 #define TCCDONE
     rv = tcc_run(s, 0, 0);
+    if (verbose && rv)
+	fprintf(stderr, "tcc_run returned %d\n", rv);
     tcc_delete(s);
     free(ccode);
 #endif
@@ -3180,13 +3322,15 @@ run_ccode(void)
  * In theory this can easily be used directly as macro invocations by any
  * macro assembler.
  *
- * Currently it's just a clean tree dump.
+ * Currently it's just a clean tree dump with a literal C conversion in
+ * the ';' marked comments.
  */
 void 
 print_adder(void)
 {
     struct bfi * n = bfprog;
 
+    printf("bf_start\n");
     while(n)
     {
 	if (enable_trace)
@@ -3194,17 +3338,17 @@ print_adder(void)
 	switch(n->type)
 	{
 	case T_MOV:
-	    printf("ptradd\t%d\t; p += %d\n", n->count, n->count);
+	    printf("ptradd\t%d\t; p+=%d;\n", n->count, n->count);
 	    break;
 
 	case T_ADD:
-	    printf("add\t%d,%d\t; p[%d] += %d\n",
+	    printf("add_i\t%d,%d\t; p[%d]+=%d;\n",
 		    n->offset, n->count,
 		    n->offset, n->count);
 	    break;
 
 	case T_SET:
-	    printf("setci\t%d,%d\t; p[%d] = %d\n",
+	    printf("set_i\t%d,%d\t; p[%d]=%d;\n",
 		    n->offset, n->count,
 		    n->offset, n->count);
 	    break;
@@ -3212,14 +3356,14 @@ print_adder(void)
 	case T_CALC:
 	    if (n->count == 0) {
 		if (n->offset == n->offset2 && n->count2 == 1 && n->count3 == 1) {
-		    printf("addc\t%d,%d\t; p[%d] += p[%d]\n",
+		    printf("add_c\t%d,%d\t; p[%d]+=p[%d];\n",
 			    n->offset, n->offset3,
 			    n->offset, n->offset3);
 		    break;
 		}
 
 		if (n->offset == n->offset2 && n->count2 == 1) {
-		    printf("addmul\t%d,%d,%d\t; p[%d] += p[%d]*%d\n",
+		    printf("add_cm\t%d,%d,%d\t; p[%d]+=p[%d]*%d;\n",
 			    n->offset, n->offset3, n->count3,
 			    n->offset, n->offset3, n->count3);
 		    break;
@@ -3227,14 +3371,14 @@ print_adder(void)
 
 		if (n->count3 == 0) {
 		    if (n->count2 == 1) {
-			printf("setc\t%d,%d",
+			printf("set_c\t%d,%d",
 			    n->offset, n->offset2);
-			printf("\t; p[%d] = p[%d]\n",
+			printf("\t; p[%d]=p[%d];\n",
 			    n->offset, n->offset2);
 		    } else {
-			printf("setmulc\t%d,%d,%d",
+			printf("set_cm\t%d,%d,%d",
 			    n->offset, n->offset2, n->count2);
-			printf("\t; p[%d] = p[%d]*%d\n",
+			printf("\t; p[%d]=p[%d]*%d;\n",
 			    n->offset, n->offset2, n->count2);
 		    }
 		    break;
@@ -3242,21 +3386,21 @@ print_adder(void)
 	    }
 
 	    if (n->offset == n->offset2 && n->count2 == 1) {
-		printf("addmuli\t%d,%d,%d,%d\t; p[%d] += p[%d]*%d + %d\n",
+		printf("add_cmi\t%d,%d,%d,%d\t; p[%d]+=p[%d]*%d+%d;\n",
 			n->offset, n->offset3, n->count3, n->count,
 			n->offset, n->offset3, n->count3, n->count);
 		break;
 	    }
 
 	    if (n->count3 == 0) {
-		printf("calc4\t%d,%d,%d,%d",
-		    n->offset, n->count, n->offset2, n->count2);
-		printf("\t; p[%d] = %d + p[%d]*%d\n",
-		    n->offset, n->count, n->offset2, n->count2);
+		printf("set_cmi\t%d,%d,%d,%d",
+		    n->offset, n->offset2, n->count2, n->count);
+		printf("\t; p[%d]=p[%d]*%d+%d;\n",
+		    n->offset, n->offset2, n->count2, n->count);
 	    } else {
-		printf("calc6\t%d,%d,%d,%d,%d,%d\n",
+		printf("calc_x\t%d,%d,%d,%d,%d,%d;\n",
 		    n->offset, n->count, n->offset2, n->count2, n->offset3, n->count3);
-		printf("\t; p[%d] = %d + p[%d]*%d + p[%d]*%d\n",
+		printf("\t; p[%d]=%d+p[%d]*%d+p[%d]*%d;\n",
 		    n->offset, n->count, n->offset2, n->count2,
 		    n->offset3, n->count3);
 	    }
@@ -3265,35 +3409,48 @@ print_adder(void)
 	case T_PRT:
 	    if (n->count > -1) {
 		if (n->count >= ' ' && n->count <= '~' && n->count != '\'')
-		    printf("putchar\t'%c'\n", n->count);
+		    printf("outchar\t'%c'\t; ", n->count);
 		else
-		    printf("putchar\t%d\n", n->count);
-	    } else
-		printf("write\t%d\n", n->offset);
+		    printf("outchar\t%d\t; ", n->count);
+		printf("putchar(%d);\n", n->count);
+	    } else {
+		printf("write\t%d\t; ", n->offset);
+		printf("putchar(p[%d]);\n", n->offset);
+	    }
 	    break;
 
 	case T_INP:
-	    printf("read\t%d\n", n->offset);
+	    printf("inpchar\t%d\t; ", n->offset);
+	    printf("p[%d]=getchar();\n", n->offset);
 	    break;
 
 	case T_IF:
-	    printf("if\t%d,%d\t\n", n->offset, n->count);
+	    printf("ifeqz\t%d,lbl_%d\t; ", n->offset, n->count);
+	    printf("if(p[%d]){\n", n->offset);
 	    break;
 
 	case T_ENDIF:
-	    printf("endif\t%d,%d\n", n->jmp->offset, n->jmp->count);
+	    printf("lbl_%d:\t\t; }\n", n->jmp->count);
 	    break;
 
 	case T_MULT: case T_CMULT:
 	case T_MFIND:
 	case T_ZFIND: case T_ADDWZ: case T_FOR:
 	case T_WHL:
-	    printf("loop\t%d,%d\t; %s\n", n->offset, n->count,
-		tokennames[n->type]);
+	    printf("ifeqz\t%d,lbl_%d\t; ", n->offset, n->count);
+	    printf("while(p[%d]){\n", n->offset);
+	    printf("loop_%d:\t\t;", n->count);
+	    printf("%s\n", tokennames[n->type]);
 	    break;
 
 	case T_END:
-	    printf("next\t%d,%d\n", n->jmp->offset, n->jmp->count);
+	    printf("ifnez\t%d,loop_%d\t; ", n->jmp->offset, n->jmp->count);
+	    printf("}\n");
+	    printf("lbl_%d:\n", n->jmp->count);
+	    break;
+
+	case T_STOP:
+	    printf("bf_err\t\t; exit(1);\n");
 	    break;
 
 	case T_NOP: 
@@ -3315,6 +3472,7 @@ print_adder(void)
 	}
 	n=n->next;
     }
+    printf("bf_end\n");
 }
 
 int
@@ -3424,7 +3582,8 @@ map_hugeram(void)
 
 #ifdef MADV_MERGEABLE
     if( madvise(mp, cell_array_alloc_len, MADV_MERGEABLE | MADV_SEQUENTIAL) )
-	perror("madvise on tape");
+	if (verbose)
+	    perror("madvise() on tape returned error");
 #endif
 
     if (MEMGUARD > 0) {
