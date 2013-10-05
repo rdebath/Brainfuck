@@ -130,7 +130,8 @@ int main(int argc, char **argv)
     else if ((ifd = fopen(argv[1], "r")) == 0) 
 	perror(argv[1]);
     if (ifd) {
-	while((ch = nextchar(ifd)) != EOF && (ifd!=stdin || ch != '!')) {
+	while((ch = nextchar(ifd)) != EOF &&
+		(ifd!=stdin || ch != '!' || dld || j)) {
 	    int c = 0;
 	    switch(ch) {
 	    case '>': ch = T_MOV; c=  1; break;
@@ -385,19 +386,37 @@ nextchar(FILE * ifd)
 	    memmove(inputbuffer, inputbuffer+buflow, bufcount);
 	    buflow = 0; bufhigh = buflow + bufcount;
 	}
-	cc = fread(inputbuffer+bufhigh, 1, sizeof(inputbuffer)-bufhigh-1, ifd);
-	if (cc == 0) {
-	    bufdrain = 1;
+	if (ifd != stdin) {
+	    cc = fread(inputbuffer+bufhigh, 1,
+			sizeof(inputbuffer)-bufhigh-1, ifd);
+	    if (cc == 0) {
+		bufdrain = 1;
+	    } else {
+		bufcount += cc;
+		bufhigh += cc;
+		inputbuffer[bufhigh] = 0;
+	    }
+	    if (feof(ifd)) bufdrain = 1;
 	} else {
-	    bufcount += cc;
-	    bufhigh += cc;
-	    inputbuffer[bufhigh] = 0;
+	    cc = 0;
+	    while(bufhigh < sizeof(inputbuffer)-1 && !bufdrain) {
+		int ch = getchar();
+		if (ch == '!' || ch == EOF) {
+		    bufdrain = 1;
+		    if (ch == EOF)
+			break;
+		}
+		bufcount++; cc++;
+		inputbuffer[bufhigh++] = ch;
+		inputbuffer[bufhigh] = 0;
+	    }
 	}
-	if (feof(ifd)) bufdrain = 1;
 
 	if (cc > 0) {
 	    for(s=p=inputbuffer+bufhigh-cc; p<inputbuffer+bufhigh; p++)
 		if (strchr("+-<>[],.", *p))
+		    *s++ = *p;
+		else if (*p == '!' && ifd == stdin)
 		    *s++ = *p;
 	    *s = 0;   /* For strcmp */
 	} else
@@ -417,6 +436,7 @@ nextchar(FILE * ifd)
     }
 
     bufcount--;
+    if (inputbuffer[buflow] == '!') bufdrain = 0;
     return (unsigned char) inputbuffer[buflow++];
 }
 
@@ -618,10 +638,16 @@ run(void)
 	    *p++ = -1;
 	    break;
 
-	case T_ADD2: case T_SUB2:
-	case T_SET2:
+	case T_ADD:
+	    *p++ = n->count;
+	    while (n->next && n->next->type == n->type) {
+		n=n->next;
+		p[-1] += n->count;
+	    }
+	    break;
 
-	case T_ADD: case T_SET:
+	case T_ADD2: case T_SUB2: case T_SET2:
+	case T_SET:
 	case T_MUL: case T_QSET:
 	case T_ZFIND: case T_MFIND:
 	case T_ADDWZ:
