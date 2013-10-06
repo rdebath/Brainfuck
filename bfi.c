@@ -3763,16 +3763,28 @@ convert_tree_to_runarray(void)
 
 	case T_CALC:
 	    if (n->count3 == 0) {
-	    /*  m[off] = m[off2]*count2 */
-		p[-1] = T_CALC2;
-		*p++ = n->count;
-		*p++ = n->offset2 - last_offset;
-		*p++ = n->count2;
+		if (n->count == 0 && n->count2 == 1) {
+		    /*  m[off] = m[off2] */
+		    p[-1] = T_CALC4;
+		    *p++ = n->offset2 - last_offset;
+		} else {
+		    /*  m[off] = m[off2]*count2 + count2 */
+		    p[-1] = T_CALC2;
+		    *p++ = n->count;
+		    *p++ = n->offset2 - last_offset;
+		    *p++ = n->count2;
+		}
 	    } else if ( n->count == 0 && n->count2 == 1 && n->offset == n->offset2 ) {
-	    /*  m[off] += m[off3]*count3 */
-		p[-1] = T_CALC3;
-		*p++ = n->offset3 - last_offset;
-		*p++ = n->count3;
+		if (n->count3 == 1) {
+		    /*  m[off] += m[off3] */
+		    p[-1] = T_CALC5;
+		    *p++ = n->offset3 - last_offset;
+		} else {
+		    /*  m[off] += m[off3]*count3 */
+		    p[-1] = T_CALC3;
+		    *p++ = n->offset3 - last_offset;
+		    *p++ = n->count3;
+		}
 	    } else {
 		*p++ = n->count;
 		*p++ = n->offset2 - last_offset;
@@ -3819,7 +3831,8 @@ run_progarray(int * p)
 	case T_ADD: *m += p[1]; p += 2; break;
 	case T_SET: *m = p[1]; p += 2; break;
 
-	case T_END: if(M(*m) != 0) p += p[1];
+	case T_END:
+	    if(M(*m) != 0) p += p[1];
 	    p += 2;
 	    break;
 
@@ -3872,6 +3885,16 @@ run_progarray(int * p)
 	case T_CALC3:
 	    *m += m[p[1]] * p[2];
 	    p += 3;
+	    break;
+
+	case T_CALC4:
+	    *m = m[p[1]];
+	    p += 2;
+	    break;
+
+	case T_CALC5:
+	    *m += m[p[1]];
+	    p += 2;
 	    break;
 
 	case T_INP:

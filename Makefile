@@ -3,7 +3,7 @@ CFLAGS=-O3 -Wall -DTCC0925 $(DEFS)
 CC=gcc
 
 all:	bfi neutron hydrogen \
-	bf2bf16 \
+	bf2bf \
 	bf.bin/bf bf.bin/bf32 bf.bin/bf16 bf.bin/bf.tcc \
 	bf.bin/bfi.tcc \
 	macro/macro
@@ -21,7 +21,7 @@ hydrogen: bf.bin/proton bf.bin/protium bf.bin/deuterium bf.bin/tritium
 	ln -fs bf.bin/tritium hydrogen
 
 bf.bin/proton: hydrogen.c
-	$(CC) -DMASK=1 -DNO_RLE $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CC) -DMASK=1 -DNO_XTRA $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 bf.bin/protium: hydrogen.c
 	$(CC) -DMASK=1 $(CFLAGS) -o $@ $^ $(LDFLAGS)
