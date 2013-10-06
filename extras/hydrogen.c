@@ -34,13 +34,23 @@
 #define MEMSIZE 60000
 #endif
 
+#define T fprintf(stderr, "Trace %d\n", __LINE__);
+
 #define TOKEN_LIST(Mac) \
+    Mac(NOP) \
     Mac(MOV) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
+    \
     Mac(SAVE) Mac(MUL) Mac(QSET) \
     Mac(SET) Mac(SET4) \
     Mac(ZFIND) Mac(MFIND) Mac(ADDWZ) \
-    Mac(ADD2) Mac(SUB2) Mac(SET2) Mac(WHL2) Mac(END2) \
-    Mac(NOP) Mac(STOP) Mac(ERR)
+    \
+    Mac(SET2) Mac(ADD2) Mac(SUB2) Mac(WHL2) Mac(END2) Mac(ZTEMP2) \
+    Mac(SET2c1) Mac(ADD2c1) Mac(SUB2c1) Mac(WHL2c1) Mac(END2c1) \
+    Mac(SET2c2) Mac(ADD2c2) Mac(SUB2c2) Mac(WHL2c2) Mac(END2c2) \
+    Mac(SAVE2) Mac(MUL2) Mac(QSET2) \
+    \
+    Mac(STOP) Mac(ERR) Mac(DATA) \
+    Mac(RMOV) Mac(DEC)
 
 
 #define GEN_TOK_ENUM(NAME) T_ ## NAME,
@@ -49,26 +59,27 @@ enum token { TOKEN_LIST(GEN_TOK_ENUM) };
 #define GEN_TOK_STRING(NAME) "T_" #NAME,
 const char* tokennames[] = { TOKEN_LIST(GEN_TOK_STRING) };
 
-int nextchar(FILE * ifd);
-#define S_SET	(-1000)
-#define S_SET2	(-1001)
-#define S_SET4	(-1002)
-#define S_ADD2	(-1003)
-#define S_SUB2	(-1004)
-#define S_WHL2	(-1005)
-#define S_END2	(-1006)
+int nexttok(FILE * ifd);
 
 struct subst {
-    int t;
+    int t[7];
     char * s;
 } substrlist[] = {
-#ifndef NO_RLE
-    { S_SET,	"[+]" },
-    { S_SET4,	"[-]>[-]>[-]>[-]<<<" },
-    { S_SET4,	"[->-[->-[->-[-]<]<]<]" },	/* Cheat ? */
-#endif
+#ifndef NO_XTRA
+    { {T_SET,0},
+		"[+]" },
+    { {T_SET4, T_MOV, T_MOV, T_MOV, 0},
+		"[-]>[-]>[-]>[-]" },
+    { {T_SET4,0},
+		"[->-[->-[->-[-]<]<]<]" },	/* Cheat ? */
+
 #if MASK == 1
-    { S_SET2,	
+    { {T_MOV, T_ZTEMP2, T_MOV, T_MOV, 0},
+		"[-]>>>[-]" },
+    { {T_SET2, T_MOV, 0},
+		"[-]>[-]" },
+    { {T_SET2c1, T_SET2,0},
+		
 		"[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<"
 		    "[[-]<<<+>>>]<"
 		    "[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<"
@@ -83,25 +94,60 @@ struct subst {
 		    "[[-]<<<+>>>]<<<"
 		    "]>" },
 
-    { S_ADD2,	"+" "[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[-"
+    { {T_ADD2c1,T_ADD2,0},
+		"+" "[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[-"
 		    ">>+<<"
 		    "]>" },
-    { S_SUB2,	"[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[-"
+    { {T_SUB2c1,T_SUB2,0},
+		"[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[-"
 		    ">>-<<"
 		    "]>-"},
-    { S_WHL2,	"[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<"
+    { {T_WHL2c1,T_WHL2,0},
+		"[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<"
 		    "[[-]<<<+>>>]<"
 		    "[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<"
 		    "[[-]<<<+>>>]<<<"
 		    "[[-]>" },
-    { S_END2,	"[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<"
+    { {T_END2c1,T_END2,0},
+		"[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<"
 		    "[[-]<<<+>>>]<"
 		    "[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<"
 		    "[[-]<<<+>>>]<<<"
 		    "]>" },
 #endif
+#if MASK == 1
+    { {T_SET2c2, T_SET2,0},
+        "[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<[[-]>"
+	"<+>[<->[->>+<<]]>>[-<<+>>]<<<[->>-<<]>-"
+	"[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<]>"
+			},
+    { {T_MOV, T_ADD2c2, T_ADD2, T_RMOV, 0},
+	"+>+[<->[->>+<<]]>>[-<<+>>]<<<[->>+<<]"
+			},
+    { {T_MOV, T_SUB2c2, T_SUB2, 0},
+	"+>[<->[->>+<<]]>>[-<<+>>]<<<[->>-<<]>-"
+			},
+    { {T_WHL2c2, T_WHL2, T_RMOV, 0},
+	"[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<[[-]"
+			},
+    { {T_END2c2, T_END2, T_RMOV, 0},
+	"[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<]"
+			},
+#endif
 
-    {0,0}
+#endif
+
+    { {T_MOV,0},    ">" },
+    { {T_RMOV,0},   "<" },
+    { {T_ADD,0},    "+" },
+    { {T_DEC,0},    "-" },
+    { {T_WHL,0},    "[" },
+    { {T_END,0},    "]" },
+    { {T_PRT,0},    "." },
+    { {T_INP,0},    "," },
+    { {T_DATA,0},   "!" },
+
+    {{0},0}
 };
 
 void *
@@ -120,44 +166,34 @@ struct bfi { int type; struct bfi *next, *prev, *jmp; int count; } *pgm;
 
 void run(void);
 
+int dump_prog = 0;
+
 int main(int argc, char **argv)
 {
     FILE * ifd;
     int ch, dld = 0, lid = 0;
     struct bfi *p=0, *n=0, *j=0;
     setbuf(stdout, NULL);
+    for(;;) {
+	if (argc>1 && strcmp(argv[1], "-d") == 0) {
+	    dump_prog++; argc--; argv++;
+	} else break;
+    }
     if (argc < 2 || strcmp(argv[1], "-") == 0) ifd = stdin;
     else if ((ifd = fopen(argv[1], "r")) == 0) 
 	perror(argv[1]);
     if (ifd) {
-	while((ch = nextchar(ifd)) != EOF &&
-		(ifd!=stdin || ch != '!' || dld || j)) {
+	while((ch = nexttok(ifd)) != EOF &&
+		(ifd!=stdin || ch != T_DATA || dld || j)) {
 	    int c = 0;
 	    switch(ch) {
-	    case '>': ch = T_MOV; c=  1; break;
-	    case '<': ch = T_MOV; c= -1; break;
-	    case '+': ch = T_ADD; c=  1; break;
-	    case '-': ch = T_ADD; c= -1; break;
-	    case '[': ch = T_WHL; break;
-	    case ']': ch = T_END; break;
-	    case '.': ch = T_PRT; break;
-	    case ',': ch = T_INP; break;
-	    case S_SET: ch = T_SET; break;
-	    case S_SET4: ch = T_SET4; break;
-#if MASK == 1
-	    case S_SET2: ch = T_SET2; break;
-	    case S_ADD2: ch = T_ADD2; c = 1; break;
-	    case S_SUB2: ch = T_SUB2; c = -1; break;
-	    case S_WHL2: ch = T_WHL2; break;
-	    case S_END2: ch = T_END2; break;
-#endif
-	    default: 
-		if (ch < 0) {
-		    fprintf(stderr, "String substitution %d failed\n", ch);
-		    exit(1);
-		}
-		ch = T_NOP;
-		break;
+	    case T_MOV:  ch = T_MOV; c=  1; break;
+	    case T_RMOV: ch = T_MOV; c= -1; break;
+	    case T_ADD:  ch = T_ADD; c=  1; break;
+	    case T_DEC:  ch = T_ADD; c= -1; break;
+	    case T_ADD2: ch = T_ADD2; c=  1; break;
+	    case T_SUB2: ch = T_ADD2; c= -1; break;
+	    case T_DATA: ch = T_NOP; break;
 	    }
 	    if (ch != T_NOP) {
 		/* Comment loops, can never be run */
@@ -190,6 +226,17 @@ int main(int argc, char **argv)
 
 	while (j) { n = j; j = j->jmp; n->type = T_ERR; n->jmp = 0; }
 
+#if 0
+	for(n=pgm; n; n=n->next)
+	    if (n->type != T_END)
+		fprintf(stderr, "%s %d \t; %p %p %p\n", tokennames[n->type],
+			n->count, n, n->prev, n->jmp);
+	    else
+		fprintf(stderr, "%s %d \t; %p %p %p\n", tokennames[n->type],
+			n->jmp->count, n, n->prev, n->jmp);
+#endif
+
+#ifdef NO_XTRA
 	for(n=pgm; n; n=n->next) {
 	    switch(n->type)
 	    {
@@ -200,16 +247,37 @@ int main(int argc, char **argv)
 		    n->type = T_NOP;
 		    break;
 	    }
-#ifndef NO_RLE
+	    while (n->type == T_NOP && n->prev) {
+		n->prev->next = n->next;
+		if (n->next) n->next->prev = n->prev;
+		p = n->prev;
+		free(n);
+		n = p;
+	    }
+	}
+#else
+	for(n=pgm; n; n=n->next) {
+	    switch(n->type)
+	    {
+		case T_WHL: n->count = ++lid; break;
+		case T_WHL2: n->count = ++lid; break;
+		case T_ERR: /* Unbalanced bkts */
+		    fprintf(stderr, "Warning: skipping unbalanced brackets\n");
+		    n->type = T_NOP;
+		    break;
+	    }
+
 	    /* Merge '<' with '>' and '+' with '-' */
 	    if (n->prev && n->prev->type == n->type &&
-		    (n->type == T_MOV || n->type == T_ADD)) {
+		(n->type == T_MOV || n->type == T_ADD || n->type == T_ADD2)) {
 		n->prev->next = n->next;
 		if (n->next) n->next->prev = n->prev;
 		n->prev->count += n->count;
 		p = n->prev;
 		free(n);
 		n = p;
+	    }
+	    if (n->type == T_MOV || n->type == T_ADD || n->type == T_ADD2) {
 		if (n->count == 0)
 		    n->type = T_NOP;
 	    }
@@ -237,9 +305,53 @@ int main(int argc, char **argv)
 	    }
 
 #if MASK == 1
+	    /* Remove unnecessary T_*c1 and T_*c2 tokens */
+	    if (n->prev && (n->type == T_ADD2c1 || n->type == T_SUB2c1 ||
+	                    n->type == T_ADD2c2 || n->type == T_SUB2c2 ||
+	                    n->type == T_WHL2c2 || n->type == T_END2c2 ||
+	                    n->type == T_SET2c2 || n->type == T_ZTEMP2)) {
+		p = n->prev;
+		if (p->type == T_ADD2 || 
+		    p->type == T_SET2 || 
+		    p->type == T_WHL2 || 
+		    p->type == T_END2 ||
+		    p->type == T_ZTEMP2)
+		    n->type = T_NOP;
+		if (p->type == T_PRT) {
+		    p = p->prev;
+		    if (p->type == T_ADD2 || 
+			p->type == T_SET2 || 
+			p->type == T_WHL2 || 
+			p->type == T_END2 || 
+			p->type == T_ZTEMP2)
+			n->type = T_NOP;
+		}
+	    }
+
+	    /* Identify double byte [-] and replace */
+	    if (n->type == T_END2 &&
+		n->prev->type == T_ADD2 && n->prev->count == -1 &&
+		n->prev->prev->type == T_WHL2)
+	    {
+		// NOP the nodes.
+		p = n;
+		n->type = T_NOP;
+		n = n->prev;
+		n->type = T_NOP;
+		n = n->prev;
+		n->type = T_NOP;
+		
+		p->type = T_SET2;
+		p->count = 0;
+		p->jmp = 0;
+		if (n->prev && n->prev->type == T_WHL2c1)
+		    n->prev->type = T_SET2c1;
+		if (n->prev && n->prev->type == T_WHL2c2)
+		    n->prev->type = T_SET2c2;
+	    }
+
 	    /* Merge double byte '[-]' with '+' and '-' */
-	    if (n->prev && n->prev->type == T_SET2 &&
-		    (n->type == T_ADD2 || n->type == T_SUB2)) {
+	    if (n->prev && n->prev->type == T_SET2 && n->type == T_ADD2) {
 		n->prev->next = n->next;
 		if (n->next) n->next->prev = n->prev;
 		n->prev->count += n->count;
@@ -249,7 +361,6 @@ int main(int argc, char **argv)
 	    }
 #endif
 
-#ifndef NO_XTRA
 	    /* Identify [>>>>] "zero search" and replace */
 	    if (n->type == T_WHL &&
 		n->next->type == T_MOV &&
@@ -343,8 +454,59 @@ int main(int argc, char **argv)
 		    v->type = T_NOP;
 		}
 	    }
+
+#if MASK == 1
+	    /* [->>>+>>>+<<<<<<]   Multiple move or add loop (double byte). */
+	    if (n->type == T_END2) {
+		struct bfi *v;
+		int movsum = 0, incby = 0, idx_only = 1;
+		for(v=n->prev;
+			v->type == T_MOV
+			|| v->type == T_ADD2
+			|| v->type == T_SET2
+			|| v->type == T_ADD2c2
+//			|| v->type == T_SET2c2
+			|| v->type == T_SUB2c2
+			|| v->type == T_END2c2
+			|| v->type == T_ZTEMP2 ; v=v->prev) {
+
+		    if (v->type == T_MOV)
+			movsum += v->count;
+		    else if (movsum == 0) {
+			if (v->type == T_SET2) break;
+			if (v->type == T_ADD2 )
+			    incby += v->count;
+		    } else
+			idx_only = 0; /*FIXME*/
+		    if (movsum % 3 != 0)
+			break; /* WTF! */
+		}
+
+		if (movsum == 0 && incby == -1 && v->type == T_WHL2 &&
+		    (v->prev == 0 || v->prev->type != T_WHL2c2)) {
+		    n = v;
+		    n->type = idx_only?T_NOP:T_SAVE2;
+		    n->count = 0;
+		    n->jmp = 0;
+		    for(v=n->next; v->type != T_END2; v=v->next) {
+			if (v->type == T_MOV) {
+			    movsum += v->count;
+			} else if (movsum == 0) {
+			    v->type = idx_only?T_SET2:T_NOP;
+			    v->count = 0;
+			} else if (v->type == T_ADD2) {
+			    v->type = T_MUL2;
+			} else if (v->type == T_SET2) {
+			    v->type = T_QSET2;
+			} else if (v->type == T_END2c2) {
+			    v->type = T_NOP;
+			}
+		    }
+		    v->type = T_NOP;
+		}
+	    }
 #endif
-#endif
+
 	    /* Remove leftovers */
 	    while (n->type == T_NOP && n->prev) {
 		n->prev->next = n->next;
@@ -354,18 +516,24 @@ int main(int argc, char **argv)
 		n = p;
 	    }
 	}
-
-#if 0
-	for(n=pgm; n; n=n->next)
-	    if (n->type != T_END)
-		fprintf(stderr, "%s %d \t; %p %p %p\n", tokennames[n->type],
-			n->count, n, n->prev, n->jmp);
-	    else
-		fprintf(stderr, "%s %d \t; %p %p %p\n", tokennames[n->type],
-			n->jmp->count, n, n->prev, n->jmp);
-	if (0)
+	while (pgm && pgm->type == T_NOP) {
+	    n = pgm;
+	    pgm = pgm->next;
+	    if (pgm) pgm->prev = 0;
+	    free(n);
+	}
 #endif
-	run();
+
+	if (dump_prog) {
+	    for(n=pgm; n; n=n->next)
+		if (n->type != T_END)
+		    fprintf(stderr, "%s %d \t; %p %p %p\n", tokennames[n->type],
+			    n->count, n, n->prev, n->jmp);
+		else
+		    fprintf(stderr, "%s %d \t; %p %p %p\n", tokennames[n->type],
+			    n->jmp->count, n, n->prev, n->jmp);
+	} else
+	    run();
     }
     return !ifd;
 }
@@ -373,13 +541,17 @@ int main(int argc, char **argv)
 char inputbuffer[BUFSIZ*2];
 int buflow = 0, bufhigh = 0, bufcount = 0;
 int bufdrain = 0;
+int * symbuffer = 0;
 
 int
-nextchar(FILE * ifd)
+nexttok(FILE * ifd)
 {
     int cc;
     char *s, *p;
     struct subst * subs;
+
+    if (symbuffer && *symbuffer == 0) symbuffer = 0;
+    if (symbuffer) return *symbuffer++;
 
     while (bufcount < sizeof(inputbuffer)/2 && !bufdrain) {
 	if (buflow != 0) {
@@ -426,18 +598,20 @@ nextchar(FILE * ifd)
     }
     if (bufcount <= 0) { bufdrain=0; return EOF; }
 
-    for(subs=substrlist; subs->t; subs++) {
+    for(subs=substrlist; subs->s; subs++) {
 	int l = strlen(subs->s);
 	if (strncmp(inputbuffer+buflow, subs->s, l) == 0) {
+	    if (inputbuffer[buflow] == '!')
+		bufdrain = 0;
 	    buflow += l;
 	    bufcount -= l;
-	    return subs->t;
+	    symbuffer = subs->t;
+	    return *symbuffer++;
 	}
     }
 
-    bufcount--;
-    if (inputbuffer[buflow] == '!') bufdrain = 0;
-    return (unsigned char) inputbuffer[buflow++];
+    fprintf(stderr, "String substitution %d failed\n", inputbuffer[buflow]);
+    exit(1);
 }
 
 
@@ -556,8 +730,11 @@ run(void)
     int * p;
     int last_offset = 0;
     icell * m;
-#ifndef NO_RLE
+#ifndef NO_XTRA
     icell a = 0;
+#if MASK == 1
+    int a2 = 0;
+#endif
 #endif
 #ifndef USEHUGERAM
     void * freep;
@@ -577,7 +754,14 @@ run(void)
 	case T_MOV:
 	    break;
 
-#ifndef NO_RLE
+	case T_INP: case T_PRT:
+	case T_ADD:
+	case T_WHL: case T_END:
+	    arraylen += 3;
+	    break;
+
+#ifndef NO_XTRA
+
 	case T_SAVE:
 	case T_SET4:
 	    arraylen += 2;
@@ -587,17 +771,30 @@ run(void)
 	case T_MUL:
 	case T_ZFIND: case T_MFIND:
 	case T_ADDWZ:
-#endif
-#if MASK == 1
-	case T_ADD2: case T_SUB2:
-	case T_WHL2: case T_END2:
-	case T_SET2:
-#endif
-	case T_INP: case T_PRT:
-	case T_ADD:
-	case T_WHL: case T_END:
 	    arraylen += 3;
 	    break;
+
+#if MASK == 1
+	case T_ADD2: case T_SET2: case T_MUL2: case T_QSET2:
+	    arraylen += 3;
+	    break;
+
+	case T_WHL2: case T_END2:
+	case T_ADD2c1: case T_SUB2c1:
+	case T_ADD2c2: case T_SUB2c2:
+	    arraylen += 3;
+	    break;
+
+	case T_SAVE2:
+	case T_ZTEMP2:
+	    arraylen += 2;
+	    break;
+
+	case T_WHL2c1: case T_END2c1: case T_SET2c1:
+	case T_WHL2c2: case T_END2c2: case T_SET2c2:
+	    break;
+#endif
+#endif
 
 	default:
 	    fprintf(stderr, "Invalid node type found = %s\n",
@@ -606,8 +803,9 @@ run(void)
 	}
 	n = n->next;
     }
+    arraylen+=2;
 
-    p = progarray = calloc(arraylen+2, sizeof*progarray);
+    p = progarray = calloc(arraylen, sizeof*progarray);
     if (!progarray) { perror(program); exit(1); }
     n = pgm;
 
@@ -632,6 +830,8 @@ run(void)
 	    break;
 
 	case T_INP: case T_SAVE: case T_SET4:
+	case T_ZTEMP2:
+	case T_SAVE2:
 	    break;
 
 	case T_PRT:
@@ -646,7 +846,7 @@ run(void)
 	    }
 	    break;
 
-	case T_ADD2: case T_SUB2: case T_SET2:
+	case T_ADD2: case T_SUB2: case T_SET2: case T_MUL2: case T_QSET2:
 	case T_SET:
 	case T_MUL: case T_QSET:
 	case T_ZFIND: case T_MFIND:
@@ -667,11 +867,66 @@ run(void)
 	    progarray[n->count] = (p-progarray) - n->count;
 	    *p++ = -progarray[n->count];
 	    break;
+
+	case T_ADD2c1: case T_SUB2c1:
+	case T_ADD2c2: case T_SUB2c2:
+	    if (n->next->type != T_ADD2) {
+		*p++ = 0;
+	    } else {
+		n=n->next;
+		*p++ = n->count;
+	    }
+	    break;
+
+	case T_SET2c1:
+	case T_SET2c2:
+	    if (n->next->type != T_SET2) {
+		fprintf(stderr, "%s lost it's %s\n", 
+		    tokennames[n->type], tokennames[T_SET2]);
+		exit(1);
+	    }
+	    n=n->next;
+	    *p++ = n->count;
+	    break;
+
+	case T_WHL2c1:
+	case T_WHL2c2:
+	    if (n->next->type != T_WHL2) {
+		fprintf(stderr, "%s lost it's %s\n", 
+		    tokennames[n->type], tokennames[T_WHL2]);
+		exit(1);
+	    }
+	    n=n->next;
+	    n->jmp->count = p-progarray;
+	    *p++ = 0;
+	    break;
+
+	case T_END2c1:
+	case T_END2c2:
+	    if (n->next->type != T_END2) {
+		fprintf(stderr, "%s lost it's %s\n", 
+		    tokennames[n->type], tokennames[T_END2]);
+		exit(1);
+	    }
+	    n=n->next;
+	    progarray[n->count] = (p-progarray) - n->count;
+	    *p++ = -progarray[n->count];
+	    break;
+
+	default:
+	    fprintf(stderr, "Invalid node type found in GEN2 = %s\n",
+		    tokennames[n->type]);
+	    exit(1);
 	}
 	n = n->next;
     }
     *p++ = 0;
     *p++ = T_STOP;
+
+    if (p-progarray > arraylen) {
+	fprintf(stderr, "Program array overflow; aborting\n");
+	exit(1);
+    }
 
     p = progarray;
 
@@ -698,9 +953,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	switch(*p)
 	{
 	case T_ADD: *m += p[1]; p += 2; break;
-#ifndef NO_RLE
 	case T_SET: *m = p[1]; p += 2; break;
-#endif
 
 	case T_END:
 	    if(M(*m) != 0) p += p[1];
@@ -712,7 +965,26 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    p += 2;
 	    break;
 
-#ifndef NO_RLE
+	case T_INP:
+	    {
+		int c = getchar();
+		if (c != EOF) *m = c;
+	    }
+	    p += 1;
+	    break;
+
+	case T_PRT:
+	    {
+		int ch = M(p[1] == -1?*m:p[1]);
+		putchar(ch);
+	    }
+	    p += 2;
+	    break;
+
+	case T_STOP:
+	    goto break_break;
+
+#ifndef NO_XTRA
 	case T_ZFIND:
 	    /* Search along a rail til you find the end of it. */
 	    while(M(*m)) m += p[1];
@@ -736,29 +1008,84 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	case T_QSET: if(a) *m = p[1]; p += 2; break;
 
 	case T_SET4: *m = 0; m[1] = 0; m[2] = 0; m[3] = 0; p += 1; break;
-#endif
 
-	case T_INP:
-	    {
-		int c = getchar();
-		if (c != EOF) *m = c;
-	    }
+#if MASK == 1
+	case T_SAVE2:
+	    a = *m; a2 = (m[1]<<8) + a;
+	    *m = 0; m[1] = 0;
 	    p += 1;
 	    break;
 
-	case T_PRT:
+	case T_MUL2:
+#ifdef dcell
+	    *((dcell*)m) += p[1] * a2;
+#else
 	    {
-		int ch = M(p[1] == -1?*m:p[1]);
-		putchar(ch);
+		unsigned int t = m[0] + (m[1]<<8);
+		t += p[1] * a2;
+		m[0] = t; m[1] = (t>>8);
 	    }
+#endif
 	    p += 2;
 	    break;
 
-	case T_STOP:
-	    goto break_break;
+	case T_QSET2:
+	    if (a2)
+#ifdef dcell
+		*((dcell*)m) = p[1];
+#else
+	    {
+		unsigned int t;
+		t = p[1];
+		m[0] = t; m[1] = (t>>8);
+	    }
+#endif
+	    p += 2;
+	    break;
 
-#if MASK == 1
 	case T_ADD2:
+#ifdef dcell
+	    *((dcell*)m) += p[1];
+#else
+	    {
+		unsigned int t = m[0] + (m[1]<<8);
+		t += p[1];
+		m[0] = t; m[1] = (t>>8);
+	    }
+#endif
+	    p += 2;
+	    break;
+
+	case T_SET2:
+#ifdef dcell
+	    *((dcell*)m) = p[1];
+#else
+	    {
+		unsigned int t;
+		t = p[1];
+		m[0] = t; m[1] = (t>>8);
+	    }
+#endif
+	    p += 2;
+	    break;
+
+	case T_WHL2:
+	    if (m[0] == 0 && m[1] == 0) p += p[1];
+	    p += 2;
+	    break;
+
+	case T_END2:
+	    if (m[0] != 0 || m[1] != 0) p += p[1];
+	    p += 2;
+	    break;
+
+	case T_ZTEMP2:
+	    m[-1] = m[2] = 0;
+	    p += 1;
+	    break;
+
+
+	case T_ADD2c1:
 	    if (m[-1] != 0 || m[2] != 0) {
 		++*m;
 		m[-1] += m[0];
@@ -782,7 +1109,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    p += 2;
 	    break;
 
-	case T_SUB2:
+	case T_SUB2c1:
 	    if (m[-1] != 0 || m[2] != 0) {
 		m[-1] += m[0];
 		m[2] += m[0];
@@ -814,7 +1141,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    p += 2;
 	    break;
 
-	case T_SET2:
+	case T_SET2c1:
 	    if (m[-1] != 0 || m[2] != 0 || m[5] != 0) {
 		m[-1] += !!m[1] + !!(m[2] + m[0]);
 		m[0] += m[5];
@@ -835,7 +1162,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    p += 2;
 	    break;
 
-	case T_WHL2:
+	case T_WHL2c1:
 	    if (m[-1] != 0 || m[2] != 0 || m[5] != 0) {
 		icell t;
 		t = m[-1] + !!m[1] + !!(m[2] + m[0]);
@@ -851,7 +1178,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    }
 	    break;
 
-	case T_END2:
+	case T_END2c1:
 	    if (m[-1] != 0 || m[2] != 0 || m[5] != 0) {
 		icell t;
 		t = m[-1] + !!m[1] + !!(m[2] + m[0]);
@@ -867,6 +1194,140 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 		p += 2;
 	    }
 	    break;
+
+
+	case T_ADD2c2:
+	    if (m[-1] != 0 || m[2] != 0) {
+		++m[-1];
+		++*m;
+		if(m[0]) {
+		    --m[-1];
+		    m[2] += m[0];
+		}
+		m[0] = m[2];
+		m[2] = 0;
+		m[1] += m[-1];
+		m[-1] = 1;
+		if(m[0]) {
+		    m[-1] = 0;
+		}
+		m[1] -= m[-1];
+		m[-1] = 0;
+		--*m;
+	    }
+#ifdef dcell
+	    *((dcell*)m) += p[1];
+#else
+	    {
+		unsigned int t = m[0] + (m[1]<<8);
+		t += p[1];
+		m[0] = t; m[1] = (t>>8);
+	    }
+#endif
+	    p += 2;
+	    break;
+
+
+	case T_SUB2c2:
+	    if (m[-1] != 0 || m[2] != 0) {
+		++m[-1];
+		if(m[0]) {
+		    --m[-1];
+		    m[2] += m[0];
+		}
+		m[0] = m[2];
+		m[2] = 0;
+		m[1] -= m[-1];
+		m[-1] = 1;
+		if(m[0]) {
+		    m[-1] = 0;
+		}
+		m[1] += m[-1];
+		m[-1] = 0;
+	    }
+#ifdef dcell
+	    *((dcell*)m) += p[1];
+#else
+	    {
+		unsigned int t = m[0] + (m[1]<<8);
+		t += p[1];
+		m[0] = t; m[1] = (t>>8);
+	    }
+#endif
+	    p += 2;
+	    break;
+
+	case T_SET2c2:
+	    if (m[-1] != 0 || m[2] != 0) {
+		if(m[0]) {
+		    ++m[-1];
+		    m[2] += m[0];
+		}
+		m[0] = m[2];
+		m[2] = 0;
+		if(m[1]) {
+		    ++m[-1];
+		}
+		if(m[-1]) {
+		    m[-1] = 0;
+		    m[0] = 0;
+		    m[1] = 0;
+		}
+	    } else
+		m[0] = m[1] = 0;
+#ifdef dcell
+	    *((dcell*)m) += p[1];
+#else
+	    {
+		unsigned int t = m[0] + (m[1]<<8);
+		t += p[1];
+		m[0] = t; m[1] = (t>>8);
+	    }
+#endif
+	    p += 2;
+	    break;
+
+	case T_WHL2c2:
+	    if (m[-1] != 0 || m[2] != 0) {
+		icell t = m[-1];
+		if(m[0]) {
+		    ++t;
+		    m[2] += m[0];
+		}
+		m[0] = m[2];
+		if(m[1]) {
+		    ++t;
+		}
+		m[-1] = m[2] = 0;
+
+		if(M(t) == 0) p += p[1];
+	    } else {
+		if ((!!m[1] | !!m[0]) == 0) p += p[1];
+	    }
+	    p += 2;
+	    break;
+
+	case T_END2c2:
+	    if (m[-1] != 0 || m[2] != 0) {
+		icell t = m[-1];
+		if(m[0]) {
+		    ++t;
+		    m[2] += m[0];
+		}
+		m[0] = m[2];
+		if(m[1]) {
+		    ++t;
+		}
+		m[-1] = m[2] = 0;
+
+		if(M(t) != 0) p += p[1];
+	    } else {
+		if(M(*m) != 0 || M(m[1]) != 0) p += p[1];
+	    }
+	    p += 2;
+	    break;
+
+#endif
 #endif
 	}
     }
