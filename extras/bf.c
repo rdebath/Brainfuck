@@ -435,6 +435,11 @@ dump_c(void)
     int i;
     printf("#include <stdio.h>\n");
     printf("int mem[%d];\n", memlen);
+    printf("void putch(int ch) { putchar(ch); }\n");
+    printf("int getch(int och) {\n");
+    printf("int ch; if((ch=getchar()) != EOF) return ch; else return och;\n");
+    printf("}\n");
+
     printf("int main(void){int*m=mem+%d,a;\n", memoff);
     printf("setbuf(stdout,0);\n");
     for(i=0; i<proglen; i++) {
@@ -444,7 +449,7 @@ dump_c(void)
                 printf("*(m+=%d)+=%d;\n", prog[i].mov, prog[i].arg);
                 continue;
             case 2:
-                printf("putchar(*(m+=%d));\n", prog[i].mov);
+                printf("putch(*(m+=%d));\n", prog[i].mov);
                 continue;
             case 8:
                 printf("*(m+=%d)= %d;\n", prog[i].mov, prog[i].arg);
@@ -456,8 +461,8 @@ dump_c(void)
 	switch(prog[i].op) {
 	case 0: printf("return %d;}\n", prog[i].arg); break;
 	case 1: printf("*m+=%d;\n", prog[i].arg); break;
-	case 2: printf("putchar(*m);\n"); break;
-	case 3: printf("a=getchar();if(a!=EOF)*m=a;\n"); break;
+	case 2: printf("putch(*m);\n"); break;
+	case 3: printf("*m=getch(*m);\n"); break;
 	case 4: if(prog[i].arg) printf("while(*m){\n"); break;
 	case 5: if(prog[i].arg) printf("}\n"); break;
 	case 8: printf("*m= %d;\n", prog[i].arg); break;
