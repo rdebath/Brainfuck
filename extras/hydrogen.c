@@ -20,7 +20,7 @@
 #elif MASK == 2
 #define icell	unsigned short
 #define M(x) x
-#elif MASK <= 128
+#elif MASK < 127
 #define icell	int
 #define M(x) x
 #elif MASK == 0xFF || MASK == 0xFFFF || MASK == 0xFFFFFF
@@ -70,8 +70,6 @@ struct subst {
 		"[+]" },
     { {T_SET4, T_MOV, T_MOV, T_MOV, 0},
 		"[-]>[-]>[-]>[-]" },
-    { {T_SET4,0},
-		"[->-[->-[->-[-]<]<]<]" },	/* Cheat ? */
 
 #if MASK == 1
     { {T_MOV, T_ZTEMP2, T_MOV, T_MOV, 0},
@@ -150,21 +148,11 @@ struct subst {
     {{0},0}
 };
 
-void *
-tcalloc(size_t nmemb, size_t size)
-{
-    void * m;
-    m = calloc(nmemb, size);
-    if (m) return m;
-
-    fprintf(stderr, "Allocate of %d*%d bytes failed, ABORT\n", nmemb, size);
-    exit(42);
-}
-
 char * program = "C";
 struct bfi { int type; struct bfi *next, *prev, *jmp; int count; } *pgm;
 
 void run(void);
+void * tcalloc(size_t nmemb, size_t size);
 
 int dump_prog = 0;
 
@@ -478,6 +466,7 @@ int main(int argc, char **argv)
 			    incby += v->count;
 		    } else
 			idx_only = 0; /*FIXME*/
+
 		    if (movsum % 3 != 0)
 			break; /* WTF! */
 		}
@@ -538,16 +527,19 @@ int main(int argc, char **argv)
     return !ifd;
 }
 
-char inputbuffer[BUFSIZ*2];
+char inputbuffer[BUFSIZ];
+int inputline[BUFSIZ];
+int inputcol[BUFSIZ];
 int buflow = 0, bufhigh = 0, bufcount = 0;
 int bufdrain = 0;
 int * symbuffer = 0;
+
+int inpline = 1, inpcol = 0;
 
 int
 nexttok(FILE * ifd)
 {
     int cc;
-    char *s, *p;
     struct subst * subs;
 
     if (symbuffer && *symbuffer == 0) symbuffer = 0;
@@ -558,43 +550,24 @@ nexttok(FILE * ifd)
 	    memmove(inputbuffer, inputbuffer+buflow, bufcount);
 	    buflow = 0; bufhigh = buflow + bufcount;
 	}
-	if (ifd != stdin) {
-	    cc = fread(inputbuffer+bufhigh, 1,
-			sizeof(inputbuffer)-bufhigh-1, ifd);
-	    if (cc == 0) {
+	cc = 0;
+	while(bufhigh < sizeof(inputbuffer)-1 && !bufdrain) {
+	    int ch = getc(ifd);
+	    if (ch == '\n') {inpline++; inpcol=0;} else inpcol++;
+	    if ((ch == '!' && ifd==stdin) || ch == EOF) {
 		bufdrain = 1;
-	    } else {
-		bufcount += cc;
-		bufhigh += cc;
-		inputbuffer[bufhigh] = 0;
-	    }
-	    if (feof(ifd)) bufdrain = 1;
-	} else {
-	    cc = 0;
-	    while(bufhigh < sizeof(inputbuffer)-1 && !bufdrain) {
-		int ch = getchar();
-		if (ch == '!' || ch == EOF) {
-		    bufdrain = 1;
-		    if (ch == EOF)
-			break;
-		}
-		bufcount++; cc++;
-		inputbuffer[bufhigh++] = ch;
-		inputbuffer[bufhigh] = 0;
-	    }
+		if (ch == EOF)
+		    break;
+	    } else
+		if (!strchr("+-<>[],.", ch))
+		    continue;
+
+	    bufcount++; cc++;
+	    inputbuffer[bufhigh] = ch;
+	    inputline[bufhigh] = inpline;
+	    inputcol[bufhigh] = inpcol;
+	    inputbuffer[++bufhigh] = 0;
 	}
-
-	if (cc > 0) {
-	    for(s=p=inputbuffer+bufhigh-cc; p<inputbuffer+bufhigh; p++)
-		if (strchr("+-<>[],.", *p))
-		    *s++ = *p;
-		else if (*p == '!' && ifd == stdin)
-		    *s++ = *p;
-	    *s = 0;   /* For strcmp */
-	} else
-	    inputbuffer[bufhigh] = 0; /* EOF at start */
-
-	bufcount = bufhigh = strlen(inputbuffer);
     }
     if (bufcount <= 0) { bufdrain=0; return EOF; }
 
@@ -614,6 +587,17 @@ nexttok(FILE * ifd)
     exit(1);
 }
 
+void *
+tcalloc(size_t nmemb, size_t size)
+{
+    void * m;
+    m = calloc(nmemb, size);
+    if (m) return m;
+
+    fprintf(stderr, "Allocate of %d*%d bytes failed, ABORT\n", nmemb, size);
+    exit(42);
+}
+
 
 
 
@@ -625,7 +609,7 @@ nexttok(FILE * ifd)
  * This is very slow!
  */
 
-#ifndef NO_RLE
+#ifndef NO_XTRA
 #error "This interpreter does not support extended codes"
 #endif
 
@@ -677,7 +661,7 @@ void run(void)
  * Note it is, fractionally, quicker to use int cells and a mask when needed.
  */
 
-#ifndef NO_RLE
+#ifndef NO_XTRA
 #error "This interpreter does not support extended codes"
 #endif
 
