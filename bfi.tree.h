@@ -1,4 +1,6 @@
 
+#include "bfi.conf.h"
+
 extern char * curfile;
 extern int curr_line, curr_col;
 extern int noheader, enable_trace, hard_left_limit;

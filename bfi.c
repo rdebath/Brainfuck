@@ -31,91 +31,6 @@ CPU is very unpredictable.
 Note: If you're generating C code for later telling this program the
 Cell size you will be using allows it to generate better code.
 
-------------------------------------------------------------------------------
-
-TODO:
-    NAME THIS INTERPRETER!
-
-    T_INP if known_value T_INP unchanged on EOF if not EOF = 0 for <= 8bit and
-    EOF = -1 for > 8bit.
-
-    Add option for "*123" suffixes to "<>-+" commands for user RLE.
-
-    Add option to strip/not-strip CR from getch() input.
-
-    Allow generated C code use a expanding realloc'd array.
-	"if ((m+=2) >= memend) m = realloc_mem(m);"
-    For negative too ?
-	Note: makes railrunners very slow.
-
-    Move non-C generators (or all ?) into other files.
-
-    Other macros "[>>]" rail runner extensions, array access.
-	Mole style array access has NO prequesites.
-
-    Switch the token to a register machine? Temp? Only for basic blocks?
-
-    Note: With T_IF loops the condition may depend on the cell size.
-	If so, within the loop the cell size may be known.
-
-    IF "known non-zero" at start of loop --> do { } while();
-
-    New C function on Level 2 end while.
-	Outer while and direct code in main() rest in functions.
-	Useful for a when using a large outer loop to simulate JMPs.
-	(ie: while(jmp) switch(jmp) {...} )
-
-    BF instruction counting, even with optimisation.
-
-    T_HINT(offset), save results of known value search.
-	-- Problem, values become known as the code simplifies.
-	-- Manually added hints in a hash array?
-	-- Only use the manual hints "sometimes", when?
-
-    Code: "m[0]++; m[1] += !m[0];" 16 bit inc.
-	If T_MOV common factors includes 2 this will always be aligned.
-	But code for 16bit inc uses both m[-1] and m[2].
-	Probably requires known (8bit) cell size.
-
-    Multiple files, loaded then run in sequence on same tape.
-	Common tape.
-	Common pointer ?
-	Common control flow ?
-
-    Define comment start on command line. eg: "bfi -C //"
-	-- If first 2 characters are '#!' allow comments beginning with '#'
-	-- Poss if first character is a '#'
-
-	#!	Comment if at start of FILE
-	#	Comment if at SOL
-	%	Comment character til EOL
-	//  Comment til EOL.
-
-	*/ /*	C comments or REVERSED C comments ?
-
-
-    ;	Input cell as a decimal NUMBER, trim initial whitespace.
-    :	Output cell as a decimal NUMBER
-    #	Debugging flag.
-
-#ifdef DEBUG
-        case '@': {int a; scanf("%d", &a); m=a;} break;
-        case '=': {int a; scanf("%d", &a); mem[m]=a;} break;
-        case '?': printf("Cell %d has value %d\n", m, mem[m]); break;
-        case '#':
-            {
-                int i,j;
-                printf("Pointer = %d\n", m);
-                for(i=0; i<48; i+=16) {
-                    for(j=0; j<16; j++) {
-                        printf("%s%5d", (i+j)==m?">":" ",mem[i+j]);
-                    }
-                    printf("\n");
-                }
-            }
-            break;
-#endif
-
 */
 
 #ifdef __STRICT_ANSI__
@@ -146,7 +61,7 @@ TODO:
 #include "bfi.nasm.h"
 #include "bfi.bf.h"
 
-#ifndef NO_GNULIGHT
+#ifdef ENABLE_GNULIGHTNING
 #include "bfi.jit.h"
 #endif
 #endif
@@ -166,11 +81,7 @@ TODO:
 #warning Using small memory, define MEMSIZE to increase.
 #endif
 
-#if !defined(__STRICT_ANSI__) && !defined(NO_TCCLIB)
-#define USETCCLIB
-#endif
-
-#ifdef USETCCLIB
+#ifdef ENABLE_TCCLIB
 #include <libtcc.h>
 #endif
 
@@ -265,7 +176,7 @@ void LongUsage(FILE * fd)
     fprintf(fd, "%s: Version 0.1.0\n", program);
     fprintf(fd, "Usage: %s [options] [BF file]\n", program);
     if (fd != stdout) {
-	fprintf(fd, "   -h   Long help message.\n");
+	fprintf(fd, "   -h   Long help message. (Pipe it through more)\n");
 	fprintf(fd, "   -v   Verbose, repeat for more.\n");
 	fprintf(fd, "   -r   Run in interpreter.\n");
 	fprintf(fd, "   -c   Create C code.\n");
@@ -279,7 +190,7 @@ void LongUsage(FILE * fd)
 #ifdef _BFI_JIT_H
     printf("   -j   Run using the JIT interpreter/compiler.\n");
 #endif
-#ifdef USETCCLIB
+#ifdef ENABLE_TCCLIB
     printf("   -c   Create C code. If combined with -r the code is run using TCCLIB.\n");
 #else
     printf("   -c   Create C code.\n");
@@ -306,23 +217,25 @@ void LongUsage(FILE * fd)
     printf("   -B8  Use 8 bit cells.\n");
     printf("   -B16 Use 16 bit cells.\n");
     printf("   -B32 Use 32 bit cells.\n");
-    printf("        Default for C code is 'unknown', ASM can only be 8bit.\n");
+    printf("        Default for running now is %dbits.\n", sizeof(int)*8);
+    printf("        Default for C code is 'unknown', NASM can only be 8bit.\n");
     printf("        Other bitwidths work (including 7) for the interpreter and C.\n");
     printf("        Full Unicode characters need 21 bits.\n");
-    printf("        The optimiser may work better if this is not unknown.\n");
+    printf("        The optimiser may work better if this is specified for C generation.\n");
     printf("\n");
     printf("   -En  End of file processing for '-r'.\n");
     printf("   -E1      End of file gives no change for ',' command.\n");
-    printf("   -E1      End of file gives no change for ',' command.\n");
     printf("   -E2      End of file gives -1.\n");
     printf("   -E3      End of file gives 0.\n");
-    printf("   -E4      End of file gives EOF.\n");
-    printf("   -E5      Disable ',' command.\n");
+    printf("   -E4      End of file gives EOF (normally -1 too).\n");
+    printf("   -E5      Disable ',' command, ie: treat it as a comment character.\n");
     printf("\n");
 #ifdef _BFI_BF_H
-    printf("   -F       Attempt to regenerate BF code.\n");
+    printf("   -F   Attempt to regenerate BF code.\n");
 #endif
-    printf("   -A       Generate token list output, possibly suitable as a base for a macro assembler.\n");
+    printf("   -A   Generate token list output, "
+		    "possibly suitable as a base for a\n");
+    printf("        macro assembler.\n");
     exit(1);
 }
 
@@ -440,7 +353,7 @@ main(int argc, char ** argv)
 	if (verbose<3 && !enable_trace)
 	    do_codestyle = c_jit;
 #else
-#ifdef USETCCLIB
+#ifdef ENABLE_TCCLIB
 	if (verbose<3)
 	    do_codestyle = c_c;
 #endif
@@ -746,10 +659,11 @@ print_c_header(FILE * ofd, int * minimal_p)
 
     fprintf(ofd, "#include <stdio.h>\n");
     fprintf(ofd, "#include <stdlib.h>\n\n");
-    fprintf(ofd, "#include <stdint.h>\n\n");
 
     if (cell_size == 0) {
-	fprintf(ofd, "# ifndef C\n");
+	fprintf(ofd, "# ifdef C\n");
+	fprintf(ofd, "# include <stdint.h>\n");
+	fprintf(ofd, "# else\n");
 	fprintf(ofd, "# define C int\n");
 	fprintf(ofd, "# endif\n\n");
     }
@@ -781,9 +695,9 @@ print_c_header(FILE * ofd, int * minimal_p)
 
     if (node_type_counts[T_PRT] != 0 && !do_run) {
 	fprintf(ofd, "#ifdef WIDECHAR\n");
-	fprintf(ofd, "#define putch(ch) printf(\"%%lc\",ch)\n");
+	fprintf(ofd, "static void putch(int ch) { printf(\"%%lc\",ch); }\n");
 	fprintf(ofd, "#else\n");
-	fprintf(ofd, "#define putch(ch) putchar(ch);\n");
+	fprintf(ofd, "static void putch(int ch) { putchar(ch); }\n");
 	fprintf(ofd, "#endif\n\n");
     }
 
@@ -1400,7 +1314,7 @@ process_file(void)
 
     if (do_run) {
 	if (do_codestyle == c_c) {
-#ifdef USETCCLIB
+#ifdef ENABLE_TCCLIB
 	    run_ccode();
 #else
 	    fprintf(stderr, "Sorry cannot compile C code in memory, TCCLIB not linked\n");
@@ -1479,7 +1393,7 @@ calculate_stats(void)
     while(n)
     {
 	int t = n->type;
-	total_nodes ++;
+	n->ipos = total_nodes ++;
 	if (t < 0 || t >= TCOUNT) 
 	    node_type_counts[TCOUNT] ++;
 	else
@@ -2878,14 +2792,27 @@ flatten_loop(struct bfi * v, int constant_count)
     struct bfi *n, *dec_node = 0;
     int is_znode = 0;
     int loop_step = 0;
+    int have_mult = 0;
+    int have_add = 0;
+    int have_set = 0;
 
     n = v->next;
     while(1)
     {
 	if (n == 0) return 0;
 	if (n->type == T_END || n->type == T_ENDIF) break;
-	if (n->type != T_ADD && n->type != T_SET) return 0;
-	if (n->offset == v->offset) {
+	if (n->type != T_ADD && n->type != T_SET) {
+	    if (n->offset == v->offset) return 0;
+	    if (have_mult || have_add || have_set) return 0;
+	    if (n->type != T_CALC) return 0;
+	    if (constant_count <= 0 || constant_count > 9) return 0;
+	    if (n->count3 != 0 || n->count2 <= 0 || n->count != 0)
+		return 0;
+	    if (n->offset != n->offset2 || n->count2 > 9)
+		return 0;
+	    /* T_CALC of form X *= 5 with SMALL integers. */
+	    have_mult++;
+	} else if (n->offset == v->offset) {
 	    if (dec_node) return 0; /* Two updates, hmmm */
 	    if (n->type != T_ADD) {
 		if (n->type != T_SET || n->count != 0) return 0;
@@ -2893,15 +2820,19 @@ flatten_loop(struct bfi * v, int constant_count)
 	    }
 	    else loop_step = n->count;
 	    dec_node = n;
-	}
+	} else if (n->type == T_ADD) {
+	    have_add++;
+	} else if (n->type == T_SET)
+	    have_set++;
 	n=n->next;
     }
-    if (dec_node == 0) return 0;
+    if (dec_node == 0 || (have_mult && (have_add || have_set))) return 0;
 
     if (!is_znode && loop_step != -1)
     {
 	int sum, cnt;
 	if (loop_step == 0) return 0; /* Infinite ! */
+	if (have_mult) return 0;
 
 	/* Not a simple decrement hmmm. */
 	/* This sort of sillyness is only used for 'wrapping' 8bits so ... */
@@ -2943,6 +2874,12 @@ flatten_loop(struct bfi * v, int constant_count)
 	if (n->type == T_END || n->type == T_ENDIF) break;
 	if (n->type == T_ADD)
 	    n->count = n->count * constant_count;
+	if (n->type == T_CALC) {
+	    /* n->count2 = pow(n->count2, constant_count) */
+	    int i, j = n->count2;
+	    for(i=0; i<constant_count-1; i++)
+		n->count2 = n->count2 * j;
+	}
 	n=n->next;
     }
 
@@ -3183,7 +3120,7 @@ build_string_in_tree(struct bfi * v)
     }
 }
 
-#ifdef USETCCLIB
+#ifdef ENABLE_TCCLIB
 int *
 libbf_zfind32(int * m, int off) {
   while(*m) m += off;
@@ -3240,7 +3177,7 @@ run_ccode(void)
     tcc_add_symbol(s, "libbf_zfind16", &libbf_zfind16);
     tcc_add_symbol(s, "libbf_zfind32", &libbf_zfind32);
 
-#if defined(TCC0925) && !defined(TCCDONE)
+#if ENABLE_TCCLIB == 0x000925
 #define TCCDONE
     {
 	int (*func)(void);
@@ -3279,7 +3216,7 @@ run_ccode(void)
     }
 #endif
 
-#if defined(TCC0926) && !defined(TCCDONE)
+#if ENABLE_TCCLIB == 0x000926
 #define TCCDONE
     {
 	int (*func)(void);

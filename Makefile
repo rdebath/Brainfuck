@@ -8,6 +8,9 @@ all:	bfi neutron hydrogen \
 	bf.bin/bfi.tcc \
 	macro/macro
 
+clean:
+	-rm -f *.o bfi bf2bf
+    
 bfi:	bfi.o bfi.jit.o bfi.nasm.o bfi.bf.o
 	$(CC) $(CFLAGS) -o bfi $^ $(LDFLAGS) -ltcc -ldl
 

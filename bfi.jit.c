@@ -2,17 +2,18 @@
  * GNU Lightning JIT runner.
  *
  * This converts the BF tree into JIT assembler using GNU lightning.
- * If it's not supported on your machine define the NO_GNULIGHT flag.
  *
  * This works with both v1 and v2.
  */
-#ifndef NO_GNULIGHT
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 
+#include "bfi.tree.h"
+
+#ifdef ENABLE_GNULIGHTNING
 #include <lightning.h>
 
 #ifdef jit_set_ip
@@ -21,7 +22,6 @@
 #define GNULIGHTv2
 #endif
 
-#include "bfi.tree.h"
 #include "bfi.run.h"
 
 /* GNU lightning's macros upset GCC a little ... */
@@ -30,7 +30,6 @@
 #pragma GCC optimize(1)
 
 #ifdef GNULIGHTv1
-static jit_insn codeBuffer[1024*2048];
 #define jit_addi jit_addi_i
 #define jit_movi jit_movi_i
 #define jit_negr jit_negr_i
@@ -55,21 +54,29 @@ static jit_state_t *_jit;
 #define REG_ACC JIT_R0
 #define REG_A1	JIT_R1
 
-#define TS  sizeof(int)
+static int tape_step = sizeof(int);
 
 static void (*codeptr)();
 static int acc_loaded = 0;
 static int acc_offset = 0;
 static int acc_dirty = 0;
+static int acc_hi_dirty = 0;
 
 static void
 clean_acc(void)
 {
     if (acc_loaded && acc_dirty) {
-	if (acc_offset)
-	    jit_stxi_i(acc_offset * TS, REG_P, REG_ACC); 
-	else
-	    jit_str_i(REG_P, REG_ACC); 
+	if (tape_step > 1) {
+	    if (acc_offset)
+		jit_stxi_i(acc_offset * tape_step, REG_P, REG_ACC); 
+	    else
+		jit_str_i(REG_P, REG_ACC); 
+	} else {
+	    if (acc_offset)
+		jit_stxi_uc(acc_offset, REG_P, REG_ACC); 
+	    else
+		jit_str_uc(REG_P, REG_ACC); 
+	}
 
 	acc_dirty = 0;
     }
@@ -84,6 +91,7 @@ set_acc_offset(int offset)
     acc_offset = offset;
     acc_loaded = 1;
     acc_dirty = 1;
+    acc_hi_dirty = 1;
 }
 
 static void
@@ -96,13 +104,21 @@ load_acc_offset(int offset)
     }
 
     acc_offset = offset;
-    if (acc_offset)
-	jit_ldxi_i(REG_ACC, REG_P, acc_offset * TS); 
-    else
-	jit_ldr_i(REG_ACC, REG_P); 
+    if (tape_step > 1) {
+	if (acc_offset)
+	    jit_ldxi_i(REG_ACC, REG_P, acc_offset * tape_step); 
+	else
+	    jit_ldr_i(REG_ACC, REG_P); 
+    } else {
+	if (acc_offset)
+	    jit_ldxi_uc(REG_ACC, REG_P, acc_offset); 
+	else
+	    jit_ldr_uc(REG_ACC, REG_P); 
+    }
 
     acc_loaded = 1;
     acc_dirty = 0;
+    acc_hi_dirty = (tape_step*8 != cell_size);
 }
 
 static void puts_without_nl(char * s) { fputs(s, stdout); }
@@ -118,11 +134,26 @@ run_jit_asm(void)
 {
     struct bfi * n = bfprog;
     int maxstack = 0, stackptr = 0;
-
 #ifdef GNULIGHTv1
     jit_insn** loopstack = 0;
+    jit_insn *codeBuffer;
+#endif
+#ifdef GNULIGHTv2
+    jit_node_t    *start, *end;	    /* For size of code */
+    jit_node_t** loopstack = 0;
+#endif
 
-    /* TODO -- malloc codeBuffer */
+    calculate_stats();
+    if (cell_size == 8)
+	tape_step = 1;
+
+#ifdef GNULIGHTv1
+    if (total_nodes < 4096)
+	codeBuffer = malloc(65536);
+    else
+	codeBuffer = malloc(16 * total_nodes);
+    save_ptr_for_free(codeBuffer);
+
     codeptr = jit_set_ip(codeBuffer).vptr;
     void * startptr = jit_get_ip().ptr;
     /* Function call prolog */
@@ -132,9 +163,6 @@ run_jit_asm(void)
 #endif
 
 #ifdef GNULIGHTv2
-    jit_node_t    *start, *end;	    /* For size of code */
-    jit_node_t** loopstack = 0;
-
     init_jit(NULL); // argv[0]);
     _jit = jit_new_state();
     start = jit_note(__FILE__, __LINE__);
@@ -152,7 +180,7 @@ run_jit_asm(void)
 	    clean_acc();
 	    acc_loaded = 0;
 
-	    jit_addi(REG_P, REG_P, n->count * TS);
+	    jit_addi(REG_P, REG_P, n->count * tape_step);
 	    break;
 
 	case T_ADD:
@@ -188,7 +216,10 @@ run_jit_asm(void)
 
 		jit_movi(REG_ACC, n->count);
 		if (n->count2 != 0) {
-		    jit_ldxi_i(REG_A1, REG_P, n->offset2 * TS); 
+		    if (tape_step > 1)
+			jit_ldxi_i(REG_A1, REG_P, n->offset2 * tape_step); 
+		    else
+			jit_ldxi_uc(REG_A1, REG_P, n->offset2); 
 		    if (n->count2 == -1)
 			jit_negr(REG_A1, REG_A1);
 		    else if (n->count2 != 1)
@@ -198,7 +229,10 @@ run_jit_asm(void)
 	    }
 
 	    if (n->count3 != 0) {
-		jit_ldxi_i(REG_A1, REG_P, n->offset3 * TS); 
+		if (tape_step > 1)
+		    jit_ldxi_i(REG_A1, REG_P, n->offset3 * tape_step); 
+		else
+		    jit_ldxi_uc(REG_A1, REG_P, n->offset3); 
 		if (n->count3 == -1)
 		    jit_negr(REG_A1, REG_A1);
 		else if (n->count3 != 1)
@@ -222,7 +256,7 @@ run_jit_asm(void)
 		}
 	    }
 
-	    if (cell_mask > 0) {
+	    if (cell_mask > 0 && acc_hi_dirty) {
 		if (cell_mask == 0xFF)
 		    jit_extr_uc(REG_ACC,REG_ACC);
 		else
@@ -250,7 +284,7 @@ run_jit_asm(void)
 		exit(1);
 	    }
 
-	    if (cell_mask > 0) {
+	    if (cell_mask > 0 && acc_hi_dirty) {
 		if (cell_mask == 0xFF)
 		    jit_extr_uc(REG_ACC,REG_ACC);
 		else
@@ -289,7 +323,7 @@ run_jit_asm(void)
 		load_acc_offset(n->offset);
 		acc_loaded = 0;
 
-		if (cell_mask > 0) {
+		if (cell_mask > 0 && acc_hi_dirty) {
 		    if (cell_mask == 0xFF)
 			jit_extr_uc(REG_ACC,REG_ACC);
 		    else
