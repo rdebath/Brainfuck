@@ -1,0 +1,36 @@
+#!/bin/sh -
+
+sed \
+    -e 's/^.*#define ENABLE_GNULIGHTNING.*/\/\* #define ENABLE_GNULIGHTNING 1\*\//' \
+    -e 's/^.*#define ENABLE_TCCLIB.*/\/\* #define ENABLE_TCCLIB 1\*\//' \
+    < bfi.conf.h > _conf.tmp
+
+if [ -f /usr/include/lightning.h -o -f lightning.h ]
+then sed \
+	-e 's/^.*#define ENABLE_GNULIGHTNING.*/#define ENABLE_GNULIGHTNING 1/' \
+	< _conf.tmp > _comp2.tmp
+    mv _comp2.tmp _conf.tmp
+fi
+
+[ -x /usr/bin/apt-cache ] && {
+    TCCVER="`apt-cache policy libtcc-dev | awk '/Installed:/ {print $2;}'`"
+    case "$TCCVER" in
+    0.9.25* ) TCCVER='0x000925' ;;
+    0.9.26* ) TCCVER='0x000926' ;;
+    * ) TCCVER= ;;
+    esac
+}
+
+if [ "$TCCVER" != "" ]
+then sed \
+	-e 's/^.*#define ENABLE_TCCLIB.*/#define ENABLE_TCCLIB '$TCCVER'/' \
+	< _conf.tmp > _comp2.tmp
+
+    mv _comp2.tmp _conf.tmp
+fi
+
+if ! cmp -s bfi.conf.h _conf.tmp
+then echo Updating config
+    mv bfi.conf.h bfi.conf.h.old
+    mv _conf.tmp bfi.conf.h
+fi

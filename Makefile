@@ -55,7 +55,7 @@ bf.bin/bfi.tcc: bfi.c bfi.tree.h
 	tcc -DNO_EXT_OUT -o $@ bfi.c -ltcc -ldl
 
 save:	old/bf.c old/hydrogen.c
-	zip -o old/bfi-`date +%Y%m%d%H`.zip Makefile bfi*.[ch]
+	zip -o old/bfi-`date +%Y%m%d%H`.zip Makefile bfi*.[ch] configure
 
 old/bf.c:   bf.c
 	cp -p bf.c old/bf.c
