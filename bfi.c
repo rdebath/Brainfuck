@@ -765,10 +765,10 @@ print_c_header(FILE * ofd, int * minimal_p)
 	fprintf(ofd, "#if defined(__GNUC__) && defined(__i386__)\n");
 	fprintf(ofd, "  register %s * m asm (\"%%ebx\");\n", cell_type);
 	fprintf(ofd, "#else\n");
-	fprintf(ofd, "  %s*m;\n", cell_type);
+	fprintf(ofd, "  register %s * m;\n", cell_type);
 	fprintf(ofd, "#endif\n");
 #else
-	fprintf(ofd, "  static %s * m;\n", cell_type);
+	fprintf(ofd, "  register %s * m;\n", cell_type);
 #endif
 
 	if (memoffset > 0 && !do_run)
@@ -1136,10 +1136,22 @@ print_ccode(FILE * ofd)
 	    if (cell_size == 8 && add_mask <= 0 && do_run &&
 		    n->next->next == n->jmp && n->next->count == 1) {
 		pt(ofd, indent,n);
+		printf("if( m[%d] ) {\n", n->offset);
+		pt(ofd, indent+1,n);
+		printf("m++\n");
+		pt(ofd, indent+1,n);
+		printf("if( m[%d] ) {\n", n->offset);
+		pt(ofd, indent+2,n);
+		printf("m++\n");
+		pt(ofd, indent+2,n);
 		if (n->offset)
 		    fprintf(ofd, "m += strlen(m + %d);\n", n->offset);
 		else
 		    fprintf(ofd, "m += strlen(m);\n");
+		pt(ofd, indent+1,n);
+		printf("}\n");
+		pt(ofd, indent,n);
+		printf("}\n");
 		n=n->jmp;
 	    }
 	    else

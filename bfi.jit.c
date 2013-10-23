@@ -46,11 +46,9 @@ static jit_state_t *_jit;
 /*
  * For i386 JIT_V0 == ebx, JIT_V1 == esi, JIT_V2 == edi
  *          JIT_R0 == eax, JIT_R1 == ecx, JIT_R2 == edx
- *
- *  So use the zeros (as expected).
  */
 
-#define REG_P   JIT_V0
+#define REG_P   JIT_V1
 #define REG_ACC JIT_R0
 #define REG_A1	JIT_R1
 

@@ -2,6 +2,9 @@
 CFLAGS=-O3 -Wall -DTCC0925 $(DEFS)
 CC=gcc
 
+bfi:	bfi.o bfi.jit.o bfi.nasm.o bfi.bf.o
+	$(CC) $(CFLAGS) -o bfi $^ $(LDFLAGS) -ltcc -ldl
+
 all:	bfi neutron hydrogen \
 	bf2bf \
 	bf.bin/bf bf.bin/bf32 bf.bin/bf16 bf.bin/bf.tcc \
@@ -11,9 +14,6 @@ all:	bfi neutron hydrogen \
 clean:
 	-rm -f *.o bfi bf2bf
     
-bfi:	bfi.o bfi.jit.o bfi.nasm.o bfi.bf.o
-	$(CC) $(CFLAGS) -o bfi $^ $(LDFLAGS) -ltcc -ldl
-
 bfi.o:		bfi.c bfi.tree.h bfi.nasm.h bfi.bf.h
 bfi.nasm.o:	bfi.nasm.c bfi.tree.h bfi.nasm.h
 bfi.bf.o:	bfi.bf.c bfi.tree.h bfi.bf.h

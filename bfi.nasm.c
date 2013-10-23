@@ -9,8 +9,11 @@
 #define SM(vx) (( ((int)(vx)) <<((sizeof(int)-1)*8))>>((sizeof(int)-1)*8))
 
 static void print_asm_string(char * charmap, char * strbuf, int strsize);
+static void print_asm_header(void);
+static void print_asm_footer(void);
+static void print_hello_world(void);
 
-static int string_only = 0;
+static int hello_world = 0;
 
 void 
 print_asm()
@@ -25,7 +28,12 @@ print_asm()
     curr_line = -1;
 
     calculate_stats();
-    string_only = (total_nodes == node_type_counts[T_PRT]);
+    hello_world = (total_nodes == node_type_counts[T_PRT] && !noheader);
+
+    if (hello_world) {
+	print_hello_world();
+	return;
+    }
 
 /* System calls used ...
     int 0x80: %eax is the syscall number; %ebx, %ecx, %edx, %esi, %edi and %ebp
@@ -40,10 +48,16 @@ print_asm()
     7 ...
 
     Register allocation.
-    eax = 0x000000xx, only AL is loaded on syscall.
-    ebx = unknown, always reset.
+    eax =
+    ebx =
     ecx = current pointer.
     edx = 1, dh used for loop cmp.
+    esi =
+    edi =
+    ebp =
+
+    Intel order: AX, CX, DX, BX, SP, BP, SI, DI
+                 AL, CL, DL, BL, AH, CH, DH, BH
 
     Sigh ...
     Modern processors don't seem to have a true assembly language; this one
@@ -70,76 +84,14 @@ print_asm()
     Perhaps, just programming to GNU lightning would be close enough ...
     it does seem that most of the changes I can make to this code don't
     actually change performance at all.
+    
+    Though, it seems the ATOM is different, it isn't out of order and only,
+    normally, does one instruction per clock. Using CISC instructions can
+    be quite a bit faster.
 */
 
-    if (!noheader) {
-	printf("; %s, asmsyntax=nasm\n", curfile);
-	printf("; nasm -f bin -Ox brainfuck.asm ; chmod +x brainfuck\n");
-	printf("\n");
-	printf("BITS 32\n");
-	printf("\n");
-	printf("memsize\tequ\t0x10000\n");
-	printf("orgaddr\tequ\t0x08048000\n");
-	printf("\torg\torgaddr\n");
-	printf("\n");
-	printf("; A nice legal ELF header here, bit short, but that's okay.\n");
-	printf("ehdr:\t\t\t\t\t\t; Elf32_Ehdr\n");
-	printf("\tdb\t0x7F, \"ELF\", 1, 1, 1, 0\t\t;   e_ident\n");
-	printf("\ttimes 8 db\t0\n");
-	printf("\tdw\t2\t\t\t\t;   e_type\n");
-	printf("\tdw\t3\t\t\t\t;   e_machine\n");
-	printf("\tdd\t1\t\t\t\t;   e_version\n");
-	printf("\tdd\t_start\t\t\t\t;   e_entry\n");
-	printf("\tdd\tphdr - $$\t\t\t;   e_phoff\n");
-	printf("\tdd\t0\t\t\t\t;   e_shoff\n");
-	printf("\tdd\t0\t\t\t\t;   e_flags\n");
-	printf("\tdw\tehdrsize\t\t\t;   e_ehsize\n");
-	printf("\tdw\tphdrsize\t\t\t;   e_phentsize\n");
-	printf("\tdw\t1\t\t\t\t;   e_phnum\n");
-	printf("\tdw\t0\t\t\t\t;   e_shentsize\n");
-	printf("\tdw\t0\t\t\t\t;   e_shnum\n");
-	printf("\tdw\t0\t\t\t\t;   e_shstrndx\n");
-	printf("\n");
-	printf("ehdrsize      equ     $ - ehdr\n");
-	printf("\n");
-	printf("phdr:\t\t\t\t\t\t; Elf32_Phdr\n");
-	printf("\tdd\t1\t\t\t\t;   p_type\n");
-	printf("\tdd\t0\t\t\t\t;   p_offset\n");
-	printf("\tdd\t$$\t\t\t\t;   p_vaddr\n");
-	printf("\tdd\t$$\t\t\t\t;   p_paddr\n");
-	printf("\tdd\tfilesize\t\t\t;   p_filesz\n");
-	printf("\tdd\tfilesize+memsize\t\t;   p_memsz\n");
-	printf("\tdd\t7\t\t\t\t;   p_flags\n");
-	printf("\tdd\t0x1000\t\t\t\t;   p_align\n");
-	printf("\n");
-	printf("phdrsize      equ     $ - phdr\n");
-	printf("\n");
-	if (string_only) {
-	    printf("\tsection\t.bftext\n");
-	    printf("_start:\n");
-	    printf("\n");
-	} else {
-	    printf("_start:\n");
-	    printf("\txor\teax, eax\t; EAX = 0 ;don't change high bits.\n");
-	    printf("\tcdq\t\t\t; EDX = 0 ;sign bit of EAX\n");
-	    printf("\tinc\tedx\t\t; EDX = 1 ;ARG4 for system calls\n");
-	    printf("\tmov\tecx,mem\n");
-	    printf("\tjmp\tbfstart\n");
-	    if (node_type_counts[T_MOV] == 0) {
-		printf("\tsection\t.bftext\n");
-		printf("\tsection\t.textlib\n");
-		printf("\tsection\t.data\n");
-		printf("\tsection\t.rodata\n");
-		printf("\tsection\t.bftext\n");
-	    } else {
-		printf("\tsection\t.rodata\n");
-		printf("\tsection\t.textlib align=64\n");
-		printf("\tsection\t.bftext align=64\n");
-	    }
-	    printf("bfstart:\n");
-	    printf("\n");
-	}
-    }
+    if (!noheader)
+	print_asm_header();
 
     /* Scan the nodes so we get an APPROXIMATE distance measure */
     for(i=0, n = bfprog; n; n=n->next) {
@@ -402,21 +354,96 @@ print_asm()
 	print_asm_string(charmap, string_buffer, sp-string_buffer);
     }
 
-    if (!noheader) {
-	printf("\n");
-	printf("exit_prog:\n");
-	printf("\tmov\tbl, 0\t\t; Exit status\n");
-	printf("\txor\teax, eax\n");
-	printf("\tinc\teax\t\t; syscall(1, 0)\n");
-	printf("\tint\t0x80\n");
-	printf("\t;; EXIT ;;\n");
-	printf("\n");
-	printf("filesize equ\tsection..bss.start-orgaddr\n");
-	printf("\tsection\t.bss align=4096\n");
-	if (!hard_left_limit) 
-	    printf("\tresb 4096\n");
-	printf("mem:\n");
+    if (!noheader)
+	print_asm_footer();
+}
+
+static void
+print_asm_header(void)
+{
+    printf("; %s, asmsyntax=nasm\n", curfile);
+    printf("; nasm -f bin -Ox brainfuck.asm ; chmod +x brainfuck\n");
+    printf("\n");
+    printf("BITS 32\n");
+    printf("\n");
+    printf("memsize\tequ\t0x10000\n");
+    printf("orgaddr\tequ\t0x08048000\n");
+    printf("\torg\torgaddr\n");
+    printf("\n");
+    printf("; A nice legal ELF header here, bit short, but that's okay.\n");
+    printf("; I chose this as the smallest completely legal one from ...\n");
+    printf("; http://www.muppetlabs.com/~breadbox/software/tiny/teensy.html\n");
+    printf("\n");
+    printf("ehdr:\t\t\t\t\t\t; Elf32_Ehdr\n");
+    printf("\tdb\t0x7F, \"ELF\", 1, 1, 1, 0\t\t;   e_ident\n");
+    printf("\ttimes 8 db\t0\n");
+    printf("\tdw\t2\t\t\t\t;   e_type\n");
+    printf("\tdw\t3\t\t\t\t;   e_machine\n");
+    printf("\tdd\t1\t\t\t\t;   e_version\n");
+    printf("\tdd\t_start\t\t\t\t;   e_entry\n");
+    printf("\tdd\tphdr - $$\t\t\t;   e_phoff\n");
+    printf("\tdd\t0\t\t\t\t;   e_shoff\n");
+    printf("\tdd\t0\t\t\t\t;   e_flags\n");
+    printf("\tdw\tehdrsize\t\t\t;   e_ehsize\n");
+    printf("\tdw\tphdrsize\t\t\t;   e_phentsize\n");
+    printf("\tdw\t1\t\t\t\t;   e_phnum\n");
+    printf("\tdw\t0\t\t\t\t;   e_shentsize\n");
+    printf("\tdw\t0\t\t\t\t;   e_shnum\n");
+    printf("\tdw\t0\t\t\t\t;   e_shstrndx\n");
+    printf("\n");
+    printf("ehdrsize      equ     $ - ehdr\n");
+    printf("\n");
+    printf("phdr:\t\t\t\t\t\t; Elf32_Phdr\n");
+    printf("\tdd\t1\t\t\t\t;   p_type\n");
+    printf("\tdd\t0\t\t\t\t;   p_offset\n");
+    printf("\tdd\t$$\t\t\t\t;   p_vaddr\n");
+    printf("\tdd\t$$\t\t\t\t;   p_paddr\n");
+    printf("\tdd\tfilesize\t\t\t;   p_filesz\n");
+    printf("\tdd\tfilesize+memsize\t\t;   p_memsz\n");
+    printf("\tdd\t7\t\t\t\t;   p_flags\n");
+    printf("\tdd\t0x1000\t\t\t\t;   p_align\n");
+    printf("\n");
+    printf("phdrsize      equ     $ - phdr\n");
+    printf("\n");
+
+    if (hello_world) {
+	printf("_start:\n");
+	return;
     }
+
+    printf("; The program prolog, a few register inits and some NASM\n");
+    printf("; segments so I can put the library routines inline at their\n");
+    printf("; first use but have them collected at the start in the binary.\n");
+    printf("\n");
+    printf("\tsection\t.rodata\n");
+    printf("\tsection\t.textlib align=64\n");
+    printf("\tsection\t.bftext align=64\n");
+    printf("\tsection\t.data align=64\n");
+    printf("\n");
+    printf("\tsection\t.bftext\n");
+    printf("_start:\n");
+    printf("\txor\teax, eax\t; EAX = 0 ;don't change high bits.\n");
+    printf("\tcdq\t\t\t; EDX = 0 ;sign bit of EAX\n");
+    printf("\tinc\tedx\t\t; EDX = 1 ;ARG4 for system calls\n");
+    printf("\tmov\tecx,mem\n");
+    printf("\n");
+}
+
+static void
+print_asm_footer(void)
+{
+    printf("\n");
+    printf("exit_prog:\n");
+    printf("\tmov\tbl, 0\t\t; Exit status\n");
+    printf("\txor\teax, eax\n");
+    printf("\tinc\teax\t\t; syscall 1, exit\n");
+    printf("\tint\t0x80\t\t; exit(0)\n");
+    printf("\n");
+    printf("filesize equ\tsection..bss.start-orgaddr\n");
+    printf("\tsection\t.bss align=4096\n");
+    if (!hard_left_limit) 
+	printf("\tresb 4096\n");
+    printf("mem:\n");
 }
 
 static void
@@ -430,23 +457,18 @@ static int textno = -1;
 	if (enable_trace)
 	    printf("%%line 1 lib_string.s\n");
 	curr_line = -1;
-	if (!string_only) {
-	    printf("section .data\n");
-	    printf("putchbuf: db 0\n");
-	    printf("section .textlib\n");
-	    printf("putch:\n");
-	    printf("\tpush ecx\n");
-	    printf("\tmov ecx,putchbuf\n");
-	    printf("\tmov byte [ecx],al\n");
-	    printf("\txor eax, eax\n");
-	    printf("\tmov edx,1\n");
-	    printf("\tjmp syswrite\n");
-	    printf("prttext:\n");
-	    printf("\tpush ecx\n");
-	} else {
-	    printf("section .textlib\n");
-	    printf("prttext:\n");
-	}
+	printf("section .data\n");
+	printf("putchbuf: db 0\n");
+	printf("section .textlib\n");
+	printf("putch:\n");
+	printf("\tpush ecx\n");
+	printf("\tmov ecx,putchbuf\n");
+	printf("\tmov byte [ecx],al\n");
+	printf("\txor eax, eax\n");
+	printf("\tmov edx,1\n");
+	printf("\tjmp syswrite\n");
+	printf("prttext:\n");
+	printf("\tpush ecx\n");
         printf("\tmov ecx,eax\n");
 	printf("syswrite:\n");
         printf("\txor eax,eax\n");
@@ -454,18 +476,16 @@ static int textno = -1;
         printf("\tinc ebx\n");
         printf("\tmov al, 4\n");
         printf("\tint 0x80\t; write(ebx, ecx, edx);\n");
-	if (!string_only) {
-	    printf("\txor eax, eax\n");
-	    printf("\tcdq\n");
-	    printf("\tinc edx\n");
-	    printf("\tpop ecx\n");
-	}
+	printf("\txor eax, eax\n");
+	printf("\tcdq\n");
+	printf("\tinc edx\n");
+	printf("\tpop ecx\n");
         printf("\tret\n");
 	printf("section .bftext\n");
     }
 
     if (strsize <= 0) return;
-    if (strsize == 1 && !string_only) {
+    if (strsize == 1) {
 	int ch = *strbuf & 0xFF;
 	if (charmap[ch] == 0) {
 	    charmap[ch] = 1;
@@ -505,4 +525,51 @@ static int textno = -1;
 	printf("\tmov edx,%d\n", strsize);
 	printf("\tcall prttext\n");
     }
+}
+
+/*
+ *  A special function for generating the NASM code for a very small routine
+ *  to print a fixed string. For a short string it's 103 bytes plus the string.
+ *
+ *  If you go to the URL mentioned in the header, you'll see a 45 byte ELF
+ *  program; I have avoided using that so that my ELF headers are still legal
+ *  and non-overlapping.
+ *
+ *  On the other hand this does use the fact that a modern Linux will zero
+ *  the registers at process startup. (Linux 2.0 and earlier won't work)
+ */
+static void
+print_hello_world(void)
+{
+    struct bfi * n = bfprog;
+    int i;
+
+    print_asm_header();
+    if (total_nodes > 0) {
+	/* printf("\txor\teax,eax\n");	Linux is zero */
+	/* printf("\txor\tebx,ebx\n");	Linux is zero */
+	printf("\tmov\tal,4\t\t; syscall 4, write\n");
+	printf("\tinc\tebx\n");
+	printf("\tmov\tecx,msg\n");
+	if (total_nodes < 128) {
+	    /* printf("\tmov\tedx,eax\n");	Linux is zero */
+	    printf("\tmov\tdl,%d\n", total_nodes);
+	} else {
+	    printf("\tmov\tedx,%d\n", total_nodes);
+	}
+	printf("\tint\t0x80\t\t; write(ebx, ecx, edx);\n");
+	printf("\txor\teax,eax\n");
+	printf("\txor\tebx,ebx\n");
+    }
+    printf("\tinc\teax\t\t; syscall 1, exit\n");
+    printf("\tint\t0x80\t\t; exit(0)\n");
+    printf("msg:\n");
+    for(i=0, n = bfprog; n; n=n->next) {
+	if (i == 0) printf("\tdb\t"); else printf(", ");
+	printf("0x%02x", n->count & 0xFF);
+	i = ((i+1) & 7);
+	if (i == 0|| n->next == 0) printf("\n");
+    }
+    printf("filesize\tequ\t$ - $$\n");
+    return;
 }
