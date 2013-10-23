@@ -146,6 +146,11 @@ run_jit_asm(void)
 	tape_step = 1;
 
 #ifdef GNULIGHTv1
+    /* TODO: Use mmap for allocating memory, the x86 execute protection bit is
+     * on the segment so Linux has to say thay everything below a specific 
+     * address is executable. If you ask mmap for executable memory it puts
+     * it below the current value. The mprotect() function can't do this.
+     */
     if (total_nodes < 4096)
 	codeBuffer = malloc(65536);
     else
