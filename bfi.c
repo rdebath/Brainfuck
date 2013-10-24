@@ -76,9 +76,9 @@ Cell size you will be using allows it to generate better code.
 #define MEMSKIP	    1UL*1024*1024
 #else
 #ifndef MEMSIZE
+#warning Using small memory, define MEMSIZE to increase.
 #define MEMSIZE	    256*1024
 #endif
-#warning Using small memory, define MEMSIZE to increase.
 #endif
 
 #ifdef ENABLE_TCCLIB
@@ -173,7 +173,7 @@ void convert_tree_to_runarray(void);
 
 void LongUsage(FILE * fd)
 {
-    fprintf(fd, "%s: Version 0.1.0\n", program);
+    fprintf(fd, "%s: Version unknown\n", program);
     fprintf(fd, "Usage: %s [options] [BF file]\n", program);
     if (fd != stdout) {
 	fprintf(fd, "   -h   Long help message. (Pipe it through more)\n");
@@ -183,10 +183,16 @@ void LongUsage(FILE * fd)
 	exit(1);
     }
 
+    printf("        If file is '-' read from stdin with '!' to end program\n"
+	   "        and begin the input to the BF program.\n"
+	   "        Note: ! is ignored inside any BF loop and before the first\n"
+	   "        BF instruction has been entered\n");
+    printf("\n");
     printf("   -h   This message.\n");
     printf("   -v   Verbose, repeat for more.\n");
     printf("        Three -v or more switches to profiling interpreter\n");
-    printf("   -r   Run in interpreter. Default is fastest available interpreter.\n");
+    printf("\n");
+    printf("   -r   Run in interpreter.\n");
 #ifdef _BFI_JIT_H
     printf("   -j   Run using the JIT interpreter/compiler.\n");
 #endif
@@ -196,15 +202,27 @@ void LongUsage(FILE * fd)
     printf("   -c   Create C code.\n");
 #endif
 #ifdef _BFI_NASM_H
-    printf("   -s   Create NASM code.\n");
+    printf("   -s   Create i386 Linux ELF NASM code.\n");
+#endif
+    printf("\n");
+#ifdef _BFI_JIT_H
+    printf("        Default is to run using the JIT compiler.\n");
+#else
+#ifdef ENABLE_TCCLIB
+    printf("        Default is to run using TCCLIB.\n");
+#else
+    printf("        Default is to run using the non-profiling interpreter.\n");
+#endif
 #endif
     printf("\n");
     printf("   -T   Create trace statements in output C code or switch to\n");
     printf("        profiling interpreter and turn on tracing.\n");
     printf("   -H   Remove headers in output code\n");
     printf("        Also prevents optimiser assuming the tape starts blank.\n");
-    printf("   -u   Wide character (unicode) I/O%s\n", iostyle?" (default)":"");
-    printf("   -a   Ascii I/O%s\n", iostyle?"":" (default)");
+    printf("\n");
+    printf("   -u   Wide character (unicode) I/O%s\n", iostyle==1?" (default)":"");
+    printf("   -a   Ascii I/O%s\n", iostyle==0?" (default)":"");
+    printf("   -B   Binary I/O; don't filter CRs from input%s\n", iostyle==2?" (default)":"");
     printf("\n");
     printf("   -On  'Optimisation level'\n");
     printf("   -O0      Turn off all optimisation, just leave RLE.\n");
@@ -214,9 +232,9 @@ void LongUsage(FILE * fd)
     printf("   -O-1     Turn off all optimisation, disable RLE too.\n");
     printf("   -m   Minimal processing; same as -O0\n");
     printf("\n");
-    printf("   -B8  Use 8 bit cells.\n");
-    printf("   -B16 Use 16 bit cells.\n");
-    printf("   -B32 Use 32 bit cells.\n");
+    printf("   -b8  Use 8 bit cells.\n");
+    printf("   -b16 Use 16 bit cells.\n");
+    printf("   -b32 Use 32 bit cells.\n");
     printf("        Default for running now is %dbits.\n", sizeof(int)*8);
     printf("        Default for C code is 'unknown', NASM can only be 8bit.\n");
     printf("        Other bitwidths work (including 7) for the interpreter and C.\n");
@@ -294,6 +312,8 @@ main(int argc, char ** argv)
 #endif
                     case 'm': opt_level=0; break;
                     case 'T': enable_trace=1; break;
+
+                    case 'B': iostyle=2; break;
                     case 'u': iostyle=1; break;
                     case 'a': iostyle=0; break;
 
@@ -317,7 +337,7 @@ main(int argc, char ** argv)
 					else opt_level = strtol(ap,0,10);
 					break;
                             case 'E': eofcell=strtol(ap,0,10); break;
-                            case 'B': set_cell_size(strtol(ap,0,10)); break;
+                            case 'b': set_cell_size(strtol(ap,0,10)); break;
                             default:  Usage();
                         }
                         break;
@@ -330,17 +350,17 @@ main(int argc, char ** argv)
 		exit(1);
 	    }
 
-            if (opton && strcmp(argv[ar], "-") == 0)
-                filename = "";
-            else
-                filename = argv[ar];
+	    filename = argv[ar];
         }
 
+    if( !filename || !*filename )
+      Usage();
+    
 #ifdef _BFI_NASM_H
     if (do_codestyle == c_asm)
     {
 	if (do_run || (cell_size && cell_size != 8)) {
-	    fprintf(stderr, "The -s flag cannot be combined with -r or -B\n");
+	    fprintf(stderr, "The -s flag cannot be combined with -r or -b\n");
 	    exit(255);
 	}
 	set_cell_size(8);
@@ -366,10 +386,7 @@ main(int argc, char ** argv)
     trap_sigsegv();
 #endif
 
-    if( !filename || !*filename )
-      open_file(0);
-    else
-      open_file(filename);
+    open_file(filename);
 
     process_file();
 
@@ -3451,7 +3468,7 @@ getch(int oldch)
 	    } else
 		c = getchar();
 
-	    if (c == '\r') continue;
+	    if (iostyle != 2 && c == '\r') continue;
 	    break;
 	}
     if (c != EOF) return c;

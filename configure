@@ -1,13 +1,39 @@
 #!/bin/sh -
 
+MF=make.conf
+
+[ -f $MF ] || {
+    cat >$MF <<\!
+DEFS_LIGHTNING=
+DEFS_TCCLIB=
+LIBS_LIGHTNING=
+LIBS_TCCLIB=
+DEFS=$(DEFS_TCCLIB) $(DEFS_LIGHTNING)
+LIBS=$(LIBS_TCCLIB) $(LIBS_LIGHTNING)
+!
+}
+
 sed \
-    -e 's/^.*#define ENABLE_GNULIGHTNING.*/\/\* #define ENABLE_GNULIGHTNING 1\*\//' \
-    -e 's/^.*#define ENABLE_TCCLIB.*/\/\* #define ENABLE_TCCLIB 1\*\//' \
-    < bfi.conf.h > _conf.tmp
+    -e 's/^DEFS_LIGHTNING=.*/DEFS_LIGHTNING=/' \
+    -e 's/^DEFS_TCCLIB=.*/DEFS_TCCLIB=/' \
+    -e 's/^LIBS_LIGHTNING=.*/LIBS_LIGHTNING=/' \
+    -e 's/^LIBS_TCCLIB=.*/LIBS_TCCLIB=/' \
+    < $MF > _conf.tmp
 
 if [ -f /usr/include/lightning.h -o -f lightning.h ]
-then sed \
-	-e 's/^.*#define ENABLE_GNULIGHTNING.*/#define ENABLE_GNULIGHTNING 1/' \
+then
+    if [ -f liblightning.a ]
+    then LLIB=liblightning.a
+    else LLIB=
+    fi
+    if [ -f lightning.h ]
+    then LDEF=-I.
+    else LDEF=
+    fi
+
+    sed \
+	-e 's/^DEFS_LIGHTNING=.*/DEFS_LIGHTNING=-DENABLE_GNULIGHTNING=1 '$LDEF'/' \
+	-e 's/^LIBS_LIGHTNING=.*/LIBS_LIGHTNING='$LLIB'/' \
 	< _conf.tmp > _comp2.tmp
     mv _comp2.tmp _conf.tmp
 fi
@@ -23,14 +49,15 @@ fi
 
 if [ "$TCCVER" != "" ]
 then sed \
-	-e 's/^.*#define ENABLE_TCCLIB.*/#define ENABLE_TCCLIB '$TCCVER'/' \
+	-e 's/^DEFS_TCCLIB=.*/DEFS_TCCLIB=-DENABLE_TCCLIB='$TCCVER'/' \
+	-e 's/^LIBS_TCCLIB=.*/LIBS_TCCLIB=-ltcc -ldl/' \
 	< _conf.tmp > _comp2.tmp
 
     mv _comp2.tmp _conf.tmp
 fi
 
-if ! cmp -s bfi.conf.h _conf.tmp
+if ! cmp -s $MF _conf.tmp
 then echo Updating config
-    mv bfi.conf.h bfi.conf.h.old
-    mv _conf.tmp bfi.conf.h
+    mv $MF $MF.old
+    mv _conf.tmp $MF
 fi

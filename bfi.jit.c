@@ -41,6 +41,8 @@
 
 #ifdef GNULIGHTv2
 static jit_state_t *_jit;
+#define jit_stxi_uc jit_stxi_c
+#define jit_str_uc jit_str_c
 #endif
 
 /*
@@ -347,7 +349,7 @@ run_jit_asm(void)
 	    }
 	    acc_loaded = 0;
 
-	    if (n->count <= 0 || (n->count >= 127 && iostyle != 0) || 
+	    if (n->count <= 0 || (n->count >= 127 && iostyle == 1) || 
 		    !n->next || n->next->type != T_PRT) {
 		jit_movi(REG_ACC, n->count);
 #ifdef GNULIGHTv1
@@ -366,7 +368,7 @@ run_jit_asm(void)
 		char *s, *p;
 		while(v->next && v->next->type == T_PRT &&
 			v->next->count > 0 &&
-			    (v->next->count < 127 || iostyle == 0)) {
+			    (v->next->count < 127 || iostyle != 1)) {
 		    v = v->next;
 		    i++;
 		}
