@@ -350,7 +350,7 @@ process_image(void)
 			 * total of the 'mov' fields being zero.
 			 * But allow a set too, it's easy.
 			 */
-			int v, v2, movsum = prog[p].mov, incby = 0;
+			int v, movsum = prog[p].mov, incby = 0;
 			for(v=p-1; prog[v].op == 1 || prog[v].op == 8 ; v--) {
 			    if (movsum == 0 && prog[v].op == 8)
 				break;
@@ -362,7 +362,7 @@ process_image(void)
 			if (movsum == 0 && incby == -1 && prog[v].op == 4) {
 			    prog[v].op = 12;
 			    prog[v].arg = 0;
-			    v++; v2=v;
+			    v++;
 			    for(;v < p; v++)
 			    {
 				movsum += prog[v].mov;
