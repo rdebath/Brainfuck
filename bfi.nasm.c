@@ -14,7 +14,7 @@ static void print_hello_world(void);
 static int hello_world = 0;
 
 void
-print_asm()
+print_nasm()
 {
     struct bfi * n = bfprog;
     char string_buffer[BUFSIZ+2], *sp = string_buffer;

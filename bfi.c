@@ -88,16 +88,16 @@ int verbose = 0;
 int noheader = 0;
 int do_run = 0;
 enum codestyle { c_default, c_c,
-#ifdef _BFI_NASM_H
-    c_asm,
+#ifdef BE_NASM
+    c_nasm,
 #endif
-#ifdef _BFI_JIT_H
+#ifdef BE_JIT
     c_jit,
 #endif
-#ifdef _BFI_BF_H
+#ifdef BE_BF
     c_bf,
 #endif
-#ifdef _BFI_DC_H
+#ifdef BE_DC
     c_dc,
 #endif
     c_adder };
@@ -197,20 +197,20 @@ void LongUsage(FILE * fd)
     printf("        There are two interpreters a tree based one and a faster\n");
     printf("        array based one. The array based one will be used unless\n");
     printf("        three or more -v options are used or -T is turned on.\n");
-#ifdef _BFI_JIT_H
-    if (jit_lib_ok)
-	printf("   -j   Run using the JIT interpreter/compiler.\n");
-#endif
 #ifdef ENABLE_TCCLIB
     printf("   -c   Create C code. If combined with -r the code is run using TCCLIB.\n");
 #else
     printf("   -c   Create C code.\n");
 #endif
-#ifdef _BFI_NASM_H
+#ifdef BE_JIT
+    if (jit_lib_ok)
+	printf("   -j   Run using the JIT interpreter/compiler.\n");
+#endif
+#ifdef BE_NASM
     printf("   -s   Create i386 Linux ELF NASM code.\n");
 #endif
     printf("\n");
-#ifdef _BFI_JIT_H
+#ifdef BE_JIT
     if (jit_lib_ok)
 	printf("        Default is to run using the JIT compiler.\n");
 #else
@@ -254,10 +254,10 @@ void LongUsage(FILE * fd)
     printf("   -E4      End of file gives EOF (normally -1 too).\n");
     printf("   -E5      Disable ',' command, ie: treat it as a comment character.\n");
     printf("\n");
-#ifdef _BFI_BF_H
+#ifdef BE_BF
     printf("   -F   Attempt to regenerate BF code.\n");
 #endif
-#ifdef _BFI_DC_H
+#ifdef BE_DC
     printf("   -D   Create code for dc(1).\n");
 #endif
     printf("   -A   Generate token list output, "
@@ -317,20 +317,20 @@ main(int argc, char ** argv)
                     case 'v': verbose++; break;
                     case 'H': noheader=1; break;
                     case 'r': do_run=1; break;
-                    case 'c': do_codestyle = c_c; break;
                     case 'A': do_codestyle = c_adder; break;
-#ifdef _BFI_JIT_H
+                    case 'c': do_codestyle = c_c; break;
+#ifdef BE_JIT
                     case 'j': do_run=1; do_codestyle = c_jit; break;
 #endif
-#ifdef _BFI_NASM_H
-                    case 's': do_codestyle = c_asm; break;
+#ifdef BE_NASM
+                    case 's': do_codestyle = c_nasm; break;
 #endif
-#ifdef _BFI_BF_H
+#ifdef BE_BF
                     case 'F': do_codestyle = c_bf;
 			hard_left_limit = 0;
 			break;
 #endif
-#ifdef _BFI_DC_H
+#ifdef BE_DC
                     case 'D': do_codestyle = c_dc; break;
 #endif
                     case 'm': opt_level=0; break;
@@ -379,8 +379,8 @@ main(int argc, char ** argv)
     if( !filename || !*filename )
       Usage();
 
-#ifdef _BFI_NASM_H
-    if (do_codestyle == c_asm)
+#ifdef BE_NASM
+    if (do_codestyle == c_nasm)
     {
 	if (do_run || (cell_size && cell_size != 8)) {
 	    fprintf(stderr, "The -s flag cannot be combined with -r or -b\n");
@@ -392,7 +392,7 @@ main(int argc, char ** argv)
 
     if (!do_run && do_codestyle == c_default) {
 	do_run = 1;
-#ifdef _BFI_JIT_H
+#ifdef BE_JIT
 	if (verbose<3 && !enable_trace && jit_lib_ok)
 	    do_codestyle = c_jit;
 	else
@@ -407,7 +407,7 @@ main(int argc, char ** argv)
 
     if (do_run) {
 	if (
-#ifdef _BFI_JIT_H
+#ifdef BE_JIT
 	    do_codestyle != c_jit &&
 #endif
 #ifdef ENABLE_TCCLIB
@@ -421,7 +421,7 @@ main(int argc, char ** argv)
 	}
     }
 
-#ifdef _BFI_DC_H
+#ifdef BE_DC
     if (eofcell == 0 && do_codestyle == c_dc)
 	eofcell = 5;
 #endif
@@ -1341,7 +1341,7 @@ process_file(void)
 	    fprintf(stderr, "Sorry cannot compile C code in memory, TCCLIB not linked\n");
 	    exit(2);
 #endif
-#ifdef _BFI_JIT_H
+#ifdef BE_JIT
 	} else if (do_codestyle == c_jit) {
 	    run_jit_asm();
 #endif
@@ -1365,24 +1365,7 @@ process_file(void)
 	    fprintf(stderr, "Generating output code\n");
 
 	switch(do_codestyle) {
-	    case c_c:
-		print_ccode(stdout);
-		break;
-#ifdef _BFI_NASM_H
-	    case c_asm:
-		print_asm();
-		break;
-#endif
-#ifdef _BFI_BF_H
-	    case c_bf:
-		print_bf();
-		break;
-#endif
-#ifdef _BFI_DC_H
-	    case c_dc:
-		print_dc();
-		break;
-#endif
+	    case c_c: print_ccode(stdout); break;
 
 	    default:
 		fprintf(stderr,
@@ -1390,9 +1373,16 @@ process_file(void)
 			do_codestyle);
 		/*FALLTRHOUGH*/
 
-	    case c_adder:
-		print_adder();
-		break;
+	    case c_adder: print_adder(); break;
+#ifdef BE_NASM
+	    case c_nasm: print_nasm(); break;
+#endif
+#ifdef BE_BF
+	    case c_bf: print_bf(); break;
+#endif
+#ifdef BE_DC
+	    case c_dc: print_dc(); break;
+#endif
 	}
     }
 
@@ -3044,7 +3034,7 @@ flatten_multiplier(struct bfi * v)
     if (v->type != T_MULT && v->type != T_CMULT) return 0;
 
     if (opt_level<3) return 0;
-#ifdef _BFI_BF_H
+#ifdef BE_BF
     if (do_codestyle == c_bf) return 0;
 #endif
 
