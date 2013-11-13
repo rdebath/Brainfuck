@@ -56,8 +56,5 @@ then sed \
     mv _comp2.tmp _conf.tmp
 fi
 
-if ! cmp -s $MF _conf.tmp
-then echo Updating config
-    mv $MF $MF.old
-    mv _conf.tmp $MF
-fi
+mv $MF $MF.old
+mv _conf.tmp $MF

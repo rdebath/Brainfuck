@@ -22,7 +22,7 @@ pint(int v)
  *
  * You may have to reduce the optimisation to -O1
  */
-void 
+void
 print_bf(void)
 {
     struct bfi *v, *n = bfprog;
@@ -34,7 +34,7 @@ print_bf(void)
 	if (enable_trace && !nocr) { /* Sort of! */
 	    v = n;
 
-	    do 
+	    do
 	    {
 		printf("// %s", tokennames[v->type&0xF]);
 		printf(" O="); pint(v->offset);
@@ -132,7 +132,10 @@ print_bf(void)
 		if (const_found) {
 		    i = known_value-n->count;
 		    while(i>0) { putchar('+'); i--; }
-		    while(i<0) { putchar('-'); i++; }
+		    if (known_value == 0 && i!=0) {
+			printf("[-]");
+		    } else
+			while(i<0) { putchar('-'); i++; }
 		}
 	    } else
 		putchar('.');

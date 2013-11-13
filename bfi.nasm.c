@@ -5,17 +5,15 @@
 #include <string.h>
 
 #include "bfi.tree.h"
-
-#define SM(vx) (( ((int)(vx)) <<((sizeof(int)-1)*8))>>((sizeof(int)-1)*8))
+#include "bfi.nasm.h"
 
 static void print_asm_string(char * charmap, char * strbuf, int strsize);
 static void print_asm_header(void);
-static void print_asm_footer(void);
 static void print_hello_world(void);
 
 static int hello_world = 0;
 
-void 
+void
 print_asm()
 {
     struct bfi * n = bfprog;
@@ -77,14 +75,14 @@ print_asm()
     This processor doesn't run x86 machine code; it translates it on the fly
     to it's real internal machine code.
 
-    I need an assembler for *that* machine code, obviously to run it the 
+    I need an assembler for *that* machine code, obviously to run it the
     assembler will have to do a reverse translation to x86 machine code
     though.
 
     Perhaps, just programming to GNU lightning would be close enough ...
     it does seem that most of the changes I can make to this code don't
     actually change performance at all.
-    
+
     Though, it seems the ATOM is different, it isn't out of order and only,
     normally, does one instruction per clock. Using CISC instructions can
     be quite a bit faster.
@@ -132,6 +130,11 @@ print_asm()
 	switch(n->type)
 	{
 	case T_MOV:
+	    if (opt_level<0 && n->count == 1)
+		printf("\tinc ecx\n");
+	    else if (opt_level<0 && n->count == -1)
+		printf("\tdec ecx\n");
+	    else
 #if 0
 	    /* INC & DEC modify part of the flags register, this can stall. */
 	    if (n->count == 1)
@@ -151,6 +154,11 @@ print_asm()
 	    break;
 
 	case T_ADD:
+	    if (opt_level<0 && n->count == 1)
+		printf("\tinc byte [ecx]\n");
+	    else if (opt_level<0 && n->count == -1)
+		printf("\tdec byte [ecx]\n");
+	    else
 #if 0
 	    /* INC & DEC modify part of the flags register, this can stall. */
 	    if (n->count == 1 && n->offset == 0)
@@ -170,11 +178,11 @@ print_asm()
 	    else
 		printf("\tadd byte [ecx+%d],%d\n", n->offset, SM(n->count));
 	    break;
-	    
+
 	case T_SET:
 	    printf("\tmov byte [ecx+%d],%d\n", n->offset, SM(n->count));
 	    break;
-	    
+
 	case T_CALC:
 	    if (0) {
 		printf("; CALC [ecx+%d] = %d + [ecx+%d]*%d + [ecx+%d]*%d\n",
@@ -234,7 +242,7 @@ print_asm()
 	    if (SM(n->count))
 		printf("\tadd byte [ecx+%d],%d\n", n->offset, SM(n->count));
 	    break;
-	    
+
 	case T_PRT:
 	    if (n->count > -1) {
 		*sp++ = n->count;
@@ -247,7 +255,10 @@ print_asm()
 		    printf("%%line %d+0 %s\n", n->line, curfile);
 		    curr_line = n->line;
 		}
-		printf("\tmov al,[ecx+%d]\n", n->offset);
+		if (n->offset == 0)
+		    printf("\tmov al,[ecx]\n");
+		else
+		    printf("\tmov al,[ecx+%d]\n", n->offset);
 		printf("\tcall putch\n");
 	    } else {
 		*string_buffer = n->count;
@@ -304,7 +315,7 @@ print_asm()
 	    }
 	    break;
 
-	case T_END: 
+	case T_END:
 	    if (abs(n->ipos - n->jmp->ipos) > 120)
 		neartok = " near";
 	    else
@@ -323,17 +334,23 @@ print_asm()
 		if ((LoopClass & 2) == 2)
 		    printf("end_%d:\n", n->jmp->count);
 	    }
+
+	    if ((LoopClass & 2) == 2)
+		while(n->next && n->next->type == T_END && n->offset == n->next->offset) {
+		    n=n->next;
+		    printf("end_%d:\n", n->jmp->count);
+		}
 	    break;
 
 	case T_ENDIF:
 	    printf("end_%d:\n", n->jmp->count);
 	    break;
 
-	case T_STOP: 
+	case T_STOP:
 	    printf("\tjmp near exit_prog\n");
 	    break;
 
-	case T_NOP: 
+	case T_NOP:
 	    fprintf(stderr, "Warning on code generation: "
 	           "NOP node: ptr+%d, cnt=%d, @(%d,%d).\n",
 		    n->offset, n->count, n->line, n->col);
@@ -353,16 +370,24 @@ print_asm()
     if(sp != string_buffer) {
 	print_asm_string(charmap, string_buffer, sp-string_buffer);
     }
-
-    if (!noheader)
-	print_asm_footer();
 }
 
 static void
 print_asm_header(void)
 {
-    printf("; %s, asmsyntax=nasm\n", curfile);
-    printf("; nasm -f bin -Ox brainfuck.asm ; chmod +x brainfuck\n");
+    char *np =0, *ep;
+    if (curfile && *curfile) {
+	np = strrchr(curfile, '/');
+	if (np) np++; else np = curfile;
+    }
+    if (!np || !*np) np = "brainfuck";
+    ep = strrchr(np, '.');
+    if (!ep || (strcmp(ep, ".bf") && strcmp(ep, ".b")))
+	ep = np + strlen(np);
+
+    printf("; asmsyntax=nasm\n");
+    printf("; nasm -f bin -Ox %.*s.s && chmod +x %.*s\n",
+	    (int)(ep-np), np, (int)(ep-np), np);
     printf("\n");
     printf("BITS 32\n");
     printf("\n");
@@ -373,6 +398,8 @@ print_asm_header(void)
     printf("; A nice legal ELF header here, bit short, but that's okay.\n");
     printf("; I chose this as the smallest completely legal one from ...\n");
     printf("; http://www.muppetlabs.com/~breadbox/software/tiny/teensy.html\n");
+    printf("; See also ...\n");
+    printf("; http://blog.markloiseau.com/2012/05/tiny-64-bit-elf-executables\n");
     printf("\n");
     printf("ehdr:\t\t\t\t\t\t; Elf32_Ehdr\n");
     printf("\tdb\t0x7F, \"ELF\", 1, 1, 1, 0\t\t;   e_ident\n");
@@ -407,6 +434,11 @@ print_asm_header(void)
     printf("\n");
 
     if (hello_world) {
+	printf("filesize equ\tsection..bss.start-orgaddr\n");
+	printf("\tsection\t.text\n");
+	printf("\tsection\t.data\n");
+	printf("\tsection\t.bss\n");
+	printf("\tsection\t.text\n");
 	printf("_start:\n");
 	return;
     }
@@ -415,10 +447,25 @@ print_asm_header(void)
     printf("; segments so I can put the library routines inline at their\n");
     printf("; first use but have them collected at the start in the binary.\n");
     printf("\n");
+    printf("\tsection\t.text\n");
     printf("\tsection\t.rodata\n");
     printf("\tsection\t.textlib align=64\n");
     printf("\tsection\t.bftext align=64\n");
+    printf("\tsection\t.bftail align=1\n");
+    printf("\n");
+    printf("exit_prog:\n");
+    printf("\tmov\tbl, 0\t\t; Exit status\n");
+    printf("\txor\teax, eax\n");
+    printf("\tinc\teax\t\t; syscall 1, exit\n");
+    printf("\tint\t0x80\t\t; exit(0)\n");
+    printf("\n");
     printf("\tsection\t.data align=64\n");
+    printf("\tsection\t.bss align=4096\n");
+    printf("filesize equ\tsection..bss.start-orgaddr\n");
+    if (most_neg_maad_loop<0) 
+	printf("\tresb %d\n", -most_neg_maad_loop);
+    printf("mem:\n");
+
     printf("\n");
     printf("\tsection\t.bftext\n");
     printf("_start:\n");
@@ -427,23 +474,6 @@ print_asm_header(void)
     printf("\tinc\tedx\t\t; EDX = 1 ;ARG4 for system calls\n");
     printf("\tmov\tecx,mem\n");
     printf("\n");
-}
-
-static void
-print_asm_footer(void)
-{
-    printf("\n");
-    printf("exit_prog:\n");
-    printf("\tmov\tbl, 0\t\t; Exit status\n");
-    printf("\txor\teax, eax\n");
-    printf("\tinc\teax\t\t; syscall 1, exit\n");
-    printf("\tint\t0x80\t\t; exit(0)\n");
-    printf("\n");
-    printf("filesize equ\tsection..bss.start-orgaddr\n");
-    printf("\tsection\t.bss align=4096\n");
-    if (!hard_left_limit) 
-	printf("\tresb 4096\n");
-    printf("mem:\n");
 }
 
 static void
@@ -570,6 +600,5 @@ print_hello_world(void)
 	i = ((i+1) & 7);
 	if (i == 0|| n->next == 0) printf("\n");
     }
-    printf("filesize\tequ\t$ - $$\n");
     return;
 }

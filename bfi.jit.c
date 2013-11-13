@@ -37,12 +37,19 @@
 #define jit_addr jit_addr_i
 #define jit_andi jit_andi_i
 #define jit_extr_uc jit_extr_uc_i
+
+#ifndef __x86_64__
+#define JITLIBOK 1
+#else
+#define JITLIBOK 0
+#endif
 #endif
 
 #ifdef GNULIGHTv2
 static jit_state_t *_jit;
 #define jit_stxi_uc jit_stxi_c
 #define jit_str_uc jit_str_c
+#define JITLIBOK 1
 #endif
 
 /*
@@ -53,6 +60,8 @@ static jit_state_t *_jit;
 #define REG_P   JIT_V1
 #define REG_ACC JIT_R0
 #define REG_A1	JIT_R1
+
+int jit_lib_ok = JITLIBOK;
 
 static int tape_step = sizeof(int);
 
@@ -122,6 +131,8 @@ load_acc_offset(int offset)
 }
 
 static void puts_without_nl(char * s) { fputs(s, stdout); }
+
+static void failout(void) { fprintf(stderr, "STOP Command executed.\n"); exit(1); }
 
 static void
 save_ptr_for_free(void * memp)
@@ -411,6 +422,17 @@ run_jit_asm(void)
 	    jit_pushargr(REG_ACC);
 	    jit_finishi(getch);
 	    jit_retval(REG_ACC);     
+#endif
+	    break;
+
+	case T_STOP:
+#ifdef GNULIGHTv1
+	    jit_prepare_i(0);
+	    jit_finish(failout);
+#endif
+#ifdef GNULIGHTv2
+	    jit_prepare();
+	    jit_finishi(failout);
 #endif
 	    break;
 
