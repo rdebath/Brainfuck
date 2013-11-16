@@ -77,7 +77,7 @@ struct subst {
     { {T_SET2, T_MOV, 0},
 		"[-]>[-]" },
     { {T_SET2c1, T_SET2,0},
-		
+
 		"[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<"
 		    "[[-]<<<+>>>]<"
 		    "[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<"
@@ -168,7 +168,7 @@ int main(int argc, char **argv)
 	} else break;
     }
     if (argc < 2 || strcmp(argv[1], "-") == 0) ifd = stdin;
-    else if ((ifd = fopen(argv[1], "r")) == 0) 
+    else if ((ifd = fopen(argv[1], "r")) == 0)
 	perror(argv[1]);
     if (ifd) {
 	while((ch = nexttok(ifd)) != EOF &&
@@ -299,18 +299,18 @@ int main(int argc, char **argv)
 	                    n->type == T_WHL2c2 || n->type == T_END2c2 ||
 	                    n->type == T_SET2c2 || n->type == T_ZTEMP2)) {
 		p = n->prev;
-		if (p->type == T_ADD2 || 
-		    p->type == T_SET2 || 
-		    p->type == T_WHL2 || 
+		if (p->type == T_ADD2 ||
+		    p->type == T_SET2 ||
+		    p->type == T_WHL2 ||
 		    p->type == T_END2 ||
 		    p->type == T_ZTEMP2)
 		    n->type = T_NOP;
 		if (p->type == T_PRT) {
 		    p = p->prev;
-		    if (p->type == T_ADD2 || 
-			p->type == T_SET2 || 
-			p->type == T_WHL2 || 
-			p->type == T_END2 || 
+		    if (p->type == T_ADD2 ||
+			p->type == T_SET2 ||
+			p->type == T_WHL2 ||
+			p->type == T_END2 ||
 			p->type == T_ZTEMP2)
 			n->type = T_NOP;
 		}
@@ -328,7 +328,7 @@ int main(int argc, char **argv)
 		n->type = T_NOP;
 		n = n->prev;
 		n->type = T_NOP;
-		
+
 		p->type = T_SET2;
 		p->count = 0;
 		p->jmp = 0;
@@ -618,7 +618,7 @@ struct mem { unsigned char val; struct mem *next, *prev; };
 #ifdef __GNUC__
 __attribute((optimize(3),hot,aligned(64)))
 #endif
-void run(void) 
+void run(void)
 {
     struct bfi *n=pgm;
     struct mem *m = tcalloc(1,sizeof*m);
@@ -668,7 +668,7 @@ void run(void)
 #ifdef __GNUC__
 __attribute((optimize(3),hot,aligned(64)))
 #endif
-void run(void) 
+void run(void)
 {
     struct bfi *n=pgm;
     //unsigned char * m;
@@ -696,7 +696,7 @@ void run(void)
 #if 1
 /*
  * An interpreter that uses an arry of ints to store the instructions
- * and another array for the tape. Using ints for the tape and masking 
+ * and another array for the tape. Using ints for the tape and masking
  * when needed is marginally faster than using a char cell.
  *
  * This seems to be the fastest interpretation method on my Intel I7.
@@ -809,7 +809,7 @@ run(void)
 	*p++ = n->type;
 	switch(n->type)
 	{
-	case T_MOV: 
+	case T_MOV:
 	    p--;
 	    break;
 
@@ -865,7 +865,7 @@ run(void)
 	case T_SET2c1:
 	case T_SET2c2:
 	    if (n->next->type != T_SET2) {
-		fprintf(stderr, "%s lost it's %s\n", 
+		fprintf(stderr, "%s lost it's %s\n",
 		    tokennames[n->type], tokennames[T_SET2]);
 		exit(1);
 	    }
@@ -876,7 +876,7 @@ run(void)
 	case T_WHL2c1:
 	case T_WHL2c2:
 	    if (n->next->type != T_WHL2) {
-		fprintf(stderr, "%s lost it's %s\n", 
+		fprintf(stderr, "%s lost it's %s\n",
 		    tokennames[n->type], tokennames[T_WHL2]);
 		exit(1);
 	    }
@@ -888,7 +888,7 @@ run(void)
 	case T_END2c1:
 	case T_END2c2:
 	    if (n->next->type != T_END2) {
-		fprintf(stderr, "%s lost it's %s\n", 
+		fprintf(stderr, "%s lost it's %s\n",
 		    tokennames[n->type], tokennames[T_END2]);
 		exit(1);
 	    }
@@ -923,7 +923,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    ", m[%d]=%d"
 	    ", m[%d]=%d"
 	    ", COND=%d"
-	    "\n", 
+	    "\n",
 	    p-progarray, tokennames[*p], p[1],
 	    m-(icell*)freep-1025, m[-1],
 	    m-(icell*)freep-1024, *m,
