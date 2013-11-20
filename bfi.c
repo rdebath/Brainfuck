@@ -20,8 +20,9 @@ Or
 Or
     [   becomes   if(!*p) goto match;	]   becomes   if(*p) goto match;
 
-Note: read() and write() only work with byte cells, getchar() only works
-correctly with cells larger than a byte.
+Note: Normal (C and other) rules apply so read() and write() only work
+with byte cells, getchar() only works correctly with cells larger than
+a byte.
 
 For best speed you should use an optimising C compiler like GCC, the
 interpreter loops especially require perfect code generation for best
@@ -57,12 +58,8 @@ Cell size you will be using allows it to generate better code.
 #include "bfi.tree.h"
 #include "bfi.run.h"
 
-#ifndef NO_EXT_OUT
-#include "bfi.nasm.h"
-#include "bfi.bf.h"
-#include "bfi.dc.h"
-#include "bfi.jit.h"
-#endif
+#define XX 0
+#include "bfi.be.def"
 
 #ifdef MAP_NORESERVE
 #define USEHUGERAM
@@ -79,27 +76,13 @@ Cell size you will be using allows it to generate better code.
 #endif
 #endif
 
-#ifdef ENABLE_TCCLIB
-#include <libtcc.h>
-#endif
-
 char * program = "C";
 int verbose = 0;
 int noheader = 0;
 int do_run = 0;
-enum codestyle { c_default, c_c,
-#ifdef BE_NASM
-    c_nasm,
-#endif
-#ifdef BE_JIT
-    c_jit,
-#endif
-#ifdef BE_BF
-    c_bf,
-#endif
-#ifdef BE_DC
-    c_dc,
-#endif
+enum codestyle { c_default,
+#define XX 1
+#include "bfi.be.def"
     c_adder };
 int do_codestyle = c_default;
 
@@ -108,6 +91,7 @@ int hard_left_limit = -128;
 int enable_trace = 0;
 int iostyle = 0; /* 0=ASCII, 1=UTF8 */
 int eofcell = 0; /* 0=> Default, 1=> No Change, 2= -1, 3= 0, 4=EOF, 5=No Input. */
+char * input_string = 0;
 
 int cell_size = 0;  /* 0 is 8,16,32 or more. 7 and up are number of bits */
 int cell_mask = -1; /* -1 is don't mask. */
@@ -142,15 +126,16 @@ void * cell_array_low_addr = 0;
 size_t cell_array_alloc_len = 0;
 #endif
 
+/* Reading */
 void open_file(char * fname);
 void process_file(void);
+
+/* Building */
 void print_tree_stats(void);
 void printtreecell(FILE * efd, int indent, struct bfi * n);
 void printtree(void);
 void run_tree(void);
 void delete_tree(void);
-void run_ccode(void);
-void print_ccode(FILE * ofd);
 void calculate_stats(void);
 void pointer_scan(void);
 void quick_scan(void);
@@ -164,6 +149,8 @@ int flatten_multiplier(struct bfi * v);
 void build_string_in_tree(struct bfi * v);
 void * tcalloc(size_t nmemb, size_t size);
 struct bfi * add_node_after(struct bfi * p);
+
+/* Printing or running */
 void print_adder(void);
 void * map_hugeram(void);
 void trap_sigsegv(void);
@@ -171,6 +158,7 @@ int getch(int oldch);
 void putch(int oldch);
 void set_cell_size(int cell_bits);
 void convert_tree_to_runarray(void);
+void run_progarray(int * progarray);
 
 void LongUsage(FILE * fd)
 {
@@ -180,7 +168,10 @@ void LongUsage(FILE * fd)
 	fprintf(fd, "   -h   Long help message. (Pipe it through more)\n");
 	fprintf(fd, "   -v   Verbose, repeat for more.\n");
 	fprintf(fd, "   -r   Run in interpreter.\n");
+#ifdef BE_CCODE
 	fprintf(fd, "   -c   Create C code.\n");
+#endif
+	fprintf(fd, "   -b   Use byte cells not integer.\n");
 	exit(1);
     }
 
@@ -197,29 +188,11 @@ void LongUsage(FILE * fd)
     printf("        There are two interpreters a tree based one and a faster\n");
     printf("        array based one. The array based one will be used unless\n");
     printf("        three or more -v options are used or -T is turned on.\n");
-#ifdef ENABLE_TCCLIB
-    printf("   -c   Create C code. If combined with -r the code is run using TCCLIB.\n");
-#else
-    printf("   -c   Create C code.\n");
-#endif
-#ifdef BE_JIT
-    if (jit_lib_ok)
-	printf("   -j   Run using the JIT interpreter/compiler.\n");
-#endif
-#ifdef BE_NASM
-    printf("   -s   Create i386 Linux ELF NASM code.\n");
-#endif
     printf("\n");
-#ifdef BE_JIT
-    if (jit_lib_ok)
-	printf("        Default is to run using the JIT compiler.\n");
-#else
-#ifdef ENABLE_TCCLIB
-    printf("        Default is to run using TCCLIB.\n");
-#else
-    printf("        Default is to run using the non-profiling interpreter.\n");
-#endif
-#endif
+#define XX 2
+#include "bfi.be.def"
+    printf("   -A   Generate token list output, "
+		    "prefixed with C preprocessor code.\n");
     printf("\n");
     printf("   -T   Create trace statements in output C code or switch to\n");
     printf("        profiling interpreter and turn on tracing.\n");
@@ -253,20 +226,9 @@ void LongUsage(FILE * fd)
     printf("   -E3      End of file gives 0.\n");
     printf("   -E4      End of file gives EOF (normally -1 too).\n");
     printf("   -E5      Disable ',' command, ie: treat it as a comment character.\n");
+    printf("   -E6      Treat running the ',' command as an error and Stop.\n");
     printf("\n");
-#ifdef BE_BF
-    printf("   -F   Attempt to regenerate BF code.\n");
-#endif
-#ifdef BE_DC
-    printf("   -D   Create code for dc(1).\n");
-#endif
-    printf("   -A   Generate token list output, "
-		    "prefixed with C preprocessor code.\n");
-
-
-    printf("\n");
-    printf("\n");
-    printf("\tNOTE: Some of the code geenrators are quite limited and do\n");
+    printf("\tNOTE: Some of the code generators are quite limited and do\n");
     printf("\tnot support all these options. NASM is 8 bits only. The BF\n");
     printf("\tgenerator does not include the ability to generate most of\n");
     printf("\tthe optimisation facilities.  The dc(1) generator defaults\n");
@@ -318,21 +280,8 @@ main(int argc, char ** argv)
                     case 'H': noheader=1; break;
                     case 'r': do_run=1; break;
                     case 'A': do_codestyle = c_adder; break;
-                    case 'c': do_codestyle = c_c; break;
-#ifdef BE_JIT
-                    case 'j': do_run=1; do_codestyle = c_jit; break;
-#endif
-#ifdef BE_NASM
-                    case 's': do_codestyle = c_nasm; break;
-#endif
-#ifdef BE_BF
-                    case 'F': do_codestyle = c_bf;
-			hard_left_limit = 0;
-			break;
-#endif
-#ifdef BE_DC
-                    case 'D': do_codestyle = c_dc; break;
-#endif
+#define XX 3
+#include "bfi.be.def"
                     case 'm': opt_level=0; break;
                     case 'T': enable_trace=1; break;
 
@@ -361,6 +310,18 @@ main(int argc, char ** argv)
 					break;
                             case 'E': eofcell=strtol(ap,0,10); break;
                             case 'b': set_cell_size(strtol(ap,0,10)); break;
+			    case 'I':
+				{
+				    int len = 0, z;
+				    z = (input_string!=0);
+				    if (z) len += strlen(input_string);
+				    len += strlen(ap) + 2;
+				    input_string = realloc(input_string, len);
+				    if (!z) *input_string = 0;
+				    strcat(input_string, ap);
+				    strcat(input_string, "\n");
+				}
+				break;
                             default:  Usage();
                         }
                         break;
@@ -379,52 +340,12 @@ main(int argc, char ** argv)
     if( !filename || !*filename )
       Usage();
 
-#ifdef BE_NASM
-    if (do_codestyle == c_nasm)
-    {
-	if (do_run || (cell_size && cell_size != 8)) {
-	    fprintf(stderr, "The -s flag cannot be combined with -r or -b\n");
-	    exit(255);
-	}
-	set_cell_size(8);
-    }
-#endif
+#define XX 4
+#include "bfi.be.def"
 
     if (!do_run && do_codestyle == c_default) {
 	do_run = 1;
-#ifdef BE_JIT
-	if (verbose<3 && !enable_trace && jit_lib_ok)
-	    do_codestyle = c_jit;
-	else
-#endif
-#ifdef ENABLE_TCCLIB
-	if (verbose<3)
-	    do_codestyle = c_c;
-	else
-#endif
-	    ;
     }
-
-    if (do_run) {
-	if (
-#ifdef BE_JIT
-	    do_codestyle != c_jit &&
-#endif
-#ifdef ENABLE_TCCLIB
-	    do_codestyle != c_c &&
-#endif
-	    do_codestyle != c_default) {
-
-	    fprintf(stderr, "The selected code generator does not "
-	                    "have a 'RUN' option available.\n");
-	    exit(1);
-	}
-    }
-
-#ifdef BE_DC
-    if (eofcell == 0 && do_codestyle == c_dc)
-	eofcell = 5;
-#endif
 
     if (cell_size == 0 && do_run) set_cell_size(32);
 
@@ -515,7 +436,10 @@ open_file(char * fname)
 	switch(n->type)
 	{
 	    case T_WHL: n->count = ++lid; break;
-	    case T_INP: if (eofcell == 5) n->type = T_NOP; break;
+	    case T_INP:
+		if (eofcell == 5) n->type = T_NOP;
+		if (eofcell == 6) n->type = T_STOP;
+		break;
 	    case T_PRT: n->count = -1; break;
 
 	    case T_ERR: /* Unbalanced bkts */
@@ -613,7 +537,6 @@ printtreecell(FILE * efd, int indent, struct bfi * n)
     case T_DEAD: fprintf(efd, "if(0) id=%d, ", n->count); break;
     case T_STOP: fprintf(efd, "[%d], ", n->offset); break;
 
-    case T_ZFIND: case T_MFIND: case T_ADDWZ:
     case T_FOR: case T_IF: case T_MULT: case T_CMULT:
     case T_WHL:
 	fprintf(efd, "[%d],id=%d, ", n->offset, n->count);
@@ -678,610 +601,6 @@ printtree(void)
 }
 
 void
-pt(FILE* ofd, int indent, struct bfi * n)
-{
-    int i, j;
-    for(j=(n==0 || !enable_trace); j<2; j++) {
-	if (indent == 0)
-	    fprintf(ofd, "  ");
-	else for(i=0; i<indent; i++)
-	    fprintf(ofd, "\t");
-
-	if (j == 0) {
-	    fprintf(ofd, "t(%d,%d,\"", n->line, n->col);
-	    printtreecell(ofd, -1, n);
-	    fprintf(ofd, "\",m+ %d)\n", n->offset);
-	}
-    }
-}
-
-void
-print_c_header(FILE * ofd, int * minimal_p)
-{
-    int use_full = 0;
-    int memsize = 60000;
-    int memoffset = 0;
-
-    calculate_stats();
-
-    if (enable_trace || do_run || !minimal_p) use_full = 1;
-
-    if (total_nodes == node_type_counts[T_PRT] && !use_full) {
-	fprintf(ofd, "#include <stdio.h>\n\n");
-	fprintf(ofd, "int main(void)\n{\n");
-	*minimal_p = 1;
-	return ;
-    }
-
-    if (node_type_counts[T_INP] != 0 && !do_run) {
-	fprintf(ofd, "#ifdef WIDECHAR\n");
-	fprintf(ofd, "#include <locale.h>\n");
-	fprintf(ofd, "#include <wchar.h>\n");
-	fprintf(ofd, "#endif\n\n");
-    }
-
-    fprintf(ofd, "#include <stdio.h>\n");
-    fprintf(ofd, "#include <stdlib.h>\n\n");
-
-    if (cell_size == 0) {
-	fprintf(ofd, "# ifdef C\n");
-	fprintf(ofd, "# include <stdint.h>\n");
-	fprintf(ofd, "# else\n");
-	fprintf(ofd, "# define C int\n");
-	fprintf(ofd, "# endif\n\n");
-    }
-
-    if (node_type_counts[T_INP] != 0 && !do_run)
-    {
-	fprintf(ofd, "static int \n");
-	fprintf(ofd, "getch(int oldch)\n");
-	fprintf(ofd, "{\n");
-	fprintf(ofd, "    int ch;\n");
-	fprintf(ofd, "#ifdef WIDECHAR\n");
-	fprintf(ofd, "    ch = getwchar();\n");
-	fprintf(ofd, "#else\n");
-	fprintf(ofd, "    ch = getchar();\n");
-	fprintf(ofd, "#endif\n");
-	fprintf(ofd, "#ifndef EOFCELL\n");
-	fprintf(ofd, "    if (ch != EOF) return ch;\n");
-	fprintf(ofd, "    return oldch;\n");
-	fprintf(ofd, "#else\n");
-	fprintf(ofd, "#if EOFCELL == EOF\n");
-	fprintf(ofd, "    return ch;\n");
-	fprintf(ofd, "#else\n");
-	fprintf(ofd, "    if (ch != EOF) return ch;\n");
-	fprintf(ofd, "    return EOFCELL;\n");
-	fprintf(ofd, "#endif\n");
-	fprintf(ofd, "#endif\n");
-	fprintf(ofd, "}\n\n");
-    }
-
-    if (node_type_counts[T_PRT] != 0 && !do_run) {
-	fprintf(ofd, "#ifdef WIDECHAR\n");
-	fprintf(ofd, "static void putch(int ch) { printf(\"%%lc\",ch); }\n");
-	fprintf(ofd, "#else\n");
-	fprintf(ofd, "static void putch(int ch) { putchar(ch); }\n");
-	fprintf(ofd, "#endif\n\n");
-    }
-
-#ifdef USE_LIBZFIND
-    if (node_type_counts[T_ZFIND] != 0 &&
-	    (cell_size == 16 || cell_size == 32)) {
-
-	if (do_run) {
-	    fprintf(ofd, "extern %s *\n", cell_type);
-	    fprintf(ofd, "libbf_zfind%d(%s * m, int off);\n",
-			    cell_size, cell_type);
-	} else {
-	    fprintf(ofd, "%s *\n", cell_type);
-	    fprintf(ofd, "libbf_zfind%d(%s * m, int off) {\n",
-			    cell_size, cell_type);
-	    fprintf(ofd, "  while(*m) m += off;\n");
-	    fprintf(ofd, "  return m;\n");
-	    fprintf(ofd, "}\n\n");
-	}
-    }
-#endif
-
-    if (do_run) {
-	fprintf(ofd, "extern void putch(int ch);\n");
-	fprintf(ofd, "extern int getch(int ch);\n");
-    }
-
-    if (enable_trace)
-	fputs(	"#define t(p1,p2,p3,p4) fprintf(stderr, \"P(%d,%d)=%s"
-		"mem[%d]=%d%s\\n\", \\\n\tp1, p2, p3,"
-		" p4-mem, (p4>=mem?*(p4):0), p4>=mem?\"\":\" SIGSEG\");\n\n",
-	    ofd);
-
-    if (node_type_counts[T_MOV] == 0) {
-	if (min_pointer >= 0)
-	    memsize = max_pointer+1;
-	else {
-	    memoffset = -min_pointer;
-	    memsize = max_pointer-min_pointer+1;
-	}
-    }
-    if (hard_left_limit<0) {
-	memoffset = -most_neg_maad_loop;
-	memsize += memoffset;
-	if (memsize < 65536)
-	    memsize = 65536;
-    }
-
-    if (node_type_counts[T_MOV] == 0 && memoffset == 0) {
-	fprintf(ofd, "static %s m[%d];\n", cell_type, max_pointer+1);
-	fprintf(ofd, "int main(){\n");
-	if (enable_trace)
-	    fprintf(ofd, "#define mem m\n");
-    } else {
-	if (!do_run)
-	    fprintf(ofd, "static %s mem[%d];\n", cell_type, memsize);
-	else
-	    fprintf(ofd, "extern %s mem[];\n", cell_type);
-	fprintf(ofd, "int main(){\n");
-#if 0
-	fprintf(ofd, "#if defined(__GNUC__) && defined(__i386__)\n");
-	fprintf(ofd, "  register %s * m asm (\"%%ebx\");\n", cell_type);
-	fprintf(ofd, "#else\n");
-	fprintf(ofd, "  register %s * m;\n", cell_type);
-	fprintf(ofd, "#endif\n");
-#else
-	fprintf(ofd, "  register %s * m;\n", cell_type);
-#endif
-
-	if (memoffset > 0 && !do_run)
-	    fprintf(ofd, "  m = mem + %d;\n", memoffset);
-	else
-	    fprintf(ofd, "  m = mem;\n");
-    }
-
-    if (node_type_counts[T_INP] != 0) {
-	fprintf(ofd, "  setbuf(stdout, 0);\n");
-	fprintf(ofd, "#ifdef WIDECHAR\n");
-	fprintf(ofd, "  setlocale(LC_ALL, \"\");\n");
-	fprintf(ofd, "#endif\n");
-    }
-}
-
-void
-print_ccode(FILE * ofd)
-{
-    int indent = 0;
-    struct bfi * n = bfprog;
-    char string_buffer[180], *sp = string_buffer, lastspch = 0;
-    int ok_for_printf = 0, spc = 0;
-    int minimal = 0;
-    int add_mask = 0;
-    if (cell_size > 0 &&
-	cell_size != sizeof(int)*8 &&
-	cell_size != sizeof(short)*8 &&
-	cell_size != sizeof(char)*8)
-	add_mask = cell_mask;
-
-    if (verbose)
-	fprintf(stderr, "Generating C Code.\n");
-
-    if (!noheader)
-	print_c_header(ofd, &minimal);
-
-    while(n)
-    {
-	if (n->type == T_PRT)
-	    ok_for_printf = ( ( n->count >= ' ' && n->count <= '~') ||
-				(n->count == '\n') || (n->count == '\033'));
-
-	if (sp != string_buffer) {
-	    if ((n->type != T_SET && n->type != T_ADD && n->type != T_PRT) ||
-	        (n->type == T_PRT && !ok_for_printf) ||
-		(sp >= string_buffer + sizeof(string_buffer) - 8) ||
-		(sp > string_buffer+1 && lastspch == '\n')
-	       ) {
-		*sp++ = 0;
-		pt(ofd, indent,0);
-		if (strchr(string_buffer, '%') == 0 )
-		    fprintf(ofd, "printf(\"%s\");\n", string_buffer);
-		else
-		    fprintf(ofd, "printf(\"%%s\", \"%s\");\n", string_buffer);
-		sp = string_buffer; spc = 0;
-	    }
-	}
-
-	if (n->orgtype == T_END) indent--;
-	if (add_mask > 0) {
-	    switch(n->type)
-	    {
-	    case T_WHL: case T_ZFIND: case T_MFIND: case T_IF:
-	    case T_ADDWZ: case T_FOR: case T_CMULT:
-		pt(ofd, indent, 0);
-		fprintf(ofd, "m[%d] &= %d;\n", n->offset, add_mask);
-	    }
-	}
-	switch(n->type)
-	{
-	case T_MOV:
-	    pt(ofd, indent,n);
-	    if (n->count == 1)
-		fprintf(ofd, "++m;\n");
-	    else if (n->count == -1)
-		fprintf(ofd, "--m;\n");
-	    else if (n->count < 0)
-		fprintf(ofd, "m -= %d;\n", -n->count);
-	    else if (n->count > 0)
-		fprintf(ofd, "m += %d;\n", n->count);
-	    else
-		fprintf(ofd, "/* m += 0; */\n");
-	    break;
-	case T_ADD:
-	    pt(ofd, indent,n);
-	    if(n->offset == 0) {
-		if (n->count == 1)
-		    fprintf(ofd, "++*m;\n");
-		else if (n->count == -1)
-		    fprintf(ofd, "--*m;\n");
-		else if (n->count < 0)
-		    fprintf(ofd, "*m -= %d;\n", -n->count);
-		else if (n->count > 0)
-		    fprintf(ofd, "*m += %d;\n", n->count);
-		else
-		    fprintf(ofd, "/* *m += 0; */\n");
-	    } else {
-		if (n->count == 1)
-		    fprintf(ofd, "++m[%d];\n", n->offset);
-		else if (n->count == -1)
-		    fprintf(ofd, "--m[%d];\n", n->offset);
-		else if (n->count < 0)
-		    fprintf(ofd, "m[%d] -= %d;\n", n->offset, -n->count);
-		else if (n->count > 0)
-		    fprintf(ofd, "m[%d] += %d;\n", n->offset, n->count);
-		else
-		    fprintf(ofd, "/* m[%d] += 0; */\n", n->offset);
-	    }
-	    if (enable_trace) {
-		pt(ofd, indent,0);
-		fprintf(ofd, "t(%d,%d,\"\",m+ %d)\n", n->line, n->col, n->offset);
-	    }
-	    break;
-	case T_SET:
-	    pt(ofd, indent,n);
-	    if(n->offset == 0)
-		fprintf(ofd, "*m = %d;\n", n->count);
-	    else
-		fprintf(ofd, "m[%d] = %d;\n", n->offset, n->count);
-	    if (enable_trace) {
-		pt(ofd, indent,0);
-		fprintf(ofd, "t(%d,%d,\"\",m+ %d)\n", n->line, n->col, n->offset);
-	    }
-	    break;
-
-	case T_CALC:
-	    pt(ofd, indent, n);
-	    do {
-		if (n->count == 0) {
-		    if (n->offset == n->offset2 && n->count2 == 1)
-		    {
-			if (n->count3 == 1) {
-			    fprintf(ofd, "m[%d] += m[%d];\n",
-				    n->offset, n->offset3);
-			    break;
-			}
-
-			if (n->count3 == -1) {
-			    fprintf(ofd, "m[%d] -= m[%d];\n",
-				    n->offset, n->offset3);
-			    break;
-			}
-
-			if (n->count3 != 0) {
-			    fprintf(ofd, "m[%d] += m[%d]*%d;\n",
-				    n->offset, n->offset3, n->count3);
-			    break;
-			}
-		    }
-
-		    if (n->count3 == 0 && n->count2 != 0) {
-			if (n->count2 == 1) {
-			    fprintf(ofd, "m[%d] = m[%d];\n",
-				n->offset, n->offset2);
-			} else if (n->count2 == -1) {
-			    fprintf(ofd, "m[%d] = -m[%d];\n",
-				n->offset, n->offset2);
-			} else {
-			    fprintf(ofd, "m[%d] = m[%d]*%d;\n",
-				n->offset, n->offset2, n->count2);
-			}
-			break;
-		    }
-
-		    if (n->count3 == 1 && n->count2 != 0) {
-			fprintf(ofd, "m[%d] = m[%d]*%d + m[%d];\n",
-			    n->offset, n->offset2, n->count2, n->offset3);
-			break;
-		    }
-		}
-
-		if (n->offset == n->offset2 && n->count2 == 1) {
-		    if (n->count3 == 1) {
-			fprintf(ofd, "m[%d] += m[%d] + %d;\n",
-				n->offset, n->offset3, n->count);
-			break;
-		    }
-		    fprintf(ofd, "m[%d] += m[%d]*%d + %d;\n",
-			    n->offset, n->offset3, n->count3, n->count);
-		    break;
-		}
-
-		if (n->count3 == 0) {
-		    if (n->count2 == 1) {
-			fprintf(ofd, "m[%d] = m[%d] + %d;\n",
-			    n->offset, n->offset2, n->count);
-			break;
-		    }
-		    if (n->count2 == -1) {
-			fprintf(ofd, "m[%d] = -m[%d] + %d;\n",
-			    n->offset, n->offset2, n->count);
-			break;
-		    }
-
-		    fprintf(ofd, "m[%d] = %d + m[%d]*%d;\n",
-			n->offset, n->count, n->offset2, n->count2);
-		} else {
-		    fprintf(ofd, "m[%d] = %d + m[%d]*%d + m[%d]*%d; /*T_CALC*/\n",
-			n->offset, n->count, n->offset2, n->count2,
-			n->offset3, n->count3);
-		}
-	    } while(0);
-
-	    if (enable_trace) {
-		pt(ofd, indent,0);
-		fprintf(ofd, "t(%d,%d,\"\",m+ %d)\n", n->line, n->col, n->offset);
-	    }
-	    break;
-
-	case T_PRT:
-	    spc++;
-	    if (ok_for_printf || (sp != string_buffer && n->count > 0)) {
-		lastspch = n->count;
-		if (add_mask>0)
-		    lastspch &= add_mask;
-		if (lastspch == '\n') {
-		    *sp++ = '\\'; *sp++ = 'n';
-		} else if (lastspch == '\\' || lastspch == '"') {
-		    *sp++ = '\\'; *sp++ = lastspch;
-		} else if (lastspch >= ' ' && lastspch <= '~') {
-		    *sp++ = lastspch;
-		} else {
-		    sp += sprintf(sp, "\\%03o", lastspch & 0xFF);
-		}
-		break;
-	    }
-	    spc--;
-	    if (sp != string_buffer)
-		fprintf(stderr, "Cannot add char %d to string\n", n->count);
-	    pt(ofd, indent,n);
-	    if (n->count == -1 ) {
-		if (add_mask > 0 && add_mask < 0xFF) {
-		    fprintf(ofd, "m[%d] &= %d;\n", n->offset, add_mask);
-		    pt(ofd, indent, 0);
-		}
-		if (minimal)
-		    fprintf(ofd, "printf(\"%%lc\", m[%d]);\n", n->offset);
-		else if (n->offset == 0)
-		    fprintf(ofd, "putch(*m);\n");
-		else
-		    fprintf(ofd, "putch(m[%d]);\n", n->offset);
-	    } else {
-		int ch = n->count;
-		if (add_mask>0) ch &= add_mask;
-		if (minimal) {
-		    if (ch < 128)
-			fprintf(ofd, "putchar(%d);\n", ch);
-		    else
-			fprintf(ofd, "printf(\"%%lc\",%d);\n", ch);
-		} else if (ch >= ' ' && ch <= '~' &&
-		    ch != '\'' && ch != '\\')
-		    fprintf(ofd, "putch('%c');\n", ch);
-		else if (ch == '\n')
-		    fprintf(ofd, "putch('\\n');\n");
-		else if (ch == '\t')
-		    fprintf(ofd, "putch('\\t');\n");
-		else if (ch == '\\')
-		    fprintf(ofd, "putch('\\\\');\n");
-		else
-		    fprintf(ofd, "putch(%d);\n", ch);
-	    }
-	    break;
-	case T_INP:
-	    pt(ofd, indent,n);
-	    if (n->offset == 0)
-		fprintf(ofd, "*m = getch(*m);\n");
-	    else
-		fprintf(ofd, "m[%d] = getch(m[%d]);\n", n->offset, n->offset);
-	    if (enable_trace) {
-		pt(ofd, indent,0);
-		fprintf(ofd, "t(%d,%d,\"\",m+ %d)\n", n->line, n->col, n->offset);
-	    }
-	    break;
-	case T_IF:
-	    pt(ofd, indent,n);
-	    fprintf(ofd, "if(m[%d]) {\n", n->offset);
-	    break;
-	case T_ZFIND:
-#if 1
-#ifdef __i386__
-	    /* TCCLIB generates a slow while() with two jumps in the loop,
-	     * and several memory accesses. This is the assembler we would
-	     * actually prefer.
-	     *
-	     * These prints are really ugly; I need a 'print gas in C'
-	     * function if we have much more.
-	     */
-	    if (n->next->next == n->jmp && cell_size == 32 && do_run) {
-		pt(ofd, indent,n);
-		fprintf(ofd, "{ /*ZFIND*/\n");
-		fprintf(ofd, "__asm__ __volatile__ (\n");
-		fprintf(ofd, "\"mov %d(%%%%ecx),%%%%eax\\n\\t\"\n", 4 * n->offset);
-		fprintf(ofd, "\"test %%%%eax,%%%%eax\\n\\t\"\n");
-		fprintf(ofd, "\"je 1f\\n\\t\"\n");
-		fprintf(ofd, "\"2: add $%d,%%%%ecx\\n\\t\"\n", 4* n->next->count);
-		fprintf(ofd, "\"mov %d(%%%%ecx),%%%%eax\\n\\t\"\n", 4 * n->offset);
-		fprintf(ofd, "\"test %%%%eax,%%%%eax\\n\\t\"\n");
-		fprintf(ofd, "\"jne 2b\\n\\t\"\n");
-		fprintf(ofd, "\"1:\\n\\t\"\n");
-		fprintf(ofd, ": \"=c\" (m)\n");
-		fprintf(ofd, ": \"0\"  (m)\n");
-		fprintf(ofd, ": \"eax\"\n");
-		fprintf(ofd, ");\n");
-		pt(ofd, indent,n);
-		fprintf(ofd, "} /*ZFIND*/\n");
-		n=n->jmp;
-	    }
-	    else
-#endif
-#endif
-#if 1
-	    /* TCCLIB generates a slow 'strlen', libc is better, but the
-	     * function call overhead is horrible.
-	     */
-	    if (cell_size == 8 && add_mask <= 0 && do_run &&
-		    n->next->next == n->jmp && n->next->count == 1) {
-		pt(ofd, indent,n);
-		fprintf(ofd, "if( m[%d] ) {\n", n->offset);
-		pt(ofd, indent+1,n);
-		fprintf(ofd, "m++;\n");
-		pt(ofd, indent+1,n);
-		fprintf(ofd, "if( m[%d] ) {\n", n->offset);
-		pt(ofd, indent+2,n);
-		fprintf(ofd, "m++;\n");
-		pt(ofd, indent+2,n);
-		if (n->offset)
-		    fprintf(ofd, "m += strlen(m + %d);\n", n->offset);
-		else
-		    fprintf(ofd, "m += strlen(m);\n");
-		pt(ofd, indent+1,n);
-		fprintf(ofd, "}\n");
-		pt(ofd, indent,n);
-		fprintf(ofd, "}\n");
-		n=n->jmp;
-	    }
-	    else
-#endif
-#ifdef USE_LIBZFIND
-	    /* Despite the massive gains in running this function using GCC
-	     * the call overhead is likely to make it a net loss.
-	     */
-	    if (n->next->next == n->jmp &&
-			(cell_size == 16 || cell_size == 32)) {
-		pt(ofd, indent,n);
-		if (n->offset)
-		    fprintf(ofd, "m = libbf_zfind%d(m + %d, %d) - %d;\n",
-			    cell_size, n->offset, n->next->count, n->offset);
-		else
-		    fprintf(ofd, "m = libbf_zfind%d(m, %d);\n",
-			    cell_size, n->next->count);
-		n=n->jmp;
-	    }
-	    else
-#endif
-#if 0
-	    /* TCCLIB generates a slow while() with two jumps in the loop,
-	     * this variant have two conditions but one jump in the loop.
-	     * Many CPUs much prefer this.
-	     * However, it is unlikely there is a net gain because of all
-	     * the memory accesses.
-	     */
-	    if (n->next->next == n->jmp && do_run) {
-		pt(ofd, indent,n);
-		if (n->next->count == 1) {
-		    fprintf(ofd, "if(m[%d]) do ++m; while(m[%d]);\n",
-			n->offset, n->offset);
-		} else
-		if (n->next->count == -1) {
-		    fprintf(ofd, "if(m[%d]) do --m; while(m[%d]);\n",
-			n->offset, n->offset);
-		} else
-		    fprintf(ofd, "if(m[%d]) do m += %d; while(m[%d]);\n",
-			n->offset, n->next->count, n->offset);
-	    }
-	    else
-#endif
-	    {
-		pt(ofd, indent,n);
-		if (n->next->next != n->jmp) {
-		    fprintf(stderr, "Code generator made a broken rail runner\n");
-		    exit(1);
-		}
-		if (n->next->count == 1) {
-		    fprintf(ofd, "while(m[%d]) ++m;\n", n->offset);
-		} else if (n->next->count == -1) {
-		    fprintf(ofd, "while(m[%d]) --m;\n", n->offset);
-		} else if (n->next->count < 0) {
-		    fprintf(ofd, "while(m[%d]) m -= %d;\n",
-			n->offset, -n->next->count);
-		} else {
-		    fprintf(ofd, "while(m[%d]) m += %d;\n",
-			n->offset, n->next->count);
-		}
-		n=n->jmp;
-	    }
-	    break;
-
-	case T_WHL:
-	case T_CMULT:
-	case T_MULT:
-	case T_MFIND:
-	case T_ADDWZ:
-	    pt(ofd, indent,n);
-	    if (n->offset)
-		fprintf(ofd, "while(m[%d]) {\n", n->offset);
-	    else
-		fprintf(ofd, "while(*m) {\n");
-	    break;
-	case T_FOR:
-	    pt(ofd, indent,n);
-	    fprintf(ofd, "for(;m[%d];) {\n", n->offset);
-	    break;
-
-	case T_END: case T_ENDIF:
-	    pt(ofd, indent,n);
-	    fprintf(ofd, "}\n");
-	    break;
-
-	case T_STOP:
-	    pt(ofd, indent,n);
-	    fprintf(ofd, "return 1;\n");
-	    break;
-
-	case T_NOP:
-	    fprintf(stderr, "Warning on code generation: "
-	           "NOP node: ptr+%d, cnt=%d, @(%d,%d).\n",
-		    n->offset, n->count, n->line, n->col);
-	    break;
-	default:
-	    pt(ofd, indent,n);
-	    fprintf(ofd, "/* Bad node: type %d: ptr+%d, cnt=%d. */\n",
-		    n->type, n->offset, n->count);
-	    fprintf(stderr, "Error on code generation:\n"
-	           "Bad node: type %d: ptr+%d, cnt=%d.\n",
-		    n->type, n->offset, n->count);
-	    break;
-	}
-	if (n->orgtype == T_WHL) indent++;
-	n=n->next;
-    }
-
-    if(sp != string_buffer) {
-	*sp++ = 0;
-	if (strchr(string_buffer, '%') == 0 )
-	    fprintf(ofd, "  printf(\"%s\");\n", string_buffer);
-	else
-	    fprintf(ofd, "  printf(\"%%s\", \"%s\");\n", string_buffer);
-    }
-    if (!noheader)
-	fprintf(ofd, "  return 0;\n}\n");
-}
-
-void
 process_file(void)
 {
 #define tickstart() do{ if (verbose>2) gettimeofday(&tv_step, 0); } while(0)
@@ -1330,43 +649,44 @@ process_file(void)
 	if (verbose>5) printtree();
     }
 
-    if (verbose)
+    if (verbose) {
 	print_tree_stats();
+	if (verbose>1)
+	    printtree();
+    }
 
     if (do_run) {
-	if (do_codestyle == c_c) {
-#ifdef ENABLE_TCCLIB
-	    run_ccode();
-#else
-	    fprintf(stderr, "Sorry cannot compile C code in memory, TCCLIB not linked\n");
-	    exit(2);
-#endif
-#ifdef BE_JIT
-	} else if (do_codestyle == c_jit) {
-	    run_jit_asm();
-#endif
-	} else if (verbose>2 || enable_trace) {
-	    if (verbose)
-		fprintf(stderr, "Starting profiling interpreter\n");
-	    run_tree();
+	switch(do_codestyle) {
+	default:
+	    fprintf(stderr, "The selected code generator does not "
+			    "have a 'RUN' option available.\n");
+	    exit(1);
 
-	    if (verbose>2) {
-		print_tree_stats();
-		printtree();
+#define XX 7
+#include "bfi.be.def"
+
+	case c_default:
+	    if (verbose>2 || enable_trace) {
+		if (verbose)
+		    fprintf(stderr, "Starting profiling interpreter\n");
+		run_tree();
+
+		if (verbose>2) {
+		    print_tree_stats();
+		    printtree();
+		}
+	    } else {
+		if (verbose)
+		    fprintf(stderr, "Starting array interpreter\n");
+		convert_tree_to_runarray();
 	    }
-
-	} else {
-	    if (verbose)
-		fprintf(stderr, "Starting array interpreter\n");
-	    convert_tree_to_runarray();
+	    break;
 	}
     } else {
 	if (verbose)
 	    fprintf(stderr, "Generating output code\n");
 
 	switch(do_codestyle) {
-	    case c_c: print_ccode(stdout); break;
-
 	    default:
 		fprintf(stderr,
 			"Output for code style %d not found, dumping tree.\n",
@@ -1374,15 +694,9 @@ process_file(void)
 		/*FALLTRHOUGH*/
 
 	    case c_adder: print_adder(); break;
-#ifdef BE_NASM
-	    case c_nasm: print_nasm(); break;
-#endif
-#ifdef BE_BF
-	    case c_bf: print_bf(); break;
-#endif
-#ifdef BE_DC
-	    case c_dc: print_dc(); break;
-#endif
+
+#define XX 5
+#include "bfi.be.def"
 	}
     }
 
@@ -1409,7 +723,7 @@ calculate_stats(void)
     while(n)
     {
 	int t = n->type;
-	n->ipos = total_nodes ++;
+	total_nodes++;
 	if (t < 0 || t >= TCOUNT)
 	    node_type_counts[TCOUNT] ++;
 	else
@@ -1464,43 +778,15 @@ print_tree_stats(void)
     }
 }
 
-#ifndef NOPCOUNT
-/*
-
-#define NOPCOUNT 0
-*/
-#endif
-
-#if TMASK == 0xFF
-#define icell	unsigned char
-#define M(x) x
-#elif TMASK == 0xFFFF
-#define icell	unsigned short
-#define M(x) x
-#else
-#define icell	int
-#endif
 void
 run_tree(void)
 {
-    icell *p, *oldp;
+    int *p, *oldp;
     struct bfi * n = bfprog;
     struct timeval tv_start, tv_end, tv_pause;
-#ifdef M
-    if (sizeof(*p)*8 != cell_size && cell_size>0) {
-	fprintf(stderr, "Sorry, the interpreter has been configured with a fixed cell size of %d bits\n", sizeof(icell)*8);
-	exit(1);
-    }
-#else
-#define M(x) UM(x)
-#endif
 
     oldp = p = map_hugeram();
     gettimeofday(&tv_start, 0);
-
-#ifdef NOPCOUNT
-#include "nops.h"
-#endif
 
     while(n){
 	n->profile++;
@@ -1560,10 +846,10 @@ run_tree(void)
 	    case T_MULT: case T_CMULT:
 	    case T_IF: case T_FOR:
 
-	    case T_WHL: if(M(p[n->offset]) == 0) n=n->jmp;
+	    case T_WHL: if(UM(p[n->offset]) == 0) n=n->jmp;
 		break;
 
-	    case T_END: if(M(p[n->offset]) != 0) n=n->jmp;
+	    case T_END: if(UM(p[n->offset]) != 0) n=n->jmp;
 		break;
 
 	    case T_ENDIF:
@@ -1571,7 +857,7 @@ run_tree(void)
 
 	    case T_PRT:
 	    {
-		int ch = M(n->count == -1?p[n->offset]:n->count);
+		int ch = UM(n->count == -1?p[n->offset]:n->count);
 		/*TODO: stop the clock ? */
 		putch(ch);
 		break;
@@ -1591,45 +877,6 @@ run_tree(void)
 		    tv_start.tv_usec += 1000000;
 		    tv_start.tv_sec -= 1;
 		}
-		break;
-
-	    case T_ZFIND:
-		/* Found a rail runner */
-		if(M(p[n->offset]) == 0) { n=n->jmp; break; }
-		while(M(p[n->offset]))
-		    p += n->next->count;
-		n=n->jmp;
-		break;
-
-	    case T_MFIND:
-	    /* Search along a rail for a minus 1 */
-		{
-		    int stride = n->jmp->prev->count;
-		    while(M(p[n->offset])) {
-			p[n->offset] -= 1;
-			p += stride;
-			p[n->offset] += 1;
-		    }
-		}
-		n=n->jmp;
-		break;
-
-	    case T_ADDWZ:
-		/* Found a rail cleaner */
-		if(M(p[n->offset]) == 0) { n=n->jmp; break; }
-		{
-		    int noff, n2off, n2count, n3count;
-		    noff = n->offset;
-		    n2off = n->next->offset;
-		    n2count = n->next->count;
-		    n3count = n->next->next->count;
-		    /* This is a running add. */
-		    while(p[noff]) {
-			p[n2off] += n2count;
-			p += n3count;
-		    }
-		}
-		n=n->jmp;
 		break;
 
 	    case T_STOP:
@@ -1660,9 +907,6 @@ break_break:;
     run_time = run_time - (tv_start.tv_sec + tv_start.tv_usec/1000000.0);
     if (verbose)
 	fprintf(stderr, "Run time (excluding inputs) %.4fs\n", run_time);
-
-#undef icell
-#undef M
 }
 
 void
@@ -1815,41 +1059,6 @@ quick_scan(void)
 	fprintf(stderr, "Finding 'quick' commands.\n");
 
     while(n){
-	/* Special tight loops for the interpreter; note, the compilers
-	   shouldn't need them because the code will already do a tight loop. */
-	if (n->type == T_WHL) {
-	    /* Sequence  [>>>] Search for zeros. */
-	    if ( n->next->type == T_MOV &&
-		 n->next->count != 0 &&
-		 n->next->next->type == T_END)
-		n->type = T_ZFIND;
-	    /* Sequence  [-<<] Rails cleaners and similar. */
-	    if ( n->next->type == T_ADD &&
-		 n->next->next->type == T_MOV &&
-		 n->next->next->next->type == T_END)
-		n->type = T_ADDWZ;
-	    /* Sequence  [->>+] Search for minus one. */
-	    if ( n->next->type == T_ADD &&
-	         n->next->next->type == T_ADD &&
-		 n->next->next->next->type == T_MOV &&
-		 n->next->next->next->next->type == T_END ) {
-
-		if (
-		    n->offset == n->next->offset
-		     && n->next->next->offset - n->offset == n->next->next->next->count
-		     && n->next->count == -1
-		     && n->next->next->count == 1
-		     )
-		    n->type = T_MFIND;
-	    }
-
-	    if(verbose>4 && n->type != T_WHL) {
-		fprintf(stderr, "Replaced loop type.\n");
-		printtreecell(stderr, 1, n);
-		fprintf(stderr, "\n");
-	    }
-	}
-
 	/* Looking for "[-]" or "[+]" */
 	/* The loop classifier won't pick up [+] */
 	if( n->type == T_WHL && n->next && n->next->next &&
@@ -1958,9 +1167,43 @@ invariants_scan(void)
 
 	    if (node_changed)
 		n = n2;
+	    break;
+
+	case T_MOV:
+	    if (n->count == 0) {
+		/* Hmmm; NOP movement */
+		node_changed = 1;
+		n->type = T_NOP;
+		break;
+	    }
+
+	    n2 = n->prev;
+	    while (n2 && n2->type != T_MOV && n2->orgtype != T_WHL && n2->orgtype != T_END) {
+		n2->offset -= n->count;
+		n2->offset2 -= n->count;
+		n2->offset3 -= n->count;
+		n->prev = n2->prev;
+		if (n->prev) n->prev->next = n; else bfprog = n;
+
+		n2->next = n->next;
+		if (n2->next) n2->next->prev = n2;
+
+		n2->prev = n;
+		n->next = n2;
+
+		n2 = n->prev;
+		if(n2) { n->line = n2->line; n->col = n2->col; }
+	    }
+	    break;
 	}
 
 	if (n && n->type == T_DEAD && n->jmp) {
+	    if (verbose>6) {
+		fprintf(stderr, "Removing: ");
+		printtreecell(stderr, 0,n);
+		fprintf(stderr, "\n");
+	    }
+
 	    n2 = n->jmp;
 	    n3 = n;
 	    n = n2->next;
@@ -1977,6 +1220,12 @@ invariants_scan(void)
 	}
 
 	if (n && n->type == T_NOP) {
+	    if (verbose>6) {
+		fprintf(stderr, "Removing: ");
+		printtreecell(stderr, 0,n);
+		fprintf(stderr, "\n");
+	    }
+
 	    n2 = n; n = n->next;
 	    if(n2->prev) n2->prev->next = n; else bfprog = n;
 	    if(n) n->prev = n2->prev;
@@ -1991,7 +1240,8 @@ invariants_scan(void)
 }
 
 void
-trim_trailing_sets(void) {
+trim_trailing_sets(void)
+{
     struct bfi * n = bfprog, *lastn = 0;
     int min_pointer = 0, max_pointer = 0;
     int node_changed, i;
@@ -2313,8 +1563,8 @@ break_break:
 void
 find_known_value(struct bfi * n, int v_offset,
 		struct bfi ** n_found,
-		int * const_found_p, int * known_value_p, int * unsafe_p) {
-
+		int * const_found_p, int * known_value_p, int * unsafe_p)
+{
     int unknown_found = 0;
     find_known_value_recursion(n, v_offset,
 		n_found, const_found_p, known_value_p, unsafe_p,
@@ -2357,6 +1607,12 @@ find_known_state(struct bfi * v)
 		    n->count += v->count;
 		    v->type = T_NOP;
 		    if (verbose>5) fprintf(stderr, "  Delete this node.\n");
+		    return 1;
+		}
+		if (v->count == 0) {
+		    /* WTH! this is a nop, label it as such */
+		    v->type = T_NOP;
+		    if (verbose>5) fprintf(stderr, "  NOP this node.\n");
 		    return 1;
 		}
 		break;
@@ -2438,7 +1694,6 @@ find_known_state(struct bfi * v)
 	    if (verbose>5) fprintf(stderr, "  Make literal putchar.\n");
 	    return 1;
 
-	case T_ZFIND: case T_MFIND: case T_ADDWZ:
 	case T_IF: case T_FOR: case T_MULT: case T_CMULT:
 	case T_WHL: /* Change to (possible) constant loop or dead code. */
 	    if (!non_zero_unsafe) {
@@ -2956,7 +2211,7 @@ classify_loop(struct bfi * v)
     if (dec_node == 0) return 0;
 
     if (complex_loop) {
-	/* Complex contents but loop is simple so call it a for (or better) */
+	/* Complex contents but loop is simple so call it a for loop. */
 	if (v->type == T_WHL) {
 	    if(verbose>5) fprintf(stderr, "Changed Complex loop to T_FOR\n");
 	    v->type = T_FOR;
@@ -3034,9 +2289,9 @@ flatten_multiplier(struct bfi * v)
     if (v->type != T_MULT && v->type != T_CMULT) return 0;
 
     if (opt_level<3) return 0;
-#ifdef BE_BF
-    if (do_codestyle == c_bf) return 0;
-#endif
+
+#define XX 6		/* Check BE can cope with T_CALC */
+#include "bfi.be.def"
 
     n = v->next;
     while(n != v->jmp)
@@ -3133,132 +2388,6 @@ build_string_in_tree(struct bfi * v)
 	n = n->prev;
     }
 }
-
-#ifdef ENABLE_TCCLIB
-int *
-libbf_zfind32(int * m, int off) {
-  while(*m) m += off;
-  return m;
-}
-
-unsigned short *
-libbf_zfind16(unsigned short * m, int off) {
-  while(*m) m += off;
-  return m;
-}
-
-void
-run_ccode(void)
-{
-    char * ccode;
-    size_t ccodelen;
-
-    FILE * ofd;
-    TCCState *s;
-    int rv;
-    void * memp;
-
-    ofd = open_memstream(&ccode, &ccodelen);
-    print_ccode(ofd);
-    if (ofd == NULL) { perror("open_memstream"); exit(7); }
-    putc('\0', ofd);
-    fclose(ofd);
-
-    memp = map_hugeram();
-
-    s = tcc_new();
-    if (s == NULL) { perror("tcc_new()"); exit(7); }
-    tcc_set_output_type(s, TCC_OUTPUT_MEMORY);
-
-    tcc_compile_string(s, ccode);
-
-    tcc_add_symbol(s, "mem", memp);
-
-    /* If our code was read from stdin it'll be done in standard mode,
-     * the stdio stream is now modal (always a bad idea) so it's been switched
-     * to standard mode, stupidly, it's now impossible to switch it back.
-     *
-     * So have the loaded C code use our getch and putch functions.
-     */
-    tcc_add_symbol(s, "getch", &getch);
-    tcc_add_symbol(s, "putch", &putch);
-
-    /* GCC is a lot faster at these */
-    tcc_add_symbol(s, "libbf_zfind16", &libbf_zfind16);
-    tcc_add_symbol(s, "libbf_zfind32", &libbf_zfind32);
-
-#if ENABLE_TCCLIB == 0x000925
-#define TCCDONE
-    {
-	int (*func)(void);
-	int imagesize;
-	void * image = 0;
-
-	imagesize = tcc_relocate(s, 0);
-	if (imagesize <= 0) {
-	    fprintf(stderr, "tcc_relocate failed to return code size.\n");
-	    exit(1);
-	}
-	image = malloc(imagesize);
-	rv = tcc_relocate(s, image);
-	if (rv) {
-	    fprintf(stderr, "tcc_relocate failed error=%d\n", rv);
-	    exit(1);
-	}
-
-	/* This line produces a spurious warning. The issue is that ISO99 C
-	 * provides no way to covert a void* to a function pointer. This is
-	 * because on some nasty old machines the pointers are not compatible.
-	 * For example 8086 'medium model'.
-	 *
-	 * I could push it through a union, but this still works.
-	 */
-	func = tcc_get_symbol(s, "main");
-	if (!func) {
-	    fprintf(stderr, "Could not find compiled code entry point\n");
-	    exit(1);
-	}
-	tcc_delete(s);
-	free(ccode);
-
-	func();
-	free(image);
-    }
-#endif
-
-#if ENABLE_TCCLIB == 0x000926
-#define TCCDONE
-    {
-	int (*func)(void);
-
-	rv = tcc_relocate(s);
-	if (rv) {
-	    perror("tcc_relocate()");
-	    fprintf(stderr, "tcc_relocate failed return value=%d\n", rv);
-	    exit(1);
-	}
-	func = tcc_get_symbol(s, "main");
-	if (!func) {
-	    fprintf(stderr, "Could not find compiled code entry point\n");
-	    exit(1);
-	}
-	func();
-
-	tcc_delete(s);
-	free(ccode);
-    }
-#endif
-
-#if !defined(TCCDONE)
-#define TCCDONE
-    rv = tcc_run(s, 0, 0);
-    if (verbose && rv)
-	fprintf(stderr, "tcc_run returned %d\n", rv);
-    tcc_delete(s);
-    free(ccode);
-#endif
-}
-#endif
 
 /*
  * This outputs the tree as a flat language.
@@ -3405,9 +2534,7 @@ print_adder(void)
 	    printf("label(lbl_%d)\n", n->jmp->count);
 	    break;
 
-	case T_MULT: case T_CMULT:
-	case T_MFIND:
-	case T_ZFIND: case T_ADDWZ: case T_FOR:
+	case T_MULT: case T_CMULT: case T_FOR:
 	case T_WHL:
 	    printf("ifeqz(%d,lbl_%d,%s)\n",
 		    n->offset, n->count, tokennames[n->type]);
@@ -3457,8 +2584,17 @@ getch(int oldch)
      *
      * But it does give me somewhere to stick the EOF rubbish.
      */
-    if (eofcell != 5)
-	for(;;) {
+    if (eofcell != 5) {
+	if (input_string) {
+	    char * p = 0;
+	    c = (unsigned char)*input_string;
+	    if (c == 0) c = EOF;
+	    else
+		p = strdup(input_string+1);
+	    free(input_string);
+	    input_string = p;
+	}
+	else for(;;) {
 	    if (iostyle == 1) {
 		int rv;
 		wchar_t wch = EOF;
@@ -3475,6 +2611,7 @@ getch(int oldch)
 	    if (iostyle != 2 && c == '\r') continue;
 	    break;
 	}
+    }
     if (c != EOF) return c;
     switch(eofcell)
     {
@@ -3494,6 +2631,8 @@ putch(int ch)
 	putchar(ch);
 }
 
+#pragma GCC diagnostic push /* STFU */
+#pragma GCC diagnostic ignored "-Wparentheses"
 void
 set_cell_size(int cell_bits)
 {
@@ -3503,7 +2642,7 @@ set_cell_size(int cell_bits)
 	cell_mask = -1;
     } else {
 	cell_size = cell_bits;
-	cell_mask = (1 << cell_size) - 1;
+	cell_mask = (2 << cell_size-1) - 1;
     }
 
     if (verbose>5) {
@@ -3523,6 +2662,7 @@ set_cell_size(int cell_bits)
     } else
 	cell_type = "int";
 }
+#pragma GCC diagnostic pop
 
 #ifndef USEHUGERAM
 void *
@@ -3646,7 +2786,6 @@ trap_sigsegv(void)
 #else
 #define icell	int
 #endif
-void run_progarray(int * progarray);
 
 void
 convert_tree_to_runarray(void)
@@ -3657,9 +2796,14 @@ convert_tree_to_runarray(void)
     int * p;
     int last_offset = 0;
 #ifdef M
-    if (sizeof(*m)*8 != cell_size && cell_size>0) {
-	fprintf(stderr, "Sorry, the interpreter has been configured with a fixed cell size of %d bits\n", sizeof(icell)*8);
-	exit(1);
+    if (sizeof(icell)*8 != cell_size && cell_size>0) {
+	if (verbose)
+	    fprintf(stderr, "Oops: Switching to profiling interpreter "
+			    "because the array interpreter has been\n"
+			    "configured with a fixed cell size of %d bits\n",
+			    sizeof(icell)*8);
+	run_tree();
+	return;
     }
 #else
 #define M(x) UM(x)
@@ -3690,6 +2834,7 @@ convert_tree_to_runarray(void)
     last_offset = 0;
     while(n)
     {
+	n->ipos = p-progarray;
 	if (n->type != T_MOV) {
 	    *p++ = (n->offset - last_offset);
 	    last_offset = n->offset;
@@ -3710,23 +2855,6 @@ convert_tree_to_runarray(void)
 	    *p++ = n->count;
 	    break;
 
-	case T_ADDWZ:
-	    *p++ = n->next->offset - last_offset;
-	    *p++ = n->next->count;
-	    *p++ = n->next->next->count;
-	    n = n->jmp;
-	    break;
-
-	case T_ZFIND:
-	    *p++ = n->next->count;
-	    n = n->jmp;
-	    break;
-
-	case T_MFIND:
-	    *p++ = n->next->next->next->count;
-	    n = n->jmp;
-	    break;
-
 	case T_MULT: case T_CMULT:
 	    /* Note: for these I could generate multiply code for then enclosed
 	     * T_ADD instructions, but that will only happen if the optimiser
@@ -3737,6 +2865,44 @@ convert_tree_to_runarray(void)
 	    /*FALLTHROUGH*/
 
 	case T_WHL:
+	    if (n->next->type == T_MOV && n->next->count != 0 && opt_level>0) {
+		/* Look for [<<<], [-<<<] and [-<<<+] */
+		struct bfi *n1, *n2=0, *n3=0, *n4=0;
+		n1 = n->next;
+		if (n1) n2 = n1->next;
+		if (n2) n3 = n2->next;
+		if (n3) n4 = n3->next;
+
+		if (n2->type == T_END) {
+		    p[-1] = T_ZFIND;
+		    *p++ = n1->count;
+		    n = n->jmp;
+		    break;
+		}
+
+		if (n2->type == T_ADD && n3->type == T_END) {
+		    p[-1] = T_ADDWZ;
+		    *p++ = n2->offset - last_offset + n1->count;
+		    *p++ = n2->count;
+		    *p++ = n1->count;
+		    n = n->jmp;
+		    break;
+		}
+
+		if (n2->type == T_ADD && n3->type == T_ADD &&
+			n4->type == T_END) {
+		    if (    n2->count == -1 && n3->count == 1
+			 && n->offset == n3->offset
+			 && n->offset == n2->offset - n1->count ) {
+
+			p[-1] = T_MFIND;
+			*p++ = n1->count;
+			n = n->jmp;
+			break;
+		    }
+		}
+	    }
+
 	    /* Storing the location of the instruction in the T_END's count
 	     * field; it's not normally used */
 	    n->jmp->count = p-progarray;
@@ -3831,6 +2997,31 @@ run_progarray(int * p)
 	    p += 1;
 	    break;
 
+	case T_CALC:
+	    *m = p[1] + m[p[2]] * p[3] + m[p[4]] * p[5];
+	    p += 6;
+	    break;
+
+	case T_CALC2:
+	    *m = p[1] + m[p[2]] * p[3];
+	    p += 4;
+	    break;
+
+	case T_CALC3:
+	    *m += m[p[1]] * p[2];
+	    p += 3;
+	    break;
+
+	case T_CALC4:
+	    *m = m[p[1]];
+	    p += 2;
+	    break;
+
+	case T_CALC5:
+	    *m += m[p[1]];
+	    p += 2;
+	    break;
+
 	case T_ADDWZ:
 	    /* This is normally a running dec, it cleans up a rail */
 	    while(M(*m)) {
@@ -3855,31 +3046,6 @@ run_progarray(int * p)
 		m += p[1];
 		*m += 1;
 	    }
-	    p += 2;
-	    break;
-
-	case T_CALC:
-	    *m = p[1] + m[p[2]] * p[3] + m[p[4]] * p[5];
-	    p += 6;
-	    break;
-
-	case T_CALC2:
-	    *m = p[1] + m[p[2]] * p[3];
-	    p += 4;
-	    break;
-
-	case T_CALC3:
-	    *m += m[p[1]] * p[2];
-	    p += 3;
-	    break;
-
-	case T_CALC4:
-	    *m = m[p[1]];
-	    p += 2;
-	    break;
-
-	case T_CALC5:
-	    *m += m[p[1]];
 	    p += 2;
 	    break;
 

@@ -39,7 +39,7 @@ print_bf(void)
 		printf("// %s", tokennames[v->type&0xF]);
 		printf(" O="); pint(v->offset);
 		switch(v->type) {
-		case T_WHL: case T_ZFIND: case T_ADDWZ: case T_MFIND:
+		case T_WHL:
 		    printf(" ID="); pint(v->count);
 		    break;
 		case T_END: case T_ENDIF:
@@ -71,7 +71,6 @@ print_bf(void)
 	    while(v && v->prev->type != T_END && v->prev->type != T_ENDIF && (
 		n->type == T_MULT ||
 		n->type == T_CMULT ||
-		n->type == T_ADDWZ ||
 		n->type == T_IF ||
 		n->type == T_FOR));
 	}
@@ -145,27 +144,8 @@ print_bf(void)
 	    putchar(',');
 	    break;
 
-	case T_ZFIND:
-	    if (n->next->next != n->jmp) {
-		putchar('[');
-	    } else {
-		int i;
-		putchar('[');
-		if (n->next->count >= 0) {
-		    for(i=0; i<n->next->count; i++)
-			putchar('>');
-		} else {
-		    for(i=0; i< -n->next->count; i++)
-			putchar('<');
-		}
-		putchar(']');
-		n=n->jmp;
-	    }
-	    break;
-
 	case T_MULT: case T_CMULT:
-	case T_ADDWZ: case T_IF: case T_FOR:
-	case T_MFIND:
+	case T_IF: case T_FOR:
 	    nocr = 1;
 	case T_WHL:
 	    putchar('[');

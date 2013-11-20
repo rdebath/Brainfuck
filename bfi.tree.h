@@ -2,7 +2,9 @@
 extern char * curfile;
 extern int curr_line, curr_col;
 extern int noheader, enable_trace, hard_left_limit, most_neg_maad_loop;
+extern int min_pointer, max_pointer;
 extern int opt_level;
+extern char * input_string;
 
 extern int cell_size;
 extern int cell_mask;
@@ -14,8 +16,8 @@ extern char *cell_type;
 #define TOKEN_LIST(Mac) \
     Mac(MOV) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
     Mac(SET) Mac(CALC) \
-    Mac(ZFIND) Mac(MFIND) Mac(ADDWZ) \
     Mac(IF) Mac(ENDIF) Mac(MULT) Mac(CMULT) Mac(FOR) \
+    Mac(ZFIND) Mac(MFIND) Mac(ADDWZ) \
     Mac(CALC2) Mac(CALC3) Mac(CALC4) Mac(CALC5) \
     Mac(STOP) Mac(NOP) Mac(DEAD) Mac(ERR)
 

@@ -149,8 +149,7 @@ print_dc(void)
 	    save_cell(n->offset);
 	    break;
 
-	case T_IF: case T_MULT: case T_CMULT:
-	case T_MFIND: case T_ZFIND: case T_ADDWZ: case T_FOR:
+	case T_IF: case T_MULT: case T_CMULT: case T_FOR:
 	case T_WHL:
 	    stackdepth++;
 	    fprintf(ofd, "[\n");
@@ -225,6 +224,7 @@ print_dc(void)
 	    break;
 
 	case T_STOP:
+	    fprintf(ofd, "[STOP command executed\n]P\n");
 	    if (stackdepth>1)
 		fprintf(ofd, "%dQ\n", stackdepth);
 	    else
@@ -287,8 +287,19 @@ print_dc(void)
 	fprintf(ofd, "[%d+]sM [%d %% d0>M]sm\n", cell_mask+1, cell_mask+1);
 
     if (used_lix) {
-	fprintf(ofd, "[1G [sB_1]SA [bAla]SB 0=A Bx 0sALAaBLB+ ]si\n");
-	fprintf(ofd, "[? z [_1]SA 0=A 0sALA+ ]si\n");
+	if (input_string) {
+	    char * p = input_string;
+	    fprintf(ofd, "0si\n");
+	    for(;*p; p++)
+		fprintf(ofd, "%dlid1+si:I\n", (unsigned char)*p);
+	    fprintf(ofd, "_1lid1+si:I\n");
+	    fprintf(ofd, "0li:I0sn\n");
+	    fprintf(ofd, "[lnd1+sn;I]si\n");
+	} else {
+
+	    fprintf(ofd, "[1G [sB_1]SA [bAla]SB 0=A Bx 0sALAaBLB+ ]si\n");
+	    fprintf(ofd, "[? z [_1]SA 0=A 0sALA+ ]si\n");
+	}
     }
 
     fprintf(ofd, "LFx\n");

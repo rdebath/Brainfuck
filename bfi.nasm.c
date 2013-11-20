@@ -286,13 +286,11 @@ print_nasm()
 /* LoopClass: condition at 1=> end, 2=>start, 3=>both */
 #define LoopClass 3
 
-	case T_MULT: case T_CMULT:
-	case T_MFIND: case T_ZFIND:
-	case T_ADDWZ: case T_IF: case T_FOR:
+	case T_MULT: case T_CMULT: case T_IF: case T_FOR:
 	case T_WHL:
 
 	    /* Need a "near" for jumps that we know are a long way away because
-	     * nasm is VERY slow at working out which sort of jump to use 
+	     * nasm is VERY slow at working out which sort of jump to use
 	     * without the hint. But we can't be sure exactly what number to
 	     * put here without being a lot more detailed about the
 	     * instructions we use so we don't force short jumps.
@@ -418,7 +416,7 @@ print_asm_header(void)
     printf("\tdw\t0\t\t\t\t;   e_shnum\n");
     printf("\tdw\t0\t\t\t\t;   e_shstrndx\n");
     printf("\n");
-    printf("ehdrsize      equ     $ - ehdr\n");
+    printf("ehdrsize\tequ\t$ - ehdr\n");
     printf("\n");
     printf("phdr:\t\t\t\t\t\t; Elf32_Phdr\n");
     printf("\tdd\t1\t\t\t\t;   p_type\n");
@@ -430,7 +428,7 @@ print_asm_header(void)
     printf("\tdd\t7\t\t\t\t;   p_flags\n");
     printf("\tdd\t0x1000\t\t\t\t;   p_align\n");
     printf("\n");
-    printf("phdrsize      equ     $ - phdr\n");
+    printf("phdrsize\tequ\t$ - phdr\n");
     printf("\n");
 
     if (hello_world) {
@@ -460,9 +458,9 @@ print_asm_header(void)
     printf("\tint\t0x80\t\t; exit(0)\n");
     printf("\n");
     printf("\tsection\t.data align=64\n");
-    printf("\tsection\t.bss align=4096\n");
+    printf("\tsection\t.bss align=64\n");
     printf("filesize equ\tsection..bss.start-orgaddr\n");
-    if (most_neg_maad_loop<0) 
+    if (most_neg_maad_loop<0)
 	printf("\tresb %d\n", -most_neg_maad_loop);
     printf("mem:\n");
 

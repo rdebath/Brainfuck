@@ -7,8 +7,8 @@ CC=gcc
 -include make.conf
 -include Makefile2
 
-bfi:	bfi.o bfi.jit.o bfi.nasm.o bfi.bf.o bfi.dc.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o bfi $^ $(LIBS) $(TARGET_ARCH)
+bfi:	bfi.o bfi.ccode.o bfi.jit.o bfi.nasm.o bfi.bf.o bfi.dc.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o bfi $^ $(LDLIBS) $(TARGET_ARCH)
 
 clean:
 	-rm -f *.o bfi bf2bf make.conf
@@ -16,7 +16,8 @@ clean:
 make.conf: Makefile
 	sh configure $(TARGET_ARCH)
     
-bfi.o:		bfi.c bfi.tree.h bfi.nasm.h bfi.bf.h bfi.dc.h make.conf
+bfi.o:		bfi.c bfi.tree.h bfi.nasm.h bfi.bf.h bfi.dc.h make.conf bfi.be.def
+bfi.ccode.o:	bfi.ccode.c bfi.tree.h bfi.ccode.h make.conf
 bfi.nasm.o:	bfi.nasm.c bfi.tree.h bfi.nasm.h make.conf
 bfi.bf.o:	bfi.bf.c bfi.tree.h bfi.bf.h make.conf
 bfi.dc.o:	bfi.dc.c bfi.tree.h bfi.dc.h make.conf

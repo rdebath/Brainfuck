@@ -13,7 +13,7 @@
 
 #include "bfi.tree.h"
 
-#ifdef ENABLE_GNULIGHTNING
+#ifndef DISABLE_GNULIGHTNING
 #include <lightning.h>
 
 #ifdef jit_set_ip
@@ -77,14 +77,14 @@ clean_acc(void)
     if (acc_loaded && acc_dirty) {
 	if (tape_step > 1) {
 	    if (acc_offset)
-		jit_stxi_i(acc_offset * tape_step, REG_P, REG_ACC); 
+		jit_stxi_i(acc_offset * tape_step, REG_P, REG_ACC);
 	    else
-		jit_str_i(REG_P, REG_ACC); 
+		jit_str_i(REG_P, REG_ACC);
 	} else {
 	    if (acc_offset)
-		jit_stxi_uc(acc_offset, REG_P, REG_ACC); 
+		jit_stxi_uc(acc_offset, REG_P, REG_ACC);
 	    else
-		jit_str_uc(REG_P, REG_ACC); 
+		jit_str_uc(REG_P, REG_ACC);
 	}
 
 	acc_dirty = 0;
@@ -115,14 +115,14 @@ load_acc_offset(int offset)
     acc_offset = offset;
     if (tape_step > 1) {
 	if (acc_offset)
-	    jit_ldxi_i(REG_ACC, REG_P, acc_offset * tape_step); 
+	    jit_ldxi_i(REG_ACC, REG_P, acc_offset * tape_step);
 	else
-	    jit_ldr_i(REG_ACC, REG_P); 
+	    jit_ldr_i(REG_ACC, REG_P);
     } else {
 	if (acc_offset)
-	    jit_ldxi_uc(REG_ACC, REG_P, acc_offset); 
+	    jit_ldxi_uc(REG_ACC, REG_P, acc_offset);
 	else
-	    jit_ldr_uc(REG_ACC, REG_P); 
+	    jit_ldr_uc(REG_ACC, REG_P);
     }
 
     acc_loaded = 1;
@@ -140,7 +140,7 @@ save_ptr_for_free(void * memp)
     /* TODO */
 }
 
-void 
+void
 run_jit_asm(void)
 {
     struct bfi * n = bfprog;
@@ -160,7 +160,7 @@ run_jit_asm(void)
 
 #ifdef GNULIGHTv1
     /* TODO: Use mmap for allocating memory, the x86 execute protection bit is
-     * on the segment so Linux has to say thay everything below a specific 
+     * on the segment so Linux has to say thay everything below a specific
      * address is executable. If you ask mmap for executable memory it puts
      * it below the current value. The mprotect() function can't do this.
      */
@@ -233,9 +233,9 @@ run_jit_asm(void)
 		jit_movi(REG_ACC, n->count);
 		if (n->count2 != 0) {
 		    if (tape_step > 1)
-			jit_ldxi_i(REG_A1, REG_P, n->offset2 * tape_step); 
+			jit_ldxi_i(REG_A1, REG_P, n->offset2 * tape_step);
 		    else
-			jit_ldxi_uc(REG_A1, REG_P, n->offset2); 
+			jit_ldxi_uc(REG_A1, REG_P, n->offset2);
 		    if (n->count2 == -1)
 			jit_negr(REG_A1, REG_A1);
 		    else if (n->count2 != 1)
@@ -246,9 +246,9 @@ run_jit_asm(void)
 
 	    if (n->count3 != 0) {
 		if (tape_step > 1)
-		    jit_ldxi_i(REG_A1, REG_P, n->offset3 * tape_step); 
+		    jit_ldxi_i(REG_A1, REG_P, n->offset3 * tape_step);
 		else
-		    jit_ldxi_uc(REG_A1, REG_P, n->offset3); 
+		    jit_ldxi_uc(REG_A1, REG_P, n->offset3);
 		if (n->count3 == -1)
 		    jit_negr(REG_A1, REG_A1);
 		else if (n->count3 != 1)
@@ -257,8 +257,7 @@ run_jit_asm(void)
 	    }
 	    break;
 
-	case T_IF: case T_MULT: case T_CMULT:
-	case T_MFIND: case T_ZFIND: case T_ADDWZ: case T_FOR:
+	case T_IF: case T_MULT: case T_CMULT: case T_FOR:
 	case T_WHL:
 	    load_acc_offset(n->offset);
 	    clean_acc();
@@ -360,7 +359,7 @@ run_jit_asm(void)
 	    }
 	    acc_loaded = 0;
 
-	    if (n->count <= 0 || (n->count >= 127 && iostyle == 1) || 
+	    if (n->count <= 0 || (n->count >= 127 && iostyle == 1) ||
 		    !n->next || n->next->type != T_PRT) {
 		jit_movi(REG_ACC, n->count);
 #ifdef GNULIGHTv1
@@ -415,13 +414,13 @@ run_jit_asm(void)
 	    jit_prepare_i(1);
 	    jit_pusharg_i(REG_ACC);
 	    jit_finish(getch);
-	    jit_retval_i(REG_ACC);     
+	    jit_retval_i(REG_ACC);
 #endif
 #ifdef GNULIGHTv2
 	    jit_prepare();
 	    jit_pushargr(REG_ACC);
 	    jit_finishi(getch);
-	    jit_retval(REG_ACC);     
+	    jit_retval(REG_ACC);
 #endif
 	    break;
 

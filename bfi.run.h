@@ -1,6 +1,7 @@
 
 extern int verbose;
 extern int iostyle;
+extern int do_run;
 
 void * map_hugeram(void);
 void delete_tree(void);
