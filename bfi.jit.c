@@ -26,6 +26,8 @@
 
 /* GNU lightning's macros upset GCC a little ... */
 #pragma GCC diagnostic ignored "-Wunused-value"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wpointer-to-int-cast"
 #pragma GCC optimize("no-strict-aliasing")
 #pragma GCC optimize(1)
 
@@ -42,6 +44,7 @@
 #define JITLIBOK 1
 #else
 #define JITLIBOK 0
+#warning "The GNU Lightning header smells bad, I won't be using it by default."
 #endif
 #endif
 
@@ -476,7 +479,7 @@ run_jit_asm(void)
 
     if (verbose)
 	fprintf(stderr, "Generated %d bytes of machine code, running\n",
-		jit_get_ip().ptr - (char*)startptr);
+		(int)(jit_get_ip().ptr - (char*)startptr));
 
     codeptr();
 #endif

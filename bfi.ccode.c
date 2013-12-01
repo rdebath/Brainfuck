@@ -1,3 +1,21 @@
+#ifdef __STRICT_ANSI__
+#define _POSIX_C_SOURCE 200809UL
+#if __STDC_VERSION__ < 199901L
+#error This program needs at least the C99 standard.
+#endif
+
+#ifndef DISABLE_TCCLIB
+#ifdef __GNUC__
+#if __GNUC__<4 || ( __GNUC__==4 && __GNUC_MINOR__<7 )
+#error "This GNUC version doesn't work properly with libtcc and -std=c99 turned on."
+#endif
+#endif
+#endif
+
+#else
+#define _GNU_SOURCE
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -590,6 +608,8 @@ print_ccode(FILE * ofd)
 }
 
 #ifndef DISABLE_TCCLIB
+typedef void (*void_func)(void);
+
 void
 run_ccode(void)
 {
@@ -600,6 +620,9 @@ run_ccode(void)
     TCCState *s;
     int rv;
     void * memp;
+#ifdef __STRICT_ANSI__
+    void * iso_workaround;
+#endif
 
     ofd = open_memstream(&ccode, &ccodelen);
     print_ccode(ofd);
@@ -622,7 +645,17 @@ run_ccode(void)
      * to standard mode, stupidly, it's now impossible to switch it back.
      *
      * So have the loaded C code use our getch and putch functions.
+     *
+     * The ugly casting is forced by the C99 standard as a (void*) is not a
+     * valid cast for a function pointer.
      */
+
+#ifdef __STRICT_ANSI__
+    *(void_func*) &iso_workaround  = (void_func) &getch;
+    tcc_add_symbol(s, "getch", iso_workaround);
+    *(void_func*) &iso_workaround  = (void_func) &putch;
+    tcc_add_symbol(s, "putch", iso_workaround);
+#else
     tcc_add_symbol(s, "getch", &getch);
     tcc_add_symbol(s, "putch", &putch);
 
@@ -645,14 +678,14 @@ run_ccode(void)
 	    exit(1);
 	}
 
-	/* This line produces a spurious warning. The issue is that ISO99 C
-	 * provides no way to covert a void* to a function pointer. This is
-	 * because on some nasty old machines the pointers are not compatible.
-	 * For example 8086 'medium model'.
+	/*
+	 * The ugly casting is forced by the C99 standard as a (void*) is not a
+	 * valid cast for a function pointer.
 	 *
-	 * I could push it through a union, but this still works.
+	*(void **) (&func) = tcc_get_symbol(s, "main");
 	 */
 	func = tcc_get_symbol(s, "main");
+
 	if (!func) {
 	    fprintf(stderr, "Could not find compiled code entry point\n");
 	    exit(1);
@@ -676,7 +709,14 @@ run_ccode(void)
 	    fprintf(stderr, "tcc_relocate failed return value=%d\n", rv);
 	    exit(1);
 	}
+
+	/*
+	 * The ugly casting is forced by the C99 standard as a (void*) is not a
+	 * valid cast for a function pointer.
+	*(void **) (&func) = tcc_get_symbol(s, "main");
+	 */
 	func = tcc_get_symbol(s, "main");
+
 	if (!func) {
 	    fprintf(stderr, "Could not find compiled code entry point\n");
 	    exit(1);
@@ -686,6 +726,7 @@ run_ccode(void)
 	tcc_delete(s);
 	free(ccode);
     }
+#endif
 #endif
 
 #if !defined(TCCDONE)

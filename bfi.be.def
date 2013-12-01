@@ -4,7 +4,9 @@ backends are brought here in one place. To add another backend just add
 it to the list and fill in it's entry.
 */
 
-#ifndef NO_EXT_OUT
+#ifdef NO_EXT_BE
+#undef XX
+#else
 
 #if XX == 0
 #include "bfi.ccode.h"
@@ -47,7 +49,7 @@ X(jit,JIT,
     /* Cannot do print_jit() */                                     ,
     case c_jit: run_jit_asm(); break;                               )
 #if XX == 4
-    if (!do_run && do_codestyle == c_default &&
+    if (do_run == -1 && do_codestyle == c_default &&
 	    verbose<3 && !enable_trace && !debug_mode && jit_lib_ok) {
 	do_run = 1;
 	do_codestyle = c_jit;
@@ -59,12 +61,12 @@ X(jit,JIT,
 #ifndef DISABLE_TCCLIB
 X(ccode,CCODE,
     printf("   -c   Create C code. If combined with -r the code is run using TCCLIB.\n");   ,
-    case 'c': do_codestyle = c_ccode; break;			    ,
+    case 'c': do_codestyle = c_ccode; do_run = (do_run==1); break;			    ,
     case c_ccode: print_ccode(stdout); break;			    ,
     case c_ccode: run_ccode(); break;                               )
 
 #if XX == 4
-    if (!do_run && do_codestyle == c_default && verbose<3 && !debug_mode) {
+    if (do_run == -1 && do_codestyle == c_default && verbose<3 && !debug_mode) {
 	do_run = 1;
 	do_codestyle = c_ccode;
     }
@@ -86,6 +88,7 @@ X(nasm,NASM,
 #if XX == 4
     if (do_codestyle == c_nasm)
     {
+	do_run = (do_run==1);
 	if (do_run || (cell_size && cell_size != 8)) {
 	    fprintf(stderr, "The -s flag cannot be combined with -r or -b\n");
 	    exit(255);
@@ -119,8 +122,6 @@ X(dc,DC,
 /****************************************************************************/
 
 #undef X
-
 #endif /*XX==?*/
-#endif /*NO_EXT_OUT*/
-
 #undef XX
+#endif /*NO_EXT_BE*/

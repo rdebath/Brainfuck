@@ -61,11 +61,14 @@ characters after your favorite comment marker in a very visible form.
 #include <langinfo.h>
 #include <wchar.h>
 
+#include "bfi.version.h"
 #include "bfi.tree.h"
-#include "bfi.run.h"
 
+#ifndef NO_EXT_BE
+#include "bfi.run.h"
 #define XX 0
 #include "bfi.be.def"
+#endif
 
 #ifdef MAP_NORESERVE
 #define USEHUGERAM
@@ -75,22 +78,34 @@ characters after your favorite comment marker in a very visible form.
 #define MEMSIZE	    2UL*1024*1024*1024
 #define MEMGUARD    16UL*1024*1024
 #define MEMSKIP	    1UL*1024*1024
+
+#ifndef MAP_NORESERVE
+#define MAP_NORESERVE 0
+#endif
+
 #else
 #ifndef MEMSIZE
+#ifdef __STRICT_ANSI__
+#pragma message "WARNING: Using small memory, define MEMSIZE to increase."
+#else
 #warning Using small memory, define MEMSIZE to increase.
+#endif
 #define MEMSIZE	    60*1024
 #endif
+#endif
+
+#ifndef NO_EXT_BE
+enum codestyle { c_default,
+#define XX 1
+#include "bfi.be.def"
+    };
+int do_codestyle = c_default;
 #endif
 
 char * program = "C";
 int verbose = 0;
 int noheader = 0;
-int do_run = 0;
-enum codestyle { c_default,
-#define XX 1
-#include "bfi.be.def"
-    c_adder };
-int do_codestyle = c_default;
+int do_run = -1;
 
 int opt_level = 3;
 int opt_no_calc = 0;
@@ -173,16 +188,13 @@ void run_progarray(int * progarray);
 
 void LongUsage(FILE * fd)
 {
-    fprintf(fd, "%s: Version unknown\n", program);
+    fprintf(fd, "%s: Version "VERSION" (Compiled: %s)\n", program, __DATE__);
     fprintf(fd, "Usage: %s [options] [BF file]\n", program);
     if (fd != stdout) {
 	fprintf(fd, "   -h   Long help message. (Pipe it through more)\n");
 	fprintf(fd, "   -v   Verbose, repeat for more.\n");
-	fprintf(fd, "   -r   Run in interpreter.\n");
-#ifdef BE_CCODE
-	fprintf(fd, "   -c   Create C code.\n");
-#endif
 	fprintf(fd, "   -b   Use byte cells not integer.\n");
+	fprintf(fd, "   -En  End of file processing.\n");
 	exit(1);
     }
 
@@ -193,18 +205,22 @@ void LongUsage(FILE * fd)
     printf("\n");
     printf("   -h   This message.\n");
     printf("   -v   Verbose, repeat for more.\n");
-    printf("        Three -v or more switches to profiling interpreter\n");
     printf("\n");
     printf("   -r   Run in interpreter.\n");
-    printf("        There are two interpreters a tree based one and a faster\n");
-    printf("        array based one. The array based one will be used unless\n");
-    printf("        three or more -v options are used or -T is turned on.\n");
+    printf("        There are two normal interpreters a tree based one and a faster\n");
+    printf("        array based one. The array based one will be used unless:\n");
+    printf("            * The -d option is used.\n");
+    printf("            * The -T option is used.\n");
+    printf("            * Three or more -v options are used.\n");
     printf("\n");
+    printf("   -A   Generate output to be compiled or assembled. "
+		    "(opposite of -r)\n");
+    printf("\n");
+#ifndef NO_EXT_BE
 #define XX 2
 #include "bfi.be.def"
-    printf("   -A   Generate token list output, "
-		    "prefixed with C preprocessor code.\n");
     printf("\n");
+#endif
     printf("   -T   Create trace statements in output C code or switch to\n");
     printf("        profiling interpreter and turn on tracing.\n");
     printf("   -H   Remove headers in output code\n");
@@ -226,11 +242,11 @@ void LongUsage(FILE * fd)
     printf("   -b8  Use 8 bit cells.\n");
     printf("   -b16 Use 16 bit cells.\n");
     printf("   -b32 Use 32 bit cells.\n");
-    printf("        Default for running now is %dbits.\n", sizeof(int)*8);
+    printf("        Default for running now is %dbits.\n", (int)sizeof(int)*8);
     printf("        Default for C code is 'unknown', NASM can only be 8bit.\n");
     printf("        Other bitwidths also work (including 7..32)\n");
     printf("        Full Unicode characters need 21 bits.\n");
-    printf("        The optimiser may work better if this is specified for C generation.\n");
+    printf("        The optimiser may be less effective if this is not specified.\n");
     printf("\n");
     printf("   -En  End of file processing.\n");
     printf("   -E1      End of file gives no change for ',' command.\n");
@@ -246,7 +262,7 @@ void LongUsage(FILE * fd)
     printf("\tthe optimisation facilities.  The dc(1) generator defaults\n");
     printf("\tto -E6 as standard dc(1) has no character input routines.\n");
     printf("\tMany (including dc(1)) don't support -E2,-E3 and -E4.\n");
-    printf("\tThe more unusual generators tend not to support unicode.\n");
+    printf("\tMost generators do not support unicode.\n");
 
     exit(1);
 }
@@ -296,9 +312,11 @@ main(int argc, char ** argv)
                     case 'H': noheader=1; break;
                     case 'd': debug_mode=1; break;
                     case 'r': do_run=1; break;
-                    case 'A': do_codestyle = c_adder; break;
+                    case 'A': do_run=0; break;
+#ifndef NO_EXT_BE
 #define XX 3
 #include "bfi.be.def"
+#endif
                     case 'm': opt_level=0; break;
                     case 'T': enable_trace=1; break;
 
@@ -352,17 +370,19 @@ main(int argc, char ** argv)
     if(filecount == 0)
       Usage();
 
+#ifdef NO_EXT_BE
+    if (cell_size == 0 && do_run) set_cell_size(32);
+
+#else
 #define XX 4
 #include "bfi.be.def"
 
-    if (!do_run && do_codestyle == c_default) {
-	do_run = 1;
-    }
-
+    if (do_run == -1) do_run = (do_codestyle == c_default);
     if (cell_size == 0 && do_run) set_cell_size(32);
 
 #define XX 6		/* Check BE can cope with optimisation. */
 #include "bfi.be.def"
+#endif
 
 #ifdef USEHUGERAM
     trap_sigsegv();
@@ -692,17 +712,11 @@ process_file(void)
 	    printtree();
     }
 
-    if (do_run) {
-	switch(do_codestyle) {
-	default:
-	    fprintf(stderr, "The selected code generator does not "
-			    "have a 'RUN' option available.\n");
-	    exit(1);
+#ifndef NO_EXT_BE
+    if (do_codestyle == c_default) {
+#endif
 
-#define XX 7
-#include "bfi.be.def"
-
-	case c_default:
+	if (do_run) {
 	    if (verbose>2 || debug_mode || enable_trace) {
 		if (verbose)
 		    fprintf(stderr, "Starting profiling interpreter\n");
@@ -717,25 +731,39 @@ process_file(void)
 		    fprintf(stderr, "Starting array interpreter\n");
 		convert_tree_to_runarray();
 	    }
-	    break;
-	}
+	} else
+	    print_adder();
+
+#ifndef NO_EXT_BE
     } else {
-	if (verbose)
-	    fprintf(stderr, "Generating output code\n");
+	if (do_run) {
+	    if (verbose)
+		fprintf(stderr, "Running output code\n");
 
-	switch(do_codestyle) {
+	    switch(do_codestyle) {
 	    default:
-		fprintf(stderr,
-			"Output for code style %d not found, dumping tree.\n",
-			do_codestyle);
-		/*FALLTRHOUGH*/
+		fprintf(stderr, "The selected code generator does not "
+				"have a 'RUN' option available.\n");
+		exit(1);
+#define XX 7
+#include "bfi.be.def"
+	    }
+	} else {
+	    if (verbose)
+		fprintf(stderr, "Generating output code\n");
 
-	    case c_adder: print_adder(); break;
-
+	    switch(do_codestyle) {
+	    default:
+		fprintf(stderr, "The selected code generator does not "
+				"have a 'DUMP' option available.\n");
+		exit(1);
+		break;
 #define XX 5
 #include "bfi.be.def"
+	    }
 	}
     }
+#endif
 
 #undef tickstart
 #undef tickend
@@ -2879,13 +2907,14 @@ putch(int ch)
 	putchar(ch);
 }
 
+#pragma GCC diagnostic ignored "-Wpragmas"
 #pragma GCC diagnostic push /* STFU */
 #pragma GCC diagnostic ignored "-Wparentheses"
 void
 set_cell_size(int cell_bits)
 {
     if (cell_bits == 0) cell_bits=8;
-    if (cell_bits >= sizeof(int)*8 || cell_bits <= 0) {
+    if (cell_bits >= (int)sizeof(int)*8 || cell_bits <= 0) {
 	cell_size = 32;
 	cell_mask = -1;
     } else {
@@ -2919,7 +2948,8 @@ map_hugeram(void)
     if(cell_array_pointer==0) {
 	if (hard_left_limit<0) {
 	    cell_array_pointer = tcalloc(MEMSIZE-hard_left_limit, sizeof(int));
-	    cell_array_pointer -= hard_left_limit*sizeof(int);
+	    cell_array_pointer = (char *)cell_array_pointer
+			       - hard_left_limit*sizeof(int);
 	} else
 	    cell_array_pointer = tcalloc(MEMSIZE, sizeof(int));
     }
