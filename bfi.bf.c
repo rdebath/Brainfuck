@@ -18,7 +18,7 @@ pint(int v)
  *
  * Most optimised tokens cannot be generated because the code would need
  * temp cells on the tape, but the information as to which temps were used
- * has been discarded. However, we can use any cell who's value is known.
+ * has been discarded. However, we could use any cell who's value is known.
  *
  * You may have to reduce the optimisation to -O1
  */
@@ -104,41 +104,15 @@ print_bf(void)
 	    break;
 
 	case T_PRT:
-	    if (n->count != -1) {
-		int const_found=0, known_value, non_zero_unsafe, offset = n->offset;
-		/*
-		 *  Check to see if the value is known; it was known but the
-		 *  change may have been moved or the cell is now left at it's
-		 *  old value. If the value is known we put it back after we've
-		 *  used it, if not it must be reset later.
-		 */
-		{
-		    offset = n->offset;
-		    find_known_value(n->prev, offset,
-			0, &const_found, &known_value, &non_zero_unsafe);
-		}
-
-		i = offset;
-		while(i>last_offset) { putchar('>'); last_offset++; };
-		while(i<last_offset) { putchar('<'); last_offset--; };
-		printf("[-]");
-		i = n->count;
-		while(i>0) { putchar('+'); i--; }
-		while(i<0) { putchar('-'); i++; }
+	    if (n->count == -1) {
 		putchar('.');
-//		if(n->next && n->next->type == T_PRT && n->next->count != -1);
-
-		if (const_found) {
-		    i = known_value-n->count;
-		    while(i>0) { putchar('+'); i--; }
-		    if (known_value == 0 && i!=0) {
-			printf("[-]");
-		    } else
-			while(i<0) { putchar('-'); i++; }
-		}
-	    } else
-		putchar('.');
-	    break;
+		break;
+	    }
+	    fprintf(stderr, "Error on code generation:\n"
+	           "Bad print node: %s ptr+%d, cnt=%d.\n",
+		    tokennames[n->type], n->offset, n->count);
+	    fprintf(stderr, "Optimisation level too high for BF output\n");
+	    exit(1);
 
 	case T_INP:
 	    putchar(',');
@@ -158,17 +132,12 @@ print_bf(void)
 	    nocr = 0;
 	    break;
 
-	case T_ENDIF:
-	    printf("[-]]");
-	    nocr = 0;
-	    break;
-
 	case T_STOP:
 	    printf("[-]+[]");
 	    nocr = 0;
 	    break;
 
-	case T_NOP: 
+	case T_NOP:
 	    fprintf(stderr, "Warning on code generation: "
 	           "NOP node: ptr+%d, cnt=%d, @(%d,%d).\n",
 		    n->offset, n->count, n->line, n->col);

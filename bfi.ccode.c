@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 
-#ifdef ENABLE_TCCLIB
+#ifndef DISABLE_TCCLIB
 #include <libtcc.h>
 #endif
 
@@ -186,7 +186,7 @@ print_ccode(FILE * ofd)
     {
 	if (n->type == T_PRT)
 	    ok_for_printf = ( ( n->count >= ' ' && n->count <= '~') ||
-				(n->count == '\n') || (n->count == '\033'));
+				(n->count == '\n') || (n->count == '\t') || (n->count == '\033'));
 
 	if (sp != string_buffer) {
 	    if ((n->type != T_SET && n->type != T_ADD && n->type != T_PRT) ||
@@ -195,6 +195,12 @@ print_ccode(FILE * ofd)
 		(sp > string_buffer+1 && lastspch == '\n')
 	       ) {
 		*sp++ = 0;
+		if (enable_trace) {
+		    pt(ofd, indent,0);
+		    fprintf(ofd, "t(%d,%d,\"", n->line, n->col);
+		    fprintf(ofd, "printf(...) ");
+		    fprintf(ofd, "\",m+ %d)\n", n->offset);
+		}
 		pt(ofd, indent,0);
 		if (strchr(string_buffer, '%') == 0 )
 		    fprintf(ofd, "printf(\"%s\");\n", string_buffer);
@@ -217,7 +223,7 @@ print_ccode(FILE * ofd)
 	switch(n->type)
 	{
 	case T_MOV:
-	    if (!disable_indent) pt(ofd, indent,n); disable_indent = 0;
+	    if (!disable_indent) pt(ofd, indent,n);
 	    if (n->count == 1)
 		fprintf(ofd, "++m;\n");
 	    else if (n->count == -1)
@@ -231,7 +237,7 @@ print_ccode(FILE * ofd)
 	    break;
 
 	case T_ADD:
-	    if (!disable_indent) pt(ofd, indent,n); disable_indent = 0;
+	    if (!disable_indent) pt(ofd, indent,n);
 	    if(n->offset == 0) {
 		if (n->count == 1)
 		    fprintf(ofd, "++*m;\n");
@@ -262,7 +268,7 @@ print_ccode(FILE * ofd)
 	    break;
 
 	case T_SET:
-	    if (!disable_indent) pt(ofd, indent,n); disable_indent = 0;
+	    if (!disable_indent) pt(ofd, indent,n);
 	    if(n->offset == 0)
 		fprintf(ofd, "*m = %d;\n", n->count);
 	    else
@@ -274,7 +280,7 @@ print_ccode(FILE * ofd)
 	    break;
 
 	case T_CALC:
-	    if (!disable_indent) pt(ofd, indent,n); disable_indent = 0;
+	    if (!disable_indent) pt(ofd, indent,n);
 	    do {
 		if (n->count == 0) {
 		    if (n->offset == n->offset2 && n->count2 == 1)
@@ -359,12 +365,15 @@ print_ccode(FILE * ofd)
 
 	case T_PRT:
 	    spc++;
-	    if (ok_for_printf || (sp != string_buffer && n->count > 0)) {
+	    if ((ok_for_printf && !disable_indent) ||
+			(sp != string_buffer && n->count > 0)) {
 		lastspch = n->count;
 		if (add_mask>0)
 		    lastspch &= add_mask;
 		if (lastspch == '\n') {
 		    *sp++ = '\\'; *sp++ = 'n';
+		} else if (lastspch == '\t') {
+		    *sp++ = '\\'; *sp++ = 't';
 		} else if (lastspch == '\\' || lastspch == '"') {
 		    *sp++ = '\\'; *sp++ = lastspch;
 		} else if (lastspch >= ' ' && lastspch <= '~') {
@@ -377,7 +386,7 @@ print_ccode(FILE * ofd)
 	    spc--;
 	    if (sp != string_buffer)
 		fprintf(stderr, "Cannot add char %d to string\n", n->count);
-	    if (!disable_indent) pt(ofd, indent,n); disable_indent = 0;
+	    if (!disable_indent) pt(ofd, indent,n);
 	    if (n->count == -1 ) {
 		if (add_mask > 0 && add_mask < 0xFF) {
 		    fprintf(ofd, "m[%d] &= %d;\n", n->offset, add_mask);
@@ -412,7 +421,7 @@ print_ccode(FILE * ofd)
 	    break;
 
 	case T_INP:
-	    if (!disable_indent) pt(ofd, indent,n); disable_indent = 0;
+	    if (!disable_indent) pt(ofd, indent,n);
 	    if (n->offset == 0)
 		fprintf(ofd, "*m = getch(*m);\n");
 	    else
@@ -425,7 +434,11 @@ print_ccode(FILE * ofd)
 
 	case T_IF:
 	    pt(ofd, indent,n);
-	    fprintf(ofd, "if(m[%d]) {\n", n->offset);
+	    fprintf(ofd, "if(m[%d]) ", n->offset);
+	    if (n->next->next && n->next->next->jmp == n)
+		disable_indent = 1;
+	    else
+		fprintf(ofd, "{\n");
 	    break;
 
 	case T_WHL:
@@ -526,10 +539,14 @@ print_ccode(FILE * ofd)
 	    break;
 
 	case T_END:
+	case T_ENDIF:
+	    if (disable_indent) {
+		disable_indent = 0;
+		break;
+	    }
 	    if (n->prev->prev && n->prev->prev->jmp == n)
 		break;
 
-	case T_ENDIF:
 	    pt(ofd, indent,n);
 	    fprintf(ofd, "}\n");
 	    break;
@@ -559,6 +576,10 @@ print_ccode(FILE * ofd)
 
     if(sp != string_buffer) {
 	*sp++ = 0;
+	if (enable_trace) {
+	    pt(ofd, indent,0);
+	    fprintf(ofd, "t(0,0,\"printf(...) \",m)\n");
+	}
 	if (strchr(string_buffer, '%') == 0 )
 	    fprintf(ofd, "  printf(\"%s\");\n", string_buffer);
 	else
@@ -568,19 +589,7 @@ print_ccode(FILE * ofd)
 	fprintf(ofd, "  return 0;\n}\n");
 }
 
-#ifdef ENABLE_TCCLIB
-int *
-libbf_zfind32(int * m, int off) {
-  while(*m) m += off;
-  return m;
-}
-
-unsigned short *
-libbf_zfind16(unsigned short * m, int off) {
-  while(*m) m += off;
-  return m;
-}
-
+#ifndef DISABLE_TCCLIB
 void
 run_ccode(void)
 {
@@ -617,11 +626,7 @@ run_ccode(void)
     tcc_add_symbol(s, "getch", &getch);
     tcc_add_symbol(s, "putch", &putch);
 
-    /* GCC is a lot faster at these */
-    tcc_add_symbol(s, "libbf_zfind16", &libbf_zfind16);
-    tcc_add_symbol(s, "libbf_zfind32", &libbf_zfind32);
-
-#if ENABLE_TCCLIB == 0x000925
+#if __TCCLIB_VERSION == 0x000925
 #define TCCDONE
     {
 	int (*func)(void);
@@ -660,7 +665,7 @@ run_ccode(void)
     }
 #endif
 
-#if ENABLE_TCCLIB == 0x000926
+#if __TCCLIB_VERSION == 0x000926
 #define TCCDONE
     {
 	int (*func)(void);
@@ -685,7 +690,8 @@ run_ccode(void)
 
 #if !defined(TCCDONE)
 #define TCCDONE
-    rv = tcc_run(s, 0, 0);
+static char * args[] = {"tcclib", 0};
+    rv = tcc_run(s, 1, args);
     if (verbose && rv)
 	fprintf(stderr, "tcc_run returned %d\n", rv);
     tcc_delete(s);
@@ -693,4 +699,3 @@ run_ccode(void)
 #endif
 }
 #endif
-

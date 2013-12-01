@@ -295,9 +295,9 @@ print_nasm()
 	     * put here without being a lot more detailed about the
 	     * instructions we use so we don't force short jumps.
 	     */
-	    if (abs(n->ipos - n->jmp->ipos) > 120)
-		neartok = " near";
-	    else
+//	    if (abs(n->ipos - n->jmp->ipos) > 120)
+//		neartok = " near";
+//	    else
 		neartok = "";
 
 	    if (n->type == T_IF || (LoopClass & 2) == 2) {
@@ -384,8 +384,9 @@ print_asm_header(void)
 	ep = np + strlen(np);
 
     printf("; asmsyntax=nasm\n");
-    printf("; nasm -f bin -Ox %.*s.s && chmod +x %.*s\n",
+    printf("; yasm %.*s.s && chmod +x %.*s\n",
 	    (int)(ep-np), np, (int)(ep-np), np);
+    printf("; nasm also works but is VERY slow.\n");
     printf("\n");
     printf("BITS 32\n");
     printf("\n");

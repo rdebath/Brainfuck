@@ -48,7 +48,7 @@ X(jit,JIT,
     case c_jit: run_jit_asm(); break;                               )
 #if XX == 4
     if (!do_run && do_codestyle == c_default &&
-	    verbose<3 && !enable_trace && jit_lib_ok) {
+	    verbose<3 && !enable_trace && !debug_mode && jit_lib_ok) {
 	do_run = 1;
 	do_codestyle = c_jit;
     }
@@ -56,7 +56,7 @@ X(jit,JIT,
 #endif
 
 /****************************************************************************/
-#ifdef ENABLE_TCCLIB
+#ifndef DISABLE_TCCLIB
 X(ccode,CCODE,
     printf("   -c   Create C code. If combined with -r the code is run using TCCLIB.\n");   ,
     case 'c': do_codestyle = c_ccode; break;			    ,
@@ -64,7 +64,7 @@ X(ccode,CCODE,
     case c_ccode: run_ccode(); break;                               )
 
 #if XX == 4
-    if (!do_run && do_codestyle == c_default && verbose<3) {
+    if (!do_run && do_codestyle == c_default && verbose<3 && !debug_mode) {
 	do_run = 1;
 	do_codestyle = c_ccode;
     }
@@ -101,7 +101,8 @@ X(bf,BF,
     case c_bf: print_bf(); break;                                   ,
     /* No direct run */						    )
 #if XX == 6
-    if (do_codestyle == c_bf) return 0;
+    if (do_codestyle == c_bf)
+	opt_no_calc = opt_no_endif = opt_no_litprt = 1;
 #endif
 
 /****************************************************************************/
