@@ -1,7 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifndef NO_LIBTCC
 #include <libtcc.h>
+#else
+#warning "Compiling without libtcc support"
+#endif
 
 /*
  * TCC translation from BF, runs at about 1,200,000,000 instructions per second.
@@ -16,7 +21,7 @@
 extern int bytecell;
 
 int ind = 0;
-int runmode = 0;
+int runmode = 1;
 FILE * ofd;
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
@@ -30,8 +35,13 @@ int
 check_arg(char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
+#ifndef NO_LIBTCC
     else if (strcmp(arg, "-r") == 0) {
 	runmode=1; return 1;
+    }
+#endif
+    else if (strcmp(arg, "-d") == 0) {
+	runmode=0; return 1;
     }
     return 0;
 }
@@ -61,9 +71,11 @@ outcmd(int ch, int count)
 
     switch(ch) {
     case '!':
+#ifndef NO_LIBTCC
 	if (runmode) {
 	    ofd = open_memstream(&ccode, &ccodesize);
 	} else
+#endif
 	    ofd = stdout;
 
 	pr("#!/usr/bin/tcc -run");
@@ -107,6 +119,7 @@ outcmd(int ch, int count)
     if (ch != '~') return;
     pr("return 0;\n}");
 
+#ifndef NO_LIBTCC
     if (!runmode) return;
 
     putc('\0', ofd);
@@ -126,4 +139,5 @@ outcmd(int ch, int count)
 	tcc_delete(s);
 	free(ccode);
     }
+#endif
 }

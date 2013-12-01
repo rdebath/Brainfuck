@@ -1,17 +1,28 @@
 # TARGET_ARCH=-m32
 
 LDLIBS=
-TCCLIBS=-ltcc -ldl
 
-ALLEXE= bf2bf bf2run \
-	bf2tcc bf2as32 bf2as64 bf2lua bf2perl bf2py bf2dc bf2bash \
-	bf2bas bf2awk bf2pas bf2cfish bf2ps1 bf2rb bf2asmjs bf2cgmp \
-	bf2clojure bf2php bf2neko
+EXE1=bf2bf bf2run
+EXER=\
+	bf2gas32 bf2gas64 bf2asmjs bf2awk bf2bas bf2bash bf2cfish \
+	bf2cgmp bf2clojure bf2dc bf2lua bf2neko bf2pas bf2perl \
+	bf2php bf2ps1 bf2py bf2rb bf2tcc
+
+HAVE_TCC=$(wildcard /usr/include/libtcc.h)
+ifeq ($(HAVE_TCC),)
+TCCFLAG=-DNO_LIBTCC
+TCCLIBS=
+else
+TCCFLAG=
+TCCLIBS=-ltcc -ldl
+endif
+
+ALLEXE= $(EXE1) $(EXER)
 
 all:	$(ALLEXE)
 
 clean:
-	-rm -f $(ALLEXE) *.o
+	-rm -f $(EXE1) $(EXER) *.o
 
 CFLAGS=-O3 -Wall -DBOFF=256
 
@@ -20,6 +31,9 @@ bf2bf: bf2any.o bf2bf.o
 
 bf2tcc: bf2tcc.o bf2any.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(TCCLIBS)
+
+bf2tcc.o: bf2tcc.c
+	$(CC) $(CFLAGS) $(TCCFLAG) -c -o $@ $^ $(TARGET_ARCH)
 
 bf2lua:	bf2lua.o bf2any.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
@@ -45,16 +59,16 @@ bf2awk: bf2awk.o bf2any.o
 bf2run: bf2run.o bf2any.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
 
-bf2as32: bf2as32.o bf2any.o
+bf2gas32: bf2gas32.o bf2any.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
 
-bf2as64: bf2as64.o bf2any.o
+bf2gas64: bf2gas64.o bf2any.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
 
-bf2as32.o: bf2gas.c
+bf2gas32.o: bf2gas.c
 	$(CC) $(CFLAGS) -DUSE32 $(TARGET_ARCH) -c -o $@ bf2gas.c
 
-bf2as64.o: bf2gas.c
+bf2gas64.o: bf2gas.c
 	$(CC) $(CFLAGS) -DUSE64 $(TARGET_ARCH) -c -o $@ bf2gas.c
 
 bf2pas: bf2pas.o bf2any.o
@@ -83,6 +97,4 @@ bf2php: bf2php.o bf2any.o
 
 bf2neko: bf2neko.o bf2any.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-
 
