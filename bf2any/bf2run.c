@@ -176,9 +176,9 @@ void
 dumpprog(int * p, int *mp)
 {
     for(;;){
-	printf("%06d:", p-mem);
+	printf("%06d:", (int)(p-mem));
 	if (*p)
-	    printf("MOV %d\n%06d:", *p, p-mem + 1);
+	    printf("MOV %d\n%06d:", *p, (int)(p-mem + 1));
 	p++;
 	printf("%s", tokennames[*p]);
 	switch(*p++) {
@@ -189,7 +189,7 @@ dumpprog(int * p, int *mp)
 	case T_BEG: case T_MUL1: case T_QMUL1:
 	    break;
 	case T_WHL: case T_END:
-	    printf(" %d (%06d)", *p, p-mem + *p+1);
+	    printf(" %d (%06d)", *p, (int)(p-mem + *p+1));
 	    p++;
 	    break;
 	case T_SET: case T_ADD:

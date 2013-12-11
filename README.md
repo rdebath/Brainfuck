@@ -7,7 +7,7 @@ Various brainfuck stuff:
 
   But the official output of the program is a display of the cell size ie:
 
-  <dl><dt>8 Bitcells<dd>Hello World! 255<dt>16 Bit cells<dd>Hello world! 65535<dt>32 bit cells<dd>Hello, world!</dl>
+  <dl><dt>8 Bit cells<dd>Hello World! 255<dt>16 Bit cells<dd>Hello world! 65535<dt>32 bit cells<dd>Hello, world!</dl>
 
 2. Brainfuck to anything. Well not exactly anything but the list includes ...
   * asmjs
@@ -29,7 +29,7 @@ Various brainfuck stuff:
   * python
   * ruby
   * run -- a direct interpreter -- blisteringly quick too for one without JIT.
-  * tcc -- Convert to C and run using LIBTCC -- Is quicker than *run ... just.
+  * tcc -- Convert to C and run using LIBTCC -- Is quicker than bf2run ... just.
 
   Most are heavily optimised (for Brainfuck) and most work in both 8 bit and the native size of the generated code.
   

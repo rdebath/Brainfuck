@@ -6,7 +6,7 @@ EXE1=bf2bf bf2run
 EXER=\
 	bf2gas32 bf2gas64 bf2asmjs bf2awk bf2bas bf2bash bf2cfish \
 	bf2cgmp bf2clojure bf2dc bf2lua bf2neko bf2pas bf2perl \
-	bf2php bf2ps1 bf2py bf2rb bf2tcc
+	bf2php bf2ps1 bf2py bf2rb bf2tcc bf2gcc
 
 HAVE_TCC=$(wildcard /usr/include/libtcc.h)
 ifeq ($(HAVE_TCC),)
@@ -19,14 +19,14 @@ endif
 
 ALLEXE= $(EXE1) $(EXER)
 
-all:	$(ALLEXE)
+all:	bf2any.o $(ALLEXE)
 
 clean:
 	-rm -f $(EXE1) $(EXER) *.o
 
 CFLAGS=-O3 -Wall -DBOFF=256
 
-bf2bf: bf2any.o bf2bf.o
+bf2bf: bf2bf.o bf2any.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
 
 bf2tcc: bf2tcc.o bf2any.o
@@ -34,6 +34,9 @@ bf2tcc: bf2tcc.o bf2any.o
 
 bf2tcc.o: bf2tcc.c
 	$(CC) $(CFLAGS) $(TCCFLAG) -c -o $@ $^ $(TARGET_ARCH)
+
+bf2gcc: bf2gcc.o bf2any.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) -ldl
 
 bf2lua:	bf2lua.o bf2any.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)

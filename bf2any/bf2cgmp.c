@@ -56,17 +56,19 @@ outcmd(int ch, int count)
 	printf("void new_n(struct mem *p) {\n");
 	printf("    p->n = calloc(1, sizeof*p);\n");
 	printf("    p->n->p = p;\n");
-	printf("    p = p->n;\n");
-	if (!bytecell)
+	if (!bytecell) {
+	    printf("    p = p->n;\n");
 	    printf("    mpz_init(p->v);\n");
+	}
 	printf("}\n\n");
 
 	printf("void new_p(struct mem *p) {\n");
 	printf("    p->p = calloc(1, sizeof*p);\n");
 	printf("    p->p->n = p;\n");
-	printf("    p = p->p;\n");
-	if (!bytecell)
+	if (!bytecell) {
+	    printf("    p = p->p;\n");
 	    printf("    mpz_init(p->v);\n");
+	}
 	printf("}\n\n");
 
 	printf("int\n"

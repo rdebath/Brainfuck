@@ -100,7 +100,7 @@ Multiply by 256 again to get 65536
 	Cells should be 8bits at this point
 
 	The pointer is at cell two but you only have 8 bits cells
-	and it's time to use the really bit and slow BF quad encoding
+	and it's time to use the really big and slow BF quad encoding
 
 	======= DEMO CODE =======
 	Space

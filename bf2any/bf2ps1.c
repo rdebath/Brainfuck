@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 /*
- * MS Power shell translation from BF, runs at about 390,000 instructions per second.
+ * MS Power shell translation from BF, runs at about 1,200,000 instructions per second.
  */
 
 extern int bytecell;

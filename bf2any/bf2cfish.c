@@ -9,6 +9,8 @@
 
 int col = 0;
 
+extern int bytecell;
+
 char * bf = "<>+-,.[]";
 char * fish[] = { "there", "once", "was", "a", "dead", "fish", "named", "Fred" };
 char * c[] = { "m-=1;", "m+=1;", "++*m;", "--*m;", "read(0,m,1);", "write(1,m,1);", "while(*m){", "}" };
@@ -56,7 +58,10 @@ outcmd(int ch, int count)
 	for (i=0; i<8; i++)
 	    printf("#define %s %s\n", lang[i], c[i]);
 	printf("#define _ return 0;}\n");
-	printf("char mem[30000];int main(){char*m=mem;\n");
+	if (bytecell)
+	    printf("unsigned char mem[30000];int main(){unsigned char*m=mem;\n");
+	else
+	    printf("int mem[30000];int main(){int*m=mem;\n");
 	printf("/*%s*/\n", lang[7]);
     }
 }

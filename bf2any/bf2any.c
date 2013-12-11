@@ -27,7 +27,9 @@ int check_arg(char * arg);
  * Lastly it makes sure that brackets are balanced by removing or adding
  * extra ']' tokens.
  *
- * TODO? sort all changes within a run of "-+<>" characters, remove NOPs.
+ * TODO? Sort all changes within a run of "-+<>" characters, remove NOPs.
+ *       Similar for ".," too ?
+ *       Flatten constant loops to large sets or adds ?
  */
 static char qcmd[32];
 static int qrep[32];
@@ -170,7 +172,7 @@ outrun(int ch, int repcnt)
 	    if (qcmd[i] == '+') { madd_inc[j] += qrep[i]; continue; }
 	    if (qcmd[i] == '-') { madd_inc[j] -= qrep[i]; continue; }
 
-	    /* WTF! */
+	    /* WTF! Some unknown command has made it here!? */
 	    outrun(0,0);
 	    return;
 	}
@@ -267,7 +269,7 @@ main(int argc, char ** argv)
     }
     if (ifd != stdin) fclose(ifd);
     if(c) outrun(lastch, c);
-    while(b>0){ outrun(']', 1); b--;} /* Not enough ']' */
+    while(b>0){ outrun(']', 1); b--;} /* Not enough ']', add some. */
     outrun('~', 0);
     return 0;
 }
