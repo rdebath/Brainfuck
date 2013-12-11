@@ -30,6 +30,7 @@ Various brainfuck stuff:
   * ruby
   * run -- a direct interpreter -- blisteringly quick too for one without JIT.
   * tcc -- Convert to C and run using LIBTCC -- Is quicker than bf2run ... just.
+  * gcc -- Convert to C and run as a shared lib; very quick with -O2.
 
   Most are heavily optimised (for Brainfuck) and most work in both 8 bit and the native size of the generated code.
   
