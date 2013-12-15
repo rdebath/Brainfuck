@@ -74,9 +74,8 @@ struct subst {
 #if MASK == 1
     { {T_MOV, T_ZTEMP2, T_MOV, T_MOV, 0},
 		"[-]>>>[-]" },
-    { {T_SET2, T_MOV, 0},
-		"[-]>[-]" },
-    { {T_SET2c1, T_SET2,0},
+
+    { {T_SET2c1,0},
 
 		"[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<"
 		    "[[-]<<<+>>>]<"
@@ -92,43 +91,42 @@ struct subst {
 		    "[[-]<<<+>>>]<<<"
 		    "]>" },
 
-    { {T_ADD2c1,T_ADD2,0},
+    { {T_ADD2c1,0},
 		"+" "[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[-"
 		    ">>+<<"
 		    "]>" },
-    { {T_SUB2c1,T_SUB2,0},
+    { {T_SUB2c1,0},
 		"[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[-"
 		    ">>-<<"
 		    "]>-"},
-    { {T_WHL2c1,T_WHL2,0},
+    { {T_WHL2c1,0},
 		"[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<"
 		    "[[-]<<<+>>>]<"
 		    "[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<"
 		    "[[-]<<<+>>>]<<<"
 		    "[[-]>" },
-    { {T_END2c1,T_END2,0},
+    { {T_END2c1,0},
 		"[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<"
 		    "[[-]<<<+>>>]<"
 		    "[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<"
 		    "[[-]<<<+>>>]<<<"
 		    "]>" },
-#endif
-#if MASK == 1
-    { {T_SET2c2, T_SET2,0},
+
+    { {T_SET2c2,0},
         "[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<[[-]>"
 	"<+>[<->[->>+<<]]>>[-<<+>>]<<<[->>-<<]>-"
 	"[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<]>"
 			},
-    { {T_MOV, T_ADD2c2, T_ADD2, T_RMOV, 0},
+    { {T_MOV, T_ADD2c2, T_RMOV, 0},
 	"+>+[<->[->>+<<]]>>[-<<+>>]<<<[->>+<<]"
 			},
-    { {T_MOV, T_SUB2c2, T_SUB2, 0},
+    { {T_MOV, T_SUB2c2, 0},
 	"+>[<->[->>+<<]]>>[-<<+>>]<<<[->>-<<]>-"
 			},
-    { {T_WHL2c2, T_WHL2, T_RMOV, 0},
+    { {T_WHL2c2, T_RMOV, 0},
 	"[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<[[-]"
 			},
-    { {T_END2c2, T_END2, T_RMOV, 0},
+    { {T_END2c2, T_RMOV, 0},
 	"[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<]"
 			},
 #endif
@@ -179,11 +177,15 @@ int main(int argc, char **argv)
 	    case T_RMOV: ch = T_MOV; c= -1; break;
 	    case T_ADD:  ch = T_ADD; c=  1; break;
 	    case T_DEC:  ch = T_ADD; c= -1; break;
-	    case T_ADD2: ch = T_ADD2; c=  1; break;
-	    case T_SUB2: ch = T_ADD2; c= -1; break;
+	    case T_ADD2c1:  ch = T_ADD2c1; c=  1; break;
+	    case T_SUB2c1:  ch = T_SUB2c1; c= -1; break;
+	    case T_ADD2c2:  ch = T_ADD2c2; c=  1; break;
+	    case T_SUB2c2:  ch = T_SUB2c2; c= -1; break;
 	    case T_DATA: ch = T_NOP; break;
 	    }
 	    if (ch != T_NOP) {
+		int is_whl, is_end;
+
 		/* Comment loops, can never be run */
 		if (dld || (ch == T_WHL && (!p || p->type == T_END))) {
 		    if (ch == T_WHL) dld ++;
@@ -194,16 +196,25 @@ int main(int argc, char **argv)
 		/* RLE compacting of instructions.
 		 * NB: This is not strictly required, but it decreases maximum
 		 * memory usage */
-		if (p && ch == p->type && p->count ){
+		if (p && ch == p->type && c != 0 ){
 		    p->count += c;
+		    if (p->count == 0 && p->prev) {
+			n = p->prev;
+			n->next = 0;
+			free(p);
+			p = n;
+		    }
 		    continue;
 		}
 #endif
 		n = tcalloc(1, sizeof*n);
 		if (p) { p->next = n; n->prev = p; } else pgm = n;
 		n->type = ch; p = n;
-		if (n->type == T_WHL || n->type == T_WHL2) { n->jmp=j; j = n; }
-		else if (n->type == T_END || n->type == T_END2) {
+		is_whl = (n->type == T_WHL || n->type == T_WHL2 || n->type == T_WHL2c1 || n->type == T_WHL2c2);
+		is_end = (n->type == T_END || n->type == T_END2 || n->type == T_END2c1 || n->type == T_END2c2);
+
+		if (is_whl) { n->jmp=j; j = n; }
+		else if (is_end) {
 		    if (j) { n->jmp = j; j = j->jmp; n->jmp->jmp = n;
 		    } else n->type = T_ERR;
 		} else
@@ -228,8 +239,8 @@ int main(int argc, char **argv)
 	for(n=pgm; n; n=n->next) {
 	    switch(n->type)
 	    {
-		case T_WHL: n->count = ++lid; break;
-		case T_WHL2: n->count = ++lid; break;
+		case T_WHL: case T_WHL2: case T_WHL2c1: case T_WHL2c2:
+		    n->count = ++lid; break;
 		case T_ERR: /* Unbalanced bkts */
 		    fprintf(stderr, "Warning: skipping unbalanced brackets\n");
 		    n->type = T_NOP;
@@ -247,8 +258,8 @@ int main(int argc, char **argv)
 	for(n=pgm; n; n=n->next) {
 	    switch(n->type)
 	    {
-		case T_WHL: n->count = ++lid; break;
-		case T_WHL2: n->count = ++lid; break;
+		case T_WHL: case T_WHL2: case T_WHL2c1: case T_WHL2c2:
+		    n->count = ++lid; break;
 		case T_ERR: /* Unbalanced bkts */
 		    fprintf(stderr, "Warning: skipping unbalanced brackets\n");
 		    n->type = T_NOP;
@@ -257,7 +268,7 @@ int main(int argc, char **argv)
 
 	    /* Merge '<' with '>' and '+' with '-' */
 	    if (n->prev && n->prev->type == n->type &&
-		(n->type == T_MOV || n->type == T_ADD || n->type == T_ADD2)) {
+		(n->type == T_MOV || n->type == T_ADD)) {
 		n->prev->next = n->next;
 		if (n->next) n->next->prev = n->prev;
 		n->prev->count += n->count;
@@ -265,7 +276,7 @@ int main(int argc, char **argv)
 		free(n);
 		n = p;
 	    }
-	    if (n->type == T_MOV || n->type == T_ADD || n->type == T_ADD2) {
+	    if (n->type == T_MOV || n->type == T_ADD) {
 		if (n->count == 0)
 		    n->type = T_NOP;
 	    }
@@ -293,18 +304,20 @@ int main(int argc, char **argv)
 	    }
 
 #if MASK == 1
-	    /* Remove unnecessary T_*c1 and T_*c2 tokens */
+	    /* UPGRADE T_*c1 and T_*c2 tokens to T_*2 tokens */
 	    if (n->prev && (n->type == T_ADD2c1 || n->type == T_SUB2c1 ||
 	                    n->type == T_ADD2c2 || n->type == T_SUB2c2 ||
 	                    n->type == T_WHL2c2 || n->type == T_END2c2 ||
 	                    n->type == T_SET2c2 || n->type == T_ZTEMP2)) {
+
+		int do_up = 0;
 		p = n->prev;
 		if (p->type == T_ADD2 ||
 		    p->type == T_SET2 ||
 		    p->type == T_WHL2 ||
 		    p->type == T_END2 ||
 		    p->type == T_ZTEMP2)
-		    n->type = T_NOP;
+		    do_up = 1;
 		if (p->type == T_PRT) {
 		    p = p->prev;
 		    if (p->type == T_ADD2 ||
@@ -312,9 +325,36 @@ int main(int argc, char **argv)
 			p->type == T_WHL2 ||
 			p->type == T_END2 ||
 			p->type == T_ZTEMP2)
-			n->type = T_NOP;
+			do_up = 1;
+		}
+
+		if (do_up) {
+		    if (n->type == T_ADD2c1) n->type = T_ADD2;
+		    if (n->type == T_SUB2c1) n->type = T_ADD2;
+		    if (n->type == T_ADD2c2) n->type = T_ADD2;
+		    if (n->type == T_SUB2c2) n->type = T_ADD2;
+		    if (n->type == T_WHL2c2) n->type = T_WHL2;
+		    if (n->type == T_END2c2) n->type = T_END2;
+		    if (n->type == T_SET2c2) n->type = T_SET2;
+		    if (n->type == T_ZTEMP2) n->type = T_NOP;
+		    else if(p->type == T_ZTEMP2 && p->prev) {
+			p->prev->next = p->next;
+			p->next->prev = p->prev;
+			free(p);
+		    }
 		}
 	    }
+
+	    /* Merge Double byte '+' with '-' */
+	    if (n->prev && n->prev->type == n->type && n->type == T_ADD2) {
+		n->prev->next = n->next;
+		if (n->next) n->next->prev = n->prev;
+		n->prev->count += n->count;
+		p = n->prev;
+		free(n);
+		n = p;
+	    }
+	    if (n->type == T_ADD2) { if (n->count == 0) n->type = T_ZTEMP2; }
 
 	    /* Identify double byte [-] and replace */
 	    if (n->type == T_END2 &&
@@ -332,10 +372,6 @@ int main(int argc, char **argv)
 		p->type = T_SET2;
 		p->count = 0;
 		p->jmp = 0;
-		if (n->prev && n->prev->type == T_WHL2c1)
-		    n->prev->type = T_SET2c1;
-		if (n->prev && n->prev->type == T_WHL2c2)
-		    n->prev->type = T_SET2c2;
 	    }
 
 	    /* Merge double byte '[-]' with '+' and '-' */
@@ -452,10 +488,6 @@ int main(int argc, char **argv)
 			v->type == T_MOV
 			|| v->type == T_ADD2
 			|| v->type == T_SET2
-			|| v->type == T_ADD2c2
-//			|| v->type == T_SET2c2
-			|| v->type == T_SUB2c2
-			|| v->type == T_END2c2
 			|| v->type == T_ZTEMP2 ; v=v->prev) {
 
 		    if (v->type == T_MOV)
@@ -465,14 +497,13 @@ int main(int argc, char **argv)
 			if (v->type == T_ADD2 )
 			    incby += v->count;
 		    } else
-			idx_only = 0; /*FIXME*/
+			idx_only = 0;
 
 		    if (movsum % 3 != 0)
 			break; /* WTF! */
 		}
 
-		if (movsum == 0 && incby == -1 && v->type == T_WHL2 &&
-		    (v->prev == 0 || v->prev->type != T_WHL2c2)) {
+		if (movsum == 0 && incby == -1 && v->type == T_WHL2) {
 		    n = v;
 		    n->type = idx_only?T_NOP:T_SAVE2;
 		    n->count = 0;
@@ -487,8 +518,6 @@ int main(int argc, char **argv)
 			    v->type = T_MUL2;
 			} else if (v->type == T_SET2) {
 			    v->type = T_QSET2;
-			} else if (v->type == T_END2c2) {
-			    v->type = T_NOP;
 			}
 		    }
 		    v->type = T_NOP;
@@ -760,6 +789,8 @@ run(void)
 
 #if MASK == 1
 	case T_ADD2: case T_SET2: case T_MUL2: case T_QSET2:
+	case T_WHL2c1: case T_END2c1: case T_SET2c1:
+	case T_WHL2c2: case T_END2c2: case T_SET2c2:
 	    arraylen += 3;
 	    break;
 
@@ -773,12 +804,11 @@ run(void)
 	case T_ZTEMP2:
 	    arraylen += 2;
 	    break;
-
-	case T_WHL2c1: case T_END2c1: case T_SET2c1:
-	case T_WHL2c2: case T_END2c2: case T_SET2c2:
+#endif
+#endif
+	case T_NOP:
+	    fprintf(stderr, "Warning: %s node found.\n", tokennames[n->type]);
 	    break;
-#endif
-#endif
 
 	default:
 	    fprintf(stderr, "Invalid node type found = %s\n",
@@ -796,6 +826,10 @@ run(void)
     last_offset = 0;
     while(n)
     {
+	if (n->type == T_NOP) {
+	    n = n->next;
+	    continue;
+	}
 	if (n->type != T_MOV) {
 	    *p++ = (0 - last_offset);
 	    last_offset = 0;
@@ -830,6 +864,10 @@ run(void)
 	    }
 	    break;
 
+	case T_ADD2c1: case T_SUB2c1:
+	case T_ADD2c2: case T_SUB2c2:
+	case T_SET2c1: case T_SET2c2:
+
 	case T_ADD2: case T_SUB2: case T_SET2: case T_MUL2: case T_QSET2:
 	case T_SET:
 	case T_MUL: case T_QSET:
@@ -838,6 +876,8 @@ run(void)
 	    *p++ = n->count;
 	    break;
 
+	case T_WHL2c1:
+	case T_WHL2c2:
 	case T_WHL2:
 	case T_WHL:
 	    /* Storing the location of the instruction in the T_END's count
@@ -848,51 +888,8 @@ run(void)
 
 	case T_END:
 	case T_END2:
-	    progarray[n->count] = (p-progarray) - n->count;
-	    *p++ = -progarray[n->count];
-	    break;
-
-	case T_ADD2c1: case T_SUB2c1:
-	case T_ADD2c2: case T_SUB2c2:
-	    if (n->next->type != T_ADD2) {
-		*p++ = 0;
-	    } else {
-		n=n->next;
-		*p++ = n->count;
-	    }
-	    break;
-
-	case T_SET2c1:
-	case T_SET2c2:
-	    if (n->next->type != T_SET2) {
-		fprintf(stderr, "%s lost it's %s\n",
-		    tokennames[n->type], tokennames[T_SET2]);
-		exit(1);
-	    }
-	    n=n->next;
-	    *p++ = n->count;
-	    break;
-
-	case T_WHL2c1:
-	case T_WHL2c2:
-	    if (n->next->type != T_WHL2) {
-		fprintf(stderr, "%s lost it's %s\n",
-		    tokennames[n->type], tokennames[T_WHL2]);
-		exit(1);
-	    }
-	    n=n->next;
-	    n->jmp->count = p-progarray;
-	    *p++ = 0;
-	    break;
-
 	case T_END2c1:
 	case T_END2c2:
-	    if (n->next->type != T_END2) {
-		fprintf(stderr, "%s lost it's %s\n",
-		    tokennames[n->type], tokennames[T_END2]);
-		exit(1);
-	    }
-	    n=n->next;
 	    progarray[n->count] = (p-progarray) - n->count;
 	    *p++ = -progarray[n->count];
 	    break;
@@ -997,10 +994,12 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	case T_SAVE2:
 	    a = *m; a2 = (m[1]<<8) + a;
 	    *m = 0; m[1] = 0;
+	    m[-1] = m[2] = 0;
 	    p += 1;
 	    break;
 
 	case T_MUL2:
+	    m[-1] = m[2] = 0;
 #ifdef dcell
 	    *((dcell*)m) += p[1] * a2;
 #else
@@ -1014,6 +1013,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    break;
 
 	case T_QSET2:
+	    m[-1] = m[2] = 0;
 	    if (a2)
 #ifdef dcell
 		*((dcell*)m) = p[1];
@@ -1028,6 +1028,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    break;
 
 	case T_ADD2:
+	    m[-1] = m[2] = 0;
 #ifdef dcell
 	    *((dcell*)m) += p[1];
 #else
@@ -1041,6 +1042,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    break;
 
 	case T_SET2:
+	    m[-1] = m[2] = 0;
 #ifdef dcell
 	    *((dcell*)m) = p[1];
 #else
@@ -1054,11 +1056,13 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    break;
 
 	case T_WHL2:
+	    m[-1] = m[2] = 0;
 	    if (m[0] == 0 && m[1] == 0) p += p[1];
 	    p += 2;
 	    break;
 
 	case T_END2:
+	    m[-1] = m[2] = 0;
 	    if (m[0] != 0 || m[1] != 0) p += p[1];
 	    p += 2;
 	    break;
@@ -1068,6 +1072,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    p += 1;
 	    break;
 
+/******************************************************************************/
 
 	case T_ADD2c1:
 	    if (m[-1] != 0 || m[2] != 0) {
@@ -1179,6 +1184,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    }
 	    break;
 
+/******************************************************************************/
 
 	case T_ADD2c2:
 	    if (m[-1] != 0 || m[2] != 0) {
@@ -1210,7 +1216,6 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 #endif
 	    p += 2;
 	    break;
-
 
 	case T_SUB2c2:
 	    if (m[-1] != 0 || m[2] != 0) {
@@ -1311,6 +1316,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    p += 2;
 	    break;
 
+/******************************************************************************/
 #endif
 #endif
 	}
