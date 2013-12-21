@@ -4,6 +4,7 @@
 
 int bytecell = 0;
 static int enable_optim;
+static int enable_debug;
 
 void outcmd(int ch, int count);
 int check_arg(char * arg);
@@ -232,6 +233,8 @@ main(int argc, char ** argv)
 	    enable_optim=1; argc--; argv++;
 	} else if (check_arg(argv[1])) {
 	    argc--; argv++;
+	} else if (strcmp(argv[1], "-#") == 0) {
+	    enable_debug++; argc--; argv++;
 	} else if (strcmp(argv[1], "--") == 0) {
 	    argc--; argv++;
 	    break;
@@ -246,11 +249,12 @@ main(int argc, char ** argv)
 	perror(argv[1]); exit(1);
     }
     outrun('!', 0);
-    while((ch = fgetc(ifd)) != EOF) {
+    while((ch = fgetc(ifd)) != EOF && (ifd!=stdin || ch != '!')) {
 	/* These chars are RLE */
 	m = (ch == '>' || ch == '<' || ch == '+' || ch == '-');
 	/* These ones are not */
-	if(!m && ch != '[' && ch != ']' && ch != '.' && ch != ',') continue;
+	if(!m && ch != '[' && ch != ']' && ch != '.' && ch != ',' &&
+	    (ch != '#' || !enable_debug)) continue;
 	/* Check for loop comments; ie: ][ comment ] */
 	if (lc || (ch=='[' && lastch==']')) { lc += (ch=='[') - (ch==']'); continue; }
 	if (lc) continue;
@@ -270,6 +274,7 @@ main(int argc, char ** argv)
     if (ifd != stdin) fclose(ifd);
     if(c) outrun(lastch, c);
     while(b>0){ outrun(']', 1); b--;} /* Not enough ']', add some. */
+    if (enable_debug) outrun('#', 0);
     outrun('~', 0);
     return 0;
 }

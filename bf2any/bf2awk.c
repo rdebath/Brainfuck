@@ -8,8 +8,13 @@
  *  Getting character I/O is a little interesting here; but otherwise the
  *  language is very similar to C (without semicolons).
  *
- *  Generated code works in most (if not all) awk implementations.
+ *  Generated code works in most awk implementations. For really old ones
+ *  without functions the getch() function will have to be inlined.
  */
+
+/*
+#define INLINEGETCH
+*/
 
 extern int bytecell;
 
@@ -30,7 +35,7 @@ outcmd(int ch, int count)
     switch(ch) {
     case '!':
 	printf("#!/usr/bin/awk -f\n");
-	printf("function brainfuck() {\n");
+	printf("BEGIN {\n");
 	I; printf("p=0\n"); break;
 	break;
 
@@ -51,7 +56,9 @@ outcmd(int ch, int count)
     case '<': I; printf("p=p-%d\n", count); break;
     case '>': I; printf("p=p+%d\n", count); break;
     case '.': I; printf("printf \"%%c\",m[p]\n"); break;
+#ifndef INLINEGETCH
     case ',': I; printf("getch()\n"); do_input++; break;
+#endif
     case '[':
 	if(bytecell) { I; printf("m[p]=m[p]%%256\n"); }
 	I; printf("while(m[p]!=0){\n");
@@ -64,8 +71,10 @@ outcmd(int ch, int count)
 	break;
 
     case '~':
+	I; printf("exit 0\n");
 	printf("}\n");
 
+#ifndef INLINEGETCH
 	if (do_input) {
 	    printf("\n");
 	    printf("function getch() {\n");
@@ -80,17 +89,46 @@ outcmd(int ch, int count)
 	    printf("        m[p]=10\n");
 	    printf("        return\n");
 	    printf("    }\n");
+	    printf("    if (!genord) {\n");
+	    printf("        for(i=1; i<256; i++)\n");
+	    printf("            ord[sprintf(\"%%c\",i)] = i\n");
+	    printf("        genord=1\n");
+	    printf("    }\n");
 	    printf("    c = substr(line, 1, 1)\n");
 	    printf("    line=substr(line, 2)\n");
 	    printf("    m[p] = ord[c]\n");
 	    printf("}\n");
-	    printf("BEGIN{\n");
-	    printf("    for(i=1; i<256; i++) ord[sprintf(\"%%c\",i)] = i\n");
-	    printf("    brainfuck();\n");
-	    printf("}\n");
 	}
-	else
-	    printf("BEGIN{ brainfuck(); }\n");
+#endif
 	break;
+
+#ifdef INLINEGETCH
+    case ',':
+	I; printf("while(1) {\n");
+	I; printf("    if (goteof) break\n");
+	I; printf("    if (!gotline) {\n");
+	I; printf("        gotline = getline\n");
+	I; printf("        if(!gotline) goteof = 1\n");
+	I; printf("        if (goteof) break\n");
+	I; printf("        line = $0\n");
+	I; printf("    }\n");
+	I; printf("    if (line == \"\") {\n");
+	I; printf("        gotline=0\n");
+	I; printf("        m[p]=10\n");
+	I; printf("        break\n");
+	I; printf("    }\n");
+	I; printf("    if (!genord) {\n");
+	I; printf("        for(i=1; i<256; i++)\n");
+	I; printf("            ord[sprintf(\"%%c\",i)] = i\n");
+	I; printf("        genord=1\n");
+	I; printf("    }\n");
+	I; printf("    c = substr(line, 1, 1)\n");
+	I; printf("    line=substr(line, 2)\n");
+	I; printf("    m[p] = ord[c]\n");
+	I; printf("    break\n");
+	I; printf("}\n");
+	break;
+
+#endif
     }
 }

@@ -28,7 +28,7 @@ int *mem = 0, *m = 0, memlen = 0;
 #define TOKEN_LIST(Mac) \
     Mac(STOP) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
     Mac(SET) Mac(BEG) Mac(MUL) Mac(MUL1) Mac(QSET) Mac(QMUL) Mac(QMUL1) \
-    Mac(ZFIND) Mac(RAILC)
+    Mac(ZFIND) Mac(RAILC) Mac(DUMP)
 
 #define GEN_TOK_ENUM(NAME) T_ ## NAME,
 enum token { TOKEN_LIST(GEN_TOK_ENUM) TCOUNT};
@@ -41,6 +41,7 @@ int prevtk = 0;
 
 void runprog(int * p, int *m);
 void dumpprog(int * p, int *m);
+void dumpmem(int *mp);
 
 void
 outcmd(int ch, int count)
@@ -84,6 +85,7 @@ outcmd(int ch, int count)
     case 'X': *m++ = t = T_STOP; break;
     case ',': *m++ = t = T_INP; break;
     case '.': *m++ = t = T_PRT; break;
+    case '#': *m++ = t = T_DUMP; break;
     case '~':
 	*m++ = t = T_STOP;
 	if (do_dump) {
@@ -92,9 +94,8 @@ outcmd(int ch, int count)
 	}
 	setbuf(stdout, 0);
 	if (m-mem < BOFF)
-	    runprog(mem, mem+BOFF);
-	else
-	    runprog(mem, m);
+	    m = mem+BOFF;
+	runprog(mem, m);
 	break;
 
     case '[':
@@ -167,10 +168,21 @@ runprog(register int * p, register int *mp)
 	case T_QMUL: if(a) *mp += p[2]*a; p+=3; break;
 	case T_QMUL1: if(a) *mp += a; p+=2; break;
 	case T_STOP: return;
+	case T_DUMP: dumpmem(mp); p+=2; break;
 	}
     }
 }
 
+void
+dumpmem(int *mp)
+{
+    int i, j = 0;
+    for (i = 0; i < MEMSIZE; i++) if (m[i]) j = i + 1;
+    fprintf(stderr, "Ptr: %3d, mem:", mp-m);
+    for (i = 0; i < j; i++)
+	fprintf(stderr, "%s%d", m + i == mp ? ">" : " ", m[i]);
+    fprintf(stderr, "\n");
+}
 
 void
 dumpprog(int * p, int *mp)
@@ -187,6 +199,7 @@ dumpprog(int * p, int *mp)
 	    return;
 	case T_PRT: case T_INP:
 	case T_BEG: case T_MUL1: case T_QMUL1:
+	case T_DUMP:
 	    break;
 	case T_WHL: case T_END:
 	    printf(" %d (%06d)", *p, (int)(p-mem + *p+1));
@@ -204,5 +217,3 @@ dumpprog(int * p, int *mp)
 	printf("\n");
     }
 }
-
-
