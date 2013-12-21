@@ -4,12 +4,19 @@
 #include <string.h>
 /*
  * gas32 translation from BF, runs at about 4,800,000,000 instructions per second.
- * gas64 translation from BF, runs at about 4,800,000,000 instructions per second.
+ * gas64 translation from BF, runs at about 4,600,000,000 instructions per second.
  *
  * Note: tcc generates slower assembler.
+ *
+ * Compile output with: gcc -o bfp bfp.s
+ * Add -m32 or -m64 option if it's not your default target arch.
  */
 
 int ind = 0;
+
+#if !defined(USE32) && !defined(USE64) && defined(__i386__)
+#define USE32
+#endif
 
 #ifdef USE32
 // Call params on stack
@@ -18,7 +25,7 @@ int ind = 0;
 
 #define AX	"%%eax"
 #define CX	"%%ecx"
-#define TMOV	"movzbl"
+#define MOVZB	"movzbl"
 #else
 // Call params in registers: %rdi, %rsi, %rdx, %rcx, %r8 and %r9
 // Callee saves: %rbp, %rbx and %r12 through %r15
@@ -28,7 +35,7 @@ int ind = 0;
 
 #define AX	"%%rax"
 #define CX	"%%rcx"
-#define TMOV	"movzbq"
+#define MOVZB	"movzbq"
 #endif
 
 int
@@ -81,7 +88,7 @@ outcmd(int ch, int count)
     case '<': printf("sub $%d,"CX"\n", count); break;
     case '>': printf("add $%d,"CX"\n", count); break;
     case '[':
-	printf(TMOV" ("CX"), "AX"\n");
+	printf(MOVZB" ("CX"), "AX"\n");
 	printf("test "AX", "AX"\n");
 	printf("jz %df\n", ind*2+1);
 	printf("%d:\n", ind*2+2);
@@ -89,7 +96,7 @@ outcmd(int ch, int count)
 	break;
     case ']':
 	ind--;
-	printf(TMOV" ("CX"), "AX"\n");
+	printf(MOVZB" ("CX"), "AX"\n");
 	printf("test "AX", "AX"\n");
 	printf("jnz %db\n", ind*2+2);
 	printf("%d:\n", ind*2+1);
@@ -101,7 +108,7 @@ outcmd(int ch, int count)
 	printf("movb %%al, ("CX")\n");
 	break;
     case '.':
-	printf(TMOV" ("CX"), "AX"\n");
+	printf(MOVZB" ("CX"), "AX"\n");
 	printf("push "CX"\n");
 #ifdef USE32
 	printf("push "AX"\n");

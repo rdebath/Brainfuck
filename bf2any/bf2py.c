@@ -7,6 +7,8 @@
  * There is a limit on the number of nested loops of 20.
  */
 
+/* #define USESYS // else USEOS */
+
 extern int bytecell;
 
 int do_input = 0;
@@ -26,7 +28,11 @@ outcmd(int ch, int count)
     switch(ch) {
     case '!':
 	printf("#!/usr/bin/python\n");
+#ifdef USESYS
 	printf("import sys\n");
+#else
+	printf("import os\n");
+#endif
 	printf("m = [0] * 60000\n");
 	printf("i = 0\n");
 	break;
@@ -45,12 +51,22 @@ outcmd(int ch, int count)
 	}
 	ind--;
 	break;
+
+#ifdef USESYS
     case '.': I; printf("sys.stdout.write(chr(m[i]&255))\n"); break;
     case ',':
 	I; printf("c = sys.stdin.read(1);\n");
 	I; printf("if c != '' :\n");
 	ind++; I; ind--; printf("m[i] = ord(c)\n");
 	break;
+#else
+    case '.': I; printf("os.write(1, chr(m[i]&255))\n"); break;
+    case ',':
+	I; printf("c = os.read(0, 1);\n");
+	I; printf("if c != '' :\n");
+	ind++; I; ind--; printf("m[i] = ord(c)\n");
+	break;
+#endif
     }
     lastcmd = ch;
 }

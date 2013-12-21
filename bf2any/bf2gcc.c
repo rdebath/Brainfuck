@@ -21,18 +21,21 @@ FILE * ofd;
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
 #define prv2(s,v,v2)    fprintf(ofd, "%*s" s "\n", ind*4, "", (v), (v2))
 
-static char const * ccode_name = "/tmp/brainfuck.c";
 static void compile_and_run(void);
 
 int imov = 0;
-char * optarg = "-O0";
+char * opt_flag = "-O0";
+
+static char tmpdir[] = "/tmp/bfrun.XXXXXX";
+static char ccode_name[sizeof(tmpdir)+16];
+static char dl_name[sizeof(tmpdir)+16];
 
 int
 check_arg(char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     if (strncmp(arg, "-O", 2) == 0) {
-	optarg = arg;
+	opt_flag = arg;
 	return 1;
     } else if (strcmp(arg, "-r") == 0) {
 	runmode=1; return 1;
@@ -69,6 +72,12 @@ outcmd(int ch, int count)
     switch(ch) {
     case '!':
 	if (runmode) {
+	    if( mkdtemp(tmpdir) == 0 ) {
+		perror("mkdtemp()");
+		exit(1);
+	    }
+	    strcpy(ccode_name, tmpdir); strcat(ccode_name, "/bfpgm.c");
+	    strcpy(dl_name, tmpdir); strcat(dl_name, "/bfpgm.so");
 	    ofd = fopen(ccode_name, "w");
 	} else
 	    ofd = stdout;
@@ -134,10 +143,9 @@ compile_and_run(void)
 {
     char cmdbuf[256];
     int ret;
-    char const * dlname = "/tmp/brainfuck.so";
 
     sprintf(cmdbuf, "cc %s -shared -fPIC -o %s %s",
-	    optarg, dlname, ccode_name);
+	    opt_flag, dl_name, ccode_name);
     ret = system(cmdbuf);
 
     if (ret == -1) {
@@ -159,11 +167,11 @@ compile_and_run(void)
 	exit(1);
     }
 
+    loaddll(dl_name);
+
     unlink(ccode_name);
-
-    loaddll(dlname);
-
-    unlink(dlname);
+    unlink(dl_name);
+    rmdir(tmpdir);
 
     (*runfunc)();
 
