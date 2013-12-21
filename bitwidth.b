@@ -67,8 +67,10 @@ Multiply by 256 again to get 65536
 	Cells should be 16bits at this point
 
 	The pointer is at cell two and you can continue your code confident
-	that there are medium sized cells; if you use a BF doubler you should
-	have the initial 'right' but don't have to
+	that there are medium sized cells; you can use all the cells on the
+	tape but it is recommended that you leave the first two alone
+
+	If you need 32bit cells you'll have to use a BF doubler
 
 	======= DEMO CODE =======
 	Space
@@ -169,7 +171,7 @@ Multiply by 256 again to get 65536
 
 	[-]]
 
-	One last thing; an exclamation point is not a valid BF instruction!
+	One last thing: an exclamation point is not a valid BF instruction!
 
 	Print the newline
 	[-]++++++++++.[-]
@@ -183,4 +185,5 @@ Multiply by 256 again to get 65536
 	]
 
 	===== END DEMO CODE =====
-<<
+
+<<  Finish at cell zero
