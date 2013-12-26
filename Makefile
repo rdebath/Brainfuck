@@ -2,9 +2,14 @@
 # TARGET_ARCH=-m64
 # TARGET_ARCH=-m32
 
-CFLAGS=-O3 -Wall $(DEFS)
-LDFLAGS=
+CFLAGS=-O3 -Wall -Wshadow $(DEFS)
+LDFLAGS=-ldl
 CC=gcc
+
+# for: make DEFS='$(MOREDEFS)'
+MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wshadow -Wpointer-arith -Wcast-align \
+    -Wstrict-prototypes -Wstrict-overflow=5 -Wwrite-strings -Waggregate-return \
+    -Wcast-qual -Wswitch-default -Wswitch-enum -Wconversion -Wunreachable-code
 
 -include Makefile2
 
@@ -14,7 +19,7 @@ DEFS_TCCLIB=-DDISABLE_TCCLIB
 LIBS_TCCLIB=
 else
 DEFS_TCCLIB=
-LIBS_TCCLIB=-ltcc -ldl
+LIBS_TCCLIB=-ltcc
 endif
 
 HAVE_LIGHT1=$(wildcard /usr/include/lightning.h)

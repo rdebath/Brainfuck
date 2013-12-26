@@ -14,12 +14,12 @@ static void print_hello_world(void);
 static int hello_world = 0;
 
 void
-print_nasm()
+print_nasm(void)
 {
     struct bfi * n = bfprog;
     char string_buffer[BUFSIZ+2], *sp = string_buffer;
     char charmap[256];
-    char * neartok = "";
+    char const * neartok = "";
     int i;
 
     memset(charmap, 0, sizeof(charmap));
@@ -373,7 +373,7 @@ print_nasm()
 static void
 print_asm_header(void)
 {
-    char *np =0, *ep;
+    char const *np =0, *ep;
     if (curfile && *curfile) {
 	np = strrchr(curfile, '/');
 	if (np) np++; else np = curfile;

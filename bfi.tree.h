@@ -4,11 +4,12 @@ extern int curr_line, curr_col;
 extern int noheader, enable_trace, hard_left_limit, most_neg_maad_loop;
 extern int min_pointer, max_pointer;
 extern int opt_level;
+extern int iostyle, eofcell;
 extern char * input_string;
 
 extern int cell_size;
 extern int cell_mask;
-extern char *cell_type;
+extern char const * cell_type;
 
 #define SM(vx) (( ((int)(vx)) <<(32-cell_size))>>(32-cell_size))
 #define UM(vx) ((vx) & cell_mask)

@@ -23,6 +23,13 @@
 
 #ifndef DISABLE_TCCLIB
 #include <libtcc.h>
+#else
+#ifndef DISABLE_DLOPEN
+#include <dlfcn.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#define USE_DLOPEN
+#endif
 #endif
 
 #include "bfi.tree.h"
@@ -53,23 +60,34 @@ print_c_header(FILE * ofd, int * minimal_p)
     int use_full = 0;
     int memsize = 60000;
     int memoffset = 0;
+    char const * funcname = "main";
 
     calculate_stats();
 
     if (enable_trace || do_run || !minimal_p) use_full = 1;
 
-    if (total_nodes == node_type_counts[T_PRT] && !use_full) {
-	fprintf(ofd, "#include <stdio.h>\n\n");
-	fprintf(ofd, "int main(void)\n{\n");
-	*minimal_p = 1;
-	return ;
-    }
+#ifdef USE_DLOPEN
+    if (do_run) funcname = "brainfuck";
+#endif
 
-    if (node_type_counts[T_INP] != 0 && !do_run) {
-	fprintf(ofd, "#ifdef WIDECHAR\n");
-	fprintf(ofd, "#include <locale.h>\n");
-	fprintf(ofd, "#include <wchar.h>\n");
-	fprintf(ofd, "#endif\n\n");
+    if (total_nodes == node_type_counts[T_PRT] && !use_full) {
+	int okay = 1;
+	struct bfi * n = bfprog;
+	/* Check the string; be careful. */
+	while(n && okay) {
+	    if (n->type != T_PRT || (n->count < ' ' && n->count != '\n')
+		|| n->count > '~' || n->count == '%' || n->count == '\\'
+		|| n->count == '"')
+		okay = 0;
+	    n = n->next;
+	}
+
+	if (okay) {
+	    fprintf(ofd, "#include <stdio.h>\n\n");
+	    fprintf(ofd, "int main(void)\n{\n");
+	    *minimal_p = 1;
+	    return ;
+	}
     }
 
     fprintf(ofd, "#include <stdio.h>\n");
@@ -83,8 +101,13 @@ print_c_header(FILE * ofd, int * minimal_p)
 	fprintf(ofd, "# endif\n\n");
     }
 
-    if (node_type_counts[T_INP] != 0 && !do_run)
+    if (node_type_counts[T_INP] != 0 && !do_run && iostyle != 2)
     {
+	fprintf(ofd, "#ifdef WIDECHAR\n");
+	fprintf(ofd, "#include <locale.h>\n");
+	fprintf(ofd, "#include <wchar.h>\n");
+	fprintf(ofd, "#endif\n\n");
+
 	fprintf(ofd, "static int\n");
 	fprintf(ofd, "getch(int oldch)\n");
 	fprintf(ofd, "{\n");
@@ -108,17 +131,50 @@ print_c_header(FILE * ofd, int * minimal_p)
 	fprintf(ofd, "}\n\n");
     }
 
-    if (node_type_counts[T_PRT] != 0 && !do_run) {
-	fprintf(ofd, "#ifdef WIDECHAR\n");
-	fprintf(ofd, "static void putch(int ch) { printf(\"%%lc\",ch); }\n");
+    if (node_type_counts[T_INP] != 0 && !do_run && iostyle == 2)
+    {
+	fprintf(ofd, "static int\n");
+	fprintf(ofd, "getch(int oldch)\n");
+	fprintf(ofd, "{\n");
+	fprintf(ofd, "    int ch;\n");
+	fprintf(ofd, "    ch = getchar();\n");
+	fprintf(ofd, "#ifndef EOFCELL\n");
+	fprintf(ofd, "    if (ch != EOF) return ch;\n");
+	fprintf(ofd, "    return oldch;\n");
 	fprintf(ofd, "#else\n");
-	fprintf(ofd, "static void putch(int ch) { putchar(ch); }\n");
-	fprintf(ofd, "#endif\n\n");
+	fprintf(ofd, "#if EOFCELL == EOF\n");
+	fprintf(ofd, "    return ch;\n");
+	fprintf(ofd, "#else\n");
+	fprintf(ofd, "    if (ch != EOF) return ch;\n");
+	fprintf(ofd, "    return EOFCELL;\n");
+	fprintf(ofd, "#endif\n");
+	fprintf(ofd, "}\n\n");
+    }
+
+    if (node_type_counts[T_PRT] != 0 && !do_run) {
+	if (iostyle != 2 ) {
+	    fprintf(ofd, "#ifdef WIDECHAR\n");
+	    fprintf(ofd, "static void putch(int ch) { printf(\"%%lc\",ch); }\n");
+	    fprintf(ofd, "#else\n");
+	    fprintf(ofd, "static void putch(int ch) { putchar(ch); }\n");
+	    fprintf(ofd, "#endif\n\n");
+	} else {
+	    fprintf(ofd, "static void putch(int ch) { putchar(ch); }\n");
+	}
     }
 
     if (do_run) {
+#ifdef USE_DLOPEN
+	fprintf(ofd, "#define mem brainfuck_memptr\n");
+	fprintf(ofd, "%s *mem;\n", cell_type);
+	fprintf(ofd, "#define putch (*brainfuck_putch)\n");
+	fprintf(ofd, "#define getch (*brainfuck_getch)\n");
+	fprintf(ofd, "void (*brainfuck_putch)(int ch);\n");
+	fprintf(ofd, "int (*brainfuck_getch)(int ch);\n");
+#else
 	fprintf(ofd, "extern void putch(int ch);\n");
 	fprintf(ofd, "extern int getch(int ch);\n");
+#endif
     }
 
     if (enable_trace)
@@ -142,26 +198,21 @@ print_c_header(FILE * ofd, int * minimal_p)
 	    memsize = 65536;
     }
 
-    if (node_type_counts[T_MOV] == 0 && memoffset == 0) {
+    if (node_type_counts[T_MOV] == 0 && memoffset == 0 && !do_run) {
 	fprintf(ofd, "static %s m[%d];\n", cell_type, max_pointer+1);
-	fprintf(ofd, "int main(){\n");
+	fprintf(ofd, "int %s(){\n", funcname);
 	if (enable_trace)
 	    fprintf(ofd, "#define mem m\n");
     } else {
 	if (!do_run)
 	    fprintf(ofd, "static %s mem[%d];\n", cell_type, memsize);
-	else
+	else {
+#ifndef USE_DLOPEN
 	    fprintf(ofd, "extern %s mem[];\n", cell_type);
-	fprintf(ofd, "int main(){\n");
-#if 0
-	fprintf(ofd, "#if defined(__GNUC__) && defined(__i386__)\n");
-	fprintf(ofd, "  register %s * m asm (\"%%ebx\");\n", cell_type);
-	fprintf(ofd, "#else\n");
-	fprintf(ofd, "  register %s * m;\n", cell_type);
-	fprintf(ofd, "#endif\n");
-#else
-	fprintf(ofd, "  register %s * m;\n", cell_type);
 #endif
+	}
+	fprintf(ofd, "int %s(){\n", funcname);
+	fprintf(ofd, "  register %s * m;\n", cell_type);
 
 	if (memoffset > 0 && !do_run)
 	    fprintf(ofd, "  m = mem + %d;\n", memoffset);
@@ -171,9 +222,11 @@ print_c_header(FILE * ofd, int * minimal_p)
 
     if (node_type_counts[T_INP] != 0) {
 	fprintf(ofd, "  setbuf(stdout, 0);\n");
-	fprintf(ofd, "#ifdef WIDECHAR\n");
-	fprintf(ofd, "  setlocale(LC_ALL, \"\");\n");
-	fprintf(ofd, "#endif\n");
+	if (iostyle != 2) {
+	    fprintf(ofd, "#ifdef WIDECHAR\n");
+	    fprintf(ofd, "  setlocale(LC_ALL, \"\");\n");
+	    fprintf(ofd, "#endif\n");
+	}
     }
 }
 
@@ -182,11 +235,12 @@ print_ccode(FILE * ofd)
 {
     int indent = 0, disable_indent = 0;
     struct bfi * n = bfprog;
-    char string_buffer[180], *sp = string_buffer, lastspch = 0;
-    int ok_for_printf = 0, spc = 0;
     int minimal = 0;
     int add_mask = 0;
+#ifndef DISABLE_TCCLIB
     int found_rail_runner;
+#endif
+    int use_multifunc;	    /* Create multiple functions ... TODO */
 
     if (cell_size > 0 &&
 	cell_size != sizeof(int)*8 &&
@@ -197,37 +251,20 @@ print_ccode(FILE * ofd)
     if (verbose)
 	fprintf(stderr, "Generating C Code.\n");
 
+    /* Scan the nodes so we get an APPROXIMATE distance measure */
+    for(use_multifunc=0, n = bfprog; n; n=n->next) {
+	n->ipos = use_multifunc++;
+	if (n->type == T_PRT && n->next && n->next->type == T_PRT)
+	    use_multifunc--; /* T_PRT tokens tend to get merged */
+    }
+    use_multifunc = (use_multifunc>8192);
+
     if (!noheader)
 	print_c_header(ofd, &minimal);
 
+    n = bfprog;
     while(n)
     {
-	if (n->type == T_PRT)
-	    ok_for_printf = ( ( n->count >= ' ' && n->count <= '~') ||
-				(n->count == '\n') || (n->count == '\t') || (n->count == '\033'));
-
-	if (sp != string_buffer) {
-	    if ((n->type != T_SET && n->type != T_ADD && n->type != T_PRT) ||
-	        (n->type == T_PRT && !ok_for_printf) ||
-		(sp >= string_buffer + sizeof(string_buffer) - 8) ||
-		(sp > string_buffer+1 && lastspch == '\n')
-	       ) {
-		*sp++ = 0;
-		if (enable_trace) {
-		    pt(ofd, indent,0);
-		    fprintf(ofd, "t(%d,%d,\"", n->line, n->col);
-		    fprintf(ofd, "printf(...) ");
-		    fprintf(ofd, "\",m+ %d)\n", n->offset);
-		}
-		pt(ofd, indent,0);
-		if (strchr(string_buffer, '%') == 0 )
-		    fprintf(ofd, "printf(\"%s\");\n", string_buffer);
-		else
-		    fprintf(ofd, "printf(\"%%s\", \"%s\");\n", string_buffer);
-		sp = string_buffer; spc = 0;
-	    }
-	}
-
 	if (n->orgtype == T_END) indent--;
 	if (add_mask > 0) {
 	    switch(n->type)
@@ -381,62 +418,68 @@ print_ccode(FILE * ofd)
 	    }
 	    break;
 
+#define okay_for_cstr(xc) \
+                    (((xc) >= ' ' && (xc) <= '~' && \
+                      (xc) != '\\' && (xc) != '"' \
+                    ) || (xc == '\n'))
+
 	case T_PRT:
-	    spc++;
-	    if ((ok_for_printf && !disable_indent) ||
-			(sp != string_buffer && n->count > 0)) {
-		lastspch = n->count;
-		if (add_mask>0)
-		    lastspch &= add_mask;
-		if (lastspch == '\n') {
-		    *sp++ = '\\'; *sp++ = 'n';
-		} else if (lastspch == '\t') {
-		    *sp++ = '\\'; *sp++ = 't';
-		} else if (lastspch == '\\' || lastspch == '"') {
-		    *sp++ = '\\'; *sp++ = lastspch;
-		} else if (lastspch >= ' ' && lastspch <= '~') {
-		    *sp++ = lastspch;
-		} else {
-		    sp += sprintf(sp, "\\%03o", lastspch & 0xFF);
-		}
-		break;
-	    }
-	    spc--;
-	    if (sp != string_buffer)
-		fprintf(stderr, "Cannot add char %d to string\n", n->count);
 	    if (!disable_indent) pt(ofd, indent,n);
-	    if (n->count == -1 ) {
-		if (add_mask > 0 && add_mask < 0xFF) {
-		    fprintf(ofd, "m[%d] &= %d;\n", n->offset, add_mask);
-		    pt(ofd, indent, 0);
-		}
-		if (minimal)
-		    fprintf(ofd, "printf(\"%%lc\", m[%d]);\n", n->offset);
-		else if (n->offset == 0)
+	    if (n->count == -1) {
+		if (add_mask > 0 && (add_mask < 0xFF || iostyle != 2)) {
+		    fprintf(ofd, "putch(m[%d] &= %d);\n", n->offset, add_mask);
+		} else if (n->offset == 0)
 		    fprintf(ofd, "putch(*m);\n");
 		else
 		    fprintf(ofd, "putch(m[%d]);\n", n->offset);
-	    } else {
-		int ch = n->count;
-		if (add_mask>0) ch &= add_mask;
-		if (minimal) {
-		    if (ch < 128)
-			fprintf(ofd, "putchar(%d);\n", ch);
-		    else
-			fprintf(ofd, "printf(\"%%lc\",%d);\n", ch);
-		} else if (ch >= ' ' && ch <= '~' &&
-		    ch != '\'' && ch != '\\')
-		    fprintf(ofd, "putch('%c');\n", ch);
-		else if (ch == '\n')
+		break;
+	    }
+
+	    if (!okay_for_cstr(n->count) ||
+		    !n->next || n->next->type != T_PRT) {
+
+		if (n->count == '\n')
 		    fprintf(ofd, "putch('\\n');\n");
-		else if (ch == '\t')
-		    fprintf(ofd, "putch('\\t');\n");
-		else if (ch == '\\')
-		    fprintf(ofd, "putch('\\\\');\n");
 		else
-		    fprintf(ofd, "putch(%d);\n", ch);
+		    fprintf(ofd, "putch(%d);\n", n->count);
+		break;
+	    }
+
+	    {
+		int i = 0, j;
+		int got_perc = 0;
+		int slen = 4;	/* First char + nul */
+		struct bfi * v = n;
+		char *s, *p;
+		while(v->next && v->next->type == T_PRT &&
+			    okay_for_cstr(v->next->count)) {
+		    v = v->next;
+		    if (v->count == '%') got_perc = 1;
+		    if (v->count == '\n') slen++;
+		    i++;
+		    slen++;
+		}
+		p = s = malloc(slen);
+
+		for(j=0; j<=i; j++) {
+		    if (n->count != '\n')
+			*p++ = n->count;
+		    else {
+			*p++ = '\\'; *p++ = 'n';
+		    }
+		    if (j!=i)
+			n = n->next;
+		}
+		*p++ = 0;
+
+		if (!got_perc)
+		    fprintf(ofd, "printf(\"%s\");\n", s);
+		else
+		    fprintf(ofd, "printf(\"%%s\", \"%s\");\n", s);
+		free(s);
 	    }
 	    break;
+#undef okay_for_cstr
 
 	case T_INP:
 	    if (!disable_indent) pt(ofd, indent,n);
@@ -460,7 +503,8 @@ print_ccode(FILE * ofd)
 	    break;
 
 	case T_WHL:
-#if 1
+
+#ifndef DISABLE_TCCLIB
 	    found_rail_runner = 0;
 	    if (n->next->type == T_MOV &&
 		n->next->next && n->next->next->jmp == n) {
@@ -592,17 +636,6 @@ print_ccode(FILE * ofd)
 	n=n->next;
     }
 
-    if(sp != string_buffer) {
-	*sp++ = 0;
-	if (enable_trace) {
-	    pt(ofd, indent,0);
-	    fprintf(ofd, "t(0,0,\"printf(...) \",m)\n");
-	}
-	if (strchr(string_buffer, '%') == 0 )
-	    fprintf(ofd, "  printf(\"%s\");\n", string_buffer);
-	else
-	    fprintf(ofd, "  printf(\"%%s\", \"%s\");\n", string_buffer);
-    }
     if (!noheader)
 	fprintf(ofd, "  return 0;\n}\n");
 }
@@ -625,8 +658,8 @@ run_ccode(void)
 #endif
 
     ofd = open_memstream(&ccode, &ccodelen);
-    print_ccode(ofd);
     if (ofd == NULL) { perror("open_memstream"); exit(7); }
+    print_ccode(ofd);
     putc('\0', ofd);
     fclose(ofd);
 
@@ -739,4 +772,124 @@ static char * args[] = {"tcclib", 0};
     free(ccode);
 #endif
 }
+#endif
+
+
+#ifdef USE_DLOPEN
+static void compile_and_run(void);
+
+static char tmpdir[] = "/tmp/bfrun.XXXXXX";
+static char ccode_name[sizeof(tmpdir)+16];
+static char dl_name[sizeof(tmpdir)+16];
+
+void
+run_ccode(void)
+{
+    FILE * ofd;
+    if( mkdtemp(tmpdir) == 0 ) {
+	perror("mkdtemp()");
+	exit(1);
+    }
+    strcpy(ccode_name, tmpdir); strcat(ccode_name, "/bfpgm.c");
+    strcpy(dl_name, tmpdir); strcat(dl_name, "/bfpgm.so");
+    ofd = fopen(ccode_name, "w");
+    print_ccode(ofd);
+    fclose(ofd);
+    compile_and_run();
+}
+
+/*  Needs:   gcc -shared -fPIC -o libfoo.so foo.c
+    And:     -ldl
+
+    NB: -fno-asynchronous-unwind-tables
+*/
+
+typedef void (*voidfnp)(void);
+static int loaddll(const char *);
+static voidfnp runfunc;
+static void *handle;
+
+static void
+compile_and_run(void)
+{
+    char cmdbuf[256];
+    int ret;
+
+    sprintf(cmdbuf, "cc %s -shared -fPIC -o %s %s",
+	    "", dl_name, ccode_name);
+    ret = system(cmdbuf);
+
+    if (ret == -1) {
+	perror("Calling C compiler failed");
+	exit(1);
+    }
+    if (WIFEXITED(ret)) {
+	if (WEXITSTATUS(ret)) {
+	    fprintf(stderr, "Compile failed.\n");
+	    exit(WEXITSTATUS(ret));
+	}
+    } else {
+	if (WIFSIGNALED(ret)) {
+	    if( WTERMSIG(ret) != SIGINT && WTERMSIG(ret) != SIGQUIT)
+		fprintf(stderr, "Killed by SIGNAL %d.\n", WTERMSIG(ret));
+	    exit(1);
+	}
+	perror("Abnormal exit");
+	exit(1);
+    }
+
+    loaddll(dl_name);
+
+    unlink(ccode_name);
+    unlink(dl_name);
+    rmdir(tmpdir);
+
+    (*runfunc)();
+
+    dlclose(handle);
+}
+
+int
+loaddll(const char * dlname)
+{
+    char *error;
+    void ** brainfuck_memptr;
+    // void ** ptr;
+    voidfnp *ptr;
+
+    handle = dlopen(dlname, RTLD_LAZY);
+    if (!handle) {
+        fprintf(stderr, "%s\n", dlerror());
+        exit(EXIT_FAILURE);
+    }
+
+    dlerror();    /* Clear any existing error */
+
+    /* The C99 standard leaves casting from "void *" to a function
+       pointer undefined.  The assignment used below is the POSIX.1-2003
+       (Technical Corrigendum 1) workaround; see the Rationale for the
+       POSIX specification of dlsym().
+     *						-- Linux man page dlsym()
+     */
+
+    *(void **) (&runfunc) = dlsym(handle, "brainfuck");
+
+    /* Set the memory pointer to point to our allocated huge buffer */
+    brainfuck_memptr = dlsym(handle, "brainfuck_memptr");
+    *brainfuck_memptr = map_hugeram();
+
+    /* Set some manual fn pointers back here so we don't have to link
+     * with the -rdynamic flag */
+    ptr = dlsym(handle, "brainfuck_getch");
+    *ptr = (voidfnp) &getch;
+    ptr = dlsym(handle, "brainfuck_putch");
+    *ptr = (voidfnp) &putch;
+
+    if ((error = dlerror()) != NULL)  {
+        fprintf(stderr, "%s\n", error);
+        exit(EXIT_FAILURE);
+    }
+    return 0;
+}
+
 #endif

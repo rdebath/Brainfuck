@@ -68,7 +68,7 @@ int jit_lib_ok = JITLIBOK;
 
 static int tape_step = sizeof(int);
 
-static void (*codeptr)();
+static void (*codeptr)(void);
 static int acc_loaded = 0;
 static int acc_offset = 0;
 static int acc_dirty = 0;
@@ -196,8 +196,8 @@ run_jit_asm(void)
 	switch(n->type)
 	{
 	case T_MOV:
-	    clean_acc();
-	    acc_loaded = 0;
+	    if (acc_loaded)
+		acc_offset -= n->count;
 
 	    jit_addi(REG_P, REG_P, n->count * tape_step);
 	    break;

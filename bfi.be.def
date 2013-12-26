@@ -58,7 +58,7 @@ X(jit,JIT,
 #endif
 
 /****************************************************************************/
-#ifndef DISABLE_TCCLIB
+#if !defined(DISABLE_TCCLIB) || !defined(DISABLE_DLOPEN)
 X(ccode,CCODE,
     printf("   -c   Create C code. If combined with -r the code is run using TCCLIB.\n");   ,
     case 'c': do_codestyle = c_ccode; do_run = (do_run==1); break;			    ,
@@ -117,6 +117,8 @@ X(dc,DC,
 #if XX == 4
     if (eofcell == 0 && do_codestyle == c_dc && input_string == 0)
 	eofcell = 6;
+    if (cell_size == 0 && do_codestyle == c_dc)
+	set_cell_size(32);
 #endif
 
 /****************************************************************************/

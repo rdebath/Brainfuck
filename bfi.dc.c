@@ -21,7 +21,7 @@ static FILE * ofd;
  * b	A stack of currently open while loops
  * i	Input a chracter to the TOS
  * o	Output the TOS as one character (calls reg 'm' if needed)
- * m	Replaces TOS with (TOS & cell_size)
+ * m	Replaces TOS with (TOS & cell_mask)
  * M	Used for when % gives a negative in 'm'.
  *
  * C	May be defined as an array of character printers for lox
@@ -58,7 +58,7 @@ save_cell(int offset)
 }
 
 static void
-prt_value(char * prefix, int count, char * suffix)
+prt_value(const char * prefix, int count, const char * suffix)
 {
     if (count>=0)
 	fprintf(ofd, "%s%d%s", prefix, count, suffix);
@@ -70,7 +70,7 @@ prt_value(char * prefix, int count, char * suffix)
 /* '\' if for bsd dc, '|' and '~' are for dc.sed */
 #define okay_for_printf(xc) \
 		    ( (xc) == '\n' || ( (xc)>= ' ' && (xc) <= '~' && \
-		      (xc) != '\\' && /* (xc) != '|' && (xc) != '~' && */ \
+		      (xc) != '\\' && (xc) != '|' && (xc) != '~' && \
 		      (xc) != '[' && (xc) != ']' ) \
 		    )
 void
@@ -80,7 +80,9 @@ print_dc(void)
     int stackdepth = 0;
     int hello_world;
     int used_lix = 0;
+#ifndef DISABLE_DC_V7
     int used_lox = 0;
+#endif
     ofd = stdout;
 
     calculate_stats();
@@ -90,12 +92,14 @@ print_dc(void)
 	struct bfi * v = n;
 	while(v && v->type == T_PRT && okay_for_printf(v->count))
 	    v=v->next;
-	if (v == 0) {
-	    printf("[");
-	    for(v=n; v; v=v->next) putchar(v->count);
-	    printf("]P\n");
-	    return;
-	}
+	if (v) hello_world = 0;
+    }
+
+    if (hello_world) {
+	printf("[");
+	for(; n; n=n->next) putchar(n->count);
+	printf("]Pq\n");
+	return;
     }
 
     if (most_neg_maad_loop < 0 && node_type_counts[T_MOV] != 0)
@@ -180,16 +184,22 @@ print_dc(void)
 	case T_PRT:
 	    if (n->count == -1) {
 		fetch_cell(n->offset);
+#ifdef DISABLE_DC_V7
+		fprintf(ofd, "aP\n");
+#else
 		fprintf(ofd, "lox\n");
 		used_lox = 1;
+#endif
 		break;
 	    }
 
-	    if (!okay_for_printf(n->count) ||
-		    !n->next || n->next->type != T_PRT) {
-
+	    if (!okay_for_printf(n->count)) {
+#ifdef DISABLE_DC_V7
+		prt_value("", n->count, "aP\n");
+#else
 		prt_value("", n->count, "lox\n");
 		used_lox = 1;
+#endif
 	    } else {
 		int i = 0, j;
 		struct bfi * v = n;
@@ -250,14 +260,12 @@ print_dc(void)
 #ifndef DISABLE_DC_V7
     if (used_lox) {
 	int i;
+	/* Setup the Z register with a script to create the C array */
 	fprintf(ofd, "[");
 	for (i = 1; i < 127; i++) {
-	    if (i == '\n') {
-		fprintf(ofd, "[[\n]P]%d:C\n", i);
-	    } else if (i >= ' ' && i <= '~' &&
-		       i != '[' && i != ']' && i != '\\' && i != '|') {
+	    if (okay_for_printf(i)) {
 		fprintf(ofd, "[[%c]P]%d:C", i, i);
-	    } else if (i < 100) {
+	    } else if (i < 100) { /* Only works for 1..99 in V7 dc */
 		fprintf(ofd, "[%dP]%d:C", i, i);
 	    }
 	    if (i % 8 == 7)
@@ -266,24 +274,18 @@ print_dc(void)
 	fprintf(ofd, "]SZ\n");
 
 	/* Use 'Z' command to detect v7 dc. Detects dc.sed as not v7. */
-	fprintf(ofd, "[1   [aP]so ]SB\n");
-	fprintf(ofd, "[lZx [256%%256+256%%;Cx]so ]SA\n");
-	fprintf(ofd, "0 0 [o] Z 1=B 0=A 0sALAsBLBsZLZ c\n");
+	/* So if Z says ok we see if the '#' comment character works. */
 
-	/*  Note: dc.sed works in traditional (v7) mode, but as it takes
-	 *  80 seconds just to print "Hello World!" there's not much point
-	 *  doing an auto detection. As all other dc implementations I
-	 *  know of have the 'a' command ( "make TOS a one char string" )
-	 *  I'm assuming all future ones will too.
-	 *
-	 *  Note: if it's required the 'r' command is the most likely
-	 *  candidate for an auto detection but the 'Z' will still be needed
-	 *  to detect v7 without an error and dc.sed will output an error. */
+	fprintf(ofd, "[[aP]so\n");
+	fprintf(ofd, "1#1-\n");
+	fprintf(ofd, "]SB\n");
+	fprintf(ofd, "[lZx [256%%256+256%%;Cx]so ]SA\n");
+	fprintf(ofd, "0 0 [o] Z 1=B 0=A\n");
+	/* Restore A, B and Z */
+	fprintf(ofd, "0sALAsBLBsZLZ d!=.\n");
     }
-#else
-    if (used_lox) fprintf(ofd, "[aP]so\n");
 #endif
-    if (cell_size > 0)
+    if (cell_mask > 0)
 	fprintf(ofd, "[%d+]sM [%d %% d0>M]sm\n", cell_mask+1, cell_mask+1);
 
     if (used_lix) {
