@@ -1,7 +1,7 @@
 Brainfuck
 =========
 
-Various brainfuck stuff:
+This repository contains various [brainfuck](http://esolangs.org/wiki/Brainfuck) stuff.
 
 1. The BF program "bitwidth.b"; this is something of a torture test, if your interpreter correctly executes this anything else is likely to be dead easy. 
 
@@ -11,16 +11,15 @@ Various brainfuck stuff:
 
   Though before you try it you might like to try this slightly less nasty Hello World! 
 
-      >++++++++[<+++++++++>-]<.>>+>+>++>[-]+<[>[->+<<++++>]<<]>.+++++++..
-      +++.>>+++++++.<<<<+++++++++++++++.>>.+++.------.--------.>>+.>++++.
+      >++++++++[<+++++++++>-]<.>>+>+>++>[-]+<[>[->+<<++++>]<<]>.+++++++..+++.>
+      >+++++++.<<<[[-]<[-]>]<+++++++++++++++.>>.+++.------.--------.>>+.>++++.
 
 2. Brainfuck to anything. Well not exactly anything but the list includes ...
   * asmjs -- Convert to the "asm.js" dialect of javascript
   * awk	-- Code for any modern AWK, ancient ones need a #define
   * basic -- A couple of very random BASIC interpreters.
   * bash -- GNU bash, uses arrays, arithimetic etc.
-  * bf -- Ook, Blub and fuck fuck
-  * cfish -- C and "there once was a fish named Fred"
+  * bf -- Ook, Blub, fuck fuck, "there once was a fish named Fred" and similar transliterations. Some can be compiled as C
   * cgmp -- C using the Gnu MP library
   * clojure -- Not a very nice conversion though.
   * dc -- Won't work on dc.sed; the -r option uses a special filter on input.
@@ -38,3 +37,5 @@ Various brainfuck stuff:
   * gcc -- Convert to C and run as a shared lib; very quick with -O2.
 
   Most are heavily optimised (for Brainfuck) and most work in both 8 bit and the native size of the generated code.
+  They have been tested using many of the BF programs from the [Esoteric Files Archive](https://github.com/graue/esofiles/tree/master/brainfuck/src) (And of course tortured!)
+  
