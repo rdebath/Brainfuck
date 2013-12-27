@@ -4,7 +4,7 @@ LDLIBS=
 
 EXE1=bf2bf bf2run
 EXER=\
-	bf2gas32 bf2gas64 bf2asmjs bf2awk bf2bas bf2bash bf2cfish \
+	bf2gas32 bf2gas64 bf2asmjs bf2awk bf2bas bf2bash \
 	bf2cgmp bf2clojure bf2dc bf2lua bf2neko bf2pas bf2perl \
 	bf2php bf2ps1 bf2py bf2rb bf2tcc bf2gcc bf2sh
 
@@ -75,9 +75,6 @@ bf2gas64.o: bf2gas.c
 	$(CC) $(CFLAGS) -DUSE64 $(TARGET_ARCH) -c -o $@ bf2gas.c
 
 bf2pas: bf2pas.o bf2any.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2cfish: bf2cfish.o bf2any.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
 
 bf2ps1: bf2ps1.o bf2any.o
