@@ -14,11 +14,18 @@ This repository contains various [brainfuck](http://esolangs.org/wiki/Brainfuck)
       >++++++++[<+++++++++>-]<.>>+>+>++>[-]+<[>[->+<<++++>]<<]>.+++++++..+++.>
       >+++++++.<<<[[-]<[-]>]<+++++++++++++++.>>.+++.------.--------.>>+.>++++.
 
-2. Brainfuck to anything. Well not exactly anything but the list includes ...
+2. VIM Syntax highlighting file for brainfuck.
+
+  This file highlights the eight BF command characters in four (reasonable) classes. This is the simple part.
+
+  In addition it highlights SOME of the other characters as comments.  Generally it tries (with moderate success) to distinguish between proper comments and sequences that are probably supposed to be comments but actually contain active BF command characters. In addition it tries to identify the 'dead code' style comment loops highlighting any BF command characters within the loop in the 'PreProc' style to distinguish them from commands that may actually be executed.
+
+
+3. Brainfuck to anything. Well not exactly anything but the list includes ...
   * asmjs -- Convert to the "asm.js" dialect of javascript
   * awk	-- Code for any modern AWK, ancient ones need a #define
   * basic -- A couple of very random BASIC interpreters.
-  * bash -- GNU bash, uses arrays, arithimetic etc.
+  * bash -- GNU bash, uses arrays, arithimetic etc. (NO external programs or subshells used)
   * bf -- Ook, Blub, fuck fuck, "there once was a fish named Fred" and similar transliterations. Some can be compiled as C
   * cgmp -- C using the Gnu MP library
   * clojure -- Not a very nice conversion though.
@@ -35,6 +42,8 @@ This repository contains various [brainfuck](http://esolangs.org/wiki/Brainfuck)
   * run -- a direct interpreter -- blisteringly quick too for one without JIT.
   * tcc -- Convert to C and run using LIBTCC -- Is quicker than bf2run ... just.
   * gcc -- Convert to C and run as a shared lib; very quick with -O2.
+  * sh -- Bourne shell without bash extensions, not Unix v7 but later should be fine.
+  * rc -- The Plan9 shell rc(1) using no external programs. (Can't input without one though)
 
   Most are heavily optimised (for Brainfuck) and most work in both 8 bit and the native size of the generated code.
   They have been tested using many of the BF programs from the [Esoteric Files Archive](https://github.com/graue/esofiles/tree/master/brainfuck/src) (And of course tortured!)
