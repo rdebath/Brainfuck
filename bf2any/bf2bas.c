@@ -54,6 +54,14 @@ check_arg(char * arg)
     if (strcmp("-bw", arg) ==0) {
 	style = 11; return 1;
     } else
+    if (strcmp("-h", arg) ==0) {
+	fprintf(stderr, "%s\n",
+	"\t"    "-ansi   ANSI basic"
+	"\n\t"  "-goto   Basic using GOTOs and line numbers"
+	"\n\t"  "-bac    Some odd basic"
+	"\n\t"  "-bw     BWBasic");
+	return 1;
+    } else
 	return 0;
 }
 

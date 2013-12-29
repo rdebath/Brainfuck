@@ -219,6 +219,7 @@ outrun(int ch, int repcnt)
 int
 main(int argc, char ** argv)
 {
+    char * pgm = argv[0];
     int ch, lastch=']', c=0, m, b=0, lc=0;
     FILE * ifd;
     enable_optim = check_arg("-O");
@@ -231,15 +232,29 @@ main(int argc, char ** argv)
 	    enable_optim=0; argc--; argv++;
 	} else if (strcmp(argv[1], "-O") == 0 && check_arg(argv[1])) {
 	    enable_optim=1; argc--; argv++;
-	} else if (check_arg(argv[1])) {
-	    argc--; argv++;
 	} else if (strcmp(argv[1], "-#") == 0) {
 	    enable_debug++; argc--; argv++;
+	} else if (strcmp(argv[1], "-h") == 0) {
+	    fprintf(stderr, "%s: [options] [File]\n", pgm);
+	    fprintf(stderr, "%s\n",
+	    "\t"    "-h      This message"
+	    "\n\t"  "-b      Force byte cells"
+	    "\n\t"  "-#      Turn on trace code.");
+	    if (enable_optim)
+		fprintf(stderr, "%s\n",
+		"\t"    "-O      Enable optimisation"
+		"\n\t"  "-m      Disable optimisation");
+
+	    check_arg(argv[1]);
+	    exit(0);
+	} else if (check_arg(argv[1])) {
+	    argc--; argv++;
 	} else if (strcmp(argv[1], "--") == 0) {
 	    argc--; argv++;
 	    break;
 	} else if (argv[1][0] == '-') {
-	    fprintf(stderr, "Unknown option '%s'\n", argv[1]);
+	    fprintf(stderr, "Unknown option '%s'; try -h for option list\n",
+		    argv[1]);
 	    exit(1);
 	} else break;
     }

@@ -20,7 +20,17 @@ check_arg(char * arg)
     if (strcmp(arg, "-d") == 0) {
 	do_dump = 1;
 	return 1;
-    }
+    } else
+    if (strcmp(arg, "-r") == 0) {
+	do_dump = 0;
+	return 1;
+    } else
+    if (strcmp("-h", arg) ==0) {
+	fprintf(stderr, "%s\n",
+	"\t"    "-d      Dump code"
+	"\n\t"  "-r      Run program");
+	return 1;
+    } else
     return 0;
 }
 

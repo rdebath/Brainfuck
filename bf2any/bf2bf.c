@@ -102,6 +102,23 @@ check_arg(char * arg)
     if (strcmp(arg, "-rle") == 0) {
 	lang = bc; langver = 2; c_style = 1; return 1;
     } else
+    if (strcmp("-h", arg) ==0) {
+	fprintf(stderr, "%s\n",
+	"\t"    "-c      Plain C"
+	"\n\t"  "-nice   Nice memorable C translation."
+	"\n\t"  "-mini   Compact C translation."
+	"\n\t"  "-fish   There once was a (dead) fish named Fred"
+	"\n\t"  "-trip   Triplet like translation"
+	"\n\t"  "-ook    Ook!"
+	"\n\t"  "-blub   Blub!"
+	"\n\t"  "-fk     fuck fuck"
+	"\n\t"  "-pogaack Pogaack."
+	"\n\t"  "-:      Dotty"
+	"\n\t"  "-lisp   Lisp Zero"
+	"\n\t"  "-risbf  RISBF"
+	"\n\t"  "-rle    Odd RLE C translation");
+	return 1;
+    } else
 	return 0;
 }
 

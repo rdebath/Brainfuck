@@ -42,8 +42,16 @@ check_arg(char * arg)
 #endif
     else if (strcmp(arg, "-d") == 0) {
 	runmode=0; return 1;
-    }
-    return 0;
+    } else
+#ifndef NO_LIBTCC
+    if (strcmp("-h", arg) ==0) {
+	fprintf(stderr, "%s\n",
+	"\t"    "-d      Dump code"
+	"\n\t"  "-r      Run program");
+	return 1;
+    } else
+#endif
+	return 0;
 }
 
 void
