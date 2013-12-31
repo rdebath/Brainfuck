@@ -13,6 +13,8 @@ static void print_hello_world(void);
 
 static int hello_world = 0;
 
+static char * curfile = "brainfuck"; /* Hmmm */
+
 void
 print_nasm(void)
 {

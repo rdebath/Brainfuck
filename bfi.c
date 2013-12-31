@@ -111,8 +111,9 @@ int opt_level = 3;
 int opt_no_calc = 0;
 int opt_no_litprt = 0;
 int opt_no_endif = 0;
+int opt_no_repoint = 0;
 
-int hard_left_limit = -128;
+int hard_left_limit = -1024;
 int enable_trace = 0;
 int debug_mode = 0;
 int iostyle = 0; /* 0=ASCII, 1=UTF8, 2=Binary. */
@@ -123,7 +124,6 @@ int cell_size = 0;  /* 0 is 8,16,32 or more. 7 and up are number of bits */
 int cell_mask = -1; /* -1 is don't mask. */
 char const * cell_type = "C";
 
-char * curfile = 0;
 int curr_line = 0, curr_col = 0;
 int cmd_line = 0, cmd_col = 0;
 int bfi_num = 0;
@@ -164,6 +164,7 @@ void run_tree(void);
 void delete_tree(void);
 void calculate_stats(void);
 void pointer_scan(void);
+void pointer_regen(void);
 void quick_scan(void);
 void invariants_scan(void);
 void trim_trailing_sets(void);
@@ -227,8 +228,8 @@ void LongUsage(FILE * fd)
     printf("        Also prevents optimiser assuming the tape starts blank.\n");
     printf("   -#   Use '#' as a debug symbol. Note: Selects the tree interpreter.\n");
     printf("\n");
-    printf("   -u   Wide character (unicode) I/O%s\n", iostyle==1?" (enabled)":"");
     printf("   -a   Ascii I/O, filters CR from input%s\n", iostyle==0?" (enabled)":"");
+    printf("   -u   Wide character (unicode) I/O%s\n", iostyle==1?" (enabled)":"");
     printf("   -B   Binary I/O, unmodified I/O%s\n", iostyle==2?" (enabled)":"");
     printf("\n");
     printf("   -On  'Optimisation' level.\n");
@@ -319,9 +320,9 @@ main(int argc, char ** argv)
                     case 'm': opt_level=0; break;
                     case 'T': enable_trace=1; break;
 
-                    case 'B': iostyle=2; break;
-                    case 'u': iostyle=1; break;
                     case 'a': iostyle=0; break;
+                    case 'u': iostyle=1; break;
+                    case 'B': iostyle=2; break;
 
                     default:
 			if (p==argv[ar]+1 && *p == '-') {
@@ -365,8 +366,6 @@ main(int argc, char ** argv)
                         break;
                 }
         else {
-	    curfile = argv[ar];
-
 	    filelist[filecount++] = argv[ar];
         }
 
@@ -542,7 +541,8 @@ add_node_after(struct bfi * p)
 	if (n->next) n->next->prev = n;
 	n->prev->next = n;
     } else if (bfprog) {
-	fprintf(stderr, "Error in add_node_after()\n");
+	n->next = bfprog;
+	if (n->next) n->next->prev = n;
     } else bfprog = n;
 
     return n;
@@ -699,6 +699,9 @@ process_file(void)
 	    if (!noheader)
 		trim_trailing_sets();
 	}
+
+	if (!opt_no_repoint)
+	    pointer_regen();
 
 	if (verbose>2)
 	    fprintf(stderr, "Optimise level %d complete\n", opt_level);
@@ -1109,7 +1112,7 @@ pointer_scan(void)
 		n4->next = n3;
 		n4->prev = n2;
 
-	    } else if (n->next->type == T_END) {
+	    } else {
 		/* Stuck behind an end loop, can't push past this */
 		/* Make the line & col of the movement the same as the
 		 * T_END that's blocked it. */
@@ -1142,6 +1145,53 @@ pointer_scan(void)
     }
     if(verbose>4)
 	fprintf(stderr, "Pointer scan complete.\n");
+}
+
+void
+pointer_regen(void)
+{
+    struct bfi *v, *n = bfprog;
+    int current_shift = 0;
+
+    calculate_stats();
+    if (node_type_counts[T_MOV] == 0) return;
+    if (min_pointer > -32 && max_pointer < 32) return;
+
+    while(n)
+    {
+	switch(n->type)
+	{
+	case T_WHL: case T_MULT: case T_CMULT: case T_FOR: case T_END:
+	case T_IF: case T_ENDIF:
+	    if (n->offset != current_shift) {
+		v = add_node_after(n->prev);
+		v->type = T_MOV;
+		v->count = n->offset - current_shift;
+		current_shift = n->offset;
+	    }
+	    n->offset -= current_shift;
+	    break;
+
+	case T_PRT: case T_INP: case T_ADD: case T_SET:
+	    n->offset -= current_shift;
+	    break;
+
+	case T_CALC:
+	    n->offset -= current_shift;
+	    n->offset2 -= current_shift;
+	    n->offset3 -= current_shift;
+	    break;
+
+	case T_STOP:
+	case T_MOV:
+	    break;
+
+	default:
+	    fprintf(stderr, "Invalid node pointer regen = %s\n", tokennames[n->type]);
+	    exit(1);
+	}
+	n = n->next;
+    }
 }
 
 void
@@ -1290,6 +1340,17 @@ invariants_scan(void)
 
 		n2 = n->prev;
 		if(n2) { n->line = n2->line; n->col = n2->col; }
+	    }
+
+	    if (n && n2 && n2->type == T_MOV && n->type == T_MOV) {
+		/* Hmm, merge two movements */
+		n->count += n2->count;
+		n2->count = 0;
+		n2->type = T_NOP;
+		if (n->count == 0)
+		    n->type = T_NOP;
+		n = n2;
+		node_changed = 1;
 	    }
 	    break;
 	}
@@ -1802,7 +1863,8 @@ find_known_state(struct bfi * v)
 	    if (v->count != -1) break;
 	    if (opt_no_litprt) break; /* BE can't cope */
 	    known_value = UM(known_value);
-	    if (known_value < 0) known_value &= 0xFF;
+	    if (known_value < 0 && (known_value&0xFF) < 0x80)
+		known_value &= 0xFF;
 	    if (known_value == -1) break;
 	    v->count = known_value;
 	    if (verbose>5) fprintf(stderr, "  Make literal putchar.\n");
@@ -2564,7 +2626,7 @@ print_codedump(void)
 
     switch(eofcell)
     {
-    default:
+    case 0:
     case 1:
 	printf("#define inpchar(x) {int a=getchar();if(a!=EOF)p[x]=a;}\n");
 	break;
@@ -2576,11 +2638,6 @@ print_codedump(void)
 	break;
     case 4:
 	printf("#define inpchar(x) p[x]=getchar();\n");
-	break;
-    case 5:
-	break;
-    case 6:
-	printf("#define inpchar(x) abort();\n");
 	break;
     }
 

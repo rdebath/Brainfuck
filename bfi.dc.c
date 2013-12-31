@@ -273,8 +273,8 @@ print_dc(void)
 	}
 	fprintf(ofd, "]SZ\n");
 
-	/* Use 'Z' command to detect v7 dc. Detects dc.sed as not v7. */
-	/* So if Z says ok we see if the '#' comment character works. */
+	/* Use 'Z' command to detect v7 dc. It detects dc.sed as not v7. */
+	/* So if Z says ok we see if the '#' comment character works too. */
 
 	fprintf(ofd, "[[aP]so\n");
 	fprintf(ofd, "1#1-\n");
@@ -299,7 +299,10 @@ print_dc(void)
 	    fprintf(ofd, "[lnd1+sn;I]si\n");
 	} else {
 
+	    /* New for GNU dc, character I/O ... soon
 	    fprintf(ofd, "[1G [sB_1]SA [bAla]SB 0=A Bx 0sALAaBLB+ ]si\n");
+	    */
+	    /* Input integers, -1 on EOF */
 	    fprintf(ofd, "[? z [_1]SA 0=A 0sALA+ ]si\n");
 	}
     }

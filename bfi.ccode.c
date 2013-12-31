@@ -55,22 +55,19 @@ pt(FILE* ofd, int indent, struct bfi * n)
 }
 
 void
-print_c_header(FILE * ofd, int * minimal_p)
+print_c_header(FILE * ofd)
 {
-    int use_full = 0;
     int memsize = 60000;
     int memoffset = 0;
     char const * funcname = "main";
+    int l_iostyle = iostyle;
+
+    if (cell_mask > 0 && cell_size < 8 && l_iostyle == 1) l_iostyle = 0;
 
     calculate_stats();
 
-    if (enable_trace || do_run || !minimal_p) use_full = 1;
-
-#ifdef USE_DLOPEN
-    if (do_run) funcname = "brainfuck";
-#endif
-
-    if (total_nodes == node_type_counts[T_PRT] && !use_full) {
+    /* Hello world mode ? */
+    if (!enable_trace && !do_run && total_nodes == node_type_counts[T_PRT]) {
 	int okay = 1;
 	struct bfi * n = bfprog;
 	/* Check the string; be careful. */
@@ -85,10 +82,13 @@ print_c_header(FILE * ofd, int * minimal_p)
 	if (okay) {
 	    fprintf(ofd, "#include <stdio.h>\n\n");
 	    fprintf(ofd, "int main(void)\n{\n");
-	    *minimal_p = 1;
 	    return ;
 	}
     }
+
+#ifdef USE_DLOPEN
+    if (do_run) funcname = "brainfuck";
+#endif
 
     fprintf(ofd, "#include <stdio.h>\n");
     fprintf(ofd, "#include <stdlib.h>\n\n");
@@ -101,65 +101,79 @@ print_c_header(FILE * ofd, int * minimal_p)
 	fprintf(ofd, "# endif\n\n");
     }
 
-    if (node_type_counts[T_INP] != 0 && !do_run && iostyle != 2)
+    if (node_type_counts[T_INP] != 0 && !do_run)
     {
-	fprintf(ofd, "#ifdef WIDECHAR\n");
-	fprintf(ofd, "#include <locale.h>\n");
-	fprintf(ofd, "#include <wchar.h>\n");
-	fprintf(ofd, "#endif\n\n");
-
-	fprintf(ofd, "static int\n");
-	fprintf(ofd, "getch(int oldch)\n");
-	fprintf(ofd, "{\n");
-	fprintf(ofd, "    int ch;\n");
-	fprintf(ofd, "#ifdef WIDECHAR\n");
-	fprintf(ofd, "    ch = getwchar();\n");
-	fprintf(ofd, "#else\n");
-	fprintf(ofd, "    ch = getchar();\n");
-	fprintf(ofd, "#endif\n");
-	fprintf(ofd, "#ifndef EOFCELL\n");
-	fprintf(ofd, "    if (ch != EOF) return ch;\n");
-	fprintf(ofd, "    return oldch;\n");
-	fprintf(ofd, "#else\n");
-	fprintf(ofd, "#if EOFCELL == EOF\n");
-	fprintf(ofd, "    return ch;\n");
-	fprintf(ofd, "#else\n");
-	fprintf(ofd, "    if (ch != EOF) return ch;\n");
-	fprintf(ofd, "    return EOFCELL;\n");
-	fprintf(ofd, "#endif\n");
-	fprintf(ofd, "#endif\n");
-	fprintf(ofd, "}\n\n");
-    }
-
-    if (node_type_counts[T_INP] != 0 && !do_run && iostyle == 2)
-    {
-	fprintf(ofd, "static int\n");
-	fprintf(ofd, "getch(int oldch)\n");
-	fprintf(ofd, "{\n");
-	fprintf(ofd, "    int ch;\n");
-	fprintf(ofd, "    ch = getchar();\n");
-	fprintf(ofd, "#ifndef EOFCELL\n");
-	fprintf(ofd, "    if (ch != EOF) return ch;\n");
-	fprintf(ofd, "    return oldch;\n");
-	fprintf(ofd, "#else\n");
-	fprintf(ofd, "#if EOFCELL == EOF\n");
-	fprintf(ofd, "    return ch;\n");
-	fprintf(ofd, "#else\n");
-	fprintf(ofd, "    if (ch != EOF) return ch;\n");
-	fprintf(ofd, "    return EOFCELL;\n");
-	fprintf(ofd, "#endif\n");
-	fprintf(ofd, "}\n\n");
+	if (l_iostyle == 2 && (eofcell == 4 || (eofcell == 2 && EOF == -1)))
+	    fprintf(ofd, "static int getch(int oldch) { return getchar(); }\n");
+	else {
+	    if (l_iostyle == 1) {
+		fprintf(ofd, "#include <locale.h>\n");
+		fprintf(ofd, "#include <wchar.h>\n\n");
+	    }
+	    fprintf(ofd, "static int\n");
+	    fprintf(ofd, "getch(int oldch)\n");
+	    fprintf(ofd, "{\n");
+	    fprintf(ofd, "  int ch;\n");
+	    if (l_iostyle == 2) {
+		fprintf(ofd, "  ch = getchar();\n");
+	    } else {
+		fprintf(ofd, "  do {\n");
+		if (l_iostyle == 1)
+		    fprintf(ofd, "\tch = getwchar();\n");
+		else
+		    fprintf(ofd, "\tch = getchar();\n");
+		fprintf(ofd, "  } while (ch == '\\r');\n");
+	    }
+	    switch(eofcell) {
+	    default:
+		fprintf(ofd, "#ifndef EOFCELL\n");
+		fprintf(ofd, "  if (ch != EOF) return ch;\n");
+		fprintf(ofd, "  return oldch;\n");
+		fprintf(ofd, "#else\n");
+		fprintf(ofd, "#if EOFCELL == EOF\n");
+		fprintf(ofd, "  return ch;\n");
+		fprintf(ofd, "#else\n");
+		fprintf(ofd, "  if (ch != EOF) return ch;\n");
+		fprintf(ofd, "  return EOFCELL;\n");
+		fprintf(ofd, "#endif\n");
+		fprintf(ofd, "#endif\n");
+		break;
+	    case 1:
+		fprintf(ofd, "  if (ch != EOF) return ch;\n");
+		fprintf(ofd, "  return oldch;\n");
+		break;
+	    case 3:
+		fprintf(ofd, "  if (ch != EOF) return ch;\n");
+		fprintf(ofd, "  return 0;\n");
+		break;
+	    case 2:
+#if EOF != -1
+		fprintf(ofd, "  if (ch != EOF) return ch;\n");
+		fprintf(ofd, "  return -1;\n");
+		break;
+#endif
+	    case 4:
+		fprintf(ofd, "  return ch;\n");
+		break;
+	    }
+	    fprintf(ofd, "}\n\n");
+	}
     }
 
     if (node_type_counts[T_PRT] != 0 && !do_run) {
-	if (iostyle != 2 ) {
-	    fprintf(ofd, "#ifdef WIDECHAR\n");
-	    fprintf(ofd, "static void putch(int ch) { printf(\"%%lc\",ch); }\n");
-	    fprintf(ofd, "#else\n");
-	    fprintf(ofd, "static void putch(int ch) { putchar(ch); }\n");
-	    fprintf(ofd, "#endif\n\n");
-	} else {
-	    fprintf(ofd, "static void putch(int ch) { putchar(ch); }\n");
+	switch(l_iostyle)
+	{
+	case 0: case 2:
+	    fprintf(ofd, "static void putch(int ch) { putchar(ch); }\n\n");
+	    break;
+	case 1:
+	    fprintf(ofd, "static void putch(int ch)\n{\n"
+			"  if(ch>127)\n"
+			"\tprintf(\"%%lc\",ch);\n"
+			"  else\n"
+			"\tputchar(ch);\n"
+			"}\n\n");
+	    break;
 	}
     }
 
@@ -220,13 +234,10 @@ print_c_header(FILE * ofd, int * minimal_p)
 	    fprintf(ofd, "  m = mem;\n");
     }
 
-    if (node_type_counts[T_INP] != 0) {
+    if (node_type_counts[T_INP] != 0 && !do_run) {
 	fprintf(ofd, "  setbuf(stdout, 0);\n");
-	if (iostyle != 2) {
-	    fprintf(ofd, "#ifdef WIDECHAR\n");
+	if (l_iostyle == 1)
 	    fprintf(ofd, "  setlocale(LC_ALL, \"\");\n");
-	    fprintf(ofd, "#endif\n");
-	}
     }
 }
 
@@ -235,7 +246,6 @@ print_ccode(FILE * ofd)
 {
     int indent = 0, disable_indent = 0;
     struct bfi * n = bfprog;
-    int minimal = 0;
     int add_mask = 0;
 #ifndef DISABLE_TCCLIB
     int found_rail_runner;
@@ -259,8 +269,7 @@ print_ccode(FILE * ofd)
     }
     use_multifunc = (use_multifunc>8192);
 
-    if (!noheader)
-	print_c_header(ofd, &minimal);
+    if (!noheader) print_c_header(ofd);
 
     n = bfprog;
     while(n)
@@ -435,20 +444,17 @@ print_ccode(FILE * ofd)
 		break;
 	    }
 
-	    if (!okay_for_cstr(n->count) ||
-		    !n->next || n->next->type != T_PRT) {
-
+	    if (!okay_for_cstr(n->count)) {
 		if (n->count == '\n')
 		    fprintf(ofd, "putch('\\n');\n");
 		else
 		    fprintf(ofd, "putch(%d);\n", n->count);
-		break;
 	    }
-
+	    else
 	    {
 		int i = 0, j;
 		int got_perc = 0;
-		int slen = 4;	/* First char + nul */
+		int slen = 4;	/* First char + nul + ? */
 		struct bfi * v = n;
 		char *s, *p;
 		while(v->next && v->next->type == T_PRT &&
@@ -458,6 +464,10 @@ print_ccode(FILE * ofd)
 		    if (v->count == '\n') slen++;
 		    i++;
 		    slen++;
+		    if (v->next && v->next->count == 10)
+			;
+		    else if (slen > 132 || (slen>32 && v->count == '\n'))
+			break;
 		}
 		p = s = malloc(slen);
 
@@ -699,6 +709,9 @@ run_ccode(void)
 	int imagesize;
 	void * image = 0;
 
+	if (verbose)
+	    fprintf(stderr, "Running C Code using libtcc 9.25.\n");
+
 	imagesize = tcc_relocate(s, 0);
 	if (imagesize <= 0) {
 	    fprintf(stderr, "tcc_relocate failed to return code size.\n");
@@ -736,6 +749,9 @@ run_ccode(void)
     {
 	int (*func)(void);
 
+	if (verbose)
+	    fprintf(stderr, "Running C Code using libtcc 9.26.\n");
+
 	rv = tcc_relocate(s);
 	if (rv) {
 	    perror("tcc_relocate()");
@@ -765,6 +781,9 @@ run_ccode(void)
 #if !defined(TCCDONE)
 #define TCCDONE
 static char * args[] = {"tcclib", 0};
+    if (verbose)
+	fprintf(stderr, "Running C Code using libtcc tcc_run().\n");
+
     rv = tcc_run(s, 1, args);
     if (verbose && rv)
 	fprintf(stderr, "tcc_run returned %d\n", rv);
@@ -814,6 +833,9 @@ compile_and_run(void)
 {
     char cmdbuf[256];
     int ret;
+
+    if (verbose)
+	fprintf(stderr, "Running C Code using \"cc -shared\" and dlopen().\n");
 
     sprintf(cmdbuf, "cc %s -shared -fPIC -o %s %s",
 	    "", dl_name, ccode_name);

@@ -43,8 +43,11 @@ LDLIBS=$(LIBS_TCCLIB) $(LIBS_LIGHTNING)
 bfi:	bfi.o bfi.ccode.o bfi.jit.o bfi.nasm.o bfi.bf.o bfi.dc.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o bfi $^ $(LDLIBS) $(TARGET_ARCH)
 
+pristine: clean
+	-rm -f bfi
+
 clean:
-	-rm -f *.o bfi
+	-rm -f *.o
 
 bfi.jit.o:	bfi.jit.c bfi.tree.h bfi.jit.h
 	$(CC) $(CFLAGS) $(TARGET_ARCH)  -c -fno-strict-aliasing bfi.jit.c

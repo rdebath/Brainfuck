@@ -1,5 +1,4 @@
 
-extern char * curfile;
 extern int curr_line, curr_col;
 extern int noheader, enable_trace, hard_left_limit, most_neg_maad_loop;
 extern int min_pointer, max_pointer;
