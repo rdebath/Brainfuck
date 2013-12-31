@@ -26,7 +26,7 @@ outcmd(int ch, int count)
 	I; printf("function brainfuck() {\n");
 	ind ++;
 	I; printf("$m = @([int]0) * 65536\n");
-	I; printf("$p = 0\n");
+	I; printf("$p = %d\n", BOFF);
 	break;
 
     // case 'X': I; printf("print \"Infinite Loop\"\nGOTO 200\n"); break;

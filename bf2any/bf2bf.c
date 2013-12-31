@@ -47,8 +47,12 @@ char * bc[] = { "r", "l", "u", "d", "o", "i", "b", "e", "x" };
 /* Order should be "there", "once", "was", "a", "fish", "named", "Fred" */
 char * fish[] = { "once", "there", "was", "a", "fish", "dead", "named", "Fred" };
 
+/* Silly (er) ones. */
 char * dotty[] = { "..", "::", ".:.", ".::", ":.::", ":...", ":.:.", ":..:" };
 char * lisp2[] = { "((", "))", "()(", "())", ")())", ")(((", ")()(", ")(()" };
+
+/* Language COW: Not quite as simple as some commands aren't direct replacements. */
+char * moo[] = {"moO", "mOo", "MoO", "MOo", "MMMMOOMooOOOmooMMM", "OOOMoo", "MOOmoOmOo", "MoOMOomoo"};
 
 char ** lang = 0;
 char ** c = 0;
@@ -84,6 +88,9 @@ check_arg(char * arg)
     if (strcmp(arg, "-blub") == 0) {
 	lang = blub; langver = 0; c_style = 0; return 1;
     } else
+    if (strcmp(arg, "-moo") == 0) {
+	lang = moo; langver = 0; c_style = 0; return 1;
+    } else
     if (strcmp(arg, "-fk") == 0) {
 	lang = f__k; langver = 0; c_style = 1; return 1;
     } else
@@ -102,6 +109,12 @@ check_arg(char * arg)
     if (strcmp(arg, "-rle") == 0) {
 	lang = bc; langver = 2; c_style = 1; return 1;
     } else
+    if (strcmp(arg, "-dump") == 0) {
+	lang = 0; langver = 4; c_style = 0; return 1;
+    } else
+    if (strcmp(arg, "-O") == 0 && langver == 4) {
+	return 1;
+    } else
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-c      Plain C"
@@ -111,11 +124,13 @@ check_arg(char * arg)
 	"\n\t"  "-trip   Triplet like translation"
 	"\n\t"  "-ook    Ook!"
 	"\n\t"  "-blub   Blub!"
+	"\n\t"  "-moo    Cow -- http://www.frank-buss.de/cow.html"
 	"\n\t"  "-fk     fuck fuck"
 	"\n\t"  "-pogaack Pogaack."
 	"\n\t"  "-:      Dotty"
 	"\n\t"  "-lisp   Lisp Zero"
 	"\n\t"  "-risbf  RISBF"
+	"\n\t"  "-dump   Token dump"
 	"\n\t"  "-rle    Odd RLE C translation");
 	return 1;
     } else
@@ -161,15 +176,18 @@ outcmd(int ch, int count)
 	    } else
 		pc(ch);
 	}
-    } else if (langver == 1)
+    } else if (langver == 1) {
 	while (count-->0)
 	    risbf(ch);
-    else if (langver == 3) {
+    } else if (langver == 3) {
 	while(count-->0){
 	    char * p = lang[strchr(bf,ch)-bf];
 	    while (*p)
 		pc(*p++);
 	}
+    } else if (langver == 4) {
+	printf("%c %d\n", ch, count);
+	col = 0;
     }
 
     if (ch == '~') {

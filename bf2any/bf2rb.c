@@ -23,10 +23,10 @@ outcmd(int ch, int count)
 {
     switch(ch) {
     case '!':
-	printf( "%s",
+	printf( "%s%d%s",
 		"#!/usr/bin/ruby\n"
 		"m = Array.new(32768, 0)\n"
-		"p = 0\n"
+		"p = ", BOFF, "\n"
 		);
 	break;
 

@@ -22,7 +22,12 @@ void
 outcmd(int ch, int count)
 {
     switch(ch) {
-    case '!': printf("<?php\n$m=array_fill(0, 65535, 0);\n$p=0;\n"); break;
+    case '!':
+	printf( "%s%d%s",
+		"<?php\n"
+		"$m=array_fill(0, 65535, 0);\n"
+		"$p=",BOFF,";\n");
+	break;
 
     case '=': I; printf("$m[$p] = %d;\n", count); break;
     case 'B': I; printf("$v = $m[$p];\n"); break;

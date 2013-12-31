@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 /*
- * AT&T Plan 9 shell (rc) translation from BF, runs really slowly.
+ * AT&T Plan 9 shell (rc) translation from BF, runs at about 5,500 instructions per second.
  *
  * Large input files give:
  *      line 18551: yacc stack overflow near end of line
@@ -163,6 +163,8 @@ outcmd(int ch, int count)
 	    for (i=0; i<256; i++) {
 		if (i == 10 )
 		    printf("    case %d; echo\n", i);
+		else if (i == 27 )
+		    printf("    case %d; echo -n '%c'\n", i, i);
 		else if (i>= ' ' && i<= '~' && i != '\'')
 		    printf("    case %d; echo -n '%c'\n", i, i);
 		else if (i == '\'')

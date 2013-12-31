@@ -8,14 +8,14 @@
 #warning "Compiling without libtcc support"
 #endif
 
+#include "bf2any.h"
+
 /*
  * TCC translation from BF, runs at about 1,200,000,000 instructions per second.
  *
  * Much faster compiled with GCC, even with -O0
  *
  * BCC translation from BF, runs at about 3,000,000,000 instructions per second.
- * GCC-O0 translation from BF, runs at about 2,700,000,000 instructions per second.
- * GCC-O2 translation from BF, runs at about 4,300,000,000 instructions per second.
  */
 
 extern int bytecell;
@@ -27,14 +27,17 @@ FILE * ofd;
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
 #define prv2(s,v,v2)    fprintf(ofd, "%*s" s "\n", ind*4, "", (v), (v2))
 
+static void print_cstring(void);
+
+int imov = 0;
 char * ccode = 0;
 size_t ccodesize = 0;
-int imov = 0;
 
 int
 check_arg(char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
+    if (strcmp(arg, "-savestring") == 0) return 1;
 #ifndef NO_LIBTCC
     else if (strcmp(arg, "-r") == 0) {
 	runmode=1; return 1;
@@ -65,7 +68,7 @@ outcmd(int ch, int count)
 	case '=': prv2("*(m+=%d) = %d;", mov, count); return;
 	case '+': prv2("*(m+=%d) +=%d;", mov, count); return;
 	case '-': prv2("*(m+=%d) -=%d;", mov, count); return;
-	case 'B': prv("v=*(m+=%d);", mov); return;
+	case 'B': prv("v= *(m+=%d);", mov); return;
 	case 'M': prv2("*(m+=%d) += v*%d;", mov, count); return;
 	case 'N': prv2("*(m+=%d) -= v*%d;", mov, count); return;
 	case 'S': prv("*(m+=%d) += v;", mov); return;
@@ -86,19 +89,20 @@ outcmd(int ch, int count)
 #endif
 	    ofd = stdout;
 
-	pr("#!/usr/bin/tcc -run");
+	/* Annoyingly most C compilers don't like this line. */
+	/* pr("#!/usr/bin/tcc -run"); */
+
 	pr("#include <stdio.h>");
 	pr("int main(int argc, char ** argv){");
 	ind++;
 	if (bytecell) {
 	    pr("static char mem[30000];");
 	    prv("register char *m = mem + %d;", BOFF);
+	    pr("register int v;");
 	} else {
 	    pr("static int mem[30000];");
-	    prv("register int *m = mem + %d;", BOFF);
+	    prv("register int v, *m = mem + %d;", BOFF);
 	}
-	pr("register int v;");
-	pr("setbuf(stdout,0);");
 	break;
 
     case 'X': pr("fprintf(stderr, \"Infinite Loop\\n\"); exit(1);"); break;
@@ -118,6 +122,7 @@ outcmd(int ch, int count)
     case '>': imov += count; break;
     case '<': imov -= count; break;
     case '.': pr("putchar(*m);"); break;
+    case '"': print_cstring(); break;
     case ',': pr("v = getchar(); if(v!=EOF) *m = v;"); break;
 
     case '[': pr("while(*m) {"); ind++; break;
@@ -132,6 +137,7 @@ outcmd(int ch, int count)
 
     putc('\0', ofd);
     fclose(ofd);
+    setbuf(stdout,0);
 
     {
 	TCCState *s;
@@ -148,4 +154,48 @@ outcmd(int ch, int count)
 	free(ccode);
     }
 #endif
+}
+
+static void
+print_cstring(void)
+{
+    char * str = get_string();
+    char buf[88];
+    int gotnl = 0, gotperc = 0, i = 0;
+
+    if (!str) return;
+
+    for(;; str++) {
+	if (i && (*str == 0 || gotnl || i > sizeof(buf)-8))
+	{
+	    buf[i] = 0;
+	    if (gotnl) {
+		buf[i-2] = 0;
+		prv("puts(\"%s\");", buf);
+	    } else if (gotperc)
+		prv("printf(\"%%s\",\"%s\");", buf);
+	    else
+		prv("printf(\"%s\");", buf);
+	    gotnl = gotperc = i = 0;
+	}
+	if (!*str) break;
+
+	if (*str == '\n') gotnl = 1;
+	if (*str == '%') gotperc = 1;
+	if (*str >= ' ' && *str <= '~' && *str != '"' && *str != '\\') {
+	    buf[i++] = *str;
+	} else if (*str == '"' || *str == '\\') {
+	    buf[i++] = '\\'; buf[i++] = *str;
+	} else if (*str == '\n') {
+	    buf[i++] = '\\'; buf[i++] = 'n';
+	} else if (*str == '\t') {
+	    buf[i++] = '\\'; buf[i++] = 't';
+	} else {
+	    char buf2[16];
+	    int n;
+	    sprintf(buf2, "\\%03o", *str & 0xFF);
+	    for(n=0; buf2[n]; n++)
+		buf[i++] =buf2[n];
+	}
+    }
 }

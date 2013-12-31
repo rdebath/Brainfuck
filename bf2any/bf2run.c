@@ -188,16 +188,16 @@ dumpmem(int *mp)
 {
     int i, j = 0;
     for (i = 0; i < MEMSIZE; i++) if (m[i]) j = i + 1;
-    fprintf(stderr, "Ptr: %3d, mem:", mp-m);
+    fprintf(stderr, "Ptr: %3d, mem:", (int)(mp-m));
     for (i = 0; i < j; i++)
 	fprintf(stderr, "%s%d", m + i == mp ? ">" : " ", m[i]);
     fprintf(stderr, "\n");
 }
 
 void
-dumpprog(int * p, int *mp)
+dumpprog(int * p, int * ep)
 {
-    for(;;){
+    for(;p<ep;){
 	printf("%06d:", (int)(p-mem));
 	if (*p)
 	    printf("MOV %d\n%06d:", *p, (int)(p-mem + 1));
@@ -205,8 +205,6 @@ dumpprog(int * p, int *mp)
 	printf("%s", tokennames[*p]);
 	switch(*p++) {
 	case T_STOP:
-	    printf("\n");
-	    return;
 	case T_PRT: case T_INP:
 	case T_BEG: case T_MUL1: case T_QMUL1:
 	case T_DUMP:

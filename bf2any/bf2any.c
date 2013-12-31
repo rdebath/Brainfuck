@@ -2,12 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "bf2any.h"
+
 int bytecell = 0;
 static int enable_optim;
 static int enable_debug;
-
-void outcmd(int ch, int count);
-int check_arg(char * arg);
 
 /* Brainfuck loader.
  *
@@ -28,9 +27,8 @@ int check_arg(char * arg);
  * Lastly it makes sure that brackets are balanced by removing or adding
  * extra ']' tokens.
  *
- * TODO? Sort all changes within a run of "-+<>" characters, remove NOPs.
- *       Similar for ".," too ?
- *       Flatten constant loops to large sets or adds ?
+ * Furthermore the linked bf2const routines merge the tokens generated from
+ * this into simpler streams reordering any constants found.
  */
 static char qcmd[32];
 static int qrep[32];
@@ -51,7 +49,7 @@ outrun(int ch, int repcnt)
     else {
 	int i, mov, inc;
 
-	/* Sweep everything from the buffer into outcmd ? */
+	/* Sweep everything from the buffer into outopt ? */
 	if ((ch != '>' && ch != '<' && ch != '+' && ch != '-' &&
 	     ch != '=' && ch != '[' && ch != ']') ||
 	    (qcnt == 0 && ch != '[') ||
@@ -71,24 +69,24 @@ outrun(int ch, int repcnt)
 		    if (saved_zset) {
 			saved_zset = 0;
 			if (qcmd[i] == '+') {
-			    outcmd('=', qrep[i]);
+			    outopt('=', qrep[i]);
 			    continue;
 			} else
-			    outcmd('=', 0);
+			    outopt('=', 0);
 		    }
 		    /* Delay < and > to merge movements round deleted tokens */
 		    if (qcmd[i] == '>') { curmov += qrep[i]; continue; }
 		    if (qcmd[i] == '<') { curmov -= qrep[i]; continue; }
 		    /* send the delayed <> strings */
-		    if (curmov > 0) outcmd('>', curmov);
-		    if (curmov < 0) outcmd('<', -curmov);
+		    if (curmov > 0) outopt('>', curmov);
+		    if (curmov < 0) outopt('<', -curmov);
 		    curmov = 0;
 
 		    if (qcmd[i] == '=' && qrep[i] == 0)
 			/* Delay a [-] to see if we have any +++ after */
 			saved_zset++;
 		    else
-			outcmd(qcmd[i], qrep[i]);
+			outopt(qcmd[i], qrep[i]);
 		}
 	    }
 	    qcnt = 0;

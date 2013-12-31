@@ -19,7 +19,7 @@
 extern int bytecell;
 
 int do_input = 0;
-int ind = 1;
+int ind = 0;
 #define I printf("%*s", ind*4, "")
 
 int
@@ -35,8 +35,8 @@ outcmd(int ch, int count)
     switch(ch) {
     case '!':
 	printf("#!/usr/bin/awk -f\n");
-	printf("BEGIN {\n");
-	I; printf("p=0\n"); break;
+	printf("BEGIN {\n"); ind++;
+	I; printf("p=%d\n",BOFF); break;
 	break;
 
     case '=': I; printf("m[p] = %d\n", count); break;
@@ -51,14 +51,10 @@ outcmd(int ch, int count)
 
     case 'X': I; printf("print \"Abort: Infinite Loop.\\n\" >\"/dev/stderr\"; exit;\n"); break;
 
-    case '+': I; printf("m[p]=m[p]+%d\n", count); break;
-    case '-': I; printf("m[p]=m[p]-%d\n", count); break;
-    case '<': I; printf("p=p-%d\n", count); break;
-    case '>': I; printf("p=p+%d\n", count); break;
-    case '.': I; printf("printf \"%%c\",m[p]\n"); break;
-#ifndef INLINEGETCH
-    case ',': I; printf("getch()\n"); do_input++; break;
-#endif
+    case '+': I; printf("m[p] += %d\n", count); break;
+    case '-': I; printf("m[p] -= %d\n", count); break;
+    case '<': I; printf("p -= %d\n", count); break;
+    case '>': I; printf("p += %d\n", count); break;
     case '[':
 	if(bytecell) { I; printf("m[p]=m[p]%%256\n"); }
 	I; printf("while(m[p]!=0){\n");
@@ -72,6 +68,7 @@ outcmd(int ch, int count)
 
     case '~':
 	I; printf("exit 0\n");
+	ind--;
 	printf("}\n");
 
 #ifndef INLINEGETCH
@@ -102,7 +99,10 @@ outcmd(int ch, int count)
 #endif
 	break;
 
-#ifdef INLINEGETCH
+    case '.': I; printf("printf \"%%c\",m[p]\n"); break;
+#ifndef INLINEGETCH
+    case ',': I; printf("getch()\n"); do_input++; break;
+#else
     case ',':
 	I; printf("while(1) {\n");
 	I; printf("    if (goteof) break\n");
@@ -128,7 +128,6 @@ outcmd(int ch, int count)
 	I; printf("    break\n");
 	I; printf("}\n");
 	break;
-
 #endif
     }
 }

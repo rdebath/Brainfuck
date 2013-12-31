@@ -7,12 +7,12 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#include "bf2any.h"
+
 /*
  * GCC-O0 translation from BF, runs at about 2,700,000,000 instructions per second.
  * GCC-O2 translation from BF, runs at about 4,300,000,000 instructions per second.
  */
-
-extern int bytecell;
 
 int ind = 0;
 int runmode = 1;
@@ -22,6 +22,7 @@ FILE * ofd;
 #define prv2(s,v,v2)    fprintf(ofd, "%*s" s "\n", ind*4, "", (v), (v2))
 
 static void compile_and_run(void);
+static void print_cstring(void);
 
 int imov = 0;
 char * opt_flag = "-O0";
@@ -34,6 +35,7 @@ int
 check_arg(char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
+    if (strcmp(arg, "-savestring") == 0) return 1;
     if (strncmp(arg, "-O", 2) == 0) {
 	opt_flag = arg;
 	return 1;
@@ -64,7 +66,7 @@ outcmd(int ch, int count)
 	case '=': prv2("*(m+=%d) = %d;", mov, count); return;
 	case '+': prv2("*(m+=%d) +=%d;", mov, count); return;
 	case '-': prv2("*(m+=%d) -=%d;", mov, count); return;
-	case 'B': prv("v=*(m+=%d);", mov); return;
+	case 'B': prv("v= *(m+=%d);", mov); return;
 	case 'M': prv2("*(m+=%d) += v*%d;", mov, count); return;
 	case 'N': prv2("*(m+=%d) -= v*%d;", mov, count); return;
 	case 'S': prv("*(m+=%d) += v;", mov); return;
@@ -95,12 +97,11 @@ outcmd(int ch, int count)
 	if (bytecell) {
 	    pr("static char mem[30000];");
 	    prv("register char *m = mem + %d;", BOFF);
+	    pr("register int v;");
 	} else {
 	    pr("static int mem[30000];");
-	    prv("register int *m = mem + %d;", BOFF);
+	    prv("register int v, *m = mem + %d;", BOFF);
 	}
-	pr("register int v;");
-	pr("setbuf(stdout,0);");
 	break;
 
     case 'X': pr("fprintf(stderr, \"Infinite Loop\\n\"); exit(1);"); break;
@@ -120,6 +121,7 @@ outcmd(int ch, int count)
     case '>': imov += count; break;
     case '<': imov -= count; break;
     case '.': pr("putchar(*m);"); break;
+    case '"': print_cstring(); break;
     case ',': pr("v = getchar(); if(v!=EOF) *m = v;"); break;
 
     case '[': pr("while(*m) {"); ind++; break;
@@ -135,11 +137,68 @@ outcmd(int ch, int count)
     compile_and_run();
 }
 
+static void
+print_cstring(void)
+{
+    char * str = get_string();
+    char buf[88];
+    int gotnl = 0, gotperc = 0, i = 0;
+
+    if (!str) return;
+
+    for(;; str++) {
+	if (i && (*str == 0 || gotnl || i > sizeof(buf)-8))
+	{
+	    buf[i] = 0;
+	    if (gotnl) {
+		buf[i-2] = 0;
+		prv("puts(\"%s\");", buf);
+	    } else if (gotperc)
+		prv("printf(\"%%s\",\"%s\");", buf);
+	    else
+		prv("printf(\"%s\");", buf);
+	    gotnl = gotperc = i = 0;
+	}
+	if (!*str) break;
+
+	if (*str == '\n') gotnl = 1;
+	if (*str == '%') gotperc = 1;
+	if (*str >= ' ' && *str <= '~' && *str != '"' && *str != '\\') {
+	    buf[i++] = *str;
+	} else if (*str == '"' || *str == '\\') {
+	    buf[i++] = '\\'; buf[i++] = *str;
+	} else if (*str == '\n') {
+	    buf[i++] = '\\'; buf[i++] = 'n';
+	} else if (*str == '\t') {
+	    buf[i++] = '\\'; buf[i++] = 't';
+	} else {
+	    char buf2[16];
+	    int n;
+	    sprintf(buf2, "\\%03o", *str & 0xFF);
+	    for(n=0; buf2[n]; n++)
+		buf[i++] =buf2[n];
+	}
+    }
+}
+
 /*  Needs:   gcc -shared -fPIC -o libfoo.so foo.c
     And:     -ldl
 
     NB: -fno-asynchronous-unwind-tables
 */
+
+/* If we're 32 bit on a 64bit or vs.versa. we need an extra option */
+#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
+#if defined(__x86_64__)
+#define CC "gcc -m64"
+#elif defined(__i586__)
+#define CC "gcc -m32"
+#else
+#define CC "gcc"
+#endif
+#else
+#define CC "cc"
+#endif
 
 static int loaddll(const char *);
 static void (*runfunc)(void);
@@ -150,8 +209,9 @@ compile_and_run(void)
 {
     char cmdbuf[256];
     int ret;
+    setbuf(stdout,0);
 
-    sprintf(cmdbuf, "cc %s -shared -fPIC -o %s %s",
+    sprintf(cmdbuf, CC " %s -w -shared -fPIC -o %s %s",
 	    opt_flag, dl_name, ccode_name);
     ret = system(cmdbuf);
 
