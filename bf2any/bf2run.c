@@ -2,12 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "bf2any.h"
+
 /*
  * Integer translation from BF, runs at about 1,000,000,000 instructions per second.
  *
  */
 
-extern int bytecell;
 int do_input = 0;
 int do_dump = 0;
 
@@ -146,7 +147,7 @@ outcmd(int ch, int count)
 	break;
     }
 
-    if (t>=0) {
+    if (t>=0 && enable_optim) {
 	prevtk = (prevtk << 8) + t;
     }
 }

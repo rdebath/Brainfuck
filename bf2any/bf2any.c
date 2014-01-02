@@ -5,7 +5,7 @@
 #include "bf2any.h"
 
 int bytecell = 0;
-static int enable_optim;
+int enable_optim = 0;
 static int enable_debug;
 
 /* Brainfuck loader.
@@ -21,14 +21,18 @@ static int enable_debug;
  * Simple "Move or ADD" ( MADD ) loops containing a plain decrement of
  * the loop counter and '+', '-' or '[-]' on other cells.
  * Strings like '[-]+++++++' are changed to a set token.
+ * The linked bf2const.c then buffers token streams without loops and reorders
+ * them into groups of single sets or adds. It also notices with an output is
+ * given a constant and passes this on as a special token.
+ *
+ * After all this the 'run' backend will check for '[<<]' and '[-<<]' loops an
+ * convert those into special tokens.
  *
  * In addition it marks the trivial infinite loop '[]' as '[X]', this tends
  * to be useful for languages that hate empty loops like Pascal and Python.
  * Lastly it makes sure that brackets are balanced by removing or adding
  * extra ']' tokens.
  *
- * Furthermore the linked bf2const routines merge the tokens generated from
- * this into simpler streams reordering any constants found.
  */
 static char qcmd[32];
 static int qrep[32];

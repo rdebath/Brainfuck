@@ -18,10 +18,18 @@ extern int bytecell;
 char bf[] = "><+-.,[]";
 
 /* Language "C" */
-char * cbyte[] = { "m+=1;", "m-=1;", "++*m;", "--*m;", "write(1,m,1);", "read(0,m,1);", "while(*m){", "}", 0 };
-char * cint[] = { "m+=1;", "m-=1;", "++*m;", "--*m;", "putchar(*m);", "*m=getchar();", "while(*m){", "}", 0 };
-char * cbyte_rle[] = { ";m+=1", ";m-=1", ";*m+=1", ";*m-=1", ";write(1,m,1);", ";read(0,m,1);", ";while(*m){", ";}", "+1" };
-char * cint_rle[] = { ";m+=1", ";m-=1", ";*m+=1", ";*m-=1", ";putchar(*m);", ";*m=getchar();", ";while(*m){", ";}", "+1" };
+char * cbyte[] = { "m+=1;", "m-=1;", "++*m;", "--*m;",
+		   "write(1,m,1);", "read(0,m,1);", "while(*m){", "}", 0 };
+char * cbyte_rle[] = { ";m+=1", ";m-=1", ";*m+=1", ";*m-=1",
+		   ";write(1,m,1)", ";read(0,m,1)", ";while(*m){", ";}", "+1"};
+
+char * cint[] = { "m+=1;", "m-=1;", "++*m;", "--*m;",
+	"putchar(*m);", "{int _c=getchar();if(_c!=EOF)*m=_c;}",
+	"while(*m){", "}", 0 };
+
+char * cint_rle[] = { ";m+=1", ";m-=1", ";*m+=1", ";*m-=1",
+	";putchar(*m)", ";{int _c=getchar();if(_c!=EOF)*m=_c;}",
+	";while(*m){", ";}", "+1" };
 
 /* Language "ook" */
 char * ook[] = {"Ook. Ook?", "Ook? Ook.", "Ook. Ook.", "Ook! Ook!",
@@ -35,13 +43,14 @@ char *blub[] = {"blub. blub?", "blub? blub.", "blub. blub.", "blub! blub!",
 char *f__k[] = {"folk", "sing", "barb", "teas", "cask", "kerb", "able", "bait"};
 
 /* Language "pogaack" */
-char * pogaack[] = {"pogack!", "pogaack!", "pogaaack!", "poock!", "pogaaack?", "poock?", "pogack?", "pogaack?"};
+char * pogaack[] = {"pogack!", "pogaack!", "pogaaack!", "poock!",
+		    "pogaaack?", "poock?", "pogack?", "pogaack?"};
 
 /* Language "triplet" */
 char * trip[] = { "OOI", "IOO", "III", "OOO", "OIO", "IOI", "IIO", "OII" };
 
+/* Language "Descriptive BF" */
 char * nice[] = { "right", "left", "up", "down", "out", "in", "begin", "end" };
-
 char * bc[] = { "r", "l", "u", "d", "o", "i", "b", "e", "x" };
 
 /* Order should be "there", "once", "was", "a", "fish", "named", "Fred" */
@@ -52,12 +61,20 @@ char * dotty[] = { "..", "::", ".:.", ".::", ":.::", ":...", ":.:.", ":..:" };
 char * lisp2[] = { "((", "))", "()(", "())", ")())", ")(((", ")()(", ")(()" };
 
 /* Language COW: Not quite as simple as some commands aren't direct replacements. */
-char * moo[] = {"moO", "mOo", "MoO", "MOo", "MMMMOOMooOOOmooMMM", "OOOMoo", "MOOmoOmOo", "MoOMOomoo"};
+char * moo[] = {"moO", "mOo", "MoO", "MOo",
+		"MMMMOOMooOOOmooMMM", "OOOMoo", "MOOmoOmOo", "MoOMOomoo"};
+
+/* BF Doubler doubles the cell size. */
+char * doubler[] = {">>>>", "<<<<", ">+<+[>-]>[->>+<]<<", ">+<[>-]>[->>-<]<<-",
+		    ".", ">>>[-]<<<[-],",
+		    ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "[+<",
+		    ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "]<"};
 
 char ** lang = 0;
 char ** c = 0;
 char langver = 0;
 int col = 0;
+int maxcol = 72;
 int state = 0;
 int c_style = 0;
 
@@ -115,9 +132,17 @@ check_arg(char * arg)
     if (strcmp(arg, "-O") == 0 && langver == 4) {
 	return 1;
     } else
+    if (strncmp(arg, "-w", 2) == 0 && arg[2] >= '0' && arg[2] <= '9') {
+	maxcol = atol(arg+2);
+	return 1;
+    } else
+    if (strcmp(arg, "-double") == 0) {
+	lang = doubler; langver = 3; c_style = 0; return 1;
+    } else
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-c      Plain C"
+	"\n\t"  "-rle    Odd RLE C translation"
 	"\n\t"  "-nice   Nice memorable C translation."
 	"\n\t"  "-mini   Compact C translation."
 	"\n\t"  "-fish   There once was a (dead) fish named Fred"
@@ -131,7 +156,9 @@ check_arg(char * arg)
 	"\n\t"  "-lisp   Lisp Zero"
 	"\n\t"  "-risbf  RISBF"
 	"\n\t"  "-dump   Token dump"
-	"\n\t"  "-rle    Odd RLE C translation");
+	"\n\t"  "-double BF to BF translation, cell size doubler."
+	"\n\t"  "-w99    Width to line wrap after, default 72"
+	);
 	return 1;
     } else
 	return 0;
@@ -140,7 +167,7 @@ check_arg(char * arg)
 static void
 pc(int ch)
 {
-    if (col>=72) {
+    if (col>=maxcol && maxcol) {
 	putchar('\n');
 	col = 0;
 	if (ch == ' ') ch = 0;
@@ -209,7 +236,7 @@ outcmd(int ch, int count)
 	if (c_style == 1) {
 	    for (i=0; i<8 + (langver == 2); i++)
 		printf("#define %s %s\n", lang[i], c[i]);
-	    printf("#define _ return 0;}\n");
+	    printf("#define _ %sreturn 0;}\n", langver==2?";":"");
 	}
 	if (bytecell)
 	    printf("char mem[30000];int main(){register char*m=mem;\n");
@@ -245,6 +272,7 @@ risbf(int ch)
     }
 }
 
+#if 0 /* OLDCODE */
 void
 rlebf(int ch, int count)
 {
@@ -271,3 +299,4 @@ rlebf(int ch, int count)
 	col += printf("%s%s", col?" ":"", "_");
     }
 }
+#endif
