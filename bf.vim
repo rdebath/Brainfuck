@@ -9,13 +9,12 @@
 " In addition it highlights SOME of the other characters as comments.
 " Generally it tries (with moderate success) to distinguish between proper
 " comments and sequences that are probably supposed to be comments but
-" actually contain active BF command characters. In addition it tries to 
+" actually contain active BF command characters. In addition it tries to
 " identify the 'dead code' style comment loops highlighting any BF command
 " characters within the loop in the 'PreProc' style to distinguish them
 " from commands that may actually be executed.
 
-" Known bug: comment loops are only detected on the current or next line after
-" the closing bracket. VIM bug ? The regex works correctly when search for.
+" Use the sync options to control how far to search for comment loops.
 
 " For version 5.x: Clear all syntax items
 " For version 6.x: Quit when a syntax file was already loaded
@@ -29,8 +28,8 @@ if !exists("main_syntax")
 endif
 
 syn sync clear
-syn sync minlines=30
-syn sync maxlines=250
+syn sync minlines=150
+syn sync maxlines=150
 syn sync linebreaks=25
 
 " Various comment marking characters, make them very visible (if not in a comment)
@@ -60,16 +59,15 @@ syn match bfComment "{[^+\-<>[\].,{}]*}"
 syn match bfComment "\(^[[\]\-+<>.,\t ]*\)\@<=[^[\]\-+<>.,\t ][^[\]\-+<>.,]*$" contains=bfSPError
 
 " Then a 'comment loop'
-" Nesting of loops is good, matching the start only works on same line or the
-" next line, but if used outside highlighting the start regex will work with
-" multiple lines. Sync doesn't help.
 "
 " Any BF command characters within a comment loop are marked differently to BF
-" command characters outside a loop.
+" command characters outside a loop. Have to do have the regex parts for the
+" beginning of comment loops in the expressions twice because \@<= will only
+" search back one line irrespective of the contents of 'sync'.
 syn match bfCommentChar "[^+\-<>[\].,]\+" contained contains=bfSPError
 syn region bfCommentLoop    start="\["  end="]" contained contains=bfCommentChar,bfCommentLoop
-syn match bfComment    "\(]\_[^[\]\-+<>.,]*\)\@<=\[" contains=bfCommentLoop
-syn match bfComment    "\(\%^\_[^[\]\-+<>.,]*\)\@<=\[" contains=bfCommentLoop
+syn match bfComment    "\(]\_[^[\]\-+<>.,]*\)\@<=\_[^[\]\-+<>.,]*\[" contains=bfCommentLoop
+syn match bfComment    "\(\%^\_[^[\]\-+<>.,]*\)\@<=\_[^[\]\-+<>.,]*\[" contains=bfCommentLoop
 
 if version >= 508 || !exists("did_brainfuck_syn_inits")
   if version < 508
