@@ -62,7 +62,10 @@ outcmd(int ch, int count)
 	if(bytecell) { I; printf("(set-pointer (mod (set-or-zero) 256))\n"); }
 	ind--; I; printf("(recur)) nil))))\n");
 	break;
-    case '.': I; printf("(print (char (set-or-zero))) (flush)\n"); break;
+    case '.':
+	if(bytecell) { I; printf("(set-pointer (mod (set-or-zero) 256))\n"); }
+	I; printf("(print (char (set-or-zero))) (flush)\n");
+	break;
     case ',': I; printf("(let [ch (int (. System/in read))] (if-not (= ch -1) (do (set-pointer ch))))\n"); break;
     }
 }

@@ -32,7 +32,10 @@ outcmd(int ch, int count)
 
     // case 'X': I; printf("print \"Infinite Loop\"\nGOTO 200\n"); break;
     case '=': I; printf("$m[$p]=%d\n", count); break;
-    case 'B': I; printf("$v=$m[$p]\n"); break;
+    case 'B':
+	if(bytecell) { I; printf("$m[$p]=$m[$p] -band 255;\n"); }
+	I; printf("$v=$m[$p]\n");
+	break;
     case 'M': I; printf("$m[$p]=$m[$p]+$v*%d\n", count); break;
     case 'N': I; printf("$m[$p]=$m[$p]-$v*%d\n", count); break;
     case 'S': I; printf("$m[$p]=$m[$p]+$v\n"); break;

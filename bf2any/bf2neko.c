@@ -37,33 +37,37 @@ outcmd(int ch, int count)
 	    );
 	break;
 
-    case '=': I; printf("m[p] = %d;\n", count); break;
-    case 'B': I; printf("v = m[p];\n"); break;
-    case 'M': I; printf("m[p] = m[p]+v*%d;\n", count); break;
-    case 'N': I; printf("m[p] = m[p]-v*%d;\n", count); break;
-    case 'S': I; printf("m[p] = m[p]+v;\n"); break;
-
-    case 'Q': I; printf("if v != 0 m[p] = %d;\n", count); break;
-    case 'm': I; printf("if v != 0 m[p] = m[p]+v*%d;\n", count); break;
-    case 'n': I; printf("if v != 0 m[p] = m[p]-v*%d;\n", count); break;
-    case 's': I; printf("if v != 0 m[p] = m[p]+v;\n"); break;
+    case '=': I; printf("m[p] = %d\n", count); break;
+    case 'B':
+	if(bytecell) { I; printf("m[p] &= 255\n"); }
+	I; printf("v = m[p]\n");
+	break;
+    case 'M': I; printf("m[p] = m[p]+v*%d\n", count); break;
+    case 'N': I; printf("m[p] = m[p]-v*%d\n", count); break;
+    case 'S': I; printf("m[p] = m[p]+v\n"); break;
+    case 'Q': I; printf("if v != 0 m[p] = %d\n", count); break;
+    case 'm': I; printf("if v != 0 m[p] = m[p]+v*%d\n", count); break;
+    case 'n': I; printf("if v != 0 m[p] = m[p]-v*%d\n", count); break;
+    case 's': I; printf("if v != 0 m[p] = m[p]+v\n"); break;
 
     case 'X': I; printf("$throw(\"Abort Infinite Loop\");\n"); break;
 
-    case '+': I; printf("m[p] += %d;\n", count); break;
-    case '-': I; printf("m[p] -= %d;\n", count); break;
-    case '<': I; printf("p -= %d;\n", count); break;
-    case '>': I; printf("p += %d;\n", count); break;
+    case '+': I; printf("m[p] += %d\n", count); break;
+    case '-': I; printf("m[p] -= %d\n", count); break;
+    case '<': I; printf("p -= %d\n", count); break;
+    case '>': I; printf("p += %d\n", count); break;
     case '[':
 	if(bytecell) { I; printf("m[p] &= 255\n"); }
-	I; printf("while m[p] != 0 {\n"); ind++; break;
+	I; printf("while m[p] != 0 {\n");
+	ind++;
+	break;
     case ']':
 	if(bytecell) { I; printf("m[p] &= 255\n"); }
 	ind--; I; printf("}\n");
 	break;
-    case '.': I; printf("$sset(s,0,m[p]) $print(s);\n"); break;
+    case '.': I; printf("$sset(s,0,m[p]) $print(s)\n"); break;
     case ',':
-	I; printf("try m[p] = file_read_char(file_stdin()) catch e 0;\n");
+	I; printf("try m[p] = file_read_char(file_stdin()) catch e 0\n");
 	break;
     }
 }

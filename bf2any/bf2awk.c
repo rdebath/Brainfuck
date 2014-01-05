@@ -41,7 +41,10 @@ outcmd(int ch, int count)
 	break;
 
     case '=': I; printf("m[p] = %d\n", count); break;
-    case 'B': I; printf("v = m[p]\n"); break;
+    case 'B':
+	if(bytecell) { I; printf("m[p]=m[p]%%256\n"); }
+	I; printf("v = m[p]\n");
+	break;
     case 'M': I; printf("m[p] = m[p]+v*%d\n", count); break;
     case 'N': I; printf("m[p] = m[p]-v*%d\n", count); break;
     case 'S': I; printf("m[p] = m[p]+v\n"); break;
@@ -100,7 +103,10 @@ outcmd(int ch, int count)
 #endif
 	break;
 
-    case '.': I; printf("printf \"%%c\",m[p]\n"); break;
+    case '.':
+	if(bytecell) { I; printf("m[p]=m[p]%%256\n"); }
+	I; printf("printf \"%%c\",m[p]\n");
+	break;
 #ifndef INLINEGETCH
     case ',': I; printf("getch()\n"); do_input++; break;
 #else

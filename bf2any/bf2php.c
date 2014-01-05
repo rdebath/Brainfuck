@@ -31,7 +31,10 @@ outcmd(int ch, int count)
 	break;
 
     case '=': I; printf("$m[$p] = %d;\n", count); break;
-    case 'B': I; printf("$v = $m[$p];\n"); break;
+    case 'B':
+	if(bytecell) { I; printf("$m[$p] &= 255;\n"); }
+	I; printf("$v = $m[$p];\n");
+	break;
     case 'M': I; printf("$m[$p] = $m[$p]+$v*%d;\n", count); break;
     case 'N': I; printf("$m[$p] = $m[$p]-$v*%d;\n", count); break;
     case 'S': I; printf("$m[$p] = $m[$p]+$v;\n"); break;
@@ -42,15 +45,17 @@ outcmd(int ch, int count)
 
     case 'X': I; printf("fwrite(STDERR, \"Abort: Infinite Loop.\\n\"); exit;\n"); break;
 
-    case '+': I; printf("$m[$p]+=%d;\n", count); break;
-    case '-': I; printf("$m[$p]-=%d;\n", count); break;
-    case '<': I; printf("$p-=%d;\n", count); break;
-    case '>': I; printf("$p+=%d;\n", count); break;
+    case '+': I; printf("$m[$p] += %d;\n", count); break;
+    case '-': I; printf("$m[$p] -= %d;\n", count); break;
+    case '<': I; printf("$p -= %d;\n", count); break;
+    case '>': I; printf("$p += %d;\n", count); break;
     case '[':
-	if(bytecell) { I; printf("$m[$p]&=255;\n"); }
-	I; printf("while($m[$p]!=0){\n"); ind++; break;
+	if(bytecell) { I; printf("$m[$p] &= 255;\n"); }
+	I; printf("while($m[$p] != 0){\n");
+	ind++;
+	break;
     case ']':
-	if(bytecell) { I; printf("$m[$p]&=255;\n"); }
+	if(bytecell) { I; printf("$m[$p] &= 255;\n"); }
 	ind--; I; printf("}\n");
 	break;
     case '.': I; printf("print chr($m[$p]&255);\n"); break;

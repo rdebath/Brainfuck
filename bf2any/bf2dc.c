@@ -93,7 +93,12 @@ outcmd(int ch, int count)
 
 #ifndef USE_STACK
     case '=': prv("%dlp:a", count); break;
-    case 'B': pr("lp;asV"); break;
+    case 'B':
+	if(bytecell)
+	    pr("lmxsV");
+	else
+	    pr("lp;asV");
+	break;
     case 'M': prv("lp;alV%d*+lp:a", count); break;
     case 'N': prv("lp;alV_%d*+lp:a", count); break;
     case 'S': pr("lp;alV+lp:a"); break;

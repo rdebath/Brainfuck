@@ -17,6 +17,11 @@
  *  In addition now that the args to the PRT command ('.') are often constant
  *  this can buffer up the characters and send then to the backend in one go.
  *  (if the backend agrees.)
+ *
+ *  Note; I'm limiting the range when bytecell is set by using %= 256,
+ *  this uses the range -255..255 preserving the sign. This is larger
+ *  than the range actually needed but has the nice effect that it won't
+ *  convert '-' commands into '+' commands as a matter of routine.
  */
 
 struct mem { struct mem *p, *n; int is_set; int v; int cleaned, cleaned_val;};
@@ -78,7 +83,7 @@ flush_tape(int no_output)
 
 	for(;;)
 	{
-	    if (bytecell) p->v &= 255;
+	    if (bytecell) p->v %= 256; /* Note: preserves sign but limits range. */
 	    if (p->v || p->is_set) {
 		if (no_output) {
 		    outoff=tapeoff;
@@ -157,7 +162,7 @@ flush_cell(void)
     }
 
     /* Range check */
-    if (bytecell) tape->v &= 255;
+    if (bytecell) tape->v %= 256; /* Note: preserves sign but limits range. */
 
     /* Already done */
     if (tape->cleaned && tape->cleaned_val == tape->v && tape->is_set)
@@ -214,7 +219,7 @@ void outopt(int ch, int count)
 	    outcmd(ch, count);
 	    return;
 	}
-	if (bytecell) tape->v &= 255;
+	if (bytecell) tape->v %= 256; /* Note: preserves sign but limits range. */
 	reg_known = 1;
 	reg_val = tape->v;
 	break;
@@ -256,6 +261,6 @@ void outopt(int ch, int count)
 	    }
 	    break;
 	}
-	if (bytecell) tape->v &= 255;
+	if (bytecell) tape->v %= 256; /* Note: preserves sign but limits range. */
     }
 }

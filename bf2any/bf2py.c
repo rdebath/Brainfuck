@@ -35,18 +35,18 @@ outcmd(int ch, int count)
 	printf("import os\n");
 #endif
 	printf("m = [0] * 60000\n");
-	printf("i = 0\n");
+	printf("p = 0\n");
 	break;
-    case '+': I; printf("m[i] += %d\n", count); break;
-    case '-': I; printf("m[i] -= %d\n", count); break;
-    case '<': I; printf("i -= %d\n", count); break;
-    case '>': I; printf("i += %d\n", count); break;
+    case '+': I; printf("m[p] += %d\n", count); break;
+    case '-': I; printf("m[p] -= %d\n", count); break;
+    case '<': I; printf("p -= %d\n", count); break;
+    case '>': I; printf("p += %d\n", count); break;
     case '[':
-	if(bytecell) { I; printf("m[i] &= 255\n"); }
-	I; printf("while m[i] :\n"); ind++; break;
+	if(bytecell) { I; printf("m[p] &= 255\n"); }
+	I; printf("while m[p] :\n"); ind++; break;
     case ']':
 	if(bytecell) {
-	    I; printf("m[i] &= 255\n");
+	    I; printf("m[p] &= 255\n");
 	} else if (lastcmd == '[') {
 	    I; printf("pass\n");
 	}
@@ -54,18 +54,18 @@ outcmd(int ch, int count)
 	break;
 
 #ifdef USESYS
-    case '.': I; printf("sys.stdout.write(chr(m[i]&255))\n"); break;
+    case '.': I; printf("sys.stdout.write(chr(m[p]&255))\n"); break;
     case ',':
 	I; printf("c = sys.stdin.read(1);\n");
 	I; printf("if c != '' :\n");
-	ind++; I; ind--; printf("m[i] = ord(c)\n");
+	ind++; I; ind--; printf("m[p] = ord(c)\n");
 	break;
 #else
-    case '.': I; printf("os.write(1, chr(m[i]&255))\n"); break;
+    case '.': I; printf("os.write(1, chr(m[p]&255))\n"); break;
     case ',':
 	I; printf("c = os.read(0, 1);\n");
 	I; printf("if c != '' :\n");
-	ind++; I; ind--; printf("m[i] = ord(c)\n");
+	ind++; I; ind--; printf("m[p] = ord(c)\n");
 	break;
 #endif
     }

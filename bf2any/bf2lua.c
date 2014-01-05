@@ -28,39 +28,42 @@ outcmd(int ch, int count)
     case '!':
 	printf("#!/usr/bin/lua\n");
 	printf("local m = setmetatable({},{__index=function() return 0 end})\n");
-	printf("local i = %d\n", BOFF);
+	printf("local p = %d\n", BOFF);
 	printf("local v = 0\n");
 	printf("\n");
 	printf("function brainfuck()\n");
 	ind++;
 	break;
 
-    case '=': I; printf("m[i] = %d\n", count); break;
-    case 'B': I; printf("v = m[i]\n"); break;
-    case 'M': I; printf("m[i] = m[i]+v*%d\n", count); break;
-    case 'N': I; printf("m[i] = m[i]-v*%d\n", count); break;
-    case 'S': I; printf("m[i] = m[i]+v\n"); break;
-    case 'Q': I; printf("if v ~= 0 then m[i] = %d end\n", count); break;
-    case 'm': I; printf("if v ~= 0 then m[i] = m[i]+v*%d end\n", count); break;
-    case 'n': I; printf("if v ~= 0 then m[i] = m[i]-v*%d end\n", count); break;
-    case 's': I; printf("if v ~= 0 then m[i] = m[i]+v end\n"); break;
+    case '=': I; printf("m[p] = %d\n", count); break;
+    case 'B':
+	if(bytecell) { I; printf("m[p] = m[p]%%256\n"); }
+	I; printf("v = m[p]\n");
+	break;
+    case 'M': I; printf("m[p] = m[p]+v*%d\n", count); break;
+    case 'N': I; printf("m[p] = m[p]-v*%d\n", count); break;
+    case 'S': I; printf("m[p] = m[p]+v\n"); break;
+    case 'Q': I; printf("if v ~= 0 then m[p] = %d end\n", count); break;
+    case 'm': I; printf("if v ~= 0 then m[p] = m[p]+v*%d end\n", count); break;
+    case 'n': I; printf("if v ~= 0 then m[p] = m[p]-v*%d end\n", count); break;
+    case 's': I; printf("if v ~= 0 then m[p] = m[p]+v end\n"); break;
 
     case 'X': I; printf("io.write(\"Infinite Loop\\n\") os.exit(1)\n"); break;
 
-    case '+': I; printf("m[i] = m[i]+%d\n", count); break;
-    case '-': I; printf("m[i] = m[i]-%d\n", count); break;
-    case '>': I; printf("i = i+%d\n", count); break;
-    case '<': I; printf("i = i-%d\n", count); break;
+    case '+': I; printf("m[p] = m[p]+%d\n", count); break;
+    case '-': I; printf("m[p] = m[p]-%d\n", count); break;
+    case '>': I; printf("p = p+%d\n", count); break;
+    case '<': I; printf("p = p-%d\n", count); break;
     case '.': I; printf("putch()\n"); break;
     case ',': I; printf("getch()\n"); do_input++; break;
 
     case '[':
-	if(bytecell) { I; printf("m[i] = m[i]%%256\n"); }
-	I; printf("while m[i]~=0 do\n");
+	if(bytecell) { I; printf("m[p] = m[p]%%256\n"); }
+	I; printf("while m[p]~=0 do\n");
 	ind++;
 	break;
     case ']':
-	if(bytecell) { I; printf("m[i] = m[i]%%256\n"); }
+	if(bytecell) { I; printf("m[p] = m[p]%%256\n"); }
 	ind--; I; printf("end\n");
 	break;
 
@@ -73,14 +76,14 @@ outcmd(int ch, int count)
 	    printf("function getch()\n");
 	    printf("    local Char = io.read(1)\n");
 	    printf("    if Char then\n");
-	    printf("        m[i] = string.byte(Char)\n");
+	    printf("        m[p] = string.byte(Char)\n");
 	    printf("    end\n");
 	    printf("end\n");
 	}
 
 	printf("\n");
 	printf("function putch()\n");
-	printf("    io.write(string.char(m[i]%%256))\n");
+	printf("    io.write(string.char(m[p]%%256))\n");
 	printf("    io.flush()\n");
 	printf("end\n");
 

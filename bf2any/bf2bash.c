@@ -34,7 +34,10 @@ outcmd(int ch, int count)
     case 'X': pr("echo Infinite Loop 2>&1 ; exit 1"); break;
 
     case '=': prv("((M[P]=%d))", count); break;
-    case 'B': pr("((V=M[P]))"); break;
+    case 'B':
+	if(bytecell) pr("((M[P]&=255))");
+	pr("((V=M[P]))");
+	break;
     case 'M': prv("((M[P]+=V*%d))", count); break;
     case 'N': prv("((M[P]-=V*%d))", count); break;
     case 'S': pr("((M[P]+=V))"); break;
