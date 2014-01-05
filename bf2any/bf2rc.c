@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "bf2any.h"
+
 /*
  * AT&T Plan 9 shell (rc) translation from BF, runs at about 5,500 instructions per second.
  *
@@ -25,6 +28,7 @@ int ind = 0;
 int
 check_arg(char * arg)
 {
+    if (strcmp(arg, "-b") == 0) return 1;
     return 0;
 }
 

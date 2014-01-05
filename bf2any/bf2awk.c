@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "bf2any.h"
+
 /*
  * MAWK translation from BF, runs at about 23,000,000 instructions per second.
  * GAWK translation from BF, runs at about 13,000,000 instructions per second.
@@ -15,8 +18,6 @@
 /*
 #define INLINEGETCH
 */
-
-extern int bytecell;
 
 int do_input = 0;
 int ind = 0;

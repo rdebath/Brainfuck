@@ -1,11 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "bf2any.h"
+
 /*
  * Perl translation from BF, runs at about 14,000,000 instructions per second.
  */
-
-extern int bytecell;
 
 int do_input = 0;
 int ind = 0;

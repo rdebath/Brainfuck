@@ -1,7 +1,9 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "bf2any.h"
+
 /*
  * gas32 translation from BF, runs at about 4,800,000,000 instructions per second.
  * gas64 translation from BF, runs at about 4,600,000,000 instructions per second.
@@ -41,6 +43,7 @@ int ind = 0;
 int
 check_arg(char * arg)
 {
+    if (strcmp(arg, "-b") == 0) return 1;
     return 0;
 }
 

@@ -18,6 +18,7 @@ int
 check_arg(char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
+    if (strcmp(arg, "-#") == 0) return 1;
     if (strcmp(arg, "-d") == 0) {
 	do_dump = 1;
 	return 1;

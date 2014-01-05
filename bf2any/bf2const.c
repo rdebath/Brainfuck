@@ -1,5 +1,5 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "bf2any.h"
@@ -78,6 +78,7 @@ flush_tape(int no_output)
 
 	for(;;)
 	{
+	    if (bytecell) p->v &= 255;
 	    if (p->v || p->is_set) {
 		if (no_output) {
 		    outoff=tapeoff;
@@ -154,6 +155,9 @@ flush_cell(void)
 	fprintf(stderr, "Assertion failed tape <> tapezero in "__FILE__"\n");
 	exit(1);
     }
+
+    /* Range check */
+    if (bytecell) tape->v &= 255;
 
     /* Already done */
     if (tape->cleaned && tape->cleaned_val == tape->v && tape->is_set)
@@ -252,5 +256,6 @@ void outopt(int ch, int count)
 	    }
 	    break;
 	}
+	if (bytecell) tape->v &= 255;
     }
 }

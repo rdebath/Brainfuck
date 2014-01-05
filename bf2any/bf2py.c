@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "bf2any.h"
+
 /*
  * Python translation from BF, runs at about 18,000,000 instructions per second.
  *
@@ -8,8 +11,6 @@
  */
 
 /* #define USESYS // else USEOS */
-
-extern int bytecell;
 
 int do_input = 0;
 int ind = 0;

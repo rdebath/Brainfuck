@@ -2,12 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef NO_LIBTCC
-#include <libtcc.h>
-#else
-#warning "Compiling without libtcc support"
-#endif
-
 #include "bf2any.h"
 
 /*
@@ -18,7 +12,11 @@
  * BCC translation from BF, runs at about 3,000,000,000 instructions per second.
  */
 
-extern int bytecell;
+#ifndef NO_LIBTCC
+#include <libtcc.h>
+#else
+#warning "Compiling without libtcc support"
+#endif
 
 int ind = 0;
 int runmode = 1;

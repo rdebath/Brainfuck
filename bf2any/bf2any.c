@@ -6,7 +6,8 @@
 
 int bytecell = 0;
 int enable_optim = 0;
-static int enable_debug;
+char * current_file;
+int enable_debug;
 
 /* Brainfuck loader.
  *
@@ -224,31 +225,47 @@ main(int argc, char ** argv)
     char * pgm = argv[0];
     int ch, lastch=']', c=0, m, b=0, lc=0;
     FILE * ifd;
-    enable_optim = check_arg("-O");
+    int opt_supported, byte_supported, nobyte_supported;
+
+    opt_supported = enable_optim = check_arg("-O");
+    byte_supported = check_arg("-b");
+    nobyte_supported = check_arg("-no-byte");
+    if (!byte_supported && !nobyte_supported)
+	nobyte_supported = byte_supported = 1;
+    bytecell = !nobyte_supported;
+
     for(;;) {
 	if (argc < 2 || argv[1][0] != '-' || argv[1][1] == '\0') {
 	    break;
-	} else if (strcmp(argv[1], "-b") == 0) {
+
+	} else if (byte_supported && strcmp(argv[1], "-b") == 0) {
+	    check_arg(argv[1]);
 	    bytecell++; argc--; argv++;
-	} else if (enable_optim && strcmp(argv[1], "-m") == 0) {
+	} else if (nobyte_supported && strcmp(argv[1], "-no-byte") == 0) {
+	    check_arg(argv[1]);
+	    bytecell=0; argc--; argv++;
+	} else if (opt_supported && strcmp(argv[1], "-m") == 0) {
+	    check_arg(argv[1]);
 	    enable_optim=0; argc--; argv++;
 	} else if (strcmp(argv[1], "-O") == 0 && check_arg(argv[1])) {
 	    enable_optim=1; argc--; argv++;
-	} else if (strcmp(argv[1], "-#") == 0) {
+	} else if (strcmp(argv[1], "-#") == 0 && check_arg(argv[1])) {
 	    enable_debug++; argc--; argv++;
 	} else if (strcmp(argv[1], "-h") == 0) {
+
 	    fprintf(stderr, "%s: [options] [File]\n", pgm);
 	    fprintf(stderr, "%s\n",
 	    "\t"    "-h      This message"
 	    "\n\t"  "-b      Force byte cells"
 	    "\n\t"  "-#      Turn on trace code.");
-	    if (enable_optim)
+	    if (opt_supported)
 		fprintf(stderr, "%s\n",
 		"\t"    "-O      Enable optimisation"
 		"\n\t"  "-m      Disable optimisation");
 
 	    check_arg(argv[1]);
 	    exit(0);
+
 	} else if (check_arg(argv[1])) {
 	    argc--; argv++;
 	} else if (strcmp(argv[1], "--") == 0) {
@@ -260,11 +277,13 @@ main(int argc, char ** argv)
 	    exit(1);
 	} else break;
     }
-    if (argc<=1 || strcmp(argv[1], "-") == 0)
+    if (argc<=1 || strcmp(argv[1], "-") == 0) {
 	ifd = stdin;
-    else if((ifd = fopen(argv[1],"r")) == 0) {
+	current_file = "stdin";
+    } else if((ifd = fopen(argv[1],"r")) == 0) {
 	perror(argv[1]); exit(1);
-    }
+    } else
+	current_file = argv[1];
     outrun('!', 0);
     while((ch = fgetc(ifd)) != EOF && (ifd!=stdin || ch != '!')) {
 	/* These chars are RLE */

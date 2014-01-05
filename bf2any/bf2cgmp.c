@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "bf2any.h"
+
 /*
  * C GMP translation from BF, runs at about 590,000,000 instructions per second.
  *
@@ -23,8 +26,6 @@
  * will be checked before the condition on the 'm', 'n' and 's' tokens.
  * Therefor there's no point having distinct 'M' vs 'm' tokens.
  */
-
-extern int bytecell;
 
 int do_input = 0;
 int ind = 0;

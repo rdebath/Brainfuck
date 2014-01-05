@@ -1,15 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
+
+#include "bf2any.h"
 
 /*
  * Pascal(fpc) translation from BF, runs at about 2,400,000,000 instructions per second.
  *
  * Large pgms give: "Fatal: Procedure too complex, it requires too many registers"
  */
-
-extern int bytecell;
 
 int do_input = 0;
 int ind = 1;

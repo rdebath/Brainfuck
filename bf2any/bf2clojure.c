@@ -1,11 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "bf2any.h"
+
 /*
  * Clojure translation from BF, runs at about 140,000 instructions per second.
  */
-
-extern int bytecell;
 
 int do_input = 0;
 int ind = 0;
@@ -51,14 +52,14 @@ outcmd(int ch, int count)
     case '>': I; printf("(def pointer (+ pointer %d))\n", count); break;
     case '<': I; printf("(def pointer (- pointer %d))\n", count); break;
     case '[':
-	// if(bytecell) { I; printf("$M[$P]&=255;\n"); }
+	if(bytecell) { I; printf("(set-pointer (mod (set-or-zero) 256))\n"); }
 	I; printf("((fn [] "
 		    "(loop [] "
 			"(if (> (set-or-zero) 0) (do\n");
 	ind++;
 	break;
     case ']':
-	// if(bytecell) { I; printf("$M[$P]&=255;\n"); }
+	if(bytecell) { I; printf("(set-pointer (mod (set-or-zero) 256))\n"); }
 	ind--; I; printf("(recur)) nil))))\n");
 	break;
     case '.': I; printf("(print (char (set-or-zero))) (flush)\n"); break;

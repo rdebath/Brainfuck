@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "bf2any.h"
+
 /*
  * FreeBasic translation from BF, runs at about 680,000,000 instructions per second.
  * FreeBasic (as integer) translation from BF, runs at about 1,200,000,000 instructions per second.
@@ -12,8 +15,6 @@
  * yabasic translation from BF, runs at about 15,000,000 instructions per second.
  *
  */
-
-extern int bytecell;
 
 int do_input = 0;
 int ind = 1;

@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "bf2any.h"
+
 /*
  * BF translation to BF. This isn't an identity translation because even
  * without most of the peephole optimisation the loader will still remove
@@ -12,8 +15,6 @@
  * Some of these also generate a set of C #define lines so the output
  * is compilable as C.
  */
-
-extern int bytecell;
 
 char bf[] = "><+-.,[]";
 

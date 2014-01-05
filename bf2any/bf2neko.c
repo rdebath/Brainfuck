@@ -1,14 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "bf2any.h"
+
 /*
  * Neko translation from BF, runs at about 170,000,000 instructions per second.
  *
  * For large source it generates the error
  *      "Uncaught exception - load.c(393) : Invalid module : ..."
  */
-
-extern int bytecell;
 
 int do_input = 0;
 int ind = 0;

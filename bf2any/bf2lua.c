@@ -1,13 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "bf2any.h"
+
 /*
  * Lua translation from BF, runs at about 39,000,000 instructions per second.
  *
  * There is a limit on the size of the final script imposed by the interpreter.
  */
-
-extern int bytecell;
 
 int do_input = 0;
 int ind = 0;
