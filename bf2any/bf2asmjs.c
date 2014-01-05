@@ -102,10 +102,7 @@ outcmd(int ch, int count)
 	ptrstep = 4;
     }
 
-    last = 0;
     for(n=pgm; n; n=n->next) {
-	if (!last) free(last);
-
 	if (n->loop && n->loop->has_inp)
 	    n->has_inp = n->loop->has_inp;
 
@@ -120,7 +117,13 @@ outcmd(int ch, int count)
 	}
 
 	loutcmd(n->ch, n->count, n);
-	last = n;
+    }
+
+    while(pgm) {
+	n = pgm;
+	pgm = pgm->next;
+	memset(n, '\0', sizeof*n);
+	free(n);
     }
 }
 
