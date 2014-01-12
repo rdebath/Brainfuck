@@ -214,7 +214,7 @@ print_c_header(FILE * ofd)
 
     if (node_type_counts[T_MOV] == 0 && memoffset == 0 && !do_run) {
 	fprintf(ofd, "static %s m[%d];\n", cell_type, max_pointer+1);
-	fprintf(ofd, "int %s(){\n", funcname);
+	fprintf(ofd, "int %s(void){\n", funcname);
 	if (enable_trace)
 	    fprintf(ofd, "#define mem m\n");
     } else {
@@ -225,7 +225,7 @@ print_c_header(FILE * ofd)
 	    fprintf(ofd, "extern %s mem[];\n", cell_type);
 #endif
 	}
-	fprintf(ofd, "int %s(){\n", funcname);
+	fprintf(ofd, "int %s(void){\n", funcname);
 	fprintf(ofd, "  register %s * m;\n", cell_type);
 
 	if (memoffset > 0 && !do_run)
@@ -427,10 +427,7 @@ print_ccode(FILE * ofd)
 	    }
 	    break;
 
-#define okay_for_cstr(xc) \
-                    (((xc) >= ' ' && (xc) <= '~' && \
-                      (xc) != '\\' && (xc) != '"' \
-                    ) || (xc == '\n'))
+#define okay_for_cstr(xc) (((xc) >= ' ' && (xc) <= '~') || (xc == '\n'))
 
 	case T_PRT:
 	    if (!disable_indent) pt(ofd, indent,n);
@@ -461,7 +458,8 @@ print_ccode(FILE * ofd)
 			    okay_for_cstr(v->next->count)) {
 		    v = v->next;
 		    if (v->count == '%') got_perc = 1;
-		    if (v->count == '\n') slen++;
+		    if (v->count == '\n' || v->count == '\\' || v->count == '"')
+			slen++;
 		    i++;
 		    slen++;
 		    if (v->next && v->next->count == 10)
@@ -472,11 +470,10 @@ print_ccode(FILE * ofd)
 		p = s = malloc(slen);
 
 		for(j=0; j<=i; j++) {
-		    if (n->count != '\n')
+		    if (n->count == '\n') { *p++ = '\\'; *p++ = 'n'; } else
+		    if (n->count == '\\') { *p++ = '\\'; *p++ = '\\'; } else
+		    if (n->count == '"') { *p++ = '\\'; *p++ = '"'; } else
 			*p++ = n->count;
-		    else {
-			*p++ = '\\'; *p++ = 'n';
-		    }
 		    if (j!=i)
 			n = n->next;
 		}
@@ -634,13 +631,14 @@ print_ccode(FILE * ofd)
 		    n->offset, n->count, n->line, n->col);
 	    break;
 	default:
-	    pt(ofd, indent,n);
-	    fprintf(ofd, "/* Bad node: type %d: ptr+%d, cnt=%d. */\n",
-		    n->type, n->offset, n->count);
-	    fprintf(stderr, "Error on code generation:\n"
-	           "Bad node: type %d: ptr+%d, cnt=%d.\n",
-		    n->type, n->offset, n->count);
-	    break;
+            fprintf(stderr, "Code gen error: "
+                    "%s\t"
+                    "%d:%d, %d:%d, %d:%d\n",
+                    tokennames[n->type],
+                    n->offset, n->count,
+                    n->offset2, n->count2,
+                    n->offset3, n->count3);
+            exit(1);
 	}
 	if (n->orgtype == T_WHL) indent++;
 	n=n->next;
@@ -823,6 +821,21 @@ run_ccode(void)
     NB: -fno-asynchronous-unwind-tables
 */
 
+/* If we're 32 bit on a 64bit or vs.versa. we need an extra option */
+#ifndef CC
+#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
+#if defined(__x86_64__)
+#define CC "gcc -m64"
+#elif defined(__i586__)
+#define CC "gcc -m32"
+#else
+#define CC "gcc"
+#endif
+#else
+#define CC "cc"
+#endif
+#endif
+
 typedef void (*voidfnp)(void);
 static int loaddll(const char *);
 static voidfnp runfunc;
@@ -835,9 +848,9 @@ compile_and_run(void)
     int ret;
 
     if (verbose)
-	fprintf(stderr, "Running C Code using \"cc -shared\" and dlopen().\n");
+	fprintf(stderr, "Running C Code using \""CC" -shared\" and dlopen().\n");
 
-    sprintf(cmdbuf, "cc %s -shared -fPIC -o %s %s",
+    sprintf(cmdbuf, CC" %s -shared -fPIC -o %s %s",
 	    "", dl_name, ccode_name);
     ret = system(cmdbuf);
 

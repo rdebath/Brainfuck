@@ -61,7 +61,6 @@ characters after your favorite comment marker in a very visible form.
 #include <langinfo.h>
 #include <wchar.h>
 
-#include "bfi.version.h"
 #include "bfi.tree.h"
 
 #ifndef NO_EXT_BE
@@ -189,7 +188,11 @@ void run_progarray(int * progarray);
 
 void LongUsage(FILE * fd)
 {
-    fprintf(fd, "%s: Version "VERSION" (Compiled: %s)\n", program, __DATE__);
+#ifdef NO_EXT_BE
+    fprintf(fd, "%s: LITE version, compiled: %s\n", program, __DATE__);
+#else
+    print_banner(fd, program);
+#endif
     fprintf(fd, "Usage: %s [options] [BF file]\n", program);
     if (fd != stdout) {
 	fprintf(fd, "   -h   Long help message. (Pipe it through more)\n");
@@ -928,18 +931,21 @@ run_tree(void)
 		break;
 
 	    case T_PRT:
-	    {
-		int ch = UM(n->count == -1?p[n->offset]:n->count);
-		/*TODO: stop the clock ? */
-		putch(ch);
-		break;
-	    }
-
 	    case T_INP:
+	    {
 		gettimeofday(&tv_pause, 0); /* Stop the clock. */
 
-		p[n->offset] = getch(p[n->offset]);
+		switch(n->type)
+		{
+		case T_PRT:
+		    putch( UM(n->count == -1?p[n->offset]:n->count) );
+		    break;
+		case T_INP:
+		    p[n->offset] = getch(p[n->offset]);
+		    break;
+		}
 
+		/* Restart the clock */
 		gettimeofday(&tv_end, 0);
 		tv_start.tv_usec = tv_start.tv_usec +
 				(tv_end.tv_usec - tv_pause.tv_usec);
@@ -950,6 +956,7 @@ run_tree(void)
 		    tv_start.tv_sec -= 1;
 		}
 		break;
+	    }
 
 	    case T_STOP:
 		if (verbose)
@@ -2798,34 +2805,32 @@ getch(int oldch)
      *
      * But it does give me somewhere to stick the EOF rubbish.
      */
-    if (eofcell != 5) {
-	if (input_string) {
-	    char * p = 0;
-	    c = (unsigned char)*input_string;
-	    if (c == 0) c = EOF;
+    if (input_string) {
+	char * p = 0;
+	c = (unsigned char)*input_string;
+	if (c == 0) c = EOF;
+	else
+	    p = strdup(input_string+1);
+	free(input_string);
+	input_string = p;
+    }
+    else for(;;) {
+	if (enable_trace || debug_mode) fflush(stdout);
+	if (iostyle == 1) {
+	    int rv;
+	    wchar_t wch = EOF;
+	    rv = scanf("%lc", &wch);
+	    if (rv == EOF)
+		c = EOF;
+	    else if (rv == 0)
+		continue;
 	    else
-		p = strdup(input_string+1);
-	    free(input_string);
-	    input_string = p;
-	}
-	else for(;;) {
-	    if (enable_trace || debug_mode) fflush(stdout);
-	    if (iostyle == 1) {
-		int rv;
-		wchar_t wch = EOF;
-		rv = scanf("%lc", &wch);
-		if (rv == EOF)
-		    c = EOF;
-		else if (rv == 0)
-		    continue;
-		else
-		    c = wch;
-	    } else
-		c = getchar();
+		c = wch;
+	} else
+	    c = getchar();
 
-	    if (iostyle != 2 && c == '\r') continue;
-	    break;
-	}
+	if (iostyle != 2 && c == '\r') continue;
+	break;
     }
     if (c != EOF) return c;
     switch(eofcell)

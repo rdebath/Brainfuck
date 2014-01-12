@@ -441,7 +441,7 @@ run_jit_asm(void)
 	default:
 	    fprintf(stderr, "Code gen error: "
 		    "%s\t"
-		    "%d,%d,%d,%d,%d,%d\n",
+		    "%d:%d, %d:%d, %d:%d\n",
 		    tokennames[n->type],
 		    n->offset, n->count,
 		    n->offset2, n->count2,

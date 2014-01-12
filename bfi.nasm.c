@@ -392,7 +392,8 @@ print_asm_header(void)
     printf("\n");
     printf("BITS 32\n");
     printf("\n");
-    printf("memsize\tequ\t0x10000\n");
+    if (!hello_world)
+	printf("memsize\tequ\t0x10000\n");
     printf("orgaddr\tequ\t0x08048000\n");
     printf("\torg\torgaddr\n");
     printf("\n");
@@ -427,7 +428,10 @@ print_asm_header(void)
     printf("\tdd\t$$\t\t\t\t;   p_vaddr\n");
     printf("\tdd\t$$\t\t\t\t;   p_paddr\n");
     printf("\tdd\tfilesize\t\t\t;   p_filesz\n");
-    printf("\tdd\tfilesize+memsize\t\t;   p_memsz\n");
+    if (hello_world)
+	printf("\tdd\tfilesize\t\t\t;   p_memsz\n");
+    else
+	printf("\tdd\tfilesize+memsize\t\t;   p_memsz\n");
     printf("\tdd\t7\t\t\t\t;   p_flags\n");
     printf("\tdd\t0x1000\t\t\t\t;   p_align\n");
     printf("\n");
@@ -435,11 +439,9 @@ print_asm_header(void)
     printf("\n");
 
     if (hello_world) {
-	printf("filesize equ\tsection..bss.start-orgaddr\n");
-	printf("\tsection\t.text\n");
-	printf("\tsection\t.data\n");
-	printf("\tsection\t.bss\n");
-	printf("\tsection\t.text\n");
+	printf("; The program prolog.\n");
+	printf("; This is a special version for a 'Hello World' program.\n");
+	printf("filesize equ\tmsgend-orgaddr\n");
 	printf("_start:\n");
 	return;
     }
@@ -577,13 +579,15 @@ print_hello_world(void)
 
     print_asm_header();
     if (total_nodes > 0) {
+
 	/* printf("\txor\teax,eax\n");	Linux is zero */
 	/* printf("\txor\tebx,ebx\n");	Linux is zero */
+	/* printf("\txor\tedx,edx\n");	Linux is zero */
+
 	printf("\tmov\tal,4\t\t; syscall 4, write\n");
 	printf("\tinc\tebx\n");
 	printf("\tmov\tecx,msg\n");
 	if (total_nodes < 128) {
-	    /* printf("\tmov\tedx,eax\n");	Linux is zero */
 	    printf("\tmov\tdl,%d\n", total_nodes);
 	} else {
 	    printf("\tmov\tedx,%d\n", total_nodes);
@@ -601,5 +605,6 @@ print_hello_world(void)
 	i = ((i+1) & 7);
 	if (i == 0|| n->next == 0) printf("\n");
     }
+    printf("msgend:\n");
     return;
 }

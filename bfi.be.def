@@ -10,7 +10,7 @@ it to the list and fill in it's entry.
 
 #if XX == 0
 #include "bfi.ccode.h"
-#include "bfi.jit.h"
+#include "bfi.gnulit.h"
 #include "bfi.nasm.h"
 #include "bfi.bf.h"
 #include "bfi.dc.h"
@@ -60,8 +60,8 @@ X(jit,JIT,
 /****************************************************************************/
 #if !defined(DISABLE_TCCLIB) || !defined(DISABLE_DLOPEN)
 X(ccode,CCODE,
-    printf("   -c   Create C code. If combined with -r the code is run using TCCLIB.\n");   ,
-    case 'c': do_codestyle = c_ccode; do_run = (do_run==1); break;			    ,
+    printf("   -c   Create C code. If combined with -r the code is loaded and run.\n");   ,
+    case 'c': do_codestyle = c_ccode; do_run = (do_run==1); break;			  ,
     case c_ccode: print_ccode(stdout); break;			    ,
     case c_ccode: run_ccode(); break;                               )
 
@@ -89,8 +89,8 @@ X(nasm,NASM,
     if (do_codestyle == c_nasm)
     {
 	do_run = (do_run==1);
-	if (do_run || (cell_size && cell_size != 8)) {
-	    fprintf(stderr, "The -s flag cannot be combined with -r or -b\n");
+	if (cell_size && cell_size != 8) {
+	    fprintf(stderr, "The -s option only supports 8 bit cells.\n");
 	    exit(255);
 	}
 	set_cell_size(8);

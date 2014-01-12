@@ -56,6 +56,7 @@ extern int total_nodes;
 #define SEARCHDEPTH     10
 #define SEARCHRANGE     1000
 
+void print_banner(FILE * fd, char const * program);
 void calculate_stats(void);
 void printtreecell(FILE * efd, int indent, struct bfi * n);
 
