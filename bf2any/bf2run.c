@@ -1,3 +1,5 @@
+#ifndef PART2
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,31 +14,19 @@
 int do_input = 0;
 int do_dump = 0;
 
+#ifndef icell
+typedef int icell;
+#endif
+
+#ifndef MEMSIZE
 #define MEMSIZE 65536
+#endif
 
-int
-check_arg(char * arg)
-{
-    if (strcmp(arg, "-O") == 0) return 1;
-    if (strcmp(arg, "-#") == 0) return 1;
-    if (strcmp(arg, "-d") == 0) {
-	do_dump = 1;
-	return 1;
-    } else
-    if (strcmp(arg, "-r") == 0) {
-	do_dump = 0;
-	return 1;
-    } else
-    if (strcmp("-h", arg) ==0) {
-	fprintf(stderr, "%s\n",
-	"\t"    "-d      Dump code"
-	"\n\t"  "-r      Run program");
-	return 1;
-    } else
-    return 0;
-}
+int *mem = 0, *mptr = 0, memlen = 0;
+icell * tape = 0;
 
-int *mem = 0, *m = 0, memlen = 0;
+unsigned long tapelen = MEMSIZE+BOFF;
+
 #define TOKEN_LIST(Mac) \
     Mac(STOP) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
     Mac(SET) Mac(BEG) Mac(MUL) Mac(MUL1) Mac(QSET) Mac(QMUL) Mac(QMUL1) \
@@ -51,63 +41,95 @@ struct stkdat { struct stkdat * up; int id; } *sp = 0;
 int imov = 0;
 int prevtk = 0;
 
-void runprog(int * p, int *m);
-void dumpprog(int * p, int *m);
-void dumpmem(int *mp);
+void runprog(int * p, int *ep);
+void debugprog(int * p, int *ep);
+void dumpprog(int * p, int *ep);
+void dumpmem(int *tp);
+
+int
+check_arg(char * arg)
+{
+    if (strcmp(arg, "-O") == 0) return 1;
+    if (strcmp(arg, "-#") == 0) return 1;
+    if (strcmp(arg, "-d") == 0) {
+	do_dump = 1;
+	return 1;
+    } else
+    if (strcmp(arg, "-r") == 0) {
+	do_dump = 0;
+	return 1;
+    } else
+    if (strncmp(arg, "-m", 2) == 0) {
+	tapelen = strtoul(arg+2, 0, 10) + BOFF;
+	return 1;
+    } else
+    if (strcmp("-h", arg) ==0) {
+	fprintf(stderr, "%s\n",
+	"\t"    "-d      Dump code"
+	"\n\t"  "-mNNN   Memory to allocate for tape"
+	"\n\t"  "-r      Run program");
+	return 1;
+    } else
+    return 0;
+}
 
 void
 outcmd(int ch, int count)
 {
     int t = -1;
 
-    if (memlen < m-mem+MEMSIZE + BOFF) {
-	size_t s = m-mem + MEMSIZE + BOFF + 8192;
+    if (memlen < mptr-mem + 8) {
+	size_t s = memlen + 1024;
 	int * p;
 	p = realloc(mem, s * sizeof(int));
 
 	memset(p+memlen, '\0', (s-memlen) * sizeof(int));
-	m = (m-mem + p);
+	mptr = (mptr-mem + p);
 	mem = p;
 	memlen = s;
     }
 
     if (ch != '>' && ch != '<') {
-	*m++ = imov;
+	*mptr++ = imov;
 	imov = 0;
     }
 
     switch(ch) {
-    default: m--; imov = *m; break; /* Hmm; oops */
+    default: mptr--; imov = *mptr; break; /* Hmm; oops */
 
-    case '=': *m++ = t = T_SET; *m++ = count; break;
-    case 'B': *m++ = t = T_BEG; break;
-    case 'M': *m++ = t = T_MUL; *m++ = count; break;
-    case 'N': *m++ = t = T_MUL; *m++ = -count; break;
-    case 'S': *m++ = t = T_MUL1; break;
+    case '=': *mptr++ = t = T_SET; *mptr++ = count; break;
+    case 'B': *mptr++ = t = T_BEG; break;
+    case 'M': *mptr++ = t = T_MUL; *mptr++ = count; break;
+    case 'N': *mptr++ = t = T_MUL; *mptr++ = -count; break;
+    case 'S': *mptr++ = t = T_MUL1; break;
 
-    case 'Q': *m++ = t = T_QSET; *m++ = count; break;
-    case 'm': *m++ = t = T_QMUL; *m++ = count; break;
-    case 'n': *m++ = t = T_QMUL; *m++ = -count; break;
-    case 's': *m++ = t = T_QMUL1; break;
+    case 'Q': *mptr++ = t = T_QSET; *mptr++ = count; break;
+    case 'm': *mptr++ = t = T_QMUL; *mptr++ = count; break;
+    case 'n': *mptr++ = t = T_QMUL; *mptr++ = -count; break;
+    case 's': *mptr++ = t = T_QMUL1; break;
 
-    case '+': *m++ = t = T_ADD; *m++ = count; break;
-    case '-': *m++ = t = T_ADD; *m++ = -count; break;
+    case '+': *mptr++ = t = T_ADD; *mptr++ = count; break;
+    case '-': *mptr++ = t = T_ADD; *mptr++ = -count; break;
     case '<': imov -= count; break;
     case '>': imov += count; break;
-    case 'X': *m++ = t = T_STOP; break;
-    case ',': *m++ = t = T_INP; break;
-    case '.': *m++ = t = T_PRT; break;
-    case '#': *m++ = t = T_DUMP; break;
+    case 'X': *mptr++ = t = T_STOP; break;
+    case ',': *mptr++ = t = T_INP; break;
+    case '.': *mptr++ = t = T_PRT; break;
+    case '#': *mptr++ = t = T_DUMP; break;
     case '~':
-	*m++ = t = T_STOP;
+	*mptr++ = t = T_STOP;
 	if (do_dump) {
-	    dumpprog(mem, m);
+	    dumpprog(mem, mptr);
 	    return;
 	}
 	setbuf(stdout, 0);
-	if (m-mem < BOFF)
-	    m = mem+BOFF;
-	runprog(mem, m);
+
+	tape = calloc(tapelen, sizeof(icell));
+
+	if(!enable_debug)
+	    runprog(mem, tape+BOFF);
+	else
+	    debugprog(mem, tape+BOFF);
 	break;
 
     case '[':
@@ -115,34 +137,35 @@ outcmd(int ch, int count)
 	    struct stkdat * n = malloc(sizeof*n);
 	    n->up = sp;
 	    sp = n;
-	    *m++ = t = T_WHL;
-	    n->id = m-mem;
-	    *m++ = 0;	/* Default to NOP */
+	    *mptr++ = t = T_WHL;
+	    n->id = mptr-mem;
+	    *mptr++ = 0;	/* Default to NOP */
 	}
 	break;
 
     case ']':
-	*m++ = t = T_END;
+	*mptr++ = t = T_END;
 	if (sp) {
 	    struct stkdat * n = sp;
 	    sp = n->up;
-	    mem[n->id] = (m-mem) - n->id;
-	    *m++ = -mem[n->id];
+	    mem[n->id] = (mptr-mem) - n->id;
+	    *mptr++ = -mem[n->id];
 	    free(n);
 	} else
-	    *m++ = 0;	/* On error NOP */
+	    *mptr++ = 0;	/* On error NOP */
 
-	if ((prevtk & 0xFF) == T_WHL && m[-3] != 0) {
+	if ((prevtk & 0xFF) == T_WHL && mptr[-3] != 0) {
 	    /* [<<<] loop */
-	    m[-5] = T_ZFIND;
-	    m[-4] = m[-3];
-	    m -= 3;
+	    mptr[-5] = T_ZFIND;
+	    mptr[-4] = mptr[-3];
+	    mptr -= 3;
 	} else
-	if ((prevtk & 0xFFFF) == ((T_WHL<<8) + T_ADD) && m[-4] == -1 && m[-6] == 0 && m[-3] != 0) {
+	if ((prevtk & 0xFFFF) == ((T_WHL<<8) + T_ADD) && mptr[-4] == -1
+	    && mptr[-6] == 0 && mptr[-3] != 0) {
 	    /* [-<<<] loop */
-	    m[-8] = T_RAILC;
-	    m[-7] = m[-3];
-	    m -= 6;
+	    mptr[-8] = T_RAILC;
+	    mptr[-7] = mptr[-3];
+	    mptr -= 6;
 	}
 	/* TODO: Add special for [-<<<+] */
 	break;
@@ -153,46 +176,15 @@ outcmd(int ch, int count)
     }
 }
 
-#ifdef __GUNC__
-/* Tell GNU C to think really hard about this function! */
-__attribute((optimize(3),hot,aligned(64)))
-#endif
-void
-runprog(register int * p, register int *mp)
-{
-    register int a = 0;
-    const int msk = (bytecell)?0xFF:-1;
-    for(;;){
-	mp += p[0];
-	switch(p[1]) {
-	case T_ADD: *mp += p[2]; p+=3; break;
-	case T_SET: *mp = p[2]; p+=3; break;
-	case T_END: if ((*mp&msk)!=0) p+= p[2]; p+=3; break;
-	case T_WHL: if ((*mp&msk)==0) p+= p[2]; p+=3; break;
-	case T_BEG: a = (*mp&msk); p+=2; break;
-	case T_MUL1: *mp += a; p+=2; break;
-	case T_ZFIND: while((*mp&msk)) mp += p[2]; p+=3; break;
-	case T_RAILC: while((*mp&msk)) {*mp -=1; mp += p[2]; } p+=3; break;
-	case T_PRT: putchar(*mp); p+=2; break;
-	case T_INP: if((a=getchar()) != EOF) *mp = a; p+=2; break;
-	case T_MUL: *mp += p[2] * a; p+=3; break;
-	case T_QSET: if(a) *mp = p[2]; p+=3; break;
-	case T_QMUL: if(a) *mp += p[2]*a; p+=3; break;
-	case T_QMUL1: if(a) *mp += a; p+=2; break;
-	case T_STOP: return;
-	case T_DUMP: dumpmem(mp); p+=2; break;
-	}
-    }
-}
-
 void
 dumpmem(int *mp)
 {
     int i, j = 0;
-    for (i = 0; i < MEMSIZE; i++) if (m[i]) j = i + 1;
-    fprintf(stderr, "Ptr: %3d, mem:", (int)(mp-m));
-    for (i = 0; i < j; i++)
-	fprintf(stderr, "%s%d", m + i == mp ? ">" : " ", m[i]);
+    const icell msk = (bytecell)?0xFF:-1;
+    for (i = 0; i < tapelen; i++) if (tape[i]&msk) j = i + 1;
+    fprintf(stderr, "Ptr: %3d, mem:", (int)(mp-tape-BOFF));
+    for (i = BOFF; i < j; i++)
+	fprintf(stderr, "%s%d", tape + i == mp ? ">" : " ", tape[i]&msk);
     fprintf(stderr, "\n");
 }
 
@@ -227,3 +219,57 @@ dumpprog(int * p, int * ep)
 	printf("\n");
     }
 }
+#endif
+
+#ifdef PART2
+void
+debugprog(register int * p, register icell *mp)
+#else
+#ifdef __GUNC__
+/* Tell GNU C to think really hard about this function! */
+__attribute((optimize(3),hot,aligned(64)))
+#endif
+void
+runprog(register int * p, register icell *mp)
+#endif
+{
+    register icell a = 0;
+    const icell msk = (bytecell)?0xFF:-1;
+    for(;;){
+	mp += p[0];
+#ifdef PART2
+	if (mp>=tape+tapelen || (mp<tape+BOFF && (a || mp<tape)))
+	{
+	    fprintf(stderr,
+		    "Error: Tape pointer has moved to position %d\n",
+		    mp-tape-BOFF);
+	    exit(42);
+	}
+#endif
+	switch(p[1]) {
+	case T_ADD: *mp += p[2]; p+=3; break;
+	case T_SET: *mp = p[2]; p+=3; break;
+	case T_END: if ((*mp&=msk)!=0) p+= p[2]; p+=3; break;
+	case T_WHL: if ((*mp&=msk)==0) p+= p[2]; p+=3; break;
+	case T_BEG: a = (*mp&=msk); p+=2; break;
+	case T_MUL1: *mp += a; p+=2; break;
+	case T_ZFIND: while((*mp&msk)) mp += p[2]; p+=3; break;
+	case T_RAILC: while((*mp&msk)) {*mp -=1; mp += p[2]; } p+=3; break;
+	case T_PRT: putchar(*mp); p+=2; break;
+	case T_INP: if((a=getchar()) != EOF) *mp = a; p+=2; break;
+	case T_MUL: *mp += p[2] * a; p+=3; break;
+	case T_QSET: if(a) *mp = p[2]; p+=3; break;
+	case T_QMUL: if(a) *mp += p[2]*a; p+=3; break;
+	case T_QMUL1: if(a) *mp += a; p+=2; break;
+	case T_STOP: return;
+#ifdef PART2
+	case T_DUMP: dumpmem(mp); p+=2; break;
+#endif
+	}
+    }
+}
+
+#ifndef PART2
+#define PART2
+#include __FILE__
+#endif
