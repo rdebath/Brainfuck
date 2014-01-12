@@ -11,15 +11,17 @@ HAVE_TCC=$(wildcard /usr/include/libtcc.h)
 ifeq ($(HAVE_TCC),)
 TCCFLAG=-DNO_LIBTCC
 TCCLIBS=
+TCCDEP=bf2tcc.lib-off
 else
 TCCFLAG=
 TCCLIBS=-ltcc -ldl
+TCCDEP=bf2tcc.lib-on
 endif
 
 all:	bf2any.o bf2const.o $(ALLEXE)
 
 clean:
-	-rm -f $(ALLEXE) *.o
+	-rm -f $(ALLEXE) bf2tcc.lib-off bf2tcc.lib-on *.o
 
 CFLAGS=-O3 -Wall -DBOFF=256
 
@@ -29,8 +31,16 @@ bf2bf: bf2bf.o bf2any.o bf2const.o
 bf2tcc: bf2tcc.o bf2any.o bf2const.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(TCCLIBS)
 
-bf2tcc.o: bf2tcc.c
-	$(CC) $(CFLAGS) $(TCCFLAG) -c -o $@ $^ $(TARGET_ARCH)
+bf2tcc.o: bf2tcc.c $(TCCDEP)
+	$(CC) $(CFLAGS) $(TCCFLAG) -c -o $@ bf2tcc.c $(TARGET_ARCH)
+
+bf2tcc.lib-on:
+	-@rm -f bf2tcc.lib-off
+	@touch bf2tcc.lib-on
+
+bf2tcc.lib-off:
+	-@rm -f bf2tcc.lib-on
+	@touch bf2tcc.lib-off
 
 bf2gcc: bf2gcc.o bf2any.o bf2const.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) -ldl

@@ -69,11 +69,14 @@ char * moo[] = {"moO", "mOo", "MoO", "MOo",
 char * doubler[] = {">>>>", "<<<<", ">+<+[>-]>[->>+<]<<", ">+<[>-]>[->>-<]<<-",
 		    ".", ">>>[-]<<<[-],",
 		    ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "[+<",
-		    ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "]<"};
+		    ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "]<",
+		    ">[-]>[-]<<"};
+
+char *chinese[] = { "右", "左", "上", "下", "出", "出", "始", "末" };
 
 char ** lang = 0;
 char ** c = 0;
-char langver = 0;
+char langver = -1;
 int col = 0;
 int maxcol = 72;
 int state = 0;
@@ -87,6 +90,9 @@ check_arg(char * arg)
 {
     if (strcmp(arg, "-c") == 0) {
 	lang = cbyte; langver = 0; c_style = 2; return 1;
+    } else
+    if (strcmp(arg, "-double") == 0) {
+	lang = doubler; langver = 3; c_style = 0; return 1;
     } else
     if (strcmp(arg, "-n") == 0 || strcmp(arg, "-nice") == 0) {
 	lang = nice; langver = 0; c_style = 1; return 1;
@@ -107,7 +113,7 @@ check_arg(char * arg)
 	lang = blub; langver = 0; c_style = 0; return 1;
     } else
     if (strcmp(arg, "-moo") == 0) {
-	lang = moo; langver = 0; c_style = 0; return 1;
+	lang = moo; langver = 1; c_style = 0; return 1;
     } else
     if (strcmp(arg, "-fk") == 0) {
 	lang = f__k; langver = 0; c_style = 1; return 1;
@@ -121,8 +127,12 @@ check_arg(char * arg)
     if (strcmp(arg, "-lisp") == 0) {
 	lang = lisp2; langver = 3; c_style = 0; return 1;
     } else
+    if (strcmp(arg, "-chinese") == 0) {
+	lang = chinese; langver = 1; c_style = 0; return 1;
+    } else
+
     if (strcmp(arg, "-risbf") == 0) {
-	lang = 0; langver = 1; c_style = 0; return 1;
+	lang = 0; langver = 9; c_style = 0; return 1;
     } else
     if (strcmp(arg, "-rle") == 0) {
 	lang = bc; langver = 2; c_style = 1; return 1;
@@ -130,15 +140,13 @@ check_arg(char * arg)
     if (strcmp(arg, "-dump") == 0) {
 	lang = 0; langver = 4; c_style = 0; return 1;
     } else
+
     if (strcmp(arg, "-O") == 0 && langver == 4) {
 	return 1;
     } else
     if (strncmp(arg, "-w", 2) == 0 && arg[2] >= '0' && arg[2] <= '9') {
 	maxcol = atol(arg+2);
 	return 1;
-    } else
-    if (strcmp(arg, "-double") == 0) {
-	lang = doubler; langver = 3; c_style = 0; return 1;
     } else
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
@@ -191,31 +199,34 @@ outcmd(int ch, int count)
 	if (lang == cbyte) lang = c;
     }
 
-    if (langver == 0 || langver == 2) {
+    switch (langver) {
+    case 0: case 1: case 2:
 	while(count-->0){
-	    if (lang) {
-		pc(0);
-		col += printf("%s%s", col?" ":"", lang[strchr(bf,ch)-bf]);
-		if (langver == 2)
-		    while(count-->0){
-			pc(0);
-			col += printf("%s%s", col?" ":"", lang[8]);
-		    }
-	    } else
-		pc(ch);
+	    char * p = strchr(bf,ch);
+	    if (!p) continue;
+	    pc(0);
+	    col += printf("%s%s", (col&&langver!=1)?" ":"", lang[p-bf]);
+	    if (langver == 2)
+		while(count-->0){
+		    pc(0);
+		    col += printf("%s%s", (col&&langver!=1)?" ":"", lang[8]);
+		}
 	}
-    } else if (langver == 1) {
-	while (count-->0)
-	    risbf(ch);
-    } else if (langver == 3) {
+	break;
+
+    case 3:
 	while(count-->0){
-	    char * p = lang[strchr(bf,ch)-bf];
+	    char * p = strchr(bf,ch);
+	    if (!p) continue;
+	    p = lang[p-bf];
 	    while (*p)
 		pc(*p++);
 	}
-    } else if (langver == 4) {
-	printf("%c %d\n", ch, count);
-	col = 0;
+	break;
+
+    case 4: printf("%c %d\n", ch, count); col = 0; break;
+    case 9: while (count-->0) risbf(ch); break;
+    default: while (count-->0) pc(ch); break;
     }
 
     if (ch == '~') {
@@ -272,32 +283,3 @@ risbf(int ch)
     case ']': pc('/'); pc('-'); break;
     }
 }
-
-#if 0 /* OLDCODE */
-void
-rlebf(int ch, int count)
-{
-    if (ch == '!') {
-	printf(	"#include<unistd.h>"
-	"\n"	"#define r ;m+=1"
-	"\n"	"#define l ;m-=1"
-	"\n"	"#define u ;*m+=1"
-	"\n"	"#define d ;*m-=1"
-	"\n"	"#define b ;while(*m){"
-	"\n"	"#define e ;}"
-	"\n"	"#define o ;write(1,m,1)"
-	"\n"	"#define i ;read(0,m,1)"
-	"\n"	"#define _ ;return 0;}"
-	"\n"	"char mem[30000];int main(){register char*m=mem\n");
-    }
-    if (count > 0) {
-	pc(0);
-	col += printf("%s%s", col?" ":"", lang[strchr(bf,ch)-bf]);
-	if (count > 1) col += printf("*%d", count);
-    }
-    if (ch == '~') {
-	pc(0);
-	col += printf("%s%s", col?" ":"", "_");
-    }
-}
-#endif

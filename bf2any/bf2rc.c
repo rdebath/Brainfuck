@@ -5,7 +5,7 @@
 #include "bf2any.h"
 
 /*
- * AT&T Plan 9 shell (rc) translation from BF, runs at about 5,500 instructions per second.
+ * AT&T Plan 9 shell (rc) translation from BF, runs at about 120,000 instructions per second.
  *
  * Large input files give:
  *      line 18551: yacc stack overflow near end of line
@@ -15,8 +15,8 @@
  * There is no built in function to read a line from the stdin and there is
  * no built in function to extract the first character from a string.
  *
- * I would have to use something like "dd bs=1 count=1 >[2]/dev/null | od"
- * and so I've not included it.
+ * I have used an external command pipeline to get the next character
+ * from stdin.
  */
 
 #define MAXPRLE	1
@@ -55,7 +55,7 @@ outcmd(int ch, int count)
     case '<': printf("l\n"); break;
     case '[':
 	printf("f\n");
-	printf("while (! ~ $v 0 ) {\n");
+	printf("while (! ~ $v 0){\n");
 	ind++;
 	break;
     case ']':
@@ -74,17 +74,8 @@ outcmd(int ch, int count)
 	printf(
 	    "ptr=(1)\n"
 	    "\n"
-	    "fn lflat {\n"
-	    "  lflat=$*; *=$$1\n"
-	    "  while () {\n"
-	    "    echo -n $1; shift\n"
-	    "    ~ $#* 0 && break\n"
-	    "    echo -n $lflat(2)\n"
-	    "  }\n"
-	    "}\n"
-	    "\n"
 	    "fn f {\n"
-	    "    p=t`{lflat ptr _}\n"
+	    "    p=t$^ptr\n"
 	    "    v=$$p\n"
 	    "    if (~ $v ()) v=0\n"
 	    "}\n"
@@ -141,44 +132,65 @@ outcmd(int ch, int count)
 	    "    ptr=$nptr\n"
 	    "}\n\n");
 
-	printf("fn u {\n" "    f\n" "    switch ($v) {\n");
 	{
 	    int i;
+	    printf("inc=(\n");
 	    for (i=0; i<256; i++) {
-		printf("    case %d; v=%d\n", i, ((i+1)& 0xFF));
+		printf(" %d", (i+2)&0xFF);
+		if (i%16 == 15)
+		    printf("\n");
 	    }
-	    printf("    case *; v=1\n");
+	    printf(")\n\n");
+	    printf("fn u {\n" "    f\n");
+	    printf("    if (~ $v 0) {\n");
+	    printf("        v=1\n");
+	    printf("    } else {\n");
+	    printf("        v=$inc($v)\n");
+	    printf("    }\n");
+	    printf("    s\n" "}\n" "\n");
 	}
-	printf("    }\n" "    s\n" "}\n" "\n");
 
-	printf("fn d {\n" "    f\n" "    switch ($v) {\n");
 	{
 	    int i;
+	    printf("dec=(\n");
 	    for (i=0; i<256; i++) {
-		printf("    case %d; v=%d\n", i, ((i-1)& 0xFF));
+		printf(" %d", (i)&0xFF);
+		if (i%16 == 15)
+		    printf("\n");
 	    }
-	    printf("    case *; v=255\n");
+	    printf(")\n\n");
+	    printf("fn d {\n" "    f\n");
+	    printf("    if (~ $v 0) {\n");
+	    printf("        v=255\n");
+	    printf("    } else {\n");
+	    printf("        v=$dec($v)\n");
+	    printf("    }\n");
+	    printf("    s\n" "}\n" "\n");
 	}
-	printf("    }\n" "    s\n" "}\n" "\n");
 
 	printf("fn o {\n" "    f\n" "    switch ($v) {\n");
 	{
 	    int i;
 	    for (i=0; i<256; i++) {
 		if (i == 10 )
-		    printf("    case %d; echo\n", i);
+		    printf("    case %d\n\techo\n", i);
 		else if (i == 27 )
-		    printf("    case %d; echo -n '%c'\n", i, i);
+		    printf("    case %d\n\techo -n '%c'\n", i, i);
 		else if (i>= ' ' && i<= '~' && i != '\'')
-		    printf("    case %d; echo -n '%c'\n", i, i);
+		    printf("    case %d\n\techo -n '%c'\n", i, i);
 		else if (i == '\'')
-		    printf("    case %d; echo -n ''''\n", i);
+		    printf("    case %d\n\techo -n ''''\n", i);
+		/* else
+		 *  Missing characters can be generated using AWK if required.
+		 */
 	    }
 	}
 	printf("    }\n" "}\n" "\n");
 
 	printf("fn i {\n");
-	printf("echo STOP command executed >[1=2]\n" "exit\n");
+	printf("    f\n");
+	printf("    v=`{dd 'bs=1' 'count=1' >[2]/dev/null | od -t d1 | cut -d ' ' -s -f 2- }\n");
+	printf("    s\n");
 	printf("}\n" "\n");
 
 	if (MAXPRLE>1) {

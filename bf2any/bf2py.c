@@ -15,7 +15,6 @@
 int do_input = 0;
 int ind = 0;
 #define I printf("%*s", ind*4, "")
-int lastcmd = 0;
 
 int
 check_arg(char * arg)
@@ -37,6 +36,9 @@ outcmd(int ch, int count)
 	printf("m = [0] * 60000\n");
 	printf("p = 0\n");
 	break;
+
+    case 'X': I; printf("raise Exception('Aborting infinite loop')\n"); break;
+
     case '+': I; printf("m[p] += %d\n", count); break;
     case '-': I; printf("m[p] -= %d\n", count); break;
     case '<': I; printf("p -= %d\n", count); break;
@@ -47,8 +49,6 @@ outcmd(int ch, int count)
     case ']':
 	if(bytecell) {
 	    I; printf("m[p] &= 255\n");
-	} else if (lastcmd == '[') {
-	    I; printf("pass\n");
 	}
 	ind--;
 	break;
@@ -69,5 +69,4 @@ outcmd(int ch, int count)
 	break;
 #endif
     }
-    lastcmd = ch;
 }

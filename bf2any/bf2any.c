@@ -104,17 +104,6 @@ outrun(int ch, int repcnt)
 	qrep[qcnt] = repcnt;
 	qcnt++;
 
-	/* Need to pad the [] loop, also the 'X' can be an error message. */
-	if (qcnt >= 2) {
-	    if (qcmd[qcnt-2] == '[' && qcmd[qcnt-1] == ']') {
-		qcnt -= 2;
-		outrun('[', 1);
-		outrun('X', 1);
-		outrun(']', 1);
-		return;
-	    }
-	}
-
 	/* Actually change '[-]' and '[+]' to a single token */
 	if (qcnt >= 3) {
 	    if (qcmd[qcnt-3] == '[' && qrep[qcnt-2] == 1 && qcmd[qcnt-1] == ']'
@@ -299,13 +288,14 @@ main(int argc, char ** argv)
 	/* Post the RLE token onward */
 	if (c) outrun(lastch, c);
 	c = m;
-	lastch = ch;
 	if (!m) {
 	    /* Non RLE tokens here */
 	    if (!b && ch == ']') continue; /* Ignore too many ']' */
 	    b += (ch=='[') - (ch==']');
+	    if (lastch == '[' && ch == ']') outrun('X', 1);
 	    outrun(ch, 1);
 	}
+	lastch = ch;
     }
     if (ifd != stdin) fclose(ifd);
     if(c) outrun(lastch, c);

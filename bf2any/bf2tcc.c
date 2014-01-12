@@ -25,6 +25,9 @@ FILE * ofd;
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
 #define prv2(s,v,v2)    fprintf(ofd, "%*s" s "\n", ind*4, "", (v), (v2))
 
+#ifndef NO_LIBTCC
+static void compile_and_run(void);
+#endif
 static void print_cstring(void);
 
 int imov = 0;
@@ -91,7 +94,7 @@ outcmd(int ch, int count)
 	/* pr("#!/usr/bin/tcc -run"); */
 
 	pr("#include <stdio.h>");
-	pr("int main(int argc, char ** argv){");
+	pr("int main(void){");
 	ind++;
 	if (bytecell) {
 	    pr("static char mem[30000];");
@@ -137,20 +140,8 @@ outcmd(int ch, int count)
     fclose(ofd);
     setbuf(stdout,0);
 
-    {
-	TCCState *s;
-	int rv;
+    compile_and_run();
 
-	s = tcc_new();
-	if (s == NULL) { perror("tcc_new()"); exit(7); }
-	tcc_set_output_type(s, TCC_OUTPUT_MEMORY);
-	tcc_compile_string(s, ccode);
-
-	rv = tcc_run(s, 0, 0);
-	if (rv) fprintf(stderr, "tcc_run returned %d\n", rv);
-	tcc_delete(s);
-	free(ccode);
-    }
 #endif
 }
 
@@ -197,3 +188,22 @@ print_cstring(void)
 	}
     }
 }
+
+#ifndef NO_LIBTCC
+static void
+compile_and_run(void)
+{
+    TCCState *s;
+    int rv;
+
+    s = tcc_new();
+    if (s == NULL) { perror("tcc_new()"); exit(7); }
+    tcc_set_output_type(s, TCC_OUTPUT_MEMORY);
+    tcc_compile_string(s, ccode);
+
+    rv = tcc_run(s, 0, 0);
+    if (rv) fprintf(stderr, "tcc_run returned %d\n", rv);
+    tcc_delete(s);
+    free(ccode);
+}
+#endif

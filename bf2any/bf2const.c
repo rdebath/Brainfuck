@@ -195,11 +195,26 @@ void outopt(int ch, int count)
 	else
 	    flush_tape(0);
 	if (ch) outcmd(ch, count);
+
+	/* Loops end with zero */
+	if (ch == ']') {
+	    tape->is_set = 1;
+	    tape->v = 0;
+	    tape->cleaned = 1;
+	    tape->cleaned_val = tape->v;
+	}
 	return;
 
     case '.':
 	if (enable_prt && tape->is_set && tape->v != 0) {
 	    add_string(tape->v);
+
+	    if (sav_str_len >= 81000) /* Limit the buffer size. */
+	    {
+		add_string(0);
+		outcmd('"', 0);
+		sav_str_len = 0;
+	    }
 	    break;
 	}
 	flush_cell();

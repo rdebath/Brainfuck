@@ -54,8 +54,8 @@ outcmd(int ch, int count)
     case ',': pr("getch"); do_input++; break;
 
     case '[':
-	if(bytecell) { pr("while [[ $((M[P]&=255)) != 0 ]] ; do :"); }
-	else { pr("while [[ $((M[P])) != 0 ]] ; do :"); }
+	if(bytecell) { pr("while [[ $((M[P]&=255)) != 0 ]] ; do"); }
+	else { pr("while [[ $((M[P])) != 0 ]] ; do"); }
 	ind++;
 	break;
     case ']': ind--; pr("done"); break;

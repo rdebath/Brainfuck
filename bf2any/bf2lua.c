@@ -48,7 +48,7 @@ outcmd(int ch, int count)
     case 'n': I; printf("if v ~= 0 then m[p] = m[p]-v*%d end\n", count); break;
     case 's': I; printf("if v ~= 0 then m[p] = m[p]+v end\n"); break;
 
-    case 'X': I; printf("io.write(\"Infinite Loop\\n\") os.exit(1)\n"); break;
+    case 'X': I; printf("error('Aborting Infinite Loop')\n"); break;
 
     case '+': I; printf("m[p] = m[p]+%d\n", count); break;
     case '-': I; printf("m[p] = m[p]-%d\n", count); break;

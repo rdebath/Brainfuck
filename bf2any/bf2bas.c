@@ -119,7 +119,10 @@ outcmd(int ch, int count)
 	}
 	break;
 
-    case 'X': I; printf("print \"Infinite Loop\"\nGOTO 200\n"); break;
+    case 'X':
+	I; printf("print \"Infinite Loop\"\n");
+	I; printf("GOTO 200\n");
+	break;
     case '=': I; printf("M(P)=%d\n", count); break;
     case 'B':
 	if(bytecell) { I; printf("M(P)=M(P) MOD 256\n"); }

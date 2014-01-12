@@ -12,21 +12,23 @@
  *  language is very similar to C (without semicolons).
  *
  *  Generated code works in most awk implementations. For really old ones
- *  without functions the getch() function will have to be inlined.
+ *  without functions the getch() function has to be inlined.
  */
 
-/*
+/* Do this by default as getch() is rare. */
 #define INLINEGETCH
-*/
 
 int do_input = 0;
 int ind = 0;
 #define I printf("%*s", ind*4, "")
 
+static void print_cstring(void);
+
 int
 check_arg(char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
+    if (strcmp(arg, "-savestring") == 0) return 1;
     return 0;
 }
 
@@ -107,6 +109,8 @@ outcmd(int ch, int count)
 	if(bytecell) { I; printf("m[p]=m[p]%%256\n"); }
 	I; printf("printf \"%%c\",m[p]\n");
 	break;
+    case '"': print_cstring(); break;
+
 #ifndef INLINEGETCH
     case ',': I; printf("getch()\n"); do_input++; break;
 #else
@@ -136,5 +140,50 @@ outcmd(int ch, int count)
 	I; printf("}\n");
 	break;
 #endif
+    }
+}
+
+static void
+print_cstring(void)
+{
+    char * str = get_string();
+    char buf[88];
+    int gotnl = 0, gotperc = 0, i = 0;
+
+    if (!str) return;
+
+    for(;; str++) {
+	if (i && (*str == 0 || gotnl || i > sizeof(buf)-8))
+	{
+	    buf[i] = 0;
+	    if (gotnl) {
+		buf[i-2] = 0;
+		I; printf("print \"%s\"\n", buf);
+	    } else if (gotperc) {
+		I; printf("printf \"%%s\",\"%s\"\n", buf);
+	    } else {
+		I; printf("printf \"%s\"\n", buf);
+	    }
+	    gotnl = gotperc = i = 0;
+	}
+	if (!*str) break;
+
+	if (*str == '\n') gotnl = 1;
+	if (*str == '%') gotperc = 1;
+	if (*str >= ' ' && *str <= '~' && *str != '"' && *str != '\\') {
+	    buf[i++] = *str;
+	} else if (*str == '"' || *str == '\\') {
+	    buf[i++] = '\\'; buf[i++] = *str;
+	} else if (*str == '\n') {
+	    buf[i++] = '\\'; buf[i++] = 'n';
+	} else if (*str == '\t') {
+	    buf[i++] = '\\'; buf[i++] = 't';
+	} else {
+	    char buf2[16];
+	    int n;
+	    sprintf(buf2, "\\%03o", *str & 0xFF);
+	    for(n=0; buf2[n]; n++)
+		buf[i++] =buf2[n];
+	}
     }
 }

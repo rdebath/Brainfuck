@@ -106,6 +106,7 @@ outcmd(int ch, int count)
 	if (n->loop && n->loop->has_inp)
 	    n->has_inp = n->loop->has_inp;
 
+#ifdef COMMENTS
 	if (n->ino) {
 	    I; printf("// %d", n->ino);
 	    if (n->loop) {
@@ -115,6 +116,7 @@ outcmd(int ch, int count)
 		printf(" Has %d ',' command(s)", n->has_inp);
 	    printf("\n");
 	}
+#endif
 
 	loutcmd(n->ch, n->count, n);
     }

@@ -133,6 +133,7 @@ outcmd(int ch, int count)
 
     if (!runmode) return;
     fclose(ofd);
+    setbuf(stdout,0);
 
     compile_and_run();
 }
@@ -188,6 +189,7 @@ print_cstring(void)
 */
 
 /* If we're 32 bit on a 64bit or vs.versa. we need an extra option */
+#ifndef CC
 #if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
 #if defined(__x86_64__)
 #define CC "gcc -m64"
@@ -198,6 +200,7 @@ print_cstring(void)
 #endif
 #else
 #define CC "cc"
+#endif
 #endif
 
 static int loaddll(const char *);
