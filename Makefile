@@ -50,7 +50,7 @@ clean:
 	-rm -f *.o
 
 bfi.gnulit.o:	bfi.gnulit.c bfi.tree.h bfi.gnulit.h
-	$(CC) $(CFLAGS) $(TARGET_ARCH)  -c -fno-strict-aliasing bfi.gnulit.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ -fno-strict-aliasing bfi.gnulit.c
 
 bfi.o: \
     bfi.c bfi.tree.h bfi.run.h bfi.be.def bfi.ccode.h bfi.gnulit.h \

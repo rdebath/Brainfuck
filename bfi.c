@@ -167,7 +167,7 @@ void pointer_regen(void);
 void quick_scan(void);
 void invariants_scan(void);
 void trim_trailing_sets(void);
-int find_known_state(struct bfi * v);
+int scan_one_node(struct bfi * v, struct bfi ** move_v);
 int find_known_calc_state(struct bfi * v);
 int flatten_loop(struct bfi * v, int constant_count);
 int classify_loop(struct bfi * v);
@@ -1288,7 +1288,7 @@ invariants_scan(void)
 	switch(n->type) {
 	case T_PRT:
 	    if (n->count == -1)
-		node_changed = find_known_state(n);
+		node_changed = scan_one_node(n, &n);
 	    if (node_changed) {
 		n2 = n;
 		n = n->next;
@@ -1299,7 +1299,7 @@ invariants_scan(void)
 	case T_SET:
 	case T_ADD:
 	case T_WHL:
-	    node_changed = find_known_state(n);
+	    node_changed = scan_one_node(n, &n);
 	    break;
 
 	case T_CALC:
@@ -1310,16 +1310,17 @@ invariants_scan(void)
 
 	case T_END: case T_ENDIF:
 	    n2 = n->jmp;
-	    node_changed = find_known_state(n2);
+	    n3 = n2;
+	    node_changed = scan_one_node(n2, &n3);
 	    if (!node_changed)
-		node_changed = find_known_state(n);
+		node_changed = scan_one_node(n, &n3);
 	    if (!node_changed)
 		node_changed = classify_loop(n2);
 	    if (!node_changed)
 		node_changed = flatten_multiplier(n2);
 
 	    if (node_changed)
-		n = n2;
+		n = n3;
 	    break;
 
 	case T_MOV:
@@ -1433,12 +1434,12 @@ trim_trailing_sets(void)
 	    n->type = T_SET;
 	    n->count = -1;
 	    n->offset = i;
-	    node_changed = find_known_state(n);
+	    node_changed = scan_one_node(n, 0);
 	    if (node_changed && n->type != T_SET) {
 		n->type = T_SET;
 		n->count = 1;
 		n->offset = i;
-		node_changed = find_known_state(n);
+		node_changed = scan_one_node(n, 0);
 	    }
 	}
 	lastn->next = 0;
@@ -1754,7 +1755,7 @@ find_known_value(struct bfi * n, int v_offset,
 }
 
 int
-find_known_state(struct bfi * v)
+scan_one_node(struct bfi * v, struct bfi ** move_v)
 {
     struct bfi *n = 0;
     int const_found = 0, known_value = 0, non_zero_unsafe = 0;
@@ -1816,7 +1817,7 @@ find_known_state(struct bfi * v)
 		break;
 	    case T_IF:
 		{
-		    /* Nested T_IF with same condition */
+		    /* Nested T_IF with same condition ? */
 		    struct bfi *n2 = v;
 		    while(n2->prev &&
 			(n2->prev->type == T_ADD || n2->prev->type == T_SET || n2->prev->type == T_CALC) &&
@@ -1824,10 +1825,26 @@ find_known_state(struct bfi * v)
 			n2 = n2->prev;
 		    if (n2) n2 = n2->prev;
 		    if (n2 && n2->offset == v->offset && ( n2->orgtype == T_WHL )) {
+			if (verbose>5) fprintf(stderr, "  Nested duplicate T_IF\n");
+
 			v->type = T_NOP;
 			v->jmp->type = T_NOP;
 			return 1;
 		    }
+#if 0
+		    /* TODO: Need to check that the cell we're copying from hasn't changed (Like SSA) */
+		    if (n2 && n2->offset == v->offset && n2->type == T_CALC &&
+			n2->count == 0 && n2->count2 == 1 && n2->count3 == 0) {
+			if (verbose>5) {
+			    fprintf(stderr, "  Assignment of Cond for T_IF is copy.\n    ");
+			    printtreecell(stderr, 0, n2);
+			    fprintf(stderr, "\n");
+			}
+			v->offset = n2->offset2;
+			if (move_v) *move_v = n2;
+			return 1;
+		    }
+#endif
 		}
 		break;
 	}
@@ -2051,6 +2068,12 @@ find_known_calc_state(struct bfi * v)
 
     if(v == 0) return 0;
     if (v->type != T_CALC) return 0;
+
+    if (verbose>5) {
+	fprintf(stderr, "Check T_CALC node: ");
+	printtreecell(stderr, 0,v);
+	fprintf(stderr, "\n");
+    }
 
     if (v->count2 && v->count3 && v->offset2 == v->offset3) {
 	/* Merge identical sides */
