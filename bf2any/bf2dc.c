@@ -75,6 +75,15 @@ check_arg(char * arg)
 /* Note: calling exit() isn't posix */
 void endprog(int s) { exit(0); }
 
+static char *
+dc_ltoa(long val)
+{
+    static char buf[64];
+    snprintf(buf, sizeof(buf), "%ld", val);
+    if (*buf == '-') *buf = '_';
+    return buf;
+}
+
 void
 outcmd(int ch, int count)
 {
@@ -92,25 +101,25 @@ outcmd(int ch, int count)
 	break;
 
 #ifndef USE_STACK
-    case '=': prv("%dlp:a", count); break;
+    case '=': prv("%slp:a", dc_ltoa(count)); break;
     case 'B':
 	if(bytecell)
 	    pr("lmxsV");
 	else
 	    pr("lp;asV");
 	break;
-    case 'M': prv("lp;alV%d*+lp:a", count); break;
-    case 'N': prv("lp;alV_%d*+lp:a", count); break;
+    case 'M': prv("lp;alV%s*+lp:a", dc_ltoa(count)); break;
+    case 'N': prv("lp;alV%s*+lp:a", dc_ltoa(-count)); break;
     case 'S': pr("lp;alV+lp:a"); break;
-    case 'Q': prv("[%dlp:a]svlV0!=v", count); break;
-    case 'm': prv("[lp;alV%d*+lp:a]svlV0!=v", count); break;
-    case 'n': prv("[lp;alV_%d*+lp:a]svlV0!=v", count); break;
+    case 'Q': prv("[%slp:a]svlV0!=v", dc_ltoa(count)); break;
+    case 'm': prv("[lp;alV%s*+lp:a]svlV0!=v", dc_ltoa(count)); break;
+    case 'n': prv("[lp;alV%s*+lp:a]svlV0!=v", dc_ltoa(-count)); break;
     case 's': pr("[lp;alV+lp:a]svlV0!=v"); break;
 
-    case '+': prv("lp;a%d+lp:a", count); break;
-    case '-': prv("lp;a%d-lp:a", count); break;
-    case '<': prv("lp%d-sp", count); break;
-    case '>': prv("lp%d+sp", count); break;
+    case '+': prv("lp;a%s+lp:a", dc_ltoa(count)); break;
+    case '-': prv("lp;a%s-lp:a", dc_ltoa(count)); break;
+    case '<': prv("lp%s-sp", dc_ltoa(count)); break;
+    case '>': prv("lp%s+sp", dc_ltoa(count)); break;
     case '[': pr("["); break;
     case ']':
 	if(bytecell)
