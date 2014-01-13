@@ -2,7 +2,7 @@
  * It's rather small and dense, but still readable, more or less.
  *
  * Tape size: limited by RAM.
- * Cell size: 8bit with wraparound. 
+ * Cell size: 8bit with wraparound.
  * EOF processing: leave as is.
  *
  * Robert de Bath (c) 2013 GPL v2 or later.
@@ -12,7 +12,7 @@
 #include <string.h>
 
 struct bfi { char cmd; struct bfi *next, *jmp; };
-struct mem { char val; struct mem *next, *prev; };
+struct mem { unsigned char val; struct mem *next, *prev; };
 int main(int argc, char **argv)
 {
     FILE * ifd;
@@ -21,7 +21,7 @@ int main(int argc, char **argv)
     struct mem *m = calloc(1,sizeof*m);
     setbuf(stdout, NULL);
     if (argc < 2 || strcmp(argv[1], "-") == 0) ifd = stdin;
-    else if ((ifd = fopen(argv[1], "r")) == 0) 
+    else if ((ifd = fopen(argv[1], "r")) == 0)
 	perror(argv[1]);
     if (ifd) {
 	while((ch = getc(ifd)) != EOF && (ifd!=stdin || ch != '!')) {
