@@ -6,6 +6,7 @@
 
 int bytecell = 0;
 int enable_optim = 0;
+int enable_bf_optim = 0;
 char * current_file;
 int enable_debug;
 
@@ -35,11 +36,9 @@ int enable_debug;
  * extra ']' tokens.
  *
  */
-static char qcmd[32];
-static int qrep[32];
+static char qcmd[64];
+static int qrep[64];
 static int qcnt = 0;
-static int curmov = 0;
-static int saved_zset = 0;
 
 static int madd_offset[32];
 static int madd_inc[32];
@@ -49,10 +48,13 @@ static int madd_count = 0;
 static void
 outrun(int ch, int repcnt)
 {
-    if (!enable_optim)
-	outcmd(ch, repcnt);
-    else {
-	int i, mov, inc;
+    if (!enable_optim) {
+	if (!enable_bf_optim)
+	    outcmd(ch, repcnt);
+	else
+	    outopt(ch, repcnt);
+    } else {
+	int i, mov, inc, loopz;
 
 	/* Sweep everything from the buffer into outopt ? */
 	if ((ch != '>' && ch != '<' && ch != '+' && ch != '-' &&
@@ -70,28 +72,16 @@ outrun(int ch, int repcnt)
 	    /* For the queue ... */
 	    for(i=0; i<qcnt; i++) {
 		if (qcmd[i] > 0) {
-		    /* Merge a [-] with a following ++++ */
-		    if (saved_zset) {
-			saved_zset = 0;
-			if (qcmd[i] == '+') {
-			    outopt('=', qrep[i]);
-			    continue;
-			} else
-			    outopt('=', 0);
+		    /* Make sure counts are positive and post onward. */
+		    int cmd = qcmd[i];
+		    int rep = qrep[i];
+		    if (rep < 0) switch(cmd) {
+			case '>': cmd = '<'; rep = -rep; break;
+			case '<': cmd = '>'; rep = -rep; break;
+			case '+': cmd = '-'; rep = -rep; break;
+			case '-': cmd = '+'; rep = -rep; break;
 		    }
-		    /* Delay < and > to merge movements round deleted tokens */
-		    if (qcmd[i] == '>') { curmov += qrep[i]; continue; }
-		    if (qcmd[i] == '<') { curmov -= qrep[i]; continue; }
-		    /* send the delayed <> strings */
-		    if (curmov > 0) outopt('>', curmov);
-		    if (curmov < 0) outopt('<', -curmov);
-		    curmov = 0;
-
-		    if (qcmd[i] == '=' && qrep[i] == 0)
-			/* Delay a [-] to see if we have any +++ after */
-			saved_zset++;
-		    else
-			outopt(qcmd[i], qrep[i]);
+		    outopt(cmd, rep);
 		}
 	    }
 	    qcnt = 0;
@@ -133,7 +123,7 @@ outrun(int ch, int repcnt)
 	/* Rest is to decode a 'simple' loop */
 	if (ch != ']') return;
 
-	inc = mov = 0;
+	loopz = inc = mov = 0;
 	madd_count = 0;
 	for(i=1; i<qcnt-1; i++) {
 	    int j;
@@ -141,8 +131,7 @@ outrun(int ch, int repcnt)
 	    if (qcmd[i] == '<') { mov -= qrep[i]; continue; }
 	    if (qcmd[i] == '+' && mov == 0) { inc += qrep[i]; continue; }
 	    if (qcmd[i] == '-' && mov == 0) { inc -= qrep[i]; continue; }
-	    /* It may be an if, but that's not interesting now */
-	    if (qcmd[i] == '=' && mov == 0) { outrun(0, 0); return; }
+	    if (qcmd[i] == '=' && mov == 0) { loopz = 1; inc = qrep[i]; continue; }
 	    for (j=0; j<madd_count; j++) {
 		if (mov == madd_offset[j]) break;
 	    }
@@ -170,12 +159,21 @@ outrun(int ch, int repcnt)
 	    return;
 	}
 	/* Last check for not simple. */
-	if (mov || (inc != -1 && inc != 1)) { outrun(0, 0); return; }
+	if (mov
+	    || (loopz == 0 && inc != -1 && inc != 1)
+	    || (loopz != 0 && inc != 0) )
+	    { outrun(0, 0); return; }
 
 	/* Delete old loop */
 	qcnt = 0;
 
 	/* Start new */
+	if (loopz) {
+	    /* *m = (*m != 0) */
+	    qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
+	    qcmd[qcnt] = 'Q'; qrep[qcnt] = 1; qcnt ++;
+	    inc = -1;
+	}
 	qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
 	qcmd[qcnt] = '='; qrep[qcnt] = 0; qcnt ++;
 	for (i=0; i<madd_count; i++) {
@@ -214,9 +212,8 @@ main(int argc, char ** argv)
     char * pgm = argv[0];
     int ch, lastch=']', c=0, m, b=0, lc=0;
     FILE * ifd;
-    int opt_supported, byte_supported, nobyte_supported;
+    int opt_supported = -1, byte_supported, nobyte_supported;
 
-    opt_supported = enable_optim = check_arg("-O");
     byte_supported = check_arg("-b");
     nobyte_supported = check_arg("-no-byte");
     if (!byte_supported && !nobyte_supported)
@@ -233,11 +230,18 @@ main(int argc, char ** argv)
 	} else if (nobyte_supported && strcmp(argv[1], "-no-byte") == 0) {
 	    check_arg(argv[1]);
 	    bytecell=0; argc--; argv++;
-	} else if (opt_supported && strcmp(argv[1], "-m") == 0) {
+
+	} else if (strcmp(argv[1], "-m") == 0 && check_arg("-O")) {
+	    if (opt_supported == -1)
+		opt_supported = enable_optim = check_arg("-O");
 	    check_arg(argv[1]);
 	    enable_optim=0; argc--; argv++;
-	} else if (strcmp(argv[1], "-O") == 0 && check_arg(argv[1])) {
-	    enable_optim=1; argc--; argv++;
+	} else if (strcmp(argv[1], "-O") == 0 && check_arg("-O")) {
+	    opt_supported = enable_optim = check_arg(argv[1]);
+	    argc--; argv++;
+	} else if (strcmp(argv[1], "-Obf") == 0) {
+	    enable_bf_optim=1; argc--; argv++;
+
 	} else if (strcmp(argv[1], "-#") == 0 && check_arg(argv[1])) {
 	    enable_debug++; argc--; argv++;
 	} else if (strcmp(argv[1], "-h") == 0) {
@@ -247,7 +251,7 @@ main(int argc, char ** argv)
 	    "\t"    "-h      This message"
 	    "\n\t"  "-b      Force byte cells"
 	    "\n\t"  "-#      Turn on trace code.");
-	    if (opt_supported)
+	    if (check_arg("-O"))
 		fprintf(stderr, "%s\n",
 		"\t"    "-O      Enable optimisation"
 		"\n\t"  "-m      Disable optimisation");
@@ -266,6 +270,10 @@ main(int argc, char ** argv)
 	    exit(1);
 	} else break;
     }
+
+    if (opt_supported == -1)
+	opt_supported = enable_optim = check_arg("-O");
+
     if (argc<=1 || strcmp(argv[1], "-") == 0) {
 	ifd = stdin;
 	current_file = "stdin";

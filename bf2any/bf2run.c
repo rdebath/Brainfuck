@@ -40,6 +40,7 @@ const char* tokennames[] = { TOKEN_LIST(GEN_TOK_STRING) };
 struct stkdat { struct stkdat * up; int id; } *sp = 0;
 int imov = 0;
 int prevtk = 0;
+int checklimits = 0;
 
 void runprog(int * p, int *ep);
 void debugprog(int * p, int *ep);
@@ -51,6 +52,10 @@ check_arg(char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     if (strcmp(arg, "-#") == 0) return 1;
+    if (strcmp(arg, "-D") == 0) {
+	checklimits = 1;
+	return 1;
+    } else
     if (strcmp(arg, "-d") == 0) {
 	do_dump = 1;
 	return 1;
@@ -59,14 +64,14 @@ check_arg(char * arg)
 	do_dump = 0;
 	return 1;
     } else
-    if (strncmp(arg, "-m", 2) == 0) {
+    if (strncmp(arg, "-M", 2) == 0) {
 	tapelen = strtoul(arg+2, 0, 10) + BOFF;
 	return 1;
     } else
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-d      Dump code"
-	"\n\t"  "-mNNN   Memory to allocate for tape"
+	"\n\t"  "-MNNN   Memory to allocate for tape"
 	"\n\t"  "-r      Run program");
 	return 1;
     } else
@@ -126,7 +131,7 @@ outcmd(int ch, int count)
 
 	tape = calloc(tapelen, sizeof(icell));
 
-	if(!enable_debug)
+	if(!enable_debug && !checklimits)
 	    runprog(mem, tape+BOFF);
 	else
 	    debugprog(mem, tape+BOFF);
@@ -233,7 +238,7 @@ void
 runprog(register int * p, register icell *mp)
 #endif
 {
-    register icell a = 0;
+    register icell a = 1;
     const icell msk = (bytecell)?0xFF:-1;
     for(;;){
 	mp += p[0];

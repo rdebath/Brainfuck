@@ -19,7 +19,9 @@
 #endif
 
 int ind = 0;
+#ifndef NO_LIBTCC
 int runmode = 1;
+#endif
 FILE * ofd;
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
@@ -43,11 +45,9 @@ check_arg(char * arg)
     else if (strcmp(arg, "-r") == 0) {
 	runmode=1; return 1;
     }
-#endif
     else if (strcmp(arg, "-d") == 0) {
 	runmode=0; return 1;
     } else
-#ifndef NO_LIBTCC
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-d      Dump code"
@@ -96,6 +96,10 @@ outcmd(int ch, int count)
 	pr("#include <stdio.h>");
 	pr("int main(void){");
 	ind++;
+#ifndef NO_LIBTCC
+	if (!runmode)
+#endif
+	    pr("setbuf(stdout,0);");
 	if (bytecell) {
 	    pr("static char mem[30000];");
 	    prv("register char *m = mem + %d;", BOFF);
@@ -141,7 +145,6 @@ outcmd(int ch, int count)
     setbuf(stdout,0);
 
     compile_and_run();
-
 #endif
 }
 

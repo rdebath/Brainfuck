@@ -51,7 +51,6 @@ outcmd(int ch, int count)
     }
 
     switch(ch) {
-    case '=': printf("z\n"); break;
     case '+': printf("u\n"); break;
     case '-': printf("d\n"); break;
     case '>': printf("r\n"); break;
@@ -91,7 +90,6 @@ outcmd(int ch, int count)
 	printf("u() { eval \"A=\\$M$P\"; inc; eval \"M$P=$A\" ; }\n");
 	printf("d() { eval \"A=\\$M$P\"; dec; eval \"M$P=$A\" ; }\n");
 	printf("f() { eval \"A=\\$M$P\"; [ .$A = . ] && A=0; }\n");
-	printf("z() { eval \"M$P=0\" ; }\n");
 
 	printf("inc() {\n");
 	printf("case \"$A\" in\n");
@@ -217,31 +215,6 @@ outcmd(int ch, int count)
 	break;
     }
 }
-
-#if 0
-/* Simple filter to find [-] sequences */
-void
-outcmd(int ch, int count)
-{
-static int zstate = 0;
-
-    switch(zstate)
-    {
-    case 1:
-	if (count == 1 && ch == '-') { zstate++; return; }
-	outcmd2('[', 1);
-	break;
-    case 2:
-	if (count == 1 && ch == ']') { zstate=0; outcmd2('=', 1); return; }
-	outcmd2('[', 1);
-	outcmd2('-', 1);
-	break;
-    }
-    zstate=0;
-    if (count == 1 && ch == '[') { zstate++; return; }
-    outcmd2(ch, count);
-}
-#endif
 
 #if 0
 

@@ -92,8 +92,14 @@ outcmd(int ch, int count)
 	    ofd = stdout;
 
 	pr("#include <stdio.h>");
-	pr("int brainfuck(void){");
-	ind++;
+	if (runmode) {
+	    pr("int brainfuck(void){");
+	    ind++;
+	} else {
+	    pr("int main(void){");
+	    ind++;
+	    pr("setbuf(stdout,0);");
+	}
 	if (bytecell) {
 	    pr("static char mem[30000];");
 	    prv("register char *m = mem + %d;", BOFF);

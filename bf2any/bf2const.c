@@ -35,6 +35,8 @@ static int enable_prt = 0;
 static char * sav_str_str = 0;
 static int sav_str_maxlen = 0, sav_str_len = 0;
 
+static int deadloop = 0;
+
 static void
 new_n(struct mem *p) {
     p->n = calloc(1, sizeof*p);
@@ -183,13 +185,25 @@ flush_cell(void)
 
 void outopt(int ch, int count)
 {
+    if (deadloop) {
+	if (ch == '[') deadloop++;
+	if (ch == ']') deadloop--;
+	return;
+    }
+    if (ch == '[') {
+	if (tape->is_set && tape->v == 0) {
+	    deadloop++;
+	    return;
+	}
+    }
+
     switch(ch)
     {
     default:
 	if (ch == '!') {
 	    enable_prt = check_arg("-savestring");
 	    flush_tape(1);
-	    tape->is_set = first_run = 1;
+	    tape->is_set = first_run = enable_optim;
 	} else if (ch == '~')
 	    flush_tape(1);
 	else
@@ -197,7 +211,7 @@ void outopt(int ch, int count)
 	if (ch) outcmd(ch, count);
 
 	/* Loops end with zero */
-	if (ch == ']') {
+	if (ch == ']' && enable_optim) {
 	    tape->is_set = 1;
 	    tape->v = 0;
 	    tape->cleaned = 1;
