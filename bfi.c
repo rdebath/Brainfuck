@@ -159,7 +159,6 @@ void process_file(void);
 void print_tree_stats(void);
 void printtreecell(FILE * efd, int indent, struct bfi * n);
 void printtree(void);
-void run_tree(void);
 void delete_tree(void);
 void calculate_stats(void);
 void pointer_scan(void);
@@ -176,7 +175,8 @@ void build_string_in_tree(struct bfi * v);
 void * tcalloc(size_t nmemb, size_t size);
 struct bfi * add_node_after(struct bfi * p);
 
-/* Printing or running */
+/* Printing and running */
+void run_tree(void);
 void print_codedump(void);
 void * map_hugeram(void);
 void trap_sigsegv(void);
@@ -681,7 +681,8 @@ process_file(void)
     if (verbose>5) printtree();
     if (opt_level>=1) {
 	if (verbose>2)
-	    fprintf(stderr, "Starting optimise level %d\n", opt_level);
+	    fprintf(stderr, "Starting optimise level %d, cell_size %d\n",
+		    opt_level, cell_size);
 
 	tickstart();
 	pointer_scan();
@@ -1911,10 +1912,11 @@ scan_one_node(struct bfi * v, struct bfi ** move_v)
 		    if (verbose>5) fprintf(stderr, "  Change Loop to T_NOP.\n");
 		    return 1;
 		}
+
+		if (v->type == T_MULT || v->type == T_CMULT ||
+			v->type == T_FOR || v->type == T_WHL)
+		    return flatten_loop(v, known_value);
 	    }
-	    if (v->type == T_MULT || v->type == T_CMULT ||
-		    v->type == T_FOR || v->type == T_WHL)
-		return flatten_loop(v, known_value);
 	    break;
 
 	case T_END:
