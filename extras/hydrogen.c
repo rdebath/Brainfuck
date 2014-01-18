@@ -909,10 +909,10 @@ run(void)
 	exit(1);
     }
 
-    p = progarray;
+    p = progarray+1;
 
     for(;;) {
-	m += *p++;
+	m += p[-1];
 #if 0
 fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    ", m[%d]=%d"
@@ -933,17 +933,17 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 #endif
 	switch(*p)
 	{
-	case T_ADD: *m += p[1]; p += 2; break;
-	case T_SET: *m = p[1]; p += 2; break;
+	case T_ADD: *m += p[1]; p += 3; break;
+	case T_SET: *m = p[1]; p += 3; break;
 
 	case T_END:
 	    if(M(*m) != 0) p += p[1];
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_WHL:
 	    if(M(*m) == 0) p += p[1];
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_INP:
@@ -951,7 +951,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 		int c = getchar();
 		if (c != EOF) *m = c;
 	    }
-	    p += 1;
+	    p += 2;
 	    break;
 
 	case T_PRT:
@@ -959,7 +959,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 		int ch = M(p[1] == -1?*m:p[1]);
 		putchar(ch);
 	    }
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_STOP:
@@ -969,33 +969,33 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	case T_ZFIND:
 	    /* Search along a rail til you find the end of it. */
 	    while(M(*m)) m += p[1];
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_MFIND:
 	    (*m)--;
 	    while(M(*m) != M((icell)-1)) m += p[1];
 	    (*m)++;
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_ADDWZ:
 	    while(M(*m)) { *m -= 1; m += p[1]; }
-	    p += 2;
+	    p += 3;
 	    break;
 
-	case T_SAVE: a = *m; *m = 0; p += 1; break;
-	case T_MUL: *m += p[1] * a; p += 2; break;
-	case T_QSET: if(a) *m = p[1]; p += 2; break;
+	case T_SAVE: a = *m; *m = 0; p += 2; break;
+	case T_MUL: *m += p[1] * a; p += 3; break;
+	case T_QSET: if(a) *m = p[1]; p += 3; break;
 
-	case T_SET4: *m = 0; m[1] = 0; m[2] = 0; m[3] = 0; p += 1; break;
+	case T_SET4: *m = 0; m[1] = 0; m[2] = 0; m[3] = 0; p += 2; break;
 
 #if MASK == 1
 	case T_SAVE2:
 	    a = *m; a2 = (m[1]<<8) + a;
 	    *m = 0; m[1] = 0;
 	    m[-1] = m[2] = 0;
-	    p += 1;
+	    p += 2;
 	    break;
 
 	case T_MUL2:
@@ -1009,7 +1009,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 		m[0] = t; m[1] = (t>>8);
 	    }
 #endif
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_QSET2:
@@ -1024,7 +1024,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 		m[0] = t; m[1] = (t>>8);
 	    }
 #endif
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_ADD2:
@@ -1038,7 +1038,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 		m[0] = t; m[1] = (t>>8);
 	    }
 #endif
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_SET2:
@@ -1052,24 +1052,24 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 		m[0] = t; m[1] = (t>>8);
 	    }
 #endif
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_WHL2:
 	    m[-1] = m[2] = 0;
 	    if (m[0] == 0 && m[1] == 0) p += p[1];
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_END2:
 	    m[-1] = m[2] = 0;
 	    if (m[0] != 0 || m[1] != 0) p += p[1];
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_ZTEMP2:
 	    m[-1] = m[2] = 0;
-	    p += 1;
+	    p += 2;
 	    break;
 
 /******************************************************************************/
@@ -1095,7 +1095,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 		m[0] = t; m[1] = (t>>8);
 	    }
 #endif
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_SUB2c1:
@@ -1127,7 +1127,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 		m[0] = t; m[1] = (t>>8);
 	    }
 #endif
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_SET2c1:
@@ -1148,7 +1148,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 		m[0] = t; m[1] = (t>>8);
 	    }
 #endif
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_WHL2c1:
@@ -1160,10 +1160,10 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 		m[2] = 0;
 		m[-1] = 0;
 		if(M(t) == 0) p += p[1];
-		p += 2;
+		p += 3;
 	    } else {
 		if ((!!m[1] | !!m[0]) == 0) p += p[1];
-		p += 2;
+		p += 3;
 	    }
 	    break;
 
@@ -1177,10 +1177,10 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 		m[-1] = 0;
 
 		if(M(t) != 0) p += p[1];
-		p += 2;
+		p += 3;
 	    } else {
 		if(M(*m) != 0 || M(m[1]) != 0) p += p[1];
-		p += 2;
+		p += 3;
 	    }
 	    break;
 
@@ -1214,7 +1214,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 		m[0] = t; m[1] = (t>>8);
 	    }
 #endif
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_SUB2c2:
@@ -1243,7 +1243,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 		m[0] = t; m[1] = (t>>8);
 	    }
 #endif
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_SET2c2:
@@ -1273,7 +1273,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 		m[0] = t; m[1] = (t>>8);
 	    }
 #endif
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_WHL2c2:
@@ -1293,7 +1293,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    } else {
 		if ((!!m[1] | !!m[0]) == 0) p += p[1];
 	    }
-	    p += 2;
+	    p += 3;
 	    break;
 
 	case T_END2c2:
@@ -1313,7 +1313,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    } else {
 		if(M(*m) != 0 || M(m[1]) != 0) p += p[1];
 	    }
-	    p += 2;
+	    p += 3;
 	    break;
 
 /******************************************************************************/
