@@ -72,10 +72,12 @@ char * doubler[] = {">>>>", "<<<<", ">+<+[>-]>[->>+<]<<", ">+<[>-]>[->>-<]<<-",
 		    ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "]<",
 		    ">[-]>[-]<<"};
 
+/* Some random Chinese words */
 char *chinese[] = { "右", "左", "上", "下", "出", "出", "始", "末" };
 
 char ** lang = 0;
 char ** c = 0;
+int linefix = EOF;
 char langver = -1;
 int col = 0;
 int maxcol = 72;
@@ -83,7 +85,7 @@ int state = 0;
 int c_style = 0;
 
 void risbf(int ch);
-void rlebf(int ch, int count);
+void headsecks(int ch, int count);
 
 int
 check_arg(char * arg)
@@ -91,7 +93,7 @@ check_arg(char * arg)
     if (strcmp(arg, "-c") == 0) {
 	lang = cbyte; langver = 0; c_style = 2; return 1;
     } else
-    if (strcmp(arg, "-double") == 0) {
+    if (strcmp(arg, "-db") == 0 || strcmp(arg, "-double") == 0) {
 	lang = doubler; langver = 3; c_style = 0; return 1;
     } else
     if (strcmp(arg, "-n") == 0 || strcmp(arg, "-nice") == 0) {
@@ -118,7 +120,7 @@ check_arg(char * arg)
     if (strcmp(arg, "-fk") == 0) {
 	lang = f__k; langver = 0; c_style = 1; return 1;
     } else
-    if (strcmp(arg, "-pogaack") == 0) {
+    if (strcmp(arg, "-pog") == 0 || strcmp(arg, "-pogaack") == 0) {
 	lang = pogaack; langver = 0; c_style = 0; return 1;
     } else
     if (strcmp(arg, "-:") == 0) {
@@ -127,12 +129,15 @@ check_arg(char * arg)
     if (strcmp(arg, "-lisp") == 0) {
 	lang = lisp2; langver = 3; c_style = 0; return 1;
     } else
-    if (strcmp(arg, "-chinese") == 0) {
+    if (strcmp(arg, "-chi") == 0 || strcmp(arg, "-chinese") == 0) {
 	lang = chinese; langver = 1; c_style = 0; return 1;
+    } else
+    if (strcmp(arg, "-head") == 0) {
+	lang = 0; langver = 11; c_style = 0; return 1;
     } else
 
     if (strcmp(arg, "-risbf") == 0) {
-	lang = 0; langver = 9; c_style = 0; return 1;
+	lang = 0; langver = 10; c_style = 0; return 1;
     } else
     if (strcmp(arg, "-rle") == 0) {
 	lang = bc; langver = 2; c_style = 1; return 1;
@@ -150,7 +155,9 @@ check_arg(char * arg)
     } else
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
-	"\t"    "-c      Plain C"
+	"\t"    "-w99    Width to line wrap after, default 72"
+	"\n\t"  "-double BF to BF translation, cell size doubler."
+	"\n\t"  "-c      Plain C"
 	"\n\t"  "-rle    Odd RLE C translation"
 	"\n\t"  "-nice   Nice memorable C translation."
 	"\n\t"  "-mini   Compact C translation."
@@ -160,13 +167,13 @@ check_arg(char * arg)
 	"\n\t"  "-blub   Blub!"
 	"\n\t"  "-moo    Cow -- http://www.frank-buss.de/cow.html"
 	"\n\t"  "-fk     fuck fuck"
-	"\n\t"  "-pogaack Pogaack."
+	"\n\t"  "-head   Headsecks."
 	"\n\t"  "-:      Dotty"
 	"\n\t"  "-lisp   Lisp Zero"
 	"\n\t"  "-risbf  RISBF"
 	"\n\t"  "-dump   Token dump"
-	"\n\t"  "-double BF to BF translation, cell size doubler."
-	"\n\t"  "-w99    Width to line wrap after, default 72"
+	"\n\t"  "-pog    Pogaack."
+	"\n\t"  "-chi    In chinese."
 	);
 	return 1;
     } else
@@ -177,6 +184,7 @@ static void
 pc(int ch)
 {
     if (col>=maxcol && maxcol) {
+	if (linefix != EOF) putchar(linefix);
 	putchar('\n');
 	col = 0;
 	if (ch == ' ') ch = 0;
@@ -225,7 +233,9 @@ outcmd(int ch, int count)
 	break;
 
     case 4: printf("%c %d\n", ch, count); col = 0; break;
-    case 9: while (count-->0) risbf(ch); break;
+
+    case 10: while (count-->0) risbf(ch); break;
+    case 11: headsecks(ch, count); break;
     default: while (count-->0) pc(ch); break;
     }
 
@@ -235,8 +245,10 @@ outcmd(int ch, int count)
 	    col += printf("%s%s", col?" ":"", "_");
 	if (c_style == 2)
 	    col += printf("%s%s", col?" ":"", "return 0;}");
-	if(col)
+	if(col) {
+	    if (linefix != EOF) putchar(linefix);
 	    putchar('\n');
+	}
     }
 
     if (ch == '!' && c_style) {
@@ -281,5 +293,32 @@ risbf(int ch)
     case ',': pc('/'); pc('*'); break;
     case '[': pc('/'); pc('+'); break;
     case ']': pc('/'); pc('-'); break;
+    }
+}
+
+int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
+
+void
+headsecks(int ch, int count)
+{
+    char * p;
+    int rset;
+    static int rnd = 1;
+
+    if (ch == '!') linefix=';';
+    if (! (p = strchr(bf,ch))) return;
+
+    while(count-->0) {
+	rnd = rnd * 75 + ch + count;
+	rnd = rnd + rnd / 65537;
+	rnd &= 0x7FFFFFFF;
+
+	ch = headsecksconv[p-bf];
+	rset = rnd % 6;
+	if (rset & 1) rset += 8;
+	rset /= 2;
+	rset *= 8;
+	if (ch == 0) rset += 8;
+	pc('A' -1 + ch + rset);
     }
 }

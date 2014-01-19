@@ -19,6 +19,7 @@ int ind = 0;
 int
 check_arg(char * arg)
 {
+    if (strcmp(arg, "-O") == 0) return 1;
     return 0;
 }
 
@@ -36,6 +37,19 @@ outcmd(int ch, int count)
 	printf("m = [0] * 60000\n");
 	printf("p = 0\n");
 	break;
+
+    case '=': I; printf("m[p] = %d\n", count); break;
+    case 'B':
+	if(bytecell) { I; printf("m[p] &= 255\n"); }
+	I; printf("v = m[p]\n");
+	break;
+    case 'M': I; printf("m[p] = m[p]+v*%d\n", count); break;
+    case 'N': I; printf("m[p] = m[p]-v*%d\n", count); break;
+    case 'S': I; printf("m[p] = m[p]+v\n"); break;
+    case 'Q': I; printf("if (v != 0) : m[p] = %d\n", count); break;
+    case 'm': I; printf("if (v != 0) : m[p] = m[p]+v*%d\n", count); break;
+    case 'n': I; printf("if (v != 0) : m[p] = m[p]-v*%d\n", count); break;
+    case 's': I; printf("if (v != 0) : m[p] = m[p]+v\n"); break;
 
     case 'X': I; printf("raise Exception('Aborting infinite loop')\n"); break;
 

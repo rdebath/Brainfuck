@@ -22,30 +22,30 @@ This repository contains various [brainfuck](http://esolangs.org/wiki/Brainfuck)
 
 
 3. Brainfuck to anything. Well not exactly anything but the list includes ...
+  * run -- a direct interpreter -- blisteringly quick too for one without JIT.
+  * tcc -- Convert to C and run using LIBTCC -- Is quicker than bf2run ... just.
+  * gcc -- Convert to C and run as a shared lib; very quick with -O2.
+  * bf -- Ook, Blub, fuck fuck, "there once was a fish named Fred" and similar transliterations. Some can be compiled as C (*deoptimised*!)
   * asmjs -- Convert to the "asm.js" dialect of javascript
-  * awk	-- Code for any modern AWK, ancient ones need a #define for input.
-  * basic -- A couple of very random BASIC interpreters.
-  * bash -- GNU bash, uses arrays, arithimetic etc. (NO external programs or subshells used)
-  * dc -- The -r (run) option uses a special filter to allow character input. This is too complex for dc.sed.
-  * bf -- Ook, Blub, fuck fuck, "there once was a fish named Fred" and similar transliterations. Some can be compiled as C (*unopt*!)
-  * cgmp -- C using the Gnu MP library (partially *unopt* due to linked list style tape)
-  * gas -- x64 or x86 assembler. Use gcc to assemble and link: "gcc -o bfp bfout.s" *no-opt*
-  * clojure -- Not a very nice conversion though. *no-opt*
-  * python -- *no-opt*
+  * awk	-- Code for (almost) any version of AWK.
+  * python
   * lua
   * perl
   * php
   * ruby
+  * basic -- A couple of very random BASIC interpreters.
+  * bash -- GNU bash, uses arrays, arithimetic etc. (NO external programs or subshells used)
+  * dc -- The -r (run) option uses a special filter to allow character input. This is too complex for dc.sed.
+  * cgmp -- C using the Gnu MP library (partially *deoptimised* due to linked list style tape)
+  * gas -- x64 or x86 assembler. Use gcc to assemble and link: "gcc -o bfp bfout.s" *no-opt*
   * ps1 -- That's right MS Powershell
   * neko -- [Neko programming language VM](http://nekovm.org)
   * pascal -- Free pascal.
-  * run -- a direct interpreter -- blisteringly quick too for one without JIT.
-  * tcc -- Convert to C and run using LIBTCC -- Is quicker than bf2run ... just.
-  * gcc -- Convert to C and run as a shared lib; very quick with -O2.
-  * sh -- Bourne shell without bash extensions, not Unix v7 but later should be fine. -- *no-opt*
-  * rc -- The Plan9 shell rc(1) using no external programs. (Can't input though) -- *no-opt*
+  * clojure -- Not a very nice conversion though. *no-opt*
+  * sh -- Bourne shell without bash extensions, not Unix v7 but later should be fine. -- *deoptimised*
+  * rc -- The Plan9 shell rc(1) (Can't input without external programs.) -- *deoptimised*
 
   Most are heavily optimised (for Brainfuck) and most work in both 8 bit and the native size of the generated code.
-  The ones marked *no-opt* are not optimised, except for run length encoding; the ones marked *unopt* have even the RLE reverted.
+  The ones marked *no-opt* are not optimised, except for run length encoding; the ones marked *deoptimised* have even the RLE reverted.
   They have all been tested using many of the BF programs from the [Esoteric Files Archive](https://github.com/graue/esofiles/tree/master/brainfuck/src) (And of course tortured!)
 
