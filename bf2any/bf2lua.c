@@ -6,6 +6,7 @@
 
 /*
  * Lua translation from BF, runs at about 39,000,000 instructions per second.
+ * LuaJIT translation from BF, runs at about 360,000,000 instructions per second.
  *
  * There is a limit on the size of a while loop imposed by the interpreter.
  * The while loop's jump has a limited range, so if there are lots of tokens

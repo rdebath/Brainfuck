@@ -7,7 +7,7 @@
 /*
  * Python translation from BF, runs at about 18,000,000 instructions per second.
  *
- * There is a limit on the number of nested loops of 20.
+ * There is a limit on the number of nested loops was 20 now 100.
  */
 
 /* #define USESYS // else USEOS */

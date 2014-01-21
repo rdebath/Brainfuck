@@ -220,7 +220,7 @@ void outopt(int ch, int count)
 	return;
 
     case '.':
-	if (enable_prt && tape->is_set && tape->v != 0) {
+	if (enable_prt && tape->is_set && tape->v > 0 && tape->v < 128) {
 	    add_string(tape->v);
 
 	    if (sav_str_len >= 81000) /* Limit the buffer size. */

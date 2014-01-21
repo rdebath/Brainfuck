@@ -27,8 +27,7 @@ outcmd(int ch, int count)
 	printf( "%s%d%s",
 		"#!/usr/bin/ruby\n"
 		"m = Array.new(32768, 0)\n"
-		"p = ", BOFF, "\n"
-		);
+		"p = ", BOFF, "\n");
 	break;
 
     case '=': I; printf("m[p] = %d\n", count); break;
@@ -60,6 +59,7 @@ outcmd(int ch, int count)
 	ind--; I; printf("end\n");
 	break;
     case '.': I; printf("print (m[p]&255).chr\n"); break;
+    /* See also:	 print m[p].chr(Encoding::UTF_8) */
     case ',': I; printf("(c = $stdin.getc) != nil && m[p] = c.ord\n"); break;
     }
 }

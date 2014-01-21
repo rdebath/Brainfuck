@@ -5,7 +5,7 @@ LDLIBS=
 ALLEXE=\
 	bf2asmjs bf2awk bf2bas bf2bash bf2bf bf2cgmp bf2clojure bf2dc \
 	bf2gas32 bf2gas64 bf2gcc bf2lua bf2neko bf2pas bf2perl bf2php \
-	bf2ps1 bf2py bf2rb bf2rc bf2run bf2sh bf2tcc
+	bf2ps1 bf2py bf2rb bf2rc bf2run bf2sh bf2tcc bf2slang
 
 HAVE_TCC=$(wildcard /usr/include/libtcc.h)
 ifeq ($(HAVE_TCC),)
@@ -109,5 +109,8 @@ bf2sh: bf2sh.o bf2any.o bf2const.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
 
 bf2rc: bf2rc.o bf2any.o bf2const.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
+
+bf2slang: bf2slang.o bf2any.o bf2const.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
 

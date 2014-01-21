@@ -206,13 +206,46 @@ outrun(int ch, int repcnt)
     }
 }
 
+int opt_supported = -1, byte_supported, nobyte_supported;
+
+int
+check_argv(char * arg)
+{
+    if (byte_supported && strcmp(arg, "-b") == 0) {
+	check_arg(arg);
+	bytecell++;
+    } else if (nobyte_supported && strcmp(arg, "-no-byte") == 0) {
+	check_arg(arg);
+	bytecell=0;
+
+    } else if (strcmp(arg, "-m") == 0 && check_arg("-O")) {
+	if (opt_supported == -1)
+	    opt_supported = enable_optim = check_arg("-O");
+	check_arg(arg);
+	enable_optim=0;
+    } else if (strcmp(arg, "-O") == 0 && check_arg("-O")) {
+	opt_supported = enable_optim = check_arg(arg);
+    } else if (strcmp(arg, "-Obf") == 0) {
+	enable_bf_optim=1;
+
+    } else if (strcmp(arg, "-#") == 0 && check_arg(arg)) {
+	enable_debug++;
+
+    } else if (strcmp(arg, "-h") == 0) {
+	return 0;
+    } else if (check_arg(arg)) {
+	;
+    }
+    else return 0;
+    return 1;
+}
+
 int
 main(int argc, char ** argv)
 {
     char * pgm = argv[0];
     int ch, lastch=']', c=0, m, b=0, lc=0;
     FILE * ifd;
-    int opt_supported = -1, byte_supported, nobyte_supported;
 
     byte_supported = check_arg("-b");
     nobyte_supported = check_arg("-no-byte");
@@ -224,26 +257,6 @@ main(int argc, char ** argv)
 	if (argc < 2 || argv[1][0] != '-' || argv[1][1] == '\0') {
 	    break;
 
-	} else if (byte_supported && strcmp(argv[1], "-b") == 0) {
-	    check_arg(argv[1]);
-	    bytecell++; argc--; argv++;
-	} else if (nobyte_supported && strcmp(argv[1], "-no-byte") == 0) {
-	    check_arg(argv[1]);
-	    bytecell=0; argc--; argv++;
-
-	} else if (strcmp(argv[1], "-m") == 0 && check_arg("-O")) {
-	    if (opt_supported == -1)
-		opt_supported = enable_optim = check_arg("-O");
-	    check_arg(argv[1]);
-	    enable_optim=0; argc--; argv++;
-	} else if (strcmp(argv[1], "-O") == 0 && check_arg("-O")) {
-	    opt_supported = enable_optim = check_arg(argv[1]);
-	    argc--; argv++;
-	} else if (strcmp(argv[1], "-Obf") == 0) {
-	    enable_bf_optim=1; argc--; argv++;
-
-	} else if (strcmp(argv[1], "-#") == 0 && check_arg(argv[1])) {
-	    enable_debug++; argc--; argv++;
 	} else if (strcmp(argv[1], "-h") == 0) {
 
 	    fprintf(stderr, "%s: [options] [File]\n", pgm);
@@ -258,16 +271,26 @@ main(int argc, char ** argv)
 
 	    check_arg(argv[1]);
 	    exit(0);
-
-	} else if (check_arg(argv[1])) {
+	} else if (check_argv(argv[1])) {
 	    argc--; argv++;
 	} else if (strcmp(argv[1], "--") == 0) {
 	    argc--; argv++;
 	    break;
 	} else if (argv[1][0] == '-') {
-	    fprintf(stderr, "Unknown option '%s'; try -h for option list\n",
-		    argv[1]);
-	    exit(1);
+	    char * ap = argv[1]+1;
+	    char buf[4] = "-X";
+	    while(*ap) {
+		buf[1] = *ap;
+		if (!check_argv(buf))
+		    break;
+		ap++;
+	    }
+	    if (*ap) {
+		fprintf(stderr, "Unknown option '%s'; try -h for option list\n",
+			argv[1]);
+		exit(1);
+	    }
+	    argc--; argv++;
 	} else break;
     }
 

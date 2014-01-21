@@ -21,7 +21,7 @@
  * If external programs are allowed it becomes a lot simpler.
  */
 
-#define MAXPRLE	2
+#define MAXPRLE	25
 
 int do_input = 0;
 int do_output = 0;

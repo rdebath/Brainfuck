@@ -26,8 +26,7 @@ outcmd(int ch, int count)
     case '!':
 	printf( "%s%d%s",
 		"#!/usr/bin/perl\n"
-		"$|++;\n"
-		"$^W = 0;\n"
+		"$|++;\n" "$^W = 0;\n"
 		"$p = ", BOFF, ";\n");
 	break;
 
