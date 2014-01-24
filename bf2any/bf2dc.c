@@ -36,12 +36,7 @@ static void print_dcstring(void);
 
 FILE * ofd;
 int outputmode = 3;
-#ifdef BFPROG
-int pipemode = 1;
-#include BFPROG
-#else
-int pipemode = 0;
-#endif
+int inputmode = 2;
 
 int
 check_arg(char * arg)
@@ -51,11 +46,11 @@ check_arg(char * arg)
     if (strcmp(arg, "-O") == 0) return 1;
 #endif
     if (strcmp(arg, "-d") == 0) {
-	pipemode=0; return 1;
-    } else if (strcmp(arg, "-p") == 0) {
-	pipemode=1; return 1;
+	inputmode=0; return 1;
     } else if (strcmp(arg, "-r") == 0) {
-	pipemode=1; return 1;
+	inputmode=1; return 1;
+    } else if (strcmp(arg, "-dump") == 0) {
+	inputmode=2; return 1;
     } else if (strcmp(arg, "-t") == 0) {
 	outputmode=1; return 1;
     } else if (strcmp(arg, "-g") == 0) {
@@ -63,8 +58,9 @@ check_arg(char * arg)
     } else
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
-	"\t"    "-d      Dump code (',' command is error)"
-	"\n\t"  "-r      Run program (input will be requested before running)"
+	"\t"    "-d      Dump code (',' command input will be requested)"
+	"\n\t"  "-dump   Dump code (',' command ignored; default)"
+	"\n\t"  "-r      Run program (standard input will be translated)"
 	"\n\t"  "-t      Traditional dc mode"
 	"\n\t"  "-g      General modern dc mode (default is to autodetect)");
 	return 1;
@@ -89,12 +85,7 @@ outcmd(int ch, int count)
 {
     switch(ch) {
     case '!':
-#ifdef BFPROG
-	if (ifd == stdin && pipemode) {
-	    ifd = fmemopen(bfprog, bfprog_len, "r");
-	}
-#endif
-	if (pipemode) ofd = popen("dc", "w"); else ofd = stdout;
+	if (inputmode == 1) ofd = popen("dc", "w"); else ofd = stdout;
 	if (outputmode == 2)
 	    pr("#!/usr/bin/dc");
 	prv("[%dsp", BOFF);
@@ -143,14 +134,14 @@ outcmd(int ch, int count)
 	break;
 #endif
 
-    case ',': pr("lix"); do_input=1; break;
+    case ',': if (inputmode != 2) { pr("lix"); do_input=1; } break;
     case '.': pr("lox"); do_output=1; break;
     case '"': print_dcstring(); break;
     }
 
     if (ch != '~') return;
 
-    pr("q]SF\n");
+    pr("q]SF");
 
 #ifndef USE_STACK
     if (do_output || bytecell)
@@ -210,27 +201,25 @@ outcmd(int ch, int count)
 	}
     }
 
-    if (pipemode) {
+    if (inputmode == 1)
 	pr("[?lp:a]si");
-    } else {
-	if (do_input) {
-	    int flg = 0;
-	    pr("0si");
-	    fprintf(stderr, "Please enter the input data for the program: ");
-	    while((ch = fgetc(stdin)) != EOF) {
-		prv("%dlid1+si:I", ch);
-		if (ch == '\n') {
-		    if (flg)
-			fprintf(stderr, ">");
-		    else
-			fprintf(stderr, "More? ^D to end>");
-		    flg = 1;
-		}
+    else if (do_input) {
+	int flg = 0;
+	pr("0si");
+	fprintf(stderr, "Please enter the input data for the program: ");
+	while((ch = fgetc(stdin)) != EOF) {
+	    prv("%dlid1+si:I", ch);
+	    if (ch == '\n') {
+		if (flg)
+		    fprintf(stderr, ">");
+		else
+		    fprintf(stderr, "More? ^D to end>");
+		flg = 1;
 	    }
-	    fprintf(stderr, "\n");
-	    pr("0li:I0sn");
-	    pr("[lnd1+sn;Ilp:a]si");
 	}
+	fprintf(stderr, "\n");
+	pr("0li:I0sn");
+	pr("[lnd1+sn;Ilp:a]si");
     }
 #endif
 
@@ -238,15 +227,15 @@ outcmd(int ch, int count)
     if (bytecell)
 	fprintf(ofd, "[256+]sM [256 %% d0>M]sm\n");
     fprintf(ofd, "[aP]sO [daP]so\n");
-    if (pipemode)
+    if (inputmode == 1)
 	fprintf(ofd, "[d!=.?]si\n");
-    else
+    else if (do_input)
 	fprintf(ofd, "[]si\n");
     fprintf(ofd, "0\n");
 #endif
 
     fprintf(ofd, "LFx ");
-    if (pipemode) {
+    if (inputmode == 1) {
 
 	if (do_input) {
 	    signal(SIGCHLD, endprog);
