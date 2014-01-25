@@ -122,8 +122,8 @@ bf2jit: bf2jit.o bf2any.o bf2const.o
 bf2jit.o: bf2jit.amd64.h bf2jit.i686.h
 
 bf2jit.amd64.h: bf2jit.x86.dasc
-	lua dynasm/dynasm.lua -c -o bf2jit.amd64.h bf2jit.x86.dasc
+	lua ../tools/dynasm/dynasm.lua -c -o bf2jit.amd64.h bf2jit.x86.dasc
 
 bf2jit.i686.h: bf2jit.x86.dasc
-	lua dynasm/dynasm.lua -c -D I386 -o bf2jit.i686.h bf2jit.x86.dasc
+	lua ../tools/dynasm/dynasm.lua -c -D I386 -o bf2jit.i686.h bf2jit.x86.dasc
 

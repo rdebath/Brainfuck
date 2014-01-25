@@ -11,8 +11,8 @@
  * dasm64 translation from BF, runs at about 5,000,000,000 instructions per second.
  */
 
-#include "dynasm/dasm_proto.h"
-#include "dynasm/dasm_x86.h"
+#include "../tools/dynasm/dasm_proto.h"
+#include "../tools/dynasm/dasm_x86.h"
 
 void link_and_run(dasm_State **state);
 void free_jitcode(void *code);
