@@ -247,7 +247,7 @@ runprog(register int * p, register icell *mp)
 	{
 	    fprintf(stderr,
 		    "Error: Tape pointer has moved to position %d\n",
-		    mp-tape-BOFF);
+		    (int)(mp-tape-BOFF));
 	    exit(42);
 	}
 #endif

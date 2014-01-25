@@ -30,6 +30,7 @@ int ind = 0;
 #define MOVZB	"movzbl"
 #else
 // Call params in registers: %rdi, %rsi, %rdx, %rcx, %r8 and %r9
+// MSWindows ONLY Call params in registers: %rcx, %rdx, %r8 and %r9
 // Callee saves: %rbp, %rbx and %r12 through %r15
 // Caller saves: %rax, %rcx, %rdx and the rest
 // Register vars: %ebx, %r12d, %r13d, %r14d, %r15d

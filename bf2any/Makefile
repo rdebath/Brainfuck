@@ -5,7 +5,7 @@ LDLIBS=
 ALLEXE=\
 	bf2asmjs bf2awk bf2bas bf2bash bf2bf bf2cgmp bf2clojure bf2dc \
 	bf2gas32 bf2gas64 bf2gcc bf2lua bf2neko bf2pas bf2perl bf2php \
-	bf2ps1 bf2py bf2rb bf2rc bf2run bf2sh bf2tcc bf2slang
+	bf2ps1 bf2py bf2rb bf2rc bf2run bf2sh bf2tcc bf2slang bf2jit
 
 HAVE_TCC=$(wildcard /usr/include/libtcc.h)
 ifeq ($(HAVE_TCC),)
@@ -21,7 +21,9 @@ endif
 all:	bf2any.o bf2const.o $(ALLEXE)
 
 clean:
-	-rm -f $(ALLEXE) bf2tcc.lib-off bf2tcc.lib-on *.o
+	-rm -f $(ALLEXE)
+	-rm -f bf2tcc.lib-off bf2tcc.lib-on bf2jit.amd64.h bf2jit.i686.h
+	-rm -f *.o
 
 CFLAGS=-O3 -Wall -DBOFF=256
 
@@ -113,4 +115,15 @@ bf2rc: bf2rc.o bf2any.o bf2const.o
 
 bf2slang: bf2slang.o bf2any.o bf2const.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
+
+bf2jit: bf2jit.o bf2any.o bf2const.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
+
+bf2jit.o: bf2jit.amd64.h bf2jit.i686.h
+
+bf2jit.amd64.h: bf2jit.x86.dasc
+	lua dynasm/dynasm.lua -c -o bf2jit.amd64.h bf2jit.x86.dasc
+
+bf2jit.i686.h: bf2jit.x86.dasc
+	lua dynasm/dynasm.lua -c -D I386 -o bf2jit.i686.h bf2jit.x86.dasc
 

@@ -1,0 +1,388 @@
+/*  As I can't use #defines to control the assembler this file is assembled
+ *  twice, once for i386 and once for amd64
+ *
+ *  The C compiler then includes one to match the current compile.
+ */
+
+|.if I386
+|.arch x86
+|.else
+|.arch x64
+|.endif
+|.actionlist actions
+|.section code
+|.globals GLOB_
+
+/*  Using 32 bit working registers for both 32 and 64 bit. The REG_P register
+ *  is 64 bit on x64 so that the memory can be malloc'd beyond the 2GB limit.
+ *
+ *  Function pointers for getchar and putchar are used assuming that the
+ *  program has been compiled with -mcmodel=large so that it won't break.
+ */
+
+|.if I386
+|.define REG_P, esi
+|.define REG_A, eax
+|.define REG_AL, al
+|.define REG_B, ebx
+|.define REG_BL, bl
+|.define REG_C, ecx
+|.else
+|.define REG_P, r15
+|.define REG_A, eax
+|.define REG_AL, al
+|.define REG_B, ebx
+|.define REG_BL, bl
+|.define REG_C, ecx
+|.define PRM, rdi
+|.endif
+
+#define Dst &Dstate
+dasm_State *Dstate;
+void* global_labels[GLOB__MAX];
+int maxpc = 0;
+struct stkdat { struct stkdat * up; int id; } *sp = 0;
+
+static int acc_loaded = 0;
+static int acc_offset = 0;
+static int acc_dirty = 0;
+static int acc_hi_dirty = 0;
+static int tape_step = sizeof(int);
+
+static void
+clean_acc(void)
+{
+    if (acc_loaded && acc_dirty) {
+	if (tape_step > 1) {
+	    if (acc_offset) {
+		| mov [REG_P+acc_offset * tape_step], REG_A
+	    } else {
+		| mov [REG_P], REG_A
+	    }
+	} else {
+	    if (acc_offset) {
+		| mov byte [REG_P+acc_offset], REG_AL
+	    } else {
+		| mov byte [REG_P], REG_AL
+	    }
+	}
+
+	acc_dirty = 0;
+    }
+}
+
+static void
+set_acc_offset(int offset)
+{
+    if (acc_loaded && acc_dirty && acc_offset != offset)
+	clean_acc();
+
+    acc_offset = offset;
+    acc_loaded = 1;
+    acc_dirty = 1;
+    acc_hi_dirty = 1;
+}
+
+static void
+load_acc_offset(int offset)
+{
+    if (acc_loaded) {
+	if (acc_offset == offset) return;
+	if (acc_dirty)
+	    clean_acc();
+    }
+
+    acc_offset = offset;
+    if (tape_step > 1) {
+	if (acc_offset) {
+	    | mov REG_A, [REG_P+acc_offset*tape_step]
+	} else {
+	    | mov REG_A, [REG_P]
+	}
+    } else {
+	if (acc_offset) {
+	    | movzx REG_A, byte [REG_P+acc_offset]
+	} else {
+	    | movzx REG_A, byte [REG_P]
+	}
+    }
+
+    acc_loaded = 1;
+    acc_dirty = 0;
+    acc_hi_dirty = 0; // (tape_step*8 != cell_size);
+}
+
+void
+outcmd(int ch, int count)
+{
+    switch(ch) {
+    case '!':
+	dasm_init(Dst, 1);
+	dasm_setupglobal(Dst, global_labels, GLOB__MAX);
+	dasm_setup(Dst, actions);
+
+	if (bytecell) tape_step = 1; else tape_step = sizeof(int);
+
+        /* Create Stack frame. */
+	| ->start:
+	|.if I386
+	| push ebp
+	| push edi
+	| push esi
+	| push ebx
+        | mov  ebp, esp
+	|
+	| mov  REG_P, dword [ebp+20]
+	|.else
+        | push rbp
+        | push r15
+        | push r14
+        | push r13
+        | push r12
+        |
+        | mov  rbp, rsp
+        | sub  rsp, 64 // Some shadow space for Windows.
+        |
+        | mov  REG_P, PRM
+	|.endif
+	break;
+
+    case '=':
+	set_acc_offset(0);
+	if (count == 0) {
+	    | xor REG_A, REG_A
+	} else {
+	    | mov REG_A, count
+	}
+	break;
+
+    case 'B':
+	load_acc_offset(0);
+	if (bytecell && acc_hi_dirty) {
+	    | and REG_A, 0xFF
+	    acc_hi_dirty = 0;
+	}
+	| mov REG_B,REG_A
+	break;
+
+    case 'M':
+	load_acc_offset(0);
+	set_acc_offset(0);
+	| imul REG_C,REG_B,count
+	| add REG_A,REG_C
+	break;
+
+    case 'N':
+	load_acc_offset(0);
+	set_acc_offset(0);
+	if (count != 1) {
+	    | imul REG_C,REG_B,count
+	    | sub REG_A,REG_C
+	} else {
+	    | sub REG_A,REG_B
+	}
+	break;
+
+    case 'S':
+	load_acc_offset(0);
+	set_acc_offset(0);
+	| add REG_A,REG_B
+	break;
+
+    case 'Q':
+	if (bytecell) {
+	    | cmp   REG_BL, 0
+	    | jz   >1
+	} else {
+	    | cmp   REG_B, 0
+	    | jz   >1
+	}
+	if (acc_loaded && acc_offset == 0) {
+	    set_acc_offset(0);
+	    | mov REG_A, count
+	} else {
+	    if (tape_step > 1) {
+		| mov dword [REG_P], count
+	    } else {
+		| mov byte [REG_P], count
+	    }
+	}
+	| 1:
+	break;
+
+    case 'm':
+	if (bytecell) {
+	    | cmp   REG_BL, 0
+	    | jz   >1
+	} else {
+	    | cmp   REG_B, 0
+	    | jz   >1
+	}
+	load_acc_offset(0);
+	set_acc_offset(0);
+	| imul REG_C,REG_B,count
+	| add REG_A,REG_C
+	clean_acc();
+	acc_loaded = 0;
+	| 1:
+	break;
+
+    case 'n':
+	if (bytecell) {
+	    | cmp   REG_BL, 0
+	    | jz   >1
+	} else {
+	    | cmp   REG_B, 0
+	    | jz   >1
+	}
+	load_acc_offset(0);
+	set_acc_offset(0);
+	if (count != 1) {
+	    | imul REG_C,REG_B,count
+	    | sub REG_A,REG_C
+	} else {
+	    | sub REG_A,REG_B
+	}
+	clean_acc();
+	acc_loaded = 0;
+	| 1:
+	break;
+
+    case 's':
+	if (bytecell) {
+	    | cmp   REG_BL, 0
+	    | jz   >1
+	} else {
+	    | cmp   REG_B, 0
+	    | jz   >1
+	}
+	load_acc_offset(0);
+	set_acc_offset(0);
+	| add REG_A,REG_B
+	clean_acc();
+	acc_loaded = 0;
+	| 1:
+	break;
+
+    case '+':
+	load_acc_offset(0);
+	set_acc_offset(0);
+	| add REG_A, count
+	break;
+
+    case '-':
+	load_acc_offset(0);
+	set_acc_offset(0);
+	| sub REG_A, count
+	break;
+
+    case '>':
+	clean_acc();
+	if (acc_loaded) acc_offset -= count;
+	| add REG_P, count*tape_step
+	break;
+
+    case '<':
+	clean_acc();
+	if (acc_loaded) acc_offset += count;
+	| sub REG_P, count*tape_step
+	break;
+
+    case '[':
+	{
+	    struct stkdat * n = malloc(sizeof*n);
+	    n->up = sp;
+	    sp = n;
+
+	    maxpc += 2;
+	    n->id = maxpc;
+
+	    dasm_growpc(Dst, maxpc);
+
+	    load_acc_offset(0);
+	    clean_acc();
+	    if (bytecell) {
+		| cmp   REG_AL, 0
+	    } else {
+		| cmp   REG_A, 0
+	    }
+	    | jz   =>(maxpc-2)
+	    | =>(maxpc-1):
+	}
+	break;
+
+    case ']':
+	{
+	    struct stkdat * n = sp;
+	    int setpc;
+	    sp = n->up;
+	    setpc = n->id;
+	    free(n);
+
+	    load_acc_offset(0);
+	    clean_acc();
+	    if (bytecell) {
+		| cmp   REG_AL, 0
+	    } else {
+		| cmp   REG_A, 0
+	    }
+	    | jne   =>(setpc-1)
+	    | =>(setpc-2):
+	}
+	break;
+
+    case ',':
+	/* TODO: Leave cell unchanged on EOF */
+	clean_acc();
+	set_acc_offset(0);
+	|.if I386
+	| call &getchar
+	|.else
+	| mov64 rax, (uintptr_t) getchar
+	| call  rax
+	|.endif
+	/* Note: REG_A must be eax/rax */
+	break;
+
+    case '.':
+	clean_acc();
+	load_acc_offset(0);
+	if (bytecell && acc_hi_dirty) {
+	    | and REG_A, 0xFF
+	}
+	acc_loaded = 0;
+	|.if I386
+	| movzx eax, byte [REG_P]
+	| push eax
+	| call &putchar
+	| pop eax
+	|.else
+	| movzx PRM, byte [REG_P]
+	| mov64 rax, (uintptr_t) putchar
+	| call  rax
+	|.endif
+	break;
+
+    case '~':
+	|.if I386
+        | xor eax, eax
+        | mov esp, ebp
+	| pop ebx
+	| pop esi
+	| pop edi
+        | pop ebp
+	|.else
+        | xor rax, rax
+        | mov rsp, rbp
+        | pop r12
+        | pop r13
+        | pop r14
+        | pop r15
+        | pop rbp
+	|.endif
+        | ret
+
+	link_and_run(Dst);
+	break;
+    }
+}

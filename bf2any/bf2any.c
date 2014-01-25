@@ -207,6 +207,7 @@ outrun(int ch, int repcnt)
 }
 
 int opt_supported = -1, byte_supported, nobyte_supported;
+int enable_rle = 0;
 
 int
 check_argv(char * arg)
@@ -230,6 +231,8 @@ check_argv(char * arg)
 
     } else if (strcmp(arg, "-#") == 0 && check_arg(arg)) {
 	enable_debug++;
+    } else if (strcmp(arg, "-R") == 0) {
+	enable_rle++;
 
     } else if (strcmp(arg, "-h") == 0) {
 	return 0;
@@ -246,6 +249,7 @@ main(int argc, char ** argv)
     char * pgm = argv[0];
     int ch, lastch=']', c=0, m, b=0, lc=0;
     FILE * ifd;
+    int digits = 0, number = 0, multi = 1;
 
     byte_supported = check_arg("-b");
     nobyte_supported = check_arg("-no-byte");
@@ -263,7 +267,8 @@ main(int argc, char ** argv)
 	    fprintf(stderr, "%s\n",
 	    "\t"    "-h      This message"
 	    "\n\t"  "-b      Force byte cells"
-	    "\n\t"  "-#      Turn on trace code.");
+	    "\n\t"  "-#      Turn on trace code."
+	    "\n\t"  "-R      Decode rle on input '+-<>' only.");
 	    if (check_arg("-O"))
 		fprintf(stderr, "%s\n",
 		"\t"    "-O      Enable optimisation"
@@ -306,6 +311,15 @@ main(int argc, char ** argv)
 	current_file = argv[1];
     outrun('!', 0);
     while((ch = fgetc(ifd)) != EOF && (ifd!=stdin || ch != '!')) {
+	/* Source RLE decoding */
+	if (ch >= '0' && ch <= '9') {
+	    digits = 1;
+	    number = number*10 + ch-'0';
+	    continue;
+	}
+	if (ch == ' ' || ch == '\t') continue;
+	if (!digits) number = 1; digits=0;
+	multi = enable_rle?number:1; number = 0;
 	/* These chars are RLE */
 	m = (ch == '>' || ch == '<' || ch == '+' || ch == '-');
 	/* These ones are not */
@@ -315,17 +329,18 @@ main(int argc, char ** argv)
 	if (lc || (ch=='[' && lastch==']')) { lc += (ch=='[') - (ch==']'); continue; }
 	if (lc) continue;
 	/* Do the RLE */
-	if (m && ch == lastch) { c++; continue; }
+	if (m && ch == lastch) { c+=multi; continue; }
 	/* Post the RLE token onward */
 	if (c) outrun(lastch, c);
-	c = m;
 	if (!m) {
 	    /* Non RLE tokens here */
 	    if (!b && ch == ']') continue; /* Ignore too many ']' */
 	    b += (ch=='[') - (ch==']');
 	    if (lastch == '[' && ch == ']') outrun('X', 1);
 	    outrun(ch, 1);
-	}
+	    c = 0;
+	} else
+	    c = multi;
 	lastch = ch;
     }
     if (ifd != stdin) fclose(ifd);
