@@ -23,6 +23,7 @@ This repository contains various [brainfuck](http://esolangs.org/wiki/Brainfuck)
 
 3. Brainfuck to anything. Well not exactly anything but the list includes ...
   * run -- a direct interpreter -- blisteringly quick too for one without JIT.
+  * jit -- OTOH this one uses LuaJIT's Dynasm, it's the fastest one here.
   * tcc -- Convert to C and run using LIBTCC -- Is quicker than bf2run ... just.
   * gcc -- Convert to C and run as a shared lib; very quick with -O2.
   * bf -- Ook, Blub, fuck fuck, "there once was a fish named Fred" and similar transliterations. Some can be compiled as C (*deoptimised*!)
