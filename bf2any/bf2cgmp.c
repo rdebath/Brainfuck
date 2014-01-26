@@ -15,16 +15,17 @@
  * It isn't really wrong for true infinities either as plus and minus infinity
  * don't really obey the normal rules.
  *
- * And finally, the result if a bignum implemetation is given an infinite job
+ * And finally, the result if a bignum implementation is given an infinite job
  * is actually undefined, giving the 'right' result isn't actually wrong and
  * if you want it to crash all you have to do is turn off optimisation.
  *
  * If this is configured with byte cells the gmp library is not called.
  *
- * This on is unusual for me in that the tape is a linked list, this means I
- * have to make the tape infinite in both directions because the tape offset
- * will be checked before the condition on the 'm', 'n' and 's' tokens.
- * Therefor there's no point having distinct 'M' vs 'm' tokens.
+ * The tape on this one is unusual because the cells have to be init'd before
+ * they are used. To allow this I've used a slower 'realloc' method to store
+ * the tape with position checks on pointer movement.
+ *
+ * This is faster than the previous linked list implementation.
  */
 
 int do_input = 0;
@@ -64,30 +65,31 @@ outcmd(int ch, int count)
 	puts("");
 
 	printf("%s",
-"static\n"
-"mpz_t *\n"
-"alloc_ptr(mpz_t *p)\n"
-"{\n"
-"    int amt, memoff, i, off;\n"
-"    if (p >= mem && p < mem+memsize) return p;\n"
-"\n"
-"    memoff = p-mem; off = 0;\n"
-"    if (memoff<0) off = -memoff; else if(memoff>=memsize) off = memoff-memsize;\n"
-"    amt = off / MINALLOC;\n"
-"    amt = (amt+1) * MINALLOC;\n"
-"    mem = realloc(mem, (memsize+amt)*sizeof(*mem));\n"
-"    if (memoff<0) {\n"
-"        memmove(mem+amt, mem, memsize*sizeof(*mem));\n"
-"        for(i=0; i<amt; i++)\n"
-"            mpz_init(mem[i]);\n"
-"        memoff += amt;\n"
-"    } else {\n"
-"        for(i=0; i<amt; i++)\n"
-"            mpz_init(mem[memsize+i]);\n"
-"    }\n"
-"    memsize += amt;\n"
-"    return mem+memoff;\n"
-"}\n"
+	    "static\n"
+	    "mpz_t *\n"
+	    "alloc_ptr(mpz_t *p)\n"
+	    "{\n"
+	    "    int amt, memoff, i, off;\n"
+	    "    if (p >= mem && p < mem+memsize) return p;\n"
+	    "\n"
+	    "    memoff = p-mem; off = 0;\n"
+	    "    if (memoff<0) off = -memoff;\n"
+	    "    else if(memoff>=memsize) off = memoff-memsize;\n"
+	    "    amt = off / MINALLOC;\n"
+	    "    amt = (amt+1) * MINALLOC;\n"
+	    "    mem = realloc(mem, (memsize+amt)*sizeof(*mem));\n"
+	    "    if (memoff<0) {\n"
+	    "        memmove(mem+amt, mem, memsize*sizeof(*mem));\n"
+	    "        for(i=0; i<amt; i++)\n"
+	    "            mpz_init(mem[i]);\n"
+	    "        memoff += amt;\n"
+	    "    } else {\n"
+	    "        for(i=0; i<amt; i++)\n"
+	    "            mpz_init(mem[memsize+i]);\n"
+	    "    }\n"
+	    "    memsize += amt;\n"
+	    "    return mem+memoff;\n"
+	    "}\n"
 	);
 	puts("");
 
