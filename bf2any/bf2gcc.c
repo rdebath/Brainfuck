@@ -12,6 +12,8 @@
 /*
  * GCC-O0 translation from BF, runs at about 2,700,000,000 instructions per second.
  * GCC-O2 translation from BF, runs at about 4,300,000,000 instructions per second.
+ * BCC translation from BF, runs at about 3,000,000,000 instructions per second.
+ *	bcc -ansi -Ml -z -o bf bf.c
  */
 
 int ind = 0;
@@ -98,7 +100,6 @@ outcmd(int ch, int count)
 	} else {
 	    pr("int main(void){");
 	    ind++;
-	    pr("setbuf(stdout,0);");
 	}
 	if (bytecell) {
 	    pr("static char mem[30000];");
@@ -108,6 +109,8 @@ outcmd(int ch, int count)
 	    pr("static int mem[30000];");
 	    prv("register int v, *m = mem + %d;", BOFF);
 	}
+	if (!runmode)
+	    pr("setbuf(stdout,0);");
 	break;
 
     case 'X': pr("fprintf(stderr, \"Infinite Loop\\n\"); exit(1);"); break;

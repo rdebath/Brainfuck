@@ -47,7 +47,6 @@ static int acc_loaded = 0;
 static int acc_offset = 0;
 static int acc_dirty = 0;
 static int acc_hi_dirty = 0;
-static int tape_step = sizeof(int);
 
 static void
 clean_acc(void)

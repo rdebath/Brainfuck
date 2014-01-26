@@ -5,7 +5,7 @@
 #include "bf2any.h"
 
 /*
- * C GMP translation from BF, runs at about 590,000,000 instructions per second.
+ * C GMP translation from BF, runs at about 790,000,000 instructions per second.
  *
  * Note: This accepts the optimise flag, but strictly speaking the
  * optimisations may not be valid for bignum cells. Of course in
@@ -29,12 +29,16 @@
 
 int do_input = 0;
 int ind = 0;
-#define I printf("%*s", ind*4, "")
+#define I        printf("%*s", ind*4, "")
+#define prv(s,v) printf("%*s" s "\n", ind*4, "", (v))
+
+static void print_cstring(void);
 
 int
 check_arg(char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
+    if (strcmp(arg, "-savestring") == 0) return 1;
     return 0;
 }
 
@@ -44,40 +48,76 @@ outcmd(int ch, int count)
     switch(ch) {
     case '!':
 	printf("#include <stdlib.h>\n"
-	       "#include <stdio.h>\n");
+	       "#include <stdio.h>\n"
+	       "#include <string.h>\n");
 	if (!bytecell)
 	    printf("#include <gmp.h>\n");
-	printf("\n");
-	if (bytecell)
-	    printf("struct mem { struct mem *p, *n; unsigned char v; };\n");
-	else
-	    printf("struct mem { struct mem *p, *n; mpz_t v; };\n");
-	printf("\n");
-
-	printf("void new_n(struct mem *p) {\n");
-	printf("    p->n = calloc(1, sizeof*p);\n");
-	printf("    p->n->p = p;\n");
-	if (!bytecell) {
-	    printf("    p = p->n;\n");
-	    printf("    mpz_init(p->v);\n");
+	puts("");
+	if (bytecell) {
+	    printf("typedef unsigned char mpz_t;\n");
+	    printf("#define mpz_init(X) (X) = 0\n");
 	}
-	printf("}\n\n");
 
-	printf("void new_p(struct mem *p) {\n");
-	printf("    p->p = calloc(1, sizeof*p);\n");
-	printf("    p->p->n = p;\n");
-	if (!bytecell) {
-	    printf("    p = p->p;\n");
-	    printf("    mpz_init(p->v);\n");
-	}
-	printf("}\n\n");
+	printf("mpz_t * mem = 0;\n");
+	printf("int memsize = 0;\n");
+	printf("#define MINALLOC 16\n");
+	puts("");
+
+	printf("%s",
+"static\n"
+"mpz_t *\n"
+"alloc_ptr(mpz_t *p)\n"
+"{\n"
+"    int amt, memoff, i, off;\n"
+"    if (p >= mem && p < mem+memsize) return p;\n"
+"\n"
+"    memoff = p-mem; off = 0;\n"
+"    if (memoff<0) off = -memoff; else if(memoff>=memsize) off = memoff-memsize;\n"
+"    amt = off / MINALLOC;\n"
+"    amt = (amt+1) * MINALLOC;\n"
+"    mem = realloc(mem, (memsize+amt)*sizeof(*mem));\n"
+"    if (memoff<0) {\n"
+"        memmove(mem+amt, mem, memsize*sizeof(*mem));\n"
+"        for(i=0; i<amt; i++)\n"
+"            mpz_init(mem[i]);\n"
+"        memoff += amt;\n"
+"    } else {\n"
+"        for(i=0; i<amt; i++)\n"
+"            mpz_init(mem[memsize+i]);\n"
+"    }\n"
+"    memsize += amt;\n"
+"    return mem+memoff;\n"
+"}\n"
+	);
+	puts("");
+
+#ifdef ALLOW_INLINE_KEYWORD
+	printf("%s",
+	    "static inline\n"
+	    "mpz_t *\n"
+	    "move_ptr(mpz_t *p, int off) {\n"
+	    "    p += off;\n"
+	    "    if ((off>0 || p >= mem) && (off<0 || p < mem+memsize)) return p;\n"
+	    "    return alloc_ptr(p);\n"
+	    "}\n"
+	);
+#else
+	printf("%s",
+	    "#define move_ptr(P,O) (((P)+=(O), \\\n"
+	    "        ((O)>=0 && (P)>=mem+memsize) || \\\n"
+	    "        ((O)<=0 && (P)<mem) ) ? \\\n"
+	    "            alloc_ptr(P): (P) )\n"
+	);
+#endif
+
+	puts("");
 
 	printf("int\n"
 	       "main(int argc, char ** argv)\n"
 	       "{\n"
 	    );
 	ind ++;
-	I; printf("register struct mem * p;\n");
+	I; printf("register mpz_t * p;\n");
 	I; printf("register int c;\n");
 	if (bytecell) {
 	    I; printf("register int v;\n");
@@ -86,10 +126,7 @@ outcmd(int ch, int count)
 	    I; printf("mpz_init(v);\n");
 	}
 	I; printf("setbuf(stdout, 0);\n");
-	I; printf("p = calloc(1, sizeof*p);\n");
-	if (!bytecell) {
-	    I; printf("mpz_init(p->v);\n");
-	}
+	I; printf("p = move_ptr(mem,0);\n");
 	break;
 
     case '~':
@@ -98,97 +135,79 @@ outcmd(int ch, int count)
 
     case '=': I;
 	if(bytecell)
-	    printf("p->v = %d;\n", count);
+	    printf("*p = %d;\n", count);
 	else
-	    printf("mpz_set_si(p->v, %d);\n", count);
+	    printf("mpz_set_si(*p, %d);\n", count);
 	break;
 
     case 'B': I;
 	if (bytecell)
-	    printf("v = p->v;\n");
+	    printf("v = *p;\n");
 	else
-	    printf("mpz_set(v, p->v);\n");
+	    printf("mpz_set(v, *p);\n");
 	break;
 
     case 'm':
     case 'M': I;
 	if (bytecell)
-	    printf("p->v = p->v+v*%d;\n", count);
+	    printf("*p = *p+v*%d;\n", count);
 	else
-	    printf("mpz_addmul_ui(p->v, v, %d);\n", count);
+	    printf("mpz_addmul_ui(*p, v, %d);\n", count);
 	break;
 
     case 'n':
     case 'N': I;
 	if (bytecell)
-	    printf("p->v = p->v-v*%d;\n", count);
+	    printf("*p = *p-v*%d;\n", count);
 	else
-	    printf("mpz_submul_ui(p->v, v, %d);\n", count);
+	    printf("mpz_submul_ui(*p, v, %d);\n", count);
 	break;
 
     case 's':
     case 'S': I;
 	if (bytecell)
-	    printf("p->v = p->v+v;\n");
+	    printf("*p = *p+v;\n");
 	else
-	    printf("mpz_add(p->v, p->v, v);\n");
+	    printf("mpz_add(*p, *p, v);\n");
 	break;
 
     case 'Q': I;
 	if (bytecell)
-	    printf("if(v) p->v = %d;\n", count);
+	    printf("if(v) *p = %d;\n", count);
 	else
-	    printf("if(mpz_cmp_ui(v, 0)) mpz_set_si(p->v, %d);\n", count);
+	    printf("if(mpz_cmp_ui(v, 0)) mpz_set_si(*p, %d);\n", count);
 	break;
 
     case 'X': I; printf("fprintf(stderr, \"Abort: Infinite Loop.\\n\"); exit(1);\n"); break;
 
     case '+': I;
 	if (bytecell)
-	    printf("p->v += %d;\n", count);
+	    printf("*p += %d;\n", count);
 	else
-	    printf("mpz_add_ui(p->v, p->v, %d);\n", count);
+	    printf("mpz_add_ui(*p, *p, %d);\n", count);
 	break;
 
     case '-': I;
 	if (bytecell)
-	    printf("p->v -= %d;\n", count);
+	    printf("*p -= %d;\n", count);
 	else
-	    printf("mpz_sub_ui(p->v, p->v, %d);\n", count);
+	    printf("mpz_sub_ui(*p, *p, %d);\n", count);
 	break;
 
     case '<':
-	if (count > 1) {
-	    I; printf("for(c=0; c<%d; c++) {\n", count);
-	    ind++;
-	}
-	I; printf("if (p->p == 0) new_p(p);\n");
-	I; printf("p=p->p;\n");
-	if (count > 1) {
-	    ind--;
-	    I; printf("}\n");
-	}
+	I; printf("p = move_ptr(p, %d);\n", -count);
 	break;
 
     case '>':
-	if (count > 1) {
-	    I; printf("for(c=0; c<%d; c++) {\n", count);
-	    ind++;
-	}
-	I; printf("if (p->n == 0) new_n(p);\n");
-	I; printf("p=p->n;\n");
-	if (count > 1) {
-	    ind--;
-	    I; printf("}\n");
-	}
+	I; printf("p = move_ptr(p, %d);\n", count);
 	break;
 
     case '[':
 	I;
 	if(bytecell)
-	    printf("while(p->v){\n");
+	    printf("while(*p){\n");
 	else
-	    printf("while(mpz_cmp_ui(p->v, 0)){\n");
+	    printf("while(mpz_cmp_ui(*p, 0)){\n");
 	ind++;
 	break;
 
@@ -198,19 +217,66 @@ outcmd(int ch, int count)
 
     case '.': I;
 	if (bytecell)
-	    printf("putchar(p->v);\n");
+	    printf("putchar(*p);\n");
 	else
-	    printf("putchar(mpz_get_ui(p->v));\n");
+	    printf("putchar(mpz_get_ui(*p));\n");
 	break;
+
+    case '"': print_cstring(); break;
 
     case ',':
 	I; printf("c = getchar();\n");
 	I; printf("if (c != EOF)\n");
 	ind++; I; ind--;
 	if (bytecell)
-	    printf("p->v = c;\n");
+	    printf("*p = c;\n");
 	else
-	    printf("mpz_set_si(p->v, (long)c);\n");
+	    printf("mpz_set_si(*p, (long)c);\n");
 	break;
     }
 }
+
+static void
+print_cstring(void)
+{
+    char * str = get_string();
+    char buf[88];
+    int gotnl = 0, gotperc = 0, i = 0;
+
+    if (!str) return;
+
+    for(;; str++) {
+	if (i && (*str == 0 || gotnl || i > sizeof(buf)-8))
+	{
+	    buf[i] = 0;
+	    if (gotnl) {
+		buf[i-2] = 0;
+		prv("puts(\"%s\");", buf);
+	    } else if (gotperc)
+		prv("printf(\"%%s\",\"%s\");", buf);
+	    else
+		prv("printf(\"%s\");", buf);
+	    gotnl = gotperc = i = 0;
+	}
+	if (!*str) break;
+
+	if (*str == '\n') gotnl = 1;
+	if (*str == '%') gotperc = 1;
+	if (*str >= ' ' && *str <= '~' && *str != '"' && *str != '\\') {
+	    buf[i++] = *str;
+	} else if (*str == '"' || *str == '\\') {
+	    buf[i++] = '\\'; buf[i++] = *str;
+	} else if (*str == '\n') {
+	    buf[i++] = '\\'; buf[i++] = 'n';
+	} else if (*str == '\t') {
+	    buf[i++] = '\\'; buf[i++] = 't';
+	} else {
+	    char buf2[16];
+	    int n;
+	    sprintf(buf2, "\\%03o", *str & 0xFF);
+	    for(n=0; buf2[n]; n++)
+		buf[i++] =buf2[n];
+	}
+    }
+}
+

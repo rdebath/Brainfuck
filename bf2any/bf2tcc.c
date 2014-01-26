@@ -6,10 +6,6 @@
 
 /*
  * TCC translation from BF, runs at about 1,200,000,000 instructions per second.
- *
- * Much faster compiled with GCC, even with -O0
- *
- * BCC translation from BF, runs at about 3,000,000,000 instructions per second.
  */
 
 #ifndef NO_LIBTCC
@@ -96,10 +92,6 @@ outcmd(int ch, int count)
 	pr("#include <stdio.h>");
 	pr("int main(void){");
 	ind++;
-#ifndef NO_LIBTCC
-	if (!runmode)
-#endif
-	    pr("setbuf(stdout,0);");
 	if (bytecell) {
 	    pr("static char mem[30000];");
 	    prv("register char *m = mem + %d;", BOFF);
@@ -108,6 +100,10 @@ outcmd(int ch, int count)
 	    pr("static int mem[30000];");
 	    prv("register int v, *m = mem + %d;", BOFF);
 	}
+#ifndef NO_LIBTCC
+	if (!runmode)
+#endif
+	    pr("setbuf(stdout,0);");
 	break;
 
     case 'X': pr("fprintf(stderr, \"Infinite Loop\\n\"); exit(1);"); break;

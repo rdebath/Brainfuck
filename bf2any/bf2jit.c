@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <unistd.h>
 #include <string.h>
 #include <assert.h>
 #include <sys/mman.h>
@@ -12,21 +13,27 @@
  */
 
 #include "../tools/dynasm/dasm_proto.h"
-#include "../tools/dynasm/dasm_x86.h"
 
 void link_and_run(dasm_State **state);
-void free_jitcode(void *code);
+static int tape_step = sizeof(int);
+
+#ifdef __i386__
+#include "../tools/dynasm/dasm_x86.h"
+#include "bf2jit.i686.h"
+#elif defined(__amd64__)
+#include "../tools/dynasm/dasm_x86.h"
+#include "bf2jit.amd64.h"
+#endif
+
+#ifndef DASM_S_OK
+#error "Supported processor not detected."
+#define DASM_S_OK -1
+#endif
 
 typedef int (*fnptr)(char* memory);
 fnptr code = 0;
 size_t codelen;
 void * mem;
-
-#ifdef __i386__
-#include "bf2jit.i686.h"
-#elif defined(__amd64__)
-#include "bf2jit.amd64.h"
-#endif
 
 int
 check_arg(char * arg)
@@ -69,6 +76,7 @@ link_and_run(dasm_State ** state)
     fclose(f);
 #endif
 
+    if (isatty(STDOUT_FILENO)) setbuf(stdout, 0);
     mem = calloc(32768, tape_step);
     code = (void *) codeptr;
     code(mem + BOFF);
