@@ -36,6 +36,8 @@
 #include "bfi.run.h"
 #include "bfi.ccode.h"
 
+static char * putname = "putch";
+
 void
 pt(FILE* ofd, int indent, struct bfi * n)
 {
@@ -82,6 +84,7 @@ print_c_header(FILE * ofd)
 	if (okay) {
 	    fprintf(ofd, "#include <stdio.h>\n\n");
 	    fprintf(ofd, "int main(void)\n{\n");
+	    putname = "putchar";
 	    return ;
 	}
     }
@@ -104,7 +107,7 @@ print_c_header(FILE * ofd)
     if (node_type_counts[T_INP] != 0 && !do_run)
     {
 	if (l_iostyle == 2 && (eofcell == 4 || (eofcell == 2 && EOF == -1)))
-	    fprintf(ofd, "static int getch(int oldch) { return getchar(); }\n");
+	    fprintf(ofd, "#define getch(oldch) getchar()\n");
 	else {
 	    if (l_iostyle == 1) {
 		fprintf(ofd, "#include <locale.h>\n");
@@ -164,7 +167,7 @@ print_c_header(FILE * ofd)
 	switch(l_iostyle)
 	{
 	case 0: case 2:
-	    fprintf(ofd, "static void putch(int ch) { putchar(ch); }\n\n");
+	    putname = "putchar";
 	    break;
 	case 1:
 	    fprintf(ofd, "static void putch(int ch)\n{\n"
@@ -433,24 +436,25 @@ print_ccode(FILE * ofd)
 	    if (!disable_indent) pt(ofd, indent,n);
 	    if (n->count == -1) {
 		if (add_mask > 0 && (add_mask < 0xFF || iostyle != 2)) {
-		    fprintf(ofd, "putch(m[%d] &= %d);\n", n->offset, add_mask);
+		    fprintf(ofd, "%s(m[%d] &= %d);\n", putname, n->offset, add_mask);
 		} else if (n->offset == 0)
-		    fprintf(ofd, "putch(*m);\n");
+		    fprintf(ofd, "%s(*m);\n", putname);
 		else
-		    fprintf(ofd, "putch(m[%d]);\n", n->offset);
+		    fprintf(ofd, "%s(m[%d]);\n", putname, n->offset);
 		break;
 	    }
 
 	    if (!okay_for_cstr(n->count)) {
 		if (n->count == '\n')
-		    fprintf(ofd, "putch('\\n');\n");
+		    fprintf(ofd, "%s('\\n');\n", putname);
 		else
-		    fprintf(ofd, "putch(%d);\n", n->count);
+		    fprintf(ofd, "%s(%d);\n", putname, n->count);
 	    }
 	    else
 	    {
 		int i = 0, j;
 		int got_perc = 0;
+		int lastc = 0;
 		int slen = 4;	/* First char + nul + ? */
 		struct bfi * v = n;
 		char *s, *p;
@@ -470,6 +474,7 @@ print_ccode(FILE * ofd)
 		p = s = malloc(slen);
 
 		for(j=0; j<=i; j++) {
+		    lastc = n->count;
 		    if (n->count == '\n') { *p++ = '\\'; *p++ = 'n'; } else
 		    if (n->count == '\\') { *p++ = '\\'; *p++ = '\\'; } else
 		    if (n->count == '"') { *p++ = '\\'; *p++ = '"'; } else
@@ -477,9 +482,14 @@ print_ccode(FILE * ofd)
 		    if (j!=i)
 			n = n->next;
 		}
-		*p++ = 0;
+		*p = 0;
 
-		if (!got_perc)
+		if (p == s+1 && *s != '\'') {
+		    fprintf(ofd, "%s('%s');\n", putname, s);
+		} else if (lastc == '\n') {
+		    *--p = 0; *--p = 0;
+		    fprintf(ofd, "puts(\"%s\");\n", s);
+		} else if (!got_perc)
 		    fprintf(ofd, "printf(\"%s\");\n", s);
 		else
 		    fprintf(ofd, "printf(\"%%s\", \"%s\");\n", s);

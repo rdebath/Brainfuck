@@ -107,6 +107,7 @@ int noheader = 0;
 int do_run = -1;
 
 int opt_level = 3;
+int opt_runner = 0;
 int opt_no_calc = 0;
 int opt_no_litprt = 0;
 int opt_no_endif = 0;
@@ -132,6 +133,8 @@ const char* tokennames[] = { TOKEN_LIST(GEN_TOK_STRING) };
 
 struct bfi *bfprog = 0;
 
+struct bfi *opt_run_start, *opt_run_end;
+
 /* Stats */
 double run_time = 0;
 int loaded_nodes = 0;
@@ -142,6 +145,8 @@ int min_pointer = 0, max_pointer = 0;
 int most_negative_mov = 0, most_positive_mov = 0;
 int most_neg_maad_loop = 0;
 double profile_hits = 0.0;
+int profile_min_cell = 0;
+int profile_max_cell = 0;
 
 /* Where's the tape memory */
 void * cell_array_pointer = 0;
@@ -185,6 +190,10 @@ void putch(int oldch);
 void set_cell_size(int cell_bits);
 void convert_tree_to_runarray(void);
 void run_progarray(int * progarray);
+
+/* Trial run. */
+void try_opt_runner(void);
+int update_opt_runner(struct bfi * n, int * mem, int offset);
 
 void LongUsage(FILE * fd)
 {
@@ -241,6 +250,7 @@ void LongUsage(FILE * fd)
     printf("   -O2      Allow a few simple optimisations.\n");
     printf("   -O3      Maximum normal level, default.\n");
     printf("   -O-1     Turn off all optimisation, disable RLE too.\n");
+    printf("   -Orun    When generating code run the interpreter over it first.\n");
     printf("   -m   Minimal processing; same as -O0\n");
     printf("\n");
     printf("   -b8  Use 8 bit cells.\n");
@@ -347,9 +357,12 @@ main(int argc, char ** argv)
                             ap = argv[++ar];
                         }
                         switch(ch) {
-                            case 'O':	if(*ap == 0) opt_level = 1;
-					else opt_level = strtol(ap,0,10);
-					break;
+                            case 'O':
+				if(*ap == 0) opt_level = 1;
+				else if (!strcmp(ap, "run"))
+				    opt_runner = 1;
+				else opt_level = strtol(ap,0,10);
+				break;
                             case 'E': eofcell=strtol(ap,0,10); break;
                             case 'b': set_cell_size(strtol(ap,0,10)); break;
 			    case 'I':
@@ -359,6 +372,9 @@ main(int argc, char ** argv)
 				    if (z) len += strlen(input_string);
 				    len += strlen(ap) + 2;
 				    input_string = realloc(input_string, len);
+				    if(!input_string) {
+					perror("realloc"); exit(1);
+				    }
 				    if (!z) *input_string = 0;
 				    strcat(input_string, ap);
 				    strcat(input_string, "\n");
@@ -383,7 +399,9 @@ main(int argc, char ** argv)
 #include "bfi.be.def"
 
     if (do_run == -1) do_run = (do_codestyle == c_default);
+    if (do_run) opt_runner = 0; /* Run it in one go */
     if (cell_size == 0 && (do_codestyle == c_default)) set_cell_size(32);
+    if (cell_size == 0 && opt_runner) set_cell_size(32);
 
 #define XX 6		/* Check BE can cope with optimisation. */
 #include "bfi.be.def"
@@ -704,13 +722,16 @@ process_file(void)
 		trim_trailing_sets();
 	}
 
+	if (opt_runner) try_opt_runner();
+
 	if (!opt_no_repoint)
 	    pointer_regen();
 
 	if (verbose>2)
 	    fprintf(stderr, "Optimise level %d complete\n", opt_level);
 	if (verbose>5) printtree();
-    }
+    } else
+	if (opt_runner) try_opt_runner();
 
     if (verbose) {
 	print_tree_stats();
@@ -851,9 +872,18 @@ print_tree_stats(void)
 	    }
 	    fprintf(stderr, "\n");
 	}
+	if (profile_min_cell != 0 || profile_max_cell != 0)
+	    fprintf(stderr, "Tape cells used %d..%d\n",
+		profile_min_cell, profile_max_cell);
     }
 }
 
+/*
+ * This is a simple tree based interpreter with lots of instrumentation.
+ *
+ * Running the tree directly is slow, all the counting, tracking and tracing
+ * slows it down even more.
+ */
 void
 run_tree(void)
 {
@@ -865,49 +895,57 @@ run_tree(void)
     gettimeofday(&tv_start, 0);
 
     while(n){
-	n->profile++;
-	node_profile_counts[n->type]++;
-	if (enable_trace) {
+	{
 	    int off = (p+n->offset) - oldp;
-	    fprintf(stderr, "P(%d,%d)=", n->line, n->col);
-	    printtreecell(stderr, -1, n);
-	    if (n->type == T_MOV)
-		fprintf(stderr, "\n");
-	    else if (n->type != T_CALC) {
-		if (off >= 0)
-		    fprintf(stderr, "mem[%d]=%d\n", off, oldp[off]);
-		else
-		    fprintf(stderr, "mem[%d]= UNDERFLOW\n", off);
-	    } else {
-		int off2, off3;
-		off2 = (p+n->offset2)-oldp;
-		off3 = (p+n->offset3)-oldp;
-		if (n->offset == n->offset2 && n->count2 == 1) {
-		    if (n->count3 != 0 && p[n->offset3] == 0)
-			fprintf(stderr, "mem[%d]=%d, BF Skip.\n",
-			    off3, p[n->offset3]);
-		    else {
+	    n->profile++;
+	    node_profile_counts[n->type]++;
+	    if (n->type != T_MOV) {
+		if (off < profile_min_cell) profile_min_cell = off;
+		if (off > profile_max_cell) profile_max_cell = off;
+	    }
+
+	    if (enable_trace) {
+		fprintf(stderr, "P(%d,%d)=", n->line, n->col);
+		printtreecell(stderr, -1, n);
+		if (n->type == T_MOV)
+		    fprintf(stderr, "\n");
+		else if (n->type != T_CALC) {
+		    if (off >= 0)
+			fprintf(stderr, "mem[%d]=%d\n", off, oldp[off]);
+		    else
+			fprintf(stderr, "mem[%d]= UNDERFLOW\n", off);
+		} else {
+		    int off2, off3;
+		    off2 = (p+n->offset2)-oldp;
+		    off3 = (p+n->offset3)-oldp;
+		    if (n->offset == n->offset2 && n->count2 == 1) {
+			if (n->count3 != 0 && p[n->offset3] == 0)
+			    fprintf(stderr, "mem[%d]=%d, BF Skip.\n",
+				off3, p[n->offset3]);
+			else {
+			    fprintf(stderr, "mem[%d]=%d", off, oldp[off]);
+			    if (n->count3 != 0)
+				fprintf(stderr, ", mem[%d]=%d",
+				    off3, p[n->offset3]);
+			    if (off < 0)
+				fprintf(stderr, " UNDERFLOW\n");
+			    else
+				fprintf(stderr, "\n");
+			}
+		    } else {
 			fprintf(stderr, "mem[%d]=%d", off, oldp[off]);
+			if (n->count2 != 0)
+			    fprintf(stderr, ", mem[%d]=%d",
+				off2, p[n->offset2]);
 			if (n->count3 != 0)
 			    fprintf(stderr, ", mem[%d]=%d",
 				off3, p[n->offset3]);
-			if (off < 0)
-			    fprintf(stderr, " UNDERFLOW\n");
-			else
-			    fprintf(stderr, "\n");
+			fprintf(stderr, "\n");
 		    }
-		} else {
-		    fprintf(stderr, "mem[%d]=%d", off, oldp[off]);
-		    if (n->count2 != 0)
-			fprintf(stderr, ", mem[%d]=%d",
-			    off2, p[n->offset2]);
-		    if (n->count3 != 0)
-			fprintf(stderr, ", mem[%d]=%d",
-			    off3, p[n->offset3]);
-		    fprintf(stderr, "\n");
 		}
 	    }
 	}
+
 	switch(n->type)
 	{
 	    case T_MOV: p += n->count; break;
@@ -917,6 +955,16 @@ run_tree(void)
 		p[n->offset] = n->count
 			    + n->count2 * p[n->offset2]
 			    + n->count3 * p[n->offset3];
+		if (n->count2) {
+		    int off = (p+n->offset2) - oldp;
+		    if (off < profile_min_cell) profile_min_cell = off;
+		    if (off > profile_max_cell) profile_max_cell = off;
+		}
+		if (n->count3) {
+		    int off = (p+n->offset3) - oldp;
+		    if (off < profile_min_cell) profile_min_cell = off;
+		    if (off > profile_max_cell) profile_max_cell = off;
+		}
 		break;
 
 	    case T_MULT: case T_CMULT:
@@ -933,7 +981,20 @@ run_tree(void)
 
 	    case T_PRT:
 	    case T_INP:
-	    {
+	    if (opt_runner) {
+		if (n->type == T_INP) {
+		    fprintf(stderr, "Error: Trial run optimise hit input command\n");
+		    exit(1);
+		} else {
+		    struct bfi *v = add_node_after(opt_run_end);
+		    v->type = T_PRT;
+		    v->line = n->line;
+		    v->col = n->col;
+		    v->count = UM(n->count == -1?p[n->offset]:n->count);
+		    opt_run_end = v;
+		}
+		break;
+	    } else {
 		gettimeofday(&tv_pause, 0); /* Stop the clock. */
 
 		switch(n->type)
@@ -960,15 +1021,17 @@ run_tree(void)
 	    }
 
 	    case T_STOP:
-		if (verbose)
+		if (opt_runner)
+		    fprintf(stderr, "Error: Trial run optimise hit T_STOP.\n");
+		else
 		    fprintf(stderr, "STOP Command executed.\n");
-		goto break_break;
+		exit(1);
 
 	    case T_NOP:
 		break;
 
 	    case T_DUMP:
-		{
+		if (!opt_runner) {
 		    int i, doff, off = (p+n->offset) - oldp;
 		    fflush(stdout); /* Keep in sequence if merged */
 		    fprintf(stderr, "P(%d,%d):", n->line, n->col);
@@ -985,6 +1048,13 @@ run_tree(void)
 		    fprintf(stderr, "\n");
 		}
 		break;
+
+	    case T_SUSP:
+		n=n->next;
+		if( update_opt_runner(n, oldp, p-oldp) )
+		    continue;
+		else
+		    goto break_break;
 
 	    default:
 		fprintf(stderr, "Execution error:\n"
@@ -1832,6 +1902,12 @@ scan_one_node(struct bfi * v, struct bfi ** move_v)
 			v->jmp->type = T_NOP;
 			return 1;
 		    }
+		    if (v->jmp == v->next) {
+			if (verbose>5) fprintf(stderr, "  Empty T_IF\n");
+			v->type = T_NOP;
+			v->jmp->type = T_NOP;
+			return 1;
+		    }
 #if 0
 		    /* TODO: Need to check that the cell we're copying from hasn't changed (Like SSA) */
 		    if (n2 && n2->offset == v->offset && n2->type == T_CALC &&
@@ -2303,7 +2379,6 @@ flatten_loop(struct bfi * v, int constant_count)
     }
     if (dec_node == 0 || (have_mult && (have_add || have_set))) return 0;
 
-    /* TODO add loop step +1 and negate all multipliers */
     if (!is_znode && loop_step != -1)
     {
 	int sum, cnt;
@@ -2311,11 +2386,11 @@ flatten_loop(struct bfi * v, int constant_count)
 	if (have_mult) return 0;
 
 	/* Not a simple decrement hmmm. */
-	/* This sort of sillyness is only used for 'wrapping' 8bits so ... */
+	/* This sort of sillyness is normally only used for 'wrapping' 8bits so ... */
 	if (cell_size == 8) {
 
 	    /* I could solve the modulo division, but for eight bits
-	     * it's probably quicker just to trial it. */
+	     * it's a lot simpler just to trial it. */
 	    sum = constant_count;
 	    cnt = 0;
 	    while(sum && cnt < 256) {
@@ -2327,20 +2402,35 @@ flatten_loop(struct bfi * v, int constant_count)
 
 	    constant_count = cnt;
 	    loop_step = -1;
-	} else {
-	    /* of course it might be exactly divisible ... */
-	    if (loop_step >= 0 || constant_count <= 0) return 0;
-	    if (constant_count % -loop_step != 0) return 0;
+	}
 
-	    constant_count /= -loop_step;
+	if (loop_step != -1) {
+	    /* of course it might still be exactly divisible ... */
+	    if ((loop_step>0) == (constant_count<0) &&
+		abs(constant_count) % abs(loop_step) == 0) {
+
+		constant_count = abs(constant_count / loop_step);
+		loop_step = -1;
+	    }
+	}
+
+	/* This detects the code [-]++[>+<++] which generates MAXINT */
+	/* We can only resolve this if we know the cell size. */
+	if (abs(loop_step) == 2 && cell_size>1 && loop_step == constant_count) {
+	    constant_count = ~(-1 << cell_size-1);
 	    loop_step = -1;
 	}
-	/* Other possibilities include the +1 on the loop mentioned above and
-	 * the code "[-]++[>+<++]" which generates MAXINT for the cell size */
+
+	if (loop_step != -1) return 0;
     }
 
-    /* Found a loop with a known value at entry that contains only T_ADD and
-     * T_SET where the loop variable is decremented nicely. GOOD! */
+    if (verbose>5)
+	fprintf(stderr, "  Loop is start=%d step=%d\n", constant_count, loop_step);
+
+    if (have_mult && constant_count < 0) return 0;
+
+    /* Found a loop with a known value at entry that contains simple operations
+     * where the loop variable is decremented nicely. GOOD! */
 
     if (is_znode)
 	constant_count = 1;
@@ -2419,8 +2509,12 @@ classify_loop(struct bfi * v)
 	}
 	n=n->next;
     }
-    if (dec_node == 0) return 0;
     if (is_znode && opt_no_endif) return 0;
+    if (dec_node == 0) {
+	if (verbose>4 && v->type != T_IF)
+	    fprintf(stderr, "Possible Infinite loop at %d:%d\n", v->line, v->col);
+	return 0;
+    }
 
     if (complex_loop) {
 	/* Complex contents but loop is simple so call it a for loop. */
@@ -2620,6 +2714,137 @@ build_string_in_tree(struct bfi * v)
 }
 
 /*
+ * This function contains the code for the '-Orun' option.
+ * The option simply runs the optimised tree until it finds a loop containing
+ * an input instruction. The everything it's run gets converted onto a print
+ * string and some code to setup the tape.
+ *
+ * For a good benchmark program this should do nothing, but frequently it'll
+ * change the compiled program into a 'Hello World'.
+ */
+void
+try_opt_runner(void)
+{
+    struct bfi *v = bfprog, *n = 0;
+    int lp = 0;
+
+    while(v && v->type != T_INP && v->type != T_STOP) {
+	if (v->orgtype == T_END) lp--;
+	if(!lp && v->orgtype != T_WHL) n=v;
+	if (v->orgtype == T_WHL) lp++;
+	v=v->next;
+    }
+
+    if (n == 0) return;
+
+    if (verbose>5) {
+	fprintf(stderr, "Inserting T_SUSP node after: ");
+	printtreecell(stderr, 0, n);
+	fprintf(stderr, "\nSearch stopped by : ");
+	printtreecell(stderr, 0, v);
+	fprintf(stderr, "\n");
+    }
+    v = add_node_after(n);
+    v->type = T_SUSP;
+
+    if (verbose>5) printtree();
+
+    opt_run_start = opt_run_end = tcalloc(1, sizeof*bfprog);
+    opt_run_start->type = T_NOP;
+    if (verbose>3)
+	fprintf(stderr, "Running trial run optimise\n");
+    run_tree();
+    if (verbose>2) {
+	fprintf(stderr, "Trial run optimise finished.\n");
+	print_tree_stats();
+    }
+}
+
+int
+update_opt_runner(struct bfi * n, int * mem, int offset)
+{
+    struct bfi *v = bfprog;
+    int i;
+
+    if (n && n->orgtype == T_WHL && UM(mem[offset + n->offset]) == 0) {
+	// Move the T_SUSP
+	int lp = 1;
+	if (verbose>3)
+	    fprintf(stderr, "Trial run optimise triggered on dead loop.\n");
+
+	v = n->jmp;
+	n = 0;
+
+	while(v && v->type != T_INP && v->type != T_STOP) {
+	    if (v->orgtype == T_END) lp--;
+	    if(!lp && v->orgtype != T_WHL) n=v;
+	    if (v->orgtype == T_WHL) lp++;
+	    v=v->next;
+	}
+
+	if (verbose>5) {
+	    fprintf(stderr, "Inserting T_SUSP node after: ");
+	    printtreecell(stderr, 0, n);
+	    fprintf(stderr, "\nSearch stopped by : ");
+	    printtreecell(stderr, 0, v);
+	    fprintf(stderr, "\n");
+	}
+
+	v = add_node_after(n);
+	v->type = T_SUSP;
+	return 1;
+    }
+
+    if (verbose>3)
+	fprintf(stderr, "Trial run optimise triggered.\n");
+
+    while(v!=n) {
+	bfprog = v->next;
+	v->type = T_NOP;
+	free(v);
+	v = bfprog;
+    }
+
+    if (bfprog) {
+	for(i=profile_min_cell; i<=profile_max_cell; i++) {
+	    if (UM(mem[i]) != 0) {
+		v = add_node_after(opt_run_end);
+		v->type = T_SET;
+		v->offset = i;
+		if (cell_size == 8)
+		    v->count = UM(mem[i]);
+		else
+		    v->count = SM(mem[i]);
+		opt_run_end = v;
+	    }
+	}
+
+	if (offset) {
+	    v = add_node_after(opt_run_end);
+	    v->type = T_MOV;
+	    v->count = offset;
+	    opt_run_end = v;
+	}
+    }
+
+    if (opt_run_start && opt_run_start->type == T_NOP) {
+	v = opt_run_start->next;
+	if (v) v->prev = 0;
+	v = opt_run_start;
+	opt_run_start = opt_run_start->next;
+	free(v);
+    }
+
+    if (opt_run_start) {
+	opt_run_end->next = bfprog;
+	bfprog = opt_run_start;
+	if (opt_run_end->next)
+	    opt_run_end->next->prev = opt_run_end;
+    }
+    return 0;
+}
+
+/*
  * This outputs the tree as a flat language.
  * In theory this can easily be used directly as macro invocations by any
  * macro assembler or anything that can be translated in a similar way.
@@ -2632,7 +2857,7 @@ print_codedump(void)
     struct bfi * n = bfprog;
     int memsz = 32768;
 
-    if (!noheader)
+    if (!noheader) {
 	printf("%s%s%s\n",
 	"#include <stdio.h>"
 "\n"	"#define bf_start(msz,moff) ",cell_type," mem[msz],*p=mem+moff;int main(){"
@@ -2656,21 +2881,22 @@ print_codedump(void)
 "\n"	"#define bf_err() exit(1);"
 "\n"	"#define bf_end() return 0;}");
 
-    switch(eofcell)
-    {
-    case 0:
-    case 1:
-	printf("#define inpchar(x) {int a=getchar();if(a!=EOF)p[x]=a;}\n");
-	break;
-    case 2:
-	printf("#define inpchar(x) {int a=getchar();if(a!=EOF)p[x]=a;else p[x]= -1;}\n");
-	break;
-    case 3:
-	printf("#define inpchar(x) {int a=getchar();if(a!=EOF)p[x]=a;else p[x]=0;}\n");
-	break;
-    case 4:
-	printf("#define inpchar(x) p[x]=getchar();\n");
-	break;
+	switch(eofcell)
+	{
+	case 0:
+	case 1:
+	    printf("#define inpchar(x) {int a=getchar();if(a!=EOF)p[x]=a;}\n");
+	    break;
+	case 2:
+	    printf("#define inpchar(x) {int a=getchar();if(a!=EOF)p[x]=a;else p[x]= -1;}\n");
+	    break;
+	case 3:
+	    printf("#define inpchar(x) {int a=getchar();if(a!=EOF)p[x]=a;else p[x]=0;}\n");
+	    break;
+	case 4:
+	    printf("#define inpchar(x) p[x]=getchar();\n");
+	    break;
+	}
     }
 
     printf("bf_start(%d,%d)\n", memsz, -most_neg_maad_loop);

@@ -132,23 +132,17 @@ print_nasm(void)
 	switch(n->type)
 	{
 	case T_MOV:
-	    if (opt_level<0 && n->count == 1)
-		printf("\tinc ecx\n");
-	    else if (opt_level<0 && n->count == -1)
-		printf("\tdec ecx\n");
-	    else
-#if 0
 	    /* INC & DEC modify part of the flags register, this can stall. */
-	    if (n->count == 1)
+	    if (opt_level<=0 && n->count == 1)
 		printf("\tinc ecx\n");
-	    else if (n->count == -1)
+	    else if (opt_level<=0 && n->count == -1)
 		printf("\tdec ecx\n");
-	    else if (n->count == 2)
+	    else if (opt_level<=0 && n->count == 2)
 		printf("\tinc ecx\n" "\tinc ecx\n");
-	    else if (n->count == -2)
+	    else if (opt_level<=0 && n->count == -2)
 		printf("\tdec ecx\n" "\tdec ecx\n");
 	    else
-#endif
+
 	    if (n->count < -128)
 		printf("\tsub ecx,%d\n", -n->count);
 	    else
@@ -156,25 +150,19 @@ print_nasm(void)
 	    break;
 
 	case T_ADD:
-	    if (opt_level<0 && n->count == 1)
-		printf("\tinc byte [ecx]\n");
-	    else if (opt_level<0 && n->count == -1)
-		printf("\tdec byte [ecx]\n");
-	    else
-#if 0
 	    /* INC & DEC modify part of the flags register, this can stall. */
-	    if (n->count == 1 && n->offset == 0)
+	    if (opt_level<=0 && n->count == 1 && n->offset == 0)
 		printf("\tinc byte [ecx]\n");
-	    else if (n->count == -1 && n->offset == 0)
+	    else if (opt_level<=0 && n->count == -1 && n->offset == 0)
 		printf("\tdec byte [ecx]\n");
-	    else if (n->count < -128 && n->offset == 0)
+	    else if (opt_level<=0 && n->count < -128 && n->offset == 0)
 		printf("\tsub byte [ecx],%d\n", -n->count);
-	    else if (n->count == 1)
+	    else if (opt_level<=0 && n->count == 1)
 		printf("\tinc byte [ecx+%d]\n", n->offset);
-	    else if (n->count == -1)
+	    else if (opt_level<=0 && n->count == -1)
 		printf("\tdec byte [ecx+%d]\n", n->offset);
 	    else
-#endif
+
 	    if (n->count < -128)
 		printf("\tsub byte [ecx+%d],%d\n", n->offset, -n->count);
 	    else
@@ -393,7 +381,7 @@ print_asm_header(void)
     printf("BITS 32\n");
     printf("\n");
     if (!hello_world)
-	printf("memsize\tequ\t0x10000\n");
+	printf("memsize\tequ\t0x100000\n");
     printf("orgaddr\tequ\t0x08048000\n");
     printf("\torg\torgaddr\n");
     printf("\n");

@@ -1,7 +1,7 @@
 #define VERSION_MAJOR	0
 #define VERSION_MINOR	9
-#define VERSION_BUILD	469
-#define VERSION_DATE	"2014-01-18 16:07:37+00:00"
+#define VERSION_BUILD	539
+#define VERSION_DATE	"2014-01-26 19:48:59+00:00"
 
 #define VS_Q(x) #x
 #define VS_S(x) VS_Q(x)

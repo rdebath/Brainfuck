@@ -31,7 +31,7 @@ static FILE * ofd;
  *
  *
  * Note: traditional dc has no way of entering characters from stdin, a filter
- * number used that converts the characters into numbers. End of file is
+ * must be used that converts the characters into numbers. End of file is
  * properly detected though.
  */
 
@@ -280,9 +280,9 @@ print_dc(void)
 	fprintf(ofd, "1#1-\n");
 	fprintf(ofd, "]SB\n");
 	fprintf(ofd, "[lZx [256%%256+256%%;Cx]so ]SA\n");
-	fprintf(ofd, "0 0 [o] Z 1=B 0=A\n");
+	fprintf(ofd, "0 0[o]Z1=B0=A\n");
 	/* Restore A, B and Z */
-	fprintf(ofd, "0sALAsBLBsZLZ d!=.\n");
+	fprintf(ofd, "0sALAsBLBsZLZd!=.\n");
     }
 #endif
     if (cell_mask > 0)
@@ -291,19 +291,25 @@ print_dc(void)
     if (used_lix) {
 	if (input_string) {
 	    char * p = input_string;
-	    fprintf(ofd, "0si\n");
+	    int c = 0;
 	    for(;*p; p++)
-		fprintf(ofd, "%dlid1+si:I\n", (unsigned char)*p);
-	    fprintf(ofd, "_1lid1+si:I\n");
-	    fprintf(ofd, "0li:I0sn\n");
-	    fprintf(ofd, "[lnd1+sn;I]si\n");
+		fprintf(ofd, "%d %d:I\n", (unsigned char)*p, ++c);
+	    fprintf(ofd, "%d 0:I\n", c);
+	    fprintf(ofd, "0sn\n");
+	    fprintf(ofd, "[[d>.ln1+dsn;I]SN_1ln0;I>N0sNLNd>.]si\n");
 	} else {
+
+	    /* New for GNU dc, character input ... soon */
+	    fprintf(ofd, "0dd:Isn\n");
+	    fprintf(ofd, "[[0$I0sn]SNln0;I!>N\n");
+	    fprintf(ofd, "[d>.ln1+dsn;I]sN_1ln0;I>N0sNLNd>.]si\n");
 
 	    /* New for GNU dc, character I/O ... soon
 	    fprintf(ofd, "[1G [sB_1]SA [bAla]SB 0=A Bx 0sALAaBLB+ ]si\n");
+
 	    */
 	    /* Input integers, -1 on EOF */
-	    fprintf(ofd, "[? z [_1]SA 0=A 0sALA+ ]si\n");
+	    // fprintf(ofd, "[? z [_1]SA 0=A 0sALA+ ]si\n");
 	}
     }
 

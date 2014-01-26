@@ -19,7 +19,7 @@ extern char const * cell_type;
     Mac(IF) Mac(ENDIF) Mac(MULT) Mac(CMULT) Mac(FOR) \
     Mac(ZFIND) Mac(MFIND) Mac(ADDWZ) \
     Mac(CALC2) Mac(CALC3) Mac(CALC4) Mac(CALC5) \
-    Mac(STOP) Mac(DUMP) Mac(NOP) Mac(DEAD) Mac(ERR)
+    Mac(STOP) Mac(SUSP) Mac(DUMP) Mac(NOP) Mac(DEAD) Mac(ERR)
 
 #define GEN_TOK_ENUM(NAME) T_ ## NAME,
 enum token { TOKEN_LIST(GEN_TOK_ENUM) TCOUNT};
