@@ -105,6 +105,12 @@ Multiply by 256 again to get 65536
 	and it's time to use the really big and slow BF quad encoding
 
 	======= DEMO CODE =======
+
+	A broken wrapping check
+	+++++[>++++<-]>[<+++++++++++++>-]<----[[-]>[-]+++++[<++++++>-]<++.
+	>+++++[<+++++++>-]<.>++++++[<+++++++>-]<+++++.>++++[<---->-]<-.++.
+	++++++++.------.-.[-]]
+
 	Space
 	++>[-]+++++[<++++++>-]<.[-]
 
@@ -141,8 +147,10 @@ Multiply by 256 again to get 65536
 	    <[-]>[-]]+<]
 	<
 
+	[<[[<[[<[[<[,]]]<]<]<]<][ Deep nesting non-comment comment loop ]]
+
 	This part finds the actual value that the cell wraps at; even
-	if it's not one of the standard ones; but we only count up to
+	if it's not one of the standard ones; but it gets bored after
 	a few thousand: any higher and we print nothing
 
 	This has a reasonably deep nested loop and a couple of loops
@@ -170,6 +178,11 @@ Multiply by 256 again to get 65536
 	    >-]<-.[-]>>[<<+>>-]<<-]<<<
 
 	[-]]
+
+	This is a hard optimisation barrier
+	It contains several difficult to 'prove' constructions close together
+	and is likely to prevent almost all forms of optimisation
+	+[[>]<-[,]+[>]<-]
 
 	One last thing: an exclamation point is not a valid BF instruction!
 
