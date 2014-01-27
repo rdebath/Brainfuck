@@ -65,9 +65,9 @@ syn match bfComment "\(^[[\]\-+<>.,\t ]*\)\@<=[^[\]\-+<>.,\t ][^[\]\-+<>.,]*$" c
 " beginning of comment loops in the expressions twice because \@<= will only
 " search back one line irrespective of the contents of 'sync'.
 syn match bfCommentChar "[^+\-<>[\].,]\+" contained contains=bfSPError
-syn region bfCommentLoop    start="\["  end="]" contained contains=bfCommentChar,bfCommentLoop
-syn match bfComment    "\(]\_[^[\]\-+<>.,]*\)\@<=\_[^[\]\-+<>.,]*\[" contains=bfCommentLoop
-syn match bfComment    "\(\%^\_[^[\]\-+<>.,]*\)\@<=\_[^[\]\-+<>.,]*\[" contains=bfCommentLoop
+syn region bfCommentLoop    start="\["  end="]" contained contains=bfCommentChar,bfCommentLoop,bfSPError
+syn match bfComment    "\(]\_[^[\]\-+<>.,]*\)\@<=\_[^[\]\-+<>.,]*\[" contains=bfCommentLoop,bfSPError
+syn match bfComment    "\(\%^\_[^[\]\-+<>.,]*\)\@<=\_[^[\]\-+<>.,]*\[" contains=bfCommentLoop,bfSPError
 
 if version >= 508 || !exists("did_brainfuck_syn_inits")
   if version < 508
