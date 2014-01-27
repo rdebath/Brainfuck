@@ -202,7 +202,7 @@ print_cstring(void)
 #if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
 #if defined(__x86_64__)
 #define CC "gcc -m64"
-#elif defined(__i586__)
+#elif defined(__i386__)
 #define CC "gcc -m32"
 #else
 #define CC "gcc"

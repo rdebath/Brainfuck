@@ -15,25 +15,22 @@
 #include "../tools/dynasm/dasm_proto.h"
 
 void link_and_run(dasm_State **state);
-static int tape_step = sizeof(int);
+int tape_step = sizeof(int);
 
-#ifdef __i386__
-#include "../tools/dynasm/dasm_x86.h"
-#include "bf2jit.i686.h"
-#elif defined(__amd64__)
+#if defined(__amd64__) || defined(_M_AMD64)
 #include "../tools/dynasm/dasm_x86.h"
 #include "bf2jit.amd64.h"
+#elif defined(__i386__) || defined(_M_IX86)
+#include "../tools/dynasm/dasm_x86.h"
+#include "bf2jit.i686.h"
 #endif
 
-#ifndef DASM_S_OK
-#error "Supported processor not detected."
-#define DASM_S_OK -1
-#endif
+#ifdef DASM_S_OK
 
 typedef int (*fnptr)(char* memory);
 fnptr code = 0;
 size_t codelen;
-void * mem;
+void * tapemem;
 
 int
 check_arg(char * arg)
@@ -56,9 +53,6 @@ link_and_run(dasm_State ** state)
     assert(codeptr != MAP_FAILED);
     codelen = size;
 
-    // Store length at the beginning of the region, so we
-    // can free it without additional context.
-
     dasm_encode(state, codeptr);
     dasm_free(state);
 
@@ -71,15 +65,20 @@ link_and_run(dasm_State ** state)
     // or
     //  ndisasm -b32 code.bin
     */
-    FILE   *f = fopen("code.bin", "w");
+    FILE   *f = fopen("/tmp/code.bin", "w");
     fwrite(codeptr, size, 1, f);
     fclose(f);
 #endif
 
     if (isatty(STDOUT_FILENO)) setbuf(stdout, 0);
-    mem = calloc(32768, tape_step);
+    tapemem = calloc(32768, tape_step);
     code = (void *) codeptr;
-    code(mem + BOFF);
+    code(tapemem + BOFF);
 
     assert(munmap(code, codelen) == 0);
 }
+
+#else
+#warning "Supported processor not detected; using bf2run."
+#include "bf2run.c"
+#endif
