@@ -37,7 +37,7 @@ This repository contains various [brainfuck](http://esolangs.org/wiki/Brainfuck)
   * basic -- A couple of very random BASIC interpreters.
   * bash -- GNU bash, uses arrays, arithimetic etc. (NO external programs or subshells used)
   * dc -- The -r (run) option uses a special filter to allow character input. This is too complex for dc.sed.
-  * cgmp -- C using the Gnu MP library (partially *deoptimised* due to linked list style tape)
+  * cgmp -- C using the Gnu MP library
   * gas -- x64 or x86 assembler. Use gcc to assemble and link: "gcc -o bfp bfout.s" *no-opt*
   * ps1 -- That's right MS Powershell
   * neko -- [Neko programming language VM](http://nekovm.org)
