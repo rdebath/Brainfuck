@@ -1,0 +1,129 @@
+/*
+Preprocessor abuse; all the modifications to the main bfi.c for adding
+backends are brought here in one place. To add another backend just add
+it to the list and fill in it's entry.
+*/
+
+#ifdef NO_EXT_BE
+#undef XX
+#else
+
+#if XX == 0
+#include "bfi.ccode.h"
+#include "bfi.gnulit.h"
+#include "bfi.nasm.h"
+#include "bfi.bf.h"
+#include "bfi.dc.h"
+#else
+
+#if XX == 1
+/* The enum */
+#define X(a,b,c,d,e,f) c_ ## a,
+#elif XX == 2
+/* Help text */
+#define X(a,b,c,d,e,f) c
+#elif XX == 3
+/* Option flags */
+#define X(a,b,c,d,e,f) d
+#elif XX == 4
+/* Defaults */
+#define X(a,b,c,d,e,f)
+#elif XX == 5
+/* Print code */
+#define X(a,b,c,d,e,f) e
+#elif XX == 6
+/* Opt Limits */
+#define X(a,b,c,d,e,f)
+#elif XX == 7
+/* Run directly */
+#define X(a,b,c,d,e,f) f
+#else
+#define X(a,b,c,d,e,f)
+#endif
+
+/****************************************************************************/
+#ifndef DISABLE_GNULIGHTNING
+X(jit,JIT,
+    printf("   -j   Run using the JIT interpreter/compiler.\n");    ,
+    case 'j': do_run=1; do_codestyle = c_jit; break;                ,
+    /* Cannot do print_jit() */                                     ,
+    case c_jit: run_jit_asm(); break;                               )
+#if XX == 4
+    if (do_run == -1 && do_codestyle == c_default &&
+	    verbose<3 && !enable_trace && !debug_mode && jit_lib_ok) {
+	do_run = 1;
+	do_codestyle = c_jit;
+    }
+#endif
+#endif
+
+/****************************************************************************/
+#if !defined(DISABLE_TCCLIB) || !defined(DISABLE_DLOPEN)
+X(ccode,CCODE,
+    printf("   -c   Create C code. If combined with -r the code is loaded and run.\n");   ,
+    case 'c': do_codestyle = c_ccode; do_run = (do_run==1); break;			  ,
+    case c_ccode: print_ccode(stdout); break;			    ,
+    case c_ccode: run_ccode(); break;                               )
+
+#if XX == 4
+    if (do_run == -1 && do_codestyle == c_default && verbose<3 && !debug_mode) {
+	do_run = 1;
+	do_codestyle = c_ccode;
+    }
+#endif
+#else
+X(ccode,CCODE,
+    printf("   -c   Create C code.\n");				    ,
+    case 'c': do_codestyle = c_ccode; break;			    ,
+    case c_ccode: print_ccode(stdout); break;			    ,
+    /* No direct run */						    )
+#endif
+
+/****************************************************************************/
+X(nasm,NASM,
+    printf("   -s   Create i386 Linux ELF NASM code.\n");           ,
+    case 's': do_codestyle = c_nasm; break;                         ,
+    case c_nasm: print_nasm(); break;                               ,
+    /* No direct run */						    )
+#if XX == 4
+    if (do_codestyle == c_nasm)
+    {
+	do_run = (do_run==1);
+	if (cell_size && cell_size != 8) {
+	    fprintf(stderr, "The -s option only supports 8 bit cells.\n");
+	    exit(255);
+	}
+	set_cell_size(8);
+    }
+#endif
+
+/****************************************************************************/
+X(bf,BF,
+    printf("   -F   Attempt to regenerate BF code.\n");             ,
+    case 'F': do_codestyle = c_bf; hard_left_limit = 0; break;      ,
+    case c_bf: print_bf(); break;                                   ,
+    /* No direct run */						    )
+#if XX == 6
+    if (do_codestyle == c_bf)
+	opt_no_calc = opt_no_endif = opt_no_litprt = opt_no_repoint = 1;
+#endif
+
+/****************************************************************************/
+X(dc,DC,
+    printf("   -D   Create code for dc(1).\n");                     ,
+    case 'D': do_codestyle = c_dc; break;                           ,
+    case c_dc: print_dc(); break;                                   ,
+    /* No direct run */						    )
+#if XX == 4
+    if (eofcell == 0 && do_codestyle == c_dc && input_string == 0)
+	eofcell = 6;
+    if (cell_size == 0 && do_codestyle == c_dc)
+	set_cell_size(32);
+#endif
+
+/****************************************************************************/
+
+#undef X
+#endif /*XX==?*/
+#undef XX
+#endif /*NO_EXT_BE*/
