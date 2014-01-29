@@ -24,4 +24,15 @@ It has multiple backends.
  * Generate NASM assembler to directly create an ELF32 executable.
  * Generate a program for the unix dc(1) command.
 
-And finally there the 'cheat' option '-Orun', this runs the syntax tree as far as it can with the 'Tree' interpreter before running a code generator. If the BF program has no input (',') commands this will run the program to completetion and convert it into a 'Hello World'.
+And finally there the 'cheat' option '-Orun', this runs the syntax tree as far as it can with the 'Tree' interpreter before running a code generator. If the BF program has no input (',') commands this will run the program to completion  and convert it into a 'Hello World'.
+
+Though even without this it'll convert a standard 'Hello world!' and several other 'benchmark' programs into C code like this:
+<pre>
+#include &lt;stdio.h&gt;
+
+int main(void)
+{
+  puts("Hello World!");
+  return 0;
+}
+</pre>
