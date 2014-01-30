@@ -62,7 +62,7 @@ void
 outcmd(int ch, int count)
 {
     struct instruction * n = calloc(1, sizeof*n);
-    if (!n) { perror("bf2asnjs"); exit(42); }
+    if (!n) { perror("bf2asmjs"); exit(42); }
 
     icount ++;
     n->ch = ch;

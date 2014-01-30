@@ -19,6 +19,10 @@
  * The 'printf' command in the ',' command could be replaced by a "case".
  *
  * If external programs are allowed it becomes a lot simpler.
+ *
+ * The 'left' and 'right' commands are limited to 100000 cells, however, this
+ * limitation is due to performance reasons so this does show the shell is
+ * Turing complete even though it doesn't prove it directly.
  */
 
 #define MAXPRLE	25

@@ -1,4 +1,16 @@
-# TARGET_ARCH=-m32
+# Makefile for BF2ANY
+# Note this is compatible with Debian/GCC multiarch and also notices
+# the environment variable TARGET_ARCH.
+# You can use:
+#	export TARGET_ARCH=-m32
+# or
+#	export TARGET_ARCH=-m64
+#
+# libtcc is detected; however it is not multiarch aware and so the installed
+# version must match the version you are trying to compile.
+#
+# Both bf2gcc and bf2jit are multiarch aware on i386 vs amd64. (The kernel must
+# be 64bit for a 64bit application, but the userspace works both ways)
 
 LDLIBS=
 
@@ -25,7 +37,7 @@ clean:
 	-rm -f bf2tcc.lib-off bf2tcc.lib-on bf2jit.amd64.h bf2jit.i686.h
 	-rm -f *.o
 
-CFLAGS=-O3 -Wall -DBOFF=256
+CFLAGS=-O3 -Wall -DBOFF=256 $(DEFS)
 
 bf2bf: bf2bf.o bf2any.o bf2const.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)

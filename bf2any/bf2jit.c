@@ -23,10 +23,11 @@ int tape_step = sizeof(int);
 #elif defined(__i386__) || defined(_M_IX86)
 #include "../tools/dynasm/dasm_x86.h"
 #include "bf2jit.i686.h"
+#else
+#error "Supported processor not detected."
 #endif
 
 #ifdef DASM_S_OK
-
 typedef int (*fnptr)(char* memory);
 fnptr code = 0;
 size_t codelen;
@@ -77,8 +78,4 @@ link_and_run(dasm_State ** state)
 
     assert(munmap(code, codelen) == 0);
 }
-
-#else
-#warning "Supported processor not detected; using bf2run."
-#include "bf2run.c"
 #endif

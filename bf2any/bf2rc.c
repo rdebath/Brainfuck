@@ -17,6 +17,10 @@
  *
  * I have used an external command pipeline to get the next character
  * from stdin.
+ *
+ * This does prove the rc shell is Turing complete as the 'left' and 'right'
+ * command implementations don't have a defined right hand limit and I/O is
+ * not required for TC.
  */
 
 #define MAXPRLE	1
