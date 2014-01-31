@@ -992,6 +992,15 @@ run_tree(void)
 		    v->col = n->col;
 		    v->count = UM(n->count == -1?p[n->offset]:n->count);
 		    opt_run_end = v;
+		    if (opt_no_litprt || v->count == -1) {
+			v->type = T_SET;
+			v = add_node_after(opt_run_end);
+			v->type = T_PRT;
+			v->line = n->line;
+			v->col = n->col;
+			v->count = -1;
+			opt_run_end = v;
+		    }
 		}
 		break;
 	    } else {
@@ -2359,9 +2368,9 @@ flatten_loop(struct bfi * v, int constant_count)
 	    if (constant_count <= 0 || constant_count > 9) return 0;
 	    if (n->count3 != 0 || n->count2 <= 0 || n->count != 0)
 		return 0;
-	    if (n->offset != n->offset2 || n->count2 > 9)
+	    if (n->offset != n->offset2 || n->count2 > 1000 || n->count2 < 1)
 		return 0;
-	    /* T_CALC of form X *= 5 with SMALL integers. */
+	    /* T_CALC of form X *= 5 with SMALL integer repeats. */
 	    have_mult++;
 	} else if (n->offset == v->offset) {
 	    if (dec_node) return 0; /* Two updates, hmmm */
@@ -2716,11 +2725,14 @@ build_string_in_tree(struct bfi * v)
 /*
  * This function contains the code for the '-Orun' option.
  * The option simply runs the optimised tree until it finds a loop containing
- * an input instruction. The everything it's run gets converted onto a print
+ * an input instruction. Then everything it's run gets converted onto a print
  * string and some code to setup the tape.
  *
  * For a good benchmark program this should do nothing, but frequently it'll
  * change the compiled program into a 'Hello World'.
+ *
+ * TODO: If there are NO T_INP instructions we could use a fast runner and
+ *      just intercept the output.
  */
 void
 try_opt_runner(void)
@@ -2836,6 +2848,12 @@ update_opt_runner(struct bfi * n, int * mem, int offset)
     }
 
     if (opt_run_start) {
+	if (opt_no_litprt && bfprog) {
+	    struct bfi *v2 = add_node_after(opt_run_end);
+	    v2->type = T_SET;
+	    v2->count = 0;
+	    opt_run_end = v2;
+	}
 	opt_run_end->next = bfprog;
 	bfprog = opt_run_start;
 	if (opt_run_end->next)
@@ -2857,46 +2875,76 @@ print_codedump(void)
     struct bfi * n = bfprog;
     int memsz = 32768;
 
+    calculate_stats();
+
     if (!noheader) {
 	printf("%s%s%s\n",
 	"#include <stdio.h>"
 "\n"	"#define bf_start(msz,moff) ",cell_type," mem[msz],*p=mem+moff;int main(){"
-"\n"	"#define posn(l,c) /* Line l Column c */"
-"\n"	"#define ptradd(x) p+=(x);"
-"\n"	"#define add_i(x,y) p[x]+=(y);"
-"\n"	"#define set_i(x,y) p[x]=(y);"
-"\n"	"#define add_c(x,y) p[x]+=p[y];"
-"\n"	"#define add_cm(x,y,z) p[x]+=p[y]*(z);"
-"\n"	"#define set_c(x,y) p[x]=p[y];"
-"\n"	"#define set_cm(x,y,z) p[x]=p[y]*(z);"
-"\n"	"#define add_cmi(o1,o2,o3,o4) p[o1]+=p[o2]*(o3)+(o4);"
-"\n"	"#define set_cmi(o1,o2,o3,o4) p[o1]=p[o2]*(o3)+(o4);"
-"\n"	"#define set_tmi(o1,o2,o3,o4,o5,o6) p[o1]=(o2)+p[o3]*(o4)+p[o5]*(o6);"
-"\n"	"#define outchar(x) putchar(x);"
-"\n"	"#define outstr(x) printf(\"%s\", x);"
-"\n"	"#define write(x) putchar(p[x]);"
-"\n"	"#define ifeqz(x,y,z) if(p[x]==0) goto y;"
-"\n"	"#define ifnez(x,y) if(p[x]) goto y;"
-"\n"	"#define label(x) x:"
-"\n"	"#define bf_err() exit(1);"
 "\n"	"#define bf_end() return 0;}");
 
-	switch(eofcell)
-	{
-	case 0:
-	case 1:
-	    printf("#define inpchar(x) {int a=getchar();if(a!=EOF)p[x]=a;}\n");
-	    break;
-	case 2:
-	    printf("#define inpchar(x) {int a=getchar();if(a!=EOF)p[x]=a;else p[x]= -1;}\n");
-	    break;
-	case 3:
-	    printf("#define inpchar(x) {int a=getchar();if(a!=EOF)p[x]=a;else p[x]=0;}\n");
-	    break;
-	case 4:
-	    printf("#define inpchar(x) p[x]=getchar();\n");
-	    break;
+	if (enable_trace)
+	    puts("#define posn(l,c) /* Line l Column c */");
+
+	/* See:  opt_no_repoint */
+	if (node_type_counts[T_MOV])
+	    puts("#define ptradd(x) p+=(x);");
+
+	if (node_type_counts[T_ADD])
+	    puts("#define add_i(x,y) p[x]+=(y);");
+
+	if (node_type_counts[T_SET])
+	    puts("#define set_i(x,y) p[x]=(y);");
+
+	/* See:  opt_no_calc */
+	if (node_type_counts[T_CALC])
+	    printf("%s\n",
+		"#define add_c(x,y) p[x]+=p[y];"
+	"\n"	"#define add_cm(x,y,z) p[x]+=p[y]*(z);"
+	"\n"	"#define set_c(x,y) p[x]=p[y];"
+	"\n"	"#define set_cm(x,y,z) p[x]=p[y]*(z);"
+	"\n"	"#define add_cmi(o1,o2,o3,o4) p[o1]+=p[o2]*(o3)+(o4);"
+	"\n"	"#define set_cmi(o1,o2,o3,o4) p[o1]=p[o2]*(o3)+(o4);"
+	"\n"	"#define set_tmi(o1,o2,o3,o4,o5,o6) p[o1]=(o2)+p[o3]*(o4)+p[o5]*(o6);");
+
+	/* See:  opt_no_litprt */
+	if (node_type_counts[T_PRT])
+	    printf("%s\n",
+		"#define outchar(x) putchar(x);"
+	"\n"	"#define outstr(x) printf(\"%s\", x);"
+	"\n"	"#define write(x) putchar(p[x]);");
+
+	/* See:  opt_no_endif */
+	if(node_type_counts[T_MULT] || node_type_counts[T_CMULT]
+	    || node_type_counts[T_FOR] || node_type_counts[T_WHL]) {
+	    puts("#define ifeqz(x,y,z) if(p[x]==0) goto y;");
+	    puts("#define ifnez(x,y) if(p[x]) goto y;");
+	    puts("#define label(x) x:");
+	} else if (node_type_counts[T_IF]) {
+	    puts("#define ifeqz(x,y,z) if(p[x]==0) goto y;");
+	    puts("#define label(x) x:");
 	}
+
+	if (node_type_counts[T_STOP])
+	    puts("#define bf_err() exit(1);");
+
+	if (node_type_counts[T_INP])
+	    switch(eofcell)
+	    {
+	    case 0:
+	    case 1:
+		puts("#define inpchar(x) {int a=getchar();if(a!=EOF)p[x]=a;}");
+		break;
+	    case 2:
+		puts("#define inpchar(x) {int a=getchar();if(a!=EOF)p[x]=a;else p[x]= -1;}");
+		break;
+	    case 3:
+		puts("#define inpchar(x) {int a=getchar();if(a!=EOF)p[x]=a;else p[x]=0;}");
+		break;
+	    case 4:
+		puts("#define inpchar(x) p[x]=getchar();");
+		break;
+	    }
     }
 
     printf("bf_start(%d,%d)\n", memsz, -most_neg_maad_loop);
