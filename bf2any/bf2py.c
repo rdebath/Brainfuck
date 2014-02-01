@@ -12,7 +12,6 @@
 
 /* #define USESYS // else USEOS */
 
-int do_input = 0;
 int ind = 0;
 #define I printf("%*s", ind*4, "")
 

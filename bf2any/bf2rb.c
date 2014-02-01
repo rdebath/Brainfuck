@@ -8,7 +8,6 @@
  * Ruby translation from BF, runs at about 31,000,000 instructions per second.
  */
 
-int do_input = 0;
 int ind = 0;
 #define I printf("%*s", ind*4, "")
 

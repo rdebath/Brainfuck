@@ -11,7 +11,6 @@
  *      "Uncaught exception - load.c(393) : Invalid module : ..."
  */
 
-int do_input = 0;
 int ind = 0;
 #define I printf("%*s", ind*4, "")
 

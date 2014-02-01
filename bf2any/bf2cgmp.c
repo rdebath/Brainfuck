@@ -28,7 +28,6 @@
  * This is faster than the previous linked list implementation.
  */
 
-int do_input = 0;
 int ind = 0;
 #define I        printf("%*s", ind*4, "")
 #define prv(s,v) printf("%*s" s "\n", ind*4, "", (v))
