@@ -17,7 +17,8 @@ LDLIBS=
 ALLEXE=\
 	bf2asmjs bf2awk bf2bas bf2bash bf2bf bf2cgmp bf2clojure bf2dc \
 	bf2gas32 bf2gas64 bf2gcc bf2lua bf2neko bf2pas bf2perl bf2php \
-	bf2ps1 bf2py bf2rb bf2rc bf2run bf2sh bf2tcc bf2slang bf2jit
+	bf2ps1 bf2py bf2rb bf2rc bf2run bf2sh bf2tcc bf2slang bf2jit \
+	bf2cmd
 
 HAVE_TCC=$(wildcard /usr/include/libtcc.h)
 ifeq ($(HAVE_TCC),)
@@ -138,4 +139,7 @@ bf2jit.amd64.h: bf2jit.x86.dasc
 
 bf2jit.i686.h: bf2jit.x86.dasc
 	lua ../tools/dynasm/dynasm.lua -c -D I386 -o bf2jit.i686.h bf2jit.x86.dasc
+
+bf2cmd: bf2cmd.o bf2any.o bf2const.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
 
