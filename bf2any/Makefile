@@ -6,9 +6,6 @@
 # or
 #	export TARGET_ARCH=-m64
 #
-# libtcc is detected; however it is not multiarch aware and so the installed
-# version must match the version you are trying to compile.
-#
 # Both bf2gcc and bf2jit are multiarch aware on i386 vs amd64. (The kernel must
 # be 64bit for a 64bit application, but the userspace works both ways)
 
