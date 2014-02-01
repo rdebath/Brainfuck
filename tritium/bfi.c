@@ -361,6 +361,8 @@ main(int argc, char ** argv)
 				if(*ap == 0) opt_level = 1;
 				else if (!strcmp(ap, "run"))
 				    opt_runner = 1;
+				else if (!strcmp(ap, "flat"))
+				    opt_no_repoint = 1;
 				else opt_level = strtol(ap,0,10);
 				break;
                             case 'E': eofcell=strtol(ap,0,10); break;
@@ -1251,9 +1253,14 @@ pointer_regen(void)
 	case T_WHL: case T_MULT: case T_CMULT: case T_FOR: case T_END:
 	case T_IF: case T_ENDIF:
 	    if (n->offset != current_shift) {
-		v = add_node_after(n->prev);
-		v->type = T_MOV;
-		v->count = n->offset - current_shift;
+		if (n->prev && n->prev->type == T_MOV) {
+		    v = n->prev;
+		    v->count += n->offset - current_shift;
+		} else {
+		    v = add_node_after(n->prev);
+		    v->type = T_MOV;
+		    v->count = n->offset - current_shift;
+		}
 		current_shift = n->offset;
 	    }
 	    n->offset -= current_shift;
@@ -2864,10 +2871,15 @@ update_opt_runner(struct bfi * n, int * mem, int offset)
 
 /*
  * This outputs the tree as a flat language.
- * In theory this can easily be used directly as macro invocations by any
- * macro assembler or anything that can be translated in a similar way.
  *
- * Currently it's header generates some C code.
+ * This can easily be used as macro invocations by any macro assembler or
+ * anything that can be translated in a similar way. The C preprocessor
+ * has be used successfully to translate it into several different
+ * scripting languages (except Python).
+ *
+ *  bfi -A pgm.b | gcc -include macro.rb.cpp -E -P - > pgm.out
+ *
+ * The default header generates some C code.
  */
 void
 print_codedump(void)
@@ -2878,9 +2890,11 @@ print_codedump(void)
     calculate_stats();
 
     if (!noheader) {
-	printf("%s%s%s\n",
-	"#include <stdio.h>"
-"\n"	"#define bf_start(msz,moff) ",cell_type," mem[msz],*p=mem+moff;int main(){"
+	printf("%s%s%s%s%s\n",
+	"#ifndef bf_start"
+"\n"	"#include <stdio.h>"
+"\n"	"#define bf_start(msz,moff) ",cell_type," mem[msz];"
+	"int main(void){register ",cell_type,"*p=mem+moff;"
 "\n"	"#define bf_end() return 0;}");
 
 	if (enable_trace)
@@ -2888,24 +2902,24 @@ print_codedump(void)
 
 	/* See:  opt_no_repoint */
 	if (node_type_counts[T_MOV])
-	    puts("#define ptradd(x) p+=(x);");
+	    puts("#define ptradd(x) p += x;");
 
 	if (node_type_counts[T_ADD])
-	    puts("#define add_i(x,y) p[x]+=(y);");
+	    puts("#define add_i(x,y) p[x] += y;");
 
 	if (node_type_counts[T_SET])
-	    puts("#define set_i(x,y) p[x]=(y);");
+	    puts("#define set_i(x,y) p[x] = y;");
 
 	/* See:  opt_no_calc */
 	if (node_type_counts[T_CALC])
 	    printf("%s\n",
-		"#define add_c(x,y) p[x]+=p[y];"
-	"\n"	"#define add_cm(x,y,z) p[x]+=p[y]*(z);"
-	"\n"	"#define set_c(x,y) p[x]=p[y];"
-	"\n"	"#define set_cm(x,y,z) p[x]=p[y]*(z);"
-	"\n"	"#define add_cmi(o1,o2,o3,o4) p[o1]+=p[o2]*(o3)+(o4);"
-	"\n"	"#define set_cmi(o1,o2,o3,o4) p[o1]=p[o2]*(o3)+(o4);"
-	"\n"	"#define set_tmi(o1,o2,o3,o4,o5,o6) p[o1]=(o2)+p[o3]*(o4)+p[o5]*(o6);");
+		"#define add_c(x,y) p[x] += p[y];"
+	"\n"	"#define add_cm(x,y,z) p[x] += p[y] * z;"
+	"\n"	"#define set_c(x,y) p[x] = p[y];"
+	"\n"	"#define set_cm(x,y,z) p[x] = p[y] * z;"
+	"\n"	"#define add_cmi(o1,o2,o3,o4) p[o1] += p[o2] * o3 + o4;"
+	"\n"	"#define set_cmi(o1,o2,o3,o4) p[o1] = p[o2] * o3 + o4;"
+	"\n"	"#define set_tmi(o1,o2,o3,o4,o5,o6) p[o1] = o2 + p[o3] * o4 + p[o5] * o6;");
 
 	/* See:  opt_no_litprt */
 	if (node_type_counts[T_PRT])
@@ -2914,15 +2928,16 @@ print_codedump(void)
 	"\n"	"#define outstr(x) printf(\"%s\", x);"
 	"\n"	"#define write(x) putchar(p[x]);");
 
-	/* See:  opt_no_endif */
 	if(node_type_counts[T_MULT] || node_type_counts[T_CMULT]
 	    || node_type_counts[T_FOR] || node_type_counts[T_WHL]) {
-	    puts("#define ifeqz(x,y,z) if(p[x]==0) goto y;");
-	    puts("#define ifnez(x,y) if(p[x]) goto y;");
-	    puts("#define label(x) x:");
-	} else if (node_type_counts[T_IF]) {
-	    puts("#define ifeqz(x,y,z) if(p[x]==0) goto y;");
-	    puts("#define label(x) x:");
+	    puts("#define lp_start(x,y,z,c) while(p[x]) { /* if(p[x]==0) goto y; z: */");
+	    puts("#define lp_end(x,y,z) } /* if(p[x]) goto y; z: */");
+	}
+
+	/* See:  opt_no_endif */
+	if (node_type_counts[T_IF]) {
+	    puts("#define if_start(x,y) if(p[x]) { /* if(p[x]==0) goto y; */");
+	    puts("#define if_end(x) } /* x: */");
 	}
 
 	if (node_type_counts[T_STOP])
@@ -2945,6 +2960,8 @@ print_codedump(void)
 		puts("#define inpchar(x) p[x]=getchar();");
 		break;
 	    }
+
+	puts("#endif");
     }
 
     printf("bf_start(%d,%d)\n", memsz, -most_neg_maad_loop);
@@ -2955,11 +2972,13 @@ print_codedump(void)
 	switch(n->type)
 	{
 	case T_MOV:
-	    printf("ptradd(%d)\n", n->count);
+	    if (n->count)
+		printf("ptradd(%d)\n", n->count);
 	    break;
 
 	case T_ADD:
-	    printf("add_i(%d,%d)\n", n->offset, n->count);
+	    if (n->count)
+		printf("add_i(%d,%d)\n", n->offset, n->count);
 	    break;
 
 	case T_SET:
@@ -3047,23 +3066,22 @@ print_codedump(void)
 	    break;
 
 	case T_IF:
-	    printf("ifeqz(%d,lbl_%d,T_IF)\n", n->offset, n->count);
+	    printf("if_start(%d,lbl_%d)\n", n->offset, n->count);
 	    break;
 
 	case T_ENDIF:
-	    printf("label(lbl_%d)\n", n->jmp->count);
+	    printf("if_end(lbl_%d)\n", n->jmp->count);
 	    break;
 
 	case T_MULT: case T_CMULT: case T_FOR:
 	case T_WHL:
-	    printf("ifeqz(%d,lbl_%d,%s)\n",
-		    n->offset, n->count, tokennames[n->type]);
-	    printf("label(loop_%d)\n", n->count);
+	    printf("lp_start(%d,lbl_%d,loop_%d,%s)\n",
+		    n->offset, n->count, n->count, tokennames[n->type]);
 	    break;
 
 	case T_END:
-	    printf("ifnez(%d,loop_%d)\n", n->jmp->offset, n->jmp->count);
-	    printf("label(lbl_%d)\n", n->jmp->count);
+	    printf("lp_end(%d,loop_%d,lbl_%d)\n",
+		    n->jmp->offset, n->jmp->count, n->jmp->count);
 	    break;
 
 	case T_STOP:
