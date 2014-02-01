@@ -14,6 +14,7 @@ it to the list and fill in it's entry.
 #include "bfi.nasm.h"
 #include "bfi.bf.h"
 #include "bfi.dc.h"
+#include "bfi.dasm.h"
 #else
 
 #if XX == 1
@@ -39,6 +40,22 @@ it to the list and fill in it's entry.
 #define X(a,b,c,d,e,f) f
 #else
 #define X(a,b,c,d,e,f)
+#endif
+
+/****************************************************************************/
+#ifndef DISABLE_DYNASM
+X(dynasm,DYNASM,
+    printf("   -q   Run using the Dynasm interpreter/compiler.\n");    ,
+    case 'q': do_run=1; do_codestyle = c_dynasm; break;                ,
+    /* Cannot do print_dynasm() */                                     ,
+    case c_dynasm: run_dynasm(); break;                               )
+#if XX == 4
+    if (do_run == -1 && do_codestyle == c_default &&
+	    verbose<3 && !enable_trace && !debug_mode && dynasm_ok) {
+	do_run = 1;
+	do_codestyle = c_dynasm;
+    }
+#endif
 #endif
 
 /****************************************************************************/

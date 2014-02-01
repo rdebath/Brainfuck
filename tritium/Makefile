@@ -1,6 +1,15 @@
-
-# TARGET_ARCH=-m64
-# TARGET_ARCH=-m32
+# Note this is compatible with Debian/GCC multiarch and also notices
+# the environment variable TARGET_ARCH.
+# You can use:
+#       export TARGET_ARCH=-m32
+# or
+#       export TARGET_ARCH=-m64
+#
+# GNU lightning may be V1 or V2 and is detected; note, however, that V1 does
+# NOT work on a 64bit x64. (You can try TARGET_ARCH=-m32)
+#
+# Dasm only has assembler for x86 and x86_64 others have not yet been written.
+# It is normally a little faster that GNU Lightning.
 
 CFLAGS=-O3 -Wall -Wshadow $(DEFS)
 LDFLAGS=-ldl
@@ -10,8 +19,6 @@ CC=gcc
 MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wshadow -Wpointer-arith -Wcast-align \
     -Wstrict-prototypes -Wstrict-overflow=5 -Wwrite-strings -Waggregate-return \
     -Wcast-qual -Wswitch-default -Wswitch-enum -Wconversion -Wunreachable-code
-
--include Makefile2
 
 HAVE_TCC=$(wildcard /usr/include/libtcc.h)
 ifeq ($(HAVE_TCC),)
@@ -40,7 +47,8 @@ endif
 DEFS=$(DEFS_TCCLIB) $(DEFS_LIGHTNING)
 LDLIBS=$(LIBS_TCCLIB) $(LIBS_LIGHTNING)
 
-bfi:	bfi.o bfi.ccode.o bfi.gnulit.o bfi.nasm.o bfi.bf.o bfi.dc.o bfi.version.o
+bfi:	bfi.o bfi.ccode.o bfi.gnulit.o bfi.nasm.o bfi.bf.o bfi.dc.o bfi.dasm.o \
+	bfi.version.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o bfi $^ $(LDLIBS) $(TARGET_ARCH)
 
 pristine: clean
@@ -49,7 +57,7 @@ pristine: clean
 clean:
 	-rm -f *.o
 
-bfi.gnulit.o:	bfi.gnulit.c bfi.tree.h bfi.gnulit.h
+bfi.gnulit.o:	bfi.gnulit.c bfi.tree.h bfi.gnulit.h bfi.run.h
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ -fno-strict-aliasing bfi.gnulit.c
 
 bfi.o: \
@@ -60,6 +68,14 @@ bfi.bf.o: bfi.bf.c bfi.tree.h
 bfi.ccode.o: bfi.ccode.c bfi.tree.h bfi.run.h bfi.ccode.h
 bfi.dc.o: bfi.dc.c bfi.tree.h bfi.run.h
 bfi.nasm.o: bfi.nasm.c bfi.tree.h bfi.nasm.h
+
+bfi.dasm.o: bfi.dasm.amd64.h bfi.dasm.i686.h bfi.dasm.h bfi.tree.h bfi.run.h
+
+bfi.dasm.amd64.h: bfi.dasm.x86.dasc
+	lua ../tools/dynasm/dynasm.lua -c -o bfi.dasm.amd64.h bfi.dasm.x86.dasc
+
+bfi.dasm.i686.h: bfi.dasm.x86.dasc
+	lua ../tools/dynasm/dynasm.lua -c -D I386 -o bfi.dasm.i686.h bfi.dasm.x86.dasc
 
 bfi.version.h: \
     bfi.c bfi.tree.h bfi.run.h bfi.be.def bfi.ccode.h bfi.gnulit.h bfi.nasm.h \

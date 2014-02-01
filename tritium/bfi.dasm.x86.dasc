@@ -1,0 +1,369 @@
+/*  As I can't use #defines to control the assembler this file is assembled
+ *  twice, once for i386 and once for amd64
+ *
+ *  The C compiler then includes one to match the current compile.
+ */
+
+|.if I386
+|.arch x86
+|.else
+|.arch x64
+|.endif
+|.actionlist actions
+|.section code
+|.globals GLOB_
+
+/*  Using 32 bit working registers for both 32 and 64 bit. The REG_P register
+ *  is 64 bit on x64 so that the memory can be malloc'd beyond the 2GB limit.
+ *
+ *  Function pointers are used assuming that the program has been compiled
+ *  with -mcmodel=large so that all models will work.
+ */
+
+|.if I386
+|.define REG_P, esi
+|.define REG_A, eax
+|.define REG_AL, al
+|.define REG_B, ebx
+|.define REG_BL, bl
+|.define REG_C, ecx
+|.else
+|.define REG_P, r15
+|.define REG_A, eax
+|.define REG_AL, al
+|.define REG_B, ebx
+|.define REG_BL, bl
+|.define REG_C, ecx
+|.define PRM, rdi
+|.define PRM_D, edi
+|.endif
+
+#define Dst &Dstate
+dasm_State *Dstate;
+void* global_labels[GLOB__MAX];
+int maxpc = 0;
+int dynasm_ok = 1;
+struct stkdat { struct stkdat * up; int id; } *sp = 0;
+
+static void failout(void) { fprintf(stderr, "STOP Command executed.\n"); exit(1); }
+
+static int acc_loaded = 0;
+static int acc_offset = 0;
+static int acc_dirty = 0;
+static int acc_hi_dirty = 0;
+
+static void
+clean_acc(void)
+{
+    if (acc_loaded && acc_dirty) {
+	if (tape_step > 1) {
+	    if (acc_offset) {
+		| mov [REG_P+acc_offset * tape_step], REG_A
+	    } else {
+		| mov [REG_P], REG_A
+	    }
+	} else {
+	    if (acc_offset) {
+		| mov byte [REG_P+acc_offset], REG_AL
+	    } else {
+		| mov byte [REG_P], REG_AL
+	    }
+	}
+
+	acc_dirty = 0;
+    }
+}
+
+static void
+set_acc_offset(int offset)
+{
+    if (acc_loaded && acc_dirty && acc_offset != offset)
+	clean_acc();
+
+    acc_offset = offset;
+    acc_loaded = 1;
+    acc_dirty = 1;
+    acc_hi_dirty = 1;
+}
+
+static void
+load_acc_offset(int offset)
+{
+    if (acc_loaded) {
+	if (acc_offset == offset) return;
+	if (acc_dirty)
+	    clean_acc();
+    }
+
+    acc_offset = offset;
+    if (tape_step > 1) {
+	if (acc_offset) {
+	    | mov REG_A, [REG_P+acc_offset*tape_step]
+	} else {
+	    | mov REG_A, [REG_P]
+	}
+    } else {
+	if (acc_offset) {
+	    | movzx REG_A, byte [REG_P+acc_offset]
+	} else {
+	    | movzx REG_A, byte [REG_P]
+	}
+    }
+
+    acc_loaded = 1;
+    acc_dirty = 0;
+    acc_hi_dirty = (tape_step*8 != cell_size);
+}
+
+void
+run_dynasm(void)
+{
+    struct bfi * n = bfprog;
+
+    calculate_stats();
+    if (cell_size == 8) tape_step = 1; else
+    tape_step = sizeof(int);
+
+    dasm_init(Dst, 1);
+    dasm_setupglobal(Dst, global_labels, GLOB__MAX);
+    dasm_setup(Dst, actions);
+
+    /* Create Stack frame. */
+    | ->start:
+    |.if I386
+    | push ebp
+    | push edi
+    | push esi
+    | push ebx
+    | mov  ebp, esp
+    |
+    | mov  REG_P, dword [ebp+20]
+    |.else
+    | push rbp
+    | push r15
+    | push r14
+    | push r13
+    | push r12
+    |
+    | mov  rbp, rsp
+    | sub  rsp, 64 // Some shadow space for Windows (if this is ever ported).
+    |
+    | mov  REG_P, PRM
+    |.endif
+
+    while(n)
+    {
+	int count = n->count;
+	int offset = n->offset;
+
+	switch(n->type)
+	{
+	case T_MOV:
+	    //? clean_acc();
+	    if (acc_loaded) acc_offset -= count;
+	    | add REG_P, count*tape_step
+	    break;
+
+        case T_ADD:
+	    load_acc_offset(offset);
+	    set_acc_offset(offset);
+	    | add REG_A, count
+	    break;
+
+	case T_SET:
+	    set_acc_offset(offset);
+	    if (count == 0) {
+		| xor REG_A, REG_A
+	    } else {
+		| mov REG_A, count
+	    }
+	    break;
+
+	case T_CALC:
+	    if (n->count2 != 0) {
+		load_acc_offset(n->offset2);
+		set_acc_offset(offset);
+
+		if (n->count2 == -1) {
+		    | neg REG_A
+		} else if (n->count2 != 1) {
+		    | imul REG_A, REG_A, (n->count2)
+		}
+	    } else {
+		fprintf(stderr, "Warning: T_CALC with count2 == 0 !?\n");
+		set_acc_offset(offset);
+		| xor REG_A, REG_A
+	    }
+
+	    if (n->count3 != 0) {
+		if (tape_step > 1) {
+		    | mov REG_B, [REG_P+ (n->offset3*tape_step) ]
+		} else {
+		    | movzx REG_B, byte [REG_P+ (n->offset3) ]
+		}
+		if (n->count3 == -1) {
+		    | neg REG_B
+		} else if (n->count3 != 1) {
+		    | imul REG_B, REG_B, (n->count3)
+		}
+		| add REG_A, REG_B
+	    }
+
+	    if (n->count) {
+		| add REG_A, count
+	    }
+
+	    break;
+
+	case T_IF:
+	case T_WHL: case T_MULT: case T_CMULT: case T_FOR:
+	    load_acc_offset(n->offset);
+	    clean_acc();
+
+	    if (cell_mask > 0 && acc_hi_dirty) {
+		if (cell_mask != 0xFF || tape_step != 1) {
+		    | and REG_A, cell_mask
+		}
+	    }
+
+	    n->jmp->count = maxpc;
+	    maxpc += 2;
+	    dasm_growpc(Dst, maxpc);
+
+	    if (tape_step == 1) {
+                | cmp   REG_AL, 0
+	    } else {
+		| test  REG_A, REG_A
+	    }
+
+	    | jz   =>(n->jmp->count)
+	    | =>(n->jmp->count + 1):
+	    break;
+
+	case T_END:
+	    load_acc_offset(n->offset);
+	    clean_acc();
+
+	    if (cell_mask > 0 && acc_hi_dirty) {
+		if (cell_mask != 0xFF || tape_step != 1) {
+		    | and REG_A, cell_mask
+		}
+	    }
+
+	    if (tape_step == 1) {
+                | cmp   REG_AL, 0
+	    } else {
+		| test   REG_A, REG_A
+	    }
+
+	    | jnz   =>(n->count + 1)
+	    | =>(n->count):
+
+	case T_ENDIF:
+	    clean_acc();
+	    acc_loaded = 0;
+
+	    | =>(n->count):
+	    break;
+
+
+	case T_PRT:
+	    clean_acc();
+	    if (n->count == -1) {
+		load_acc_offset(offset);
+		acc_loaded = 0;
+
+		if (cell_mask > 0 && acc_hi_dirty) {
+		    | and REG_A, cell_mask
+		}
+
+		|.if I386
+		| push REG_A
+		| call &putch
+		| pop eax
+		|.else
+		| mov PRM_D, REG_A
+		| mov64 rax, (uintptr_t) putch
+		| call  rax
+		|.endif
+		break;
+	    }
+	    /* TODO: Strings */
+	    acc_loaded = 0;
+	    if (count >= 0 && count < 256) {
+		| xor REG_A, REG_A
+		| mov REG_AL, byte (count)
+	    } else {
+		| mov REG_A, (count)
+	    }
+	    |.if I386
+	    | push REG_A
+	    | call &putch
+	    | pop eax
+	    |.else
+	    | mov PRM_D, REG_A
+	    | mov64 rax, (uintptr_t) putch
+	    | call  rax
+	    |.endif
+	    break;
+
+	case T_INP:
+	    load_acc_offset(offset);
+	    set_acc_offset(offset);
+
+	    |.if I386
+	    | push REG_A
+	    | call &getch
+	    | pop REG_B
+	    |.else
+	    | mov PRM_D, REG_A
+	    | mov64 rax, (uintptr_t) getch
+	    | call  rax
+	    |.endif
+	    /* Note: REG_A must be eax/rax */
+	    break;
+
+	case T_STOP:
+	    |.if I386
+	    | call &failout
+	    |.else
+	    | mov64 rax, (uintptr_t) failout
+	    | call  rax
+	    |.endif
+	    break;
+
+	default:
+	    fprintf(stderr, "Code gen error: "
+		    "%s\t"
+		    "%d:%d, %d:%d, %d:%d\n",
+		    tokennames[n->type],
+		    n->offset, n->count,
+		    n->offset2, n->count2,
+		    n->offset3, n->count3);
+	    exit(1);
+	    break;
+	}
+	n=n->next;
+    }
+
+    |->endcode:
+    |.if I386
+    | xor eax, eax
+    | mov esp, ebp
+    | pop ebx
+    | pop esi
+    | pop edi
+    | pop ebp
+    |.else
+    | xor rax, rax
+    | mov rsp, rbp
+    | pop r12
+    | pop r13
+    | pop r14
+    | pop r15
+    | pop rbp
+    |.endif
+    | ret
+
+    link_and_run(Dst);
+}

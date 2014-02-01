@@ -2433,7 +2433,7 @@ flatten_loop(struct bfi * v, int constant_count)
 	/* This detects the code [-]++[>+<++] which generates MAXINT */
 	/* We can only resolve this if we know the cell size. */
 	if (abs(loop_step) == 2 && cell_size>1 && loop_step == constant_count) {
-	    constant_count = ~(-1 << cell_size-1);
+	    constant_count = ~(-1 << (cell_size-1));	    /* GCC Whinge */
 	    loop_step = -1;
 	}
 
@@ -3168,9 +3168,6 @@ putch(int ch)
 	putchar(ch);
 }
 
-#pragma GCC diagnostic ignored "-Wpragmas"
-#pragma GCC diagnostic push /* STFU */
-#pragma GCC diagnostic ignored "-Wparentheses"
 void
 set_cell_size(int cell_bits)
 {
@@ -3180,7 +3177,7 @@ set_cell_size(int cell_bits)
 	cell_mask = -1;
     } else {
 	cell_size = cell_bits;
-	cell_mask = (2 << cell_size-1) - 1;
+	cell_mask = (2 << (cell_size-1)) - 1;	/* GCC Whinge */
     }
 
     if (verbose>5) {
@@ -3200,7 +3197,6 @@ set_cell_size(int cell_bits)
     } else
 	cell_type = "int";
 }
-#pragma GCC diagnostic pop
 
 #ifndef USEHUGERAM
 void *
