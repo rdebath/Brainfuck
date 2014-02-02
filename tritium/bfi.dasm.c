@@ -12,16 +12,16 @@
 
 #include "bfi.run.h"
 
-#include "../tools/dynasm/dasm_proto.h"
+#include "dynasm/dasm_proto.h"
 
 void link_and_run(dasm_State **state);
 int tape_step = sizeof(int);
 
 #if defined(__amd64__) || defined(_M_AMD64)
-#include "../tools/dynasm/dasm_x86.h"
+#include "dynasm/dasm_x86.h"
 #include "bfi.dasm.amd64.h"
 #elif defined(__i386__) || defined(_M_IX86)
-#include "../tools/dynasm/dasm_x86.h"
+#include "dynasm/dasm_x86.h"
 #include "bfi.dasm.i686.h"
 #else
 #warning "Supported processor not detected for DYNASM."
@@ -61,7 +61,7 @@ link_and_run(dasm_State ** state)
 
     assert(mprotect(codeptr, size, PROT_EXEC | PROT_READ) == 0);
 
-#if 1
+#if 0
     /* Write generated machine code to a temporary file.
     // View with:
     //  objdump -D -b binary -mi386 -Mx86,intel code.bin

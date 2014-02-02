@@ -11,7 +11,7 @@
 # Dasm only has assembler for x86 and x86_64 others have not yet been written.
 # It is normally a little faster that GNU Lightning.
 
-CFLAGS=-O3 -Wall -Wshadow $(DEFS)
+CFLAGS=-O3 -Wall -Wshadow -I../tools $(DEFS)
 LDFLAGS=-ldl
 CC=gcc
 

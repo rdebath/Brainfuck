@@ -12,16 +12,16 @@
  * dasm64 translation from BF, runs at about 5,000,000,000 instructions per second.
  */
 
-#include "../tools/dynasm/dasm_proto.h"
+#include "dynasm/dasm_proto.h"
 
 void link_and_run(dasm_State **state);
 int tape_step = sizeof(int);
 
 #if defined(__amd64__) || defined(_M_AMD64)
-#include "../tools/dynasm/dasm_x86.h"
+#include "dynasm/dasm_x86.h"
 #include "bf2jit.amd64.h"
 #elif defined(__i386__) || defined(_M_IX86)
-#include "../tools/dynasm/dasm_x86.h"
+#include "dynasm/dasm_x86.h"
 #include "bf2jit.i686.h"
 #else
 #error "Supported processor not detected."
