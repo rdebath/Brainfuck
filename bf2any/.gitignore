@@ -11,6 +11,7 @@ bf2elf
 bf2gas32
 bf2gas64
 bf2gcc
+bf2go
 bf2jit
 bf2jit.amd64.h
 bf2jit.i686.h
