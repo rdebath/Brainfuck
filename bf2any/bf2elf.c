@@ -5,7 +5,7 @@
 #include "bf2any.h"
 
 /*
- * ELF32 translation from BF, runs at about ? instructions per second.
+ * ELF32 translation from BF, runs at about 2,700,000,000 instructions per second.
  *
  * http://www.muppetlabs.com/~breadbox/software/tiny/teensy.html
  *

@@ -192,6 +192,21 @@ outrun(int ch, int repcnt)
 		    qrep[qcnt] = -qrep[qcnt];
 		}
 
+		/*
+		 * Note the 'BOFF' define; this is an optimisation
+		 * tweak that allows loops, that may be skipped over, to
+		 * be converted into move/add instructions even if the
+		 * references inside the loop may be converted so they
+		 * 'Add zero' to cells before the start of the tape. The
+		 * start of the tape will be shifted by this count so the
+		 * 'add zero' doesn't cause a segfault.
+		 *
+		 * Any reference that is further back than this range
+		 * cannot be proven to be after the physical start of
+		 * the tape so it must keep the 'if non-zero' condition
+		 * to avert the possible segfault.
+		 */
+
 		if (mov < -BOFF) qcmd[qcnt] = qcmd[qcnt] - 'A' + 'a';
 		qcnt++;
 	    }
