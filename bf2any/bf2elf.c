@@ -8,10 +8,15 @@
  * ELF32 translation from BF, runs at about 2,700,000,000 instructions per second.
  *
  * http://www.muppetlabs.com/~breadbox/software/tiny/teensy.html
+ * http://www.muppetlabs.com/~breadbox/software/tiny/bf.asm.txt
+ * http://www.muppetlabs.com/~breadbox/pub/software/tiny.tar.gz
  *
  * Portions (c) 1999-2001 by Brian Raiter
  *
  * Compile output with: chmod +x bfp
+ *
+ * This is a stable version of the elf-166 compiler in that this code
+ * generator will make a valid executable for all known BF programs.
  */
 
 #define MEMSIZE 30000
@@ -24,7 +29,7 @@ int ind = 0;
  * program.
  */
 
-#define	MLBIT(size)	static struct { unsigned char _dummy[size]; } const 
+#define	MLBIT(size)	static struct { unsigned char _dummy[size]; } const
 
 /* This is a pregenerated ELF32 header for 80386 Linux
  * With the references.
