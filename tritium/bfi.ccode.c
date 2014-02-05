@@ -513,7 +513,7 @@ print_ccode(FILE * ofd)
 	case T_IF:
 	    pt(ofd, indent,n);
 	    fprintf(ofd, "if(m[%d]) ", n->offset);
-	    if (n->next->next && n->next->next->jmp == n)
+	    if (n->next->next && n->next->next->jmp == n && !enable_trace)
 		disable_indent = 1;
 	    else
 		fprintf(ofd, "{\n");
@@ -606,7 +606,7 @@ print_ccode(FILE * ofd)
 		fprintf(ofd, "while(m[%d]) ", n->offset);
 	    else
 		fprintf(ofd, "while(*m) ");
-	    if (n->next->next && n->next->next->jmp == n)
+	    if (n->next->next && n->next->next->jmp == n && !enable_trace)
 		disable_indent = 1;
 	    else
 		fprintf(ofd, "{\n");
@@ -623,15 +623,12 @@ print_ccode(FILE * ofd)
 		disable_indent = 0;
 		break;
 	    }
-	    if (n->prev->prev && n->prev->prev->jmp == n)
-		break;
-
 	    pt(ofd, indent,n);
 	    fprintf(ofd, "}\n");
 	    break;
 
 	case T_STOP:
-	    pt(ofd, indent,n);
+	    if (!disable_indent) pt(ofd, indent,n);
 	    fprintf(ofd, "return 1;\n");
 	    break;
 
