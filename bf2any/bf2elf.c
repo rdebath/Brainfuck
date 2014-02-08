@@ -10,6 +10,7 @@
  * http://www.muppetlabs.com/~breadbox/software/tiny/teensy.html
  * http://www.muppetlabs.com/~breadbox/software/tiny/bf.asm.txt
  * http://www.muppetlabs.com/~breadbox/pub/software/tiny.tar.gz
+ * http://www.muppetlabs.com/~breadbox/software/elfkickers.html
  *
  * Portions (c) 1999-2001 by Brian Raiter
  *
@@ -17,6 +18,7 @@
  *
  * This is a stable version of the elf-166 compiler in that this code
  * generator will make a valid executable for all known BF programs.
+ * But it doesn't use a true ELF library like the elfkickers page.
  */
 
 #define MEMSIZE 30000
