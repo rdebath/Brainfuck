@@ -64,7 +64,7 @@ static jit_state_t *_jit;
 #define REG_ACC JIT_R0
 #define REG_A1	JIT_R1
 
-int jit_lib_ok = JITLIBOK;
+int gnulightning_ok = JITLIBOK;
 
 static int tape_step = sizeof(int);
 
@@ -144,7 +144,7 @@ save_ptr_for_free(void * memp)
 }
 
 void
-run_jit_asm(void)
+run_gnulightning(void)
 {
     struct bfi * n = bfprog;
     int maxstack = 0, stackptr = 0;

@@ -20,9 +20,11 @@ int tape_step = sizeof(int);
 #if defined(__amd64__) || defined(_M_AMD64)
 #include "dynasm/dasm_x86.h"
 #include "bfi.dasm.amd64.h"
+#define CPUID "x86_64"
 #elif defined(__i386__) || defined(_M_IX86)
 #include "dynasm/dasm_x86.h"
 #include "bfi.dasm.i686.h"
+#define CPUID "i686"
 #else
 #warning "Supported processor not detected for DYNASM."
 int dynasm_ok = 0;
@@ -48,7 +50,6 @@ link_and_run(dasm_State ** state)
     int     dasm_status = dasm_link(state, &size);
     assert(dasm_status == DASM_S_OK);
 
-    if (verbose) fprintf(stderr, "Linking Dynasm code\n");
     char   *codeptr =
 	(char *) mmap(NULL, size,
 		      PROT_READ | PROT_WRITE | PROT_EXEC,
@@ -74,7 +75,7 @@ link_and_run(dasm_State ** state)
 #endif
 
     if (verbose)
-	fprintf(stderr, "Link %d bytes of Dynasm code, running.\n", (int)codelen);
+	fprintf(stderr, "Compiled %d bytes of "CPUID" Dynasm code, running.\n", (int)codelen);
 
     if (isatty(STDOUT_FILENO)) setbuf(stdout, 0);
     code = (void *) codeptr;

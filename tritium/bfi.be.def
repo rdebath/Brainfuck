@@ -38,6 +38,9 @@ it to the list and fill in it's entry.
 #elif XX == 7
 /* Run directly */
 #define X(a,b,c,d,e,f) f
+#elif XX == 8
+/* Comma strings */
+#define X(a,b,c,d,e,f) ,#a
 #else
 #define X(a,b,c,d,e,f)
 #endif
@@ -46,7 +49,7 @@ it to the list and fill in it's entry.
 #ifndef DISABLE_DYNASM
 X(dynasm,DYNASM,
     printf("   -q   Run using the Dynasm interpreter/compiler.\n");    ,
-    case 'q': do_run=1; do_codestyle = c_dynasm; break;                ,
+    case 'q': do_codestyle = c_dynasm; break;                ,
     /* Cannot do print_dynasm() */                                     ,
     case c_dynasm: run_dynasm(); break;                               )
 #if XX == 4
@@ -55,22 +58,24 @@ X(dynasm,DYNASM,
 	do_run = 1;
 	do_codestyle = c_dynasm;
     }
+    if (do_codestyle == c_dynasm && do_run == -1) do_run = 1;
 #endif
 #endif
 
 /****************************************************************************/
 #ifndef DISABLE_GNULIGHTNING
-X(jit,JIT,
-    printf("   -j   Run using the JIT interpreter/compiler.\n");    ,
-    case 'j': do_run=1; do_codestyle = c_jit; break;                ,
-    /* Cannot do print_jit() */                                     ,
-    case c_jit: run_jit_asm(); break;                               )
+X(gnulightning,GNULIGHTNING,
+    printf("   -j   Run using the GNU lightning interpreter/compiler.\n");    ,
+    case 'j': do_codestyle = c_gnulightning; break;                ,
+    /* Cannot do print_gnulightning() */                                     ,
+    case c_gnulightning: run_gnulightning(); break;                               )
 #if XX == 4
     if (do_run == -1 && do_codestyle == c_default &&
-	    verbose<3 && !enable_trace && !debug_mode && jit_lib_ok) {
+	    verbose<3 && !enable_trace && !debug_mode && gnulightning_ok) {
 	do_run = 1;
-	do_codestyle = c_jit;
+	do_codestyle = c_gnulightning;
     }
+    if (do_codestyle == c_gnulightning && do_run == -1) do_run = 1;
 #endif
 #endif
 
@@ -78,7 +83,7 @@ X(jit,JIT,
 #if !defined(DISABLE_TCCLIB) || !defined(DISABLE_DLOPEN)
 X(ccode,CCODE,
     printf("   -c   Create C code. If combined with -r the code is loaded and run.\n");   ,
-    case 'c': do_codestyle = c_ccode; do_run = (do_run==1); break;			  ,
+    case 'c': do_codestyle = c_ccode; break;			  ,
     case c_ccode: print_ccode(stdout); break;			    ,
     case c_ccode: run_ccode(); break;                               )
 
@@ -105,7 +110,6 @@ X(nasm,NASM,
 #if XX == 4
     if (do_codestyle == c_nasm)
     {
-	do_run = (do_run==1);
 	if (cell_size && cell_size != 8) {
 	    fprintf(stderr, "The -s option only supports 8 bit cells.\n");
 	    exit(255);

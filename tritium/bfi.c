@@ -99,6 +99,10 @@ enum codestyle { c_default,
 #include "bfi.be.def"
     };
 int do_codestyle = c_default;
+char * codestylename[] = { "std"
+#define XX 8
+#include "bfi.be.def"
+};
 #endif
 
 char const * program = "C";
@@ -767,24 +771,28 @@ process_file(void)
     } else {
 	if (do_run) {
 	    if (verbose)
-		fprintf(stderr, "Running output code\n");
+		fprintf(stderr, "Running tree using '%s' generator\n",
+			codestylename[do_codestyle]);
 
 	    switch(do_codestyle) {
 	    default:
-		fprintf(stderr, "The selected code generator does not "
-				"have a 'RUN' option available.\n");
+		fprintf(stderr, "The '%s' code generator does not "
+				"have a direct run option available.\n",
+				codestylename[do_codestyle]);
 		exit(1);
 #define XX 7
 #include "bfi.be.def"
 	    }
 	} else {
 	    if (verbose)
-		fprintf(stderr, "Generating output code\n");
+		fprintf(stderr, "Generating '%s' style output code\n",
+			codestylename[do_codestyle]);
 
 	    switch(do_codestyle) {
 	    default:
-		fprintf(stderr, "The selected code generator does not "
-				"have a 'DUMP' option available.\n");
+		fprintf(stderr, "The '%s' code generator does not "
+				"have a code output option available.\n",
+				codestylename[do_codestyle]);
 		exit(1);
 		break;
 #define XX 5
