@@ -5,7 +5,9 @@
 #include "bf2any.h"
 
 /*
- * MS Batch translation from BF, runs at about 1,000 instructions per second.
+ * MS Batch translation from BF, runs at less than 1,000 instructions per second.
+ *
+ * For ANSI.SYS replacement see: https://github.com/adoxa/ansicon
  */
 
 int do_input = 0;
@@ -59,13 +61,11 @@ outcmd(int ch, int count)
 	ind--; printf("GOTO :EOF\r\n)\r\n");
 	break;
     case '.':
-	puts("SET /A CH=MEMORY%PTR%^&127\r");
 	puts("CALL :put\r");
 	do_output = 1;
 	break;
     case ',':
 	puts("CALL :get\r");
-	puts("SET /A MEMORY%PTR%=CH\r");
 	do_input = 1;
 	break;
     case '~':
@@ -73,19 +73,24 @@ outcmd(int ch, int count)
 	    puts("IF NOT \"%OUTS%\" == \"\" ECHO.%OUTS%\r");
 	    puts("GOTO :EOF\r");
 	    puts(":put\r");
+	    puts("SET /A CH=MEMORY%PTR%^&127\r");
 	    puts("IF \"%CH%\"==\"10\" (\r");
 	    puts("ECHO.%OUTS%\r");
 	    puts("SET OUTS=\r");
 	    { int i;
 		for(i=' '; i<'~'; i++) {
-		    printf(") ELSE IF \"%%CH%%\"==\"%d\" (\r\n", i);
 		    if (i =='%' || i=='"' || i=='&' || i=='^' || i=='|'
-			|| i=='>' || i=='<' || i=='(' || i==')')
-			printf("SET OUTS=%%OUTS%%^%c\r\n", i);
-		    else
-			printf("SET OUTS=%%OUTS%%%c\r\n", i);
+			|| i=='>' || i=='<' || i=='(' || i==')') {
+			printf(") ELSE IF \"%%CH%%\"==\"%d\" (\r\n", i);
+			printf("SET \"OUTS=%%OUTS%%^%c\"\r\n", i);
+		    } else {
+			printf(") ELSE IF \"%%CH%%\"==\"%d\" (\r\n", i);
+			printf("SET \"OUTS=%%OUTS%%%c\"\r\n", i);
+		    }
 		}
 	    }
+	    printf(") ELSE IF \"%%CH%%\"==\"%d\" (\r\n", 27);
+	    printf("SET \"OUTS=%%OUTS%%%c\"\r\n", 27);
 	    puts(")\r");
 	}
 	puts("GOTO :EOF\r");
