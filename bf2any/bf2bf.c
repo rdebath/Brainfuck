@@ -75,6 +75,9 @@ char * doubler[] = {">>>>", "<<<<", ">+<+[>-]>[->>+<]<<", ">+<[>-]>[->>-<]<<-",
 /* Some random Chinese words */
 char *chinese[] = { "右", "左", "上", "下", "出", "出", "始", "末" };
 
+/* Ρ″ */
+char *rhoprime[] = { "r′λ", "R", "λR", "r′", "Ρ″", "Ιⁿ", "(", ")" };
+
 char ** lang = 0;
 char ** c = 0;
 int linefix = EOF;
@@ -134,6 +137,9 @@ check_arg(char * arg)
     } else
     if (strcmp(arg, "-head") == 0) {
 	lang = 0; langver = 11; c_style = 0; return 1;
+    } else
+    if (strcmp(arg, "-rho") == 0 || strcmp(arg, "-rhoprime") == 0) {
+	lang = rhoprime; langver = 1; c_style = 0; return 1;
     } else
 
     if (strcmp(arg, "-risbf") == 0) {
