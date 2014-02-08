@@ -484,7 +484,7 @@ print_ccode(FILE * ofd)
 		}
 		*p = 0;
 
-		if (p == s+1 && *s != '\'') {
+		if ((p == s+1 && *s != '\'') || (p==s+2 && lastc == '\n')) {
 		    fprintf(ofd, "%s('%s');\n", putname, s);
 		} else if (lastc == '\n') {
 		    *--p = 0; *--p = 0;
