@@ -11,7 +11,7 @@
 # Dasm only has assembler for x86 and x86_64 others have not yet been written.
 # It is normally a little faster that GNU Lightning.
 
-CFLAGS=-O3 -Wall -Wshadow -I../tools $(DEFS)
+CFLAGS=-O3 -Wall -Wshadow -I../tools $(DEFS) $(CONF)
 LDFLAGS=-ldl
 CC=gcc
 
@@ -22,29 +22,29 @@ MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wshadow -Wpointer-arith -Wcast-align \
 
 HAVE_TCC=$(wildcard /usr/include/libtcc.h)
 ifeq ($(HAVE_TCC),)
-DEFS_TCCLIB=-DDISABLE_TCCLIB
+CONF_TCCLIB=-DDISABLE_TCCLIB
 LIBS_TCCLIB=
 else
-DEFS_TCCLIB=
+CONF_TCCLIB=
 LIBS_TCCLIB=-ltcc
 endif
 
 HAVE_LIGHT1=$(wildcard /usr/include/lightning.h)
 HAVE_LIGHT2=$(wildcard /usr/include/lightning/asm.h)
 ifeq ($(HAVE_LIGHT1),)
-DEFS_LIGHTNING=-DDISABLE_GNULIGHTNING
+CONF_LIGHTNING=-DDISABLE_GNULIGHTNING
 LIBS_LIGHTNING=
 else
 ifeq ($(HAVE_LIGHT2),)
-DEFS_LIGHTNING=
+CONF_LIGHTNING=
 LIBS_LIGHTNING=-llightning
 else
-DEFS_LIGHTNING=
+CONF_LIGHTNING=
 LIBS_LIGHTNING=
 endif
 endif
 
-DEFS=$(DEFS_TCCLIB) $(DEFS_LIGHTNING)
+CONF=$(CONF_TCCLIB) $(CONF_LIGHTNING)
 LDLIBS=$(LIBS_TCCLIB) $(LIBS_LIGHTNING)
 
 bfi:	bfi.o bfi.ccode.o bfi.gnulit.o bfi.nasm.o bfi.bf.o bfi.dc.o bfi.dasm.o \
