@@ -559,7 +559,7 @@ int main(int argc, char **argv)
 char inputbuffer[BUFSIZ];
 int inputline[BUFSIZ];
 int inputcol[BUFSIZ];
-int buflow = 0, bufhigh = 0, bufcount = 0;
+unsigned buflow = 0, bufhigh = 0, bufcount = 0;
 int bufdrain = 0;
 int * symbuffer = 0;
 
@@ -623,7 +623,7 @@ tcalloc(size_t nmemb, size_t size)
     m = calloc(nmemb, size);
     if (m) return m;
 
-    fprintf(stderr, "Allocate of %d*%d bytes failed, ABORT\n", nmemb, size);
+    fprintf(stderr, "Allocate of %zd*%zd bytes failed, ABORT\n", nmemb, size);
     exit(42);
 }
 
