@@ -14,7 +14,7 @@ int ind = 0;
 static void print_cstring(void);
 
 int
-check_arg(char * arg)
+check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     if (strcmp(arg, "-savestring") == 0) return 1;
@@ -72,39 +72,40 @@ print_cstring(void)
 {
     char * str = get_string();
     char buf[88];
-    int gotnl = 0, i = 0;
+    int gotnl = 0;
+    size_t outlen = 0;
 
     if (!str) return;
 
     for(;; str++) {
-	if (i && (*str == 0 || gotnl || i > sizeof(buf)-8))
+	if (outlen && (*str == 0 || gotnl || outlen > sizeof(buf)-8))
 	{
-	    buf[i] = 0;
+	    buf[outlen] = 0;
 	    if (gotnl) {
-		buf[i-2] = 0;
+		buf[outlen-2] = 0;
 		I; printf("puts \"%s\"\n", buf);
 	    } else {
 		I; printf("print \"%s\"\n", buf);
 	    }
-	    gotnl = i = 0;
+	    gotnl = 0; outlen = 0;
 	}
 	if (!*str) break;
 
 	if (*str == '\n') gotnl = 1;
 	if (*str == '"' || *str == '\\' || *str == '#') {
-	    buf[i++] = '\\'; buf[i++] = *str;
+	    buf[outlen++] = '\\'; buf[outlen++] = *str;
 	} else if (*str >= ' ' && *str <= '~') {
-	    buf[i++] = *str;
+	    buf[outlen++] = *str;
 	} else if (*str == '\n') {
-	    buf[i++] = '\\'; buf[i++] = 'n';
+	    buf[outlen++] = '\\'; buf[outlen++] = 'n';
 	} else if (*str == '\t') {
-	    buf[i++] = '\\'; buf[i++] = 't';
+	    buf[outlen++] = '\\'; buf[outlen++] = 't';
 	} else {
 	    char buf2[16];
 	    int n;
 	    sprintf(buf2, "\\%03o", *str & 0xFF);
 	    for(n=0; buf2[n]; n++)
-		buf[i++] =buf2[n];
+		buf[outlen++] = buf2[n];
 	}
     }
 }

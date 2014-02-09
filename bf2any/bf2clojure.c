@@ -13,7 +13,7 @@ int ind = 0;
 #define I printf("%*s", ind*4, "")
 
 int
-check_arg(char * arg)
+check_arg(const char * arg)
 {
     return 0;
 }

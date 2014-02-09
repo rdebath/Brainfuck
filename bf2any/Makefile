@@ -35,7 +35,13 @@ clean:
 	-rm -f bf2tcc.lib-off bf2tcc.lib-on bf2jit.amd64.h bf2jit.i686.h
 	-rm -f *.o
 
-CFLAGS=-O3 -Wall -DBOFF=256 $(DEFS)
+CFLAGS=-O3 -Wall -Wshadow -DBOFF=256 $(DEFS)
+
+# for: make DEFS='$(MOREDEFS)'
+MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
+         -Wstrict-prototypes -Wstrict-overflow=5 -Wwrite-strings \
+	 -Waggregate-return -Wcast-qual -Wswitch-enum -Wconversion \
+	 -Wunreachable-code
 
 bf2bf: bf2bf.o bf2any.o bf2const.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)

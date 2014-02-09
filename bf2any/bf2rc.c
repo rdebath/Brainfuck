@@ -30,7 +30,7 @@ int do_output = 0;
 int ind = 0;
 
 int
-check_arg(char * arg)
+check_arg(const char * arg)
 {
     if (strcmp(arg, "-b") == 0) return 1;
     return 0;
@@ -39,7 +39,6 @@ check_arg(char * arg)
 void
 outcmd(int ch, int count)
 {
-    int i;
     while (count>MAXPRLE) { outcmd(ch, MAXPRLE); count -= MAXPRLE; }
 
     if (count > 1) {
@@ -198,6 +197,7 @@ outcmd(int ch, int count)
 	printf("}\n" "\n");
 
 	if (MAXPRLE>1) {
+	    int i;
 	    for (i=3; i<=MAXPRLE; i++) {
 		printf("fn u%d { u ; u%d; }\n", i, i-1);
 		printf("fn d%d { d ; d%d; }\n", i, i-1);

@@ -37,9 +37,9 @@ int ind = 0;
  * With the references.
  */
 
-const int base_address = 0x08048000;
-const int p_filesz = 68;
-const int p_memsz = 72;
+const size_t base_address = 0x08048000;
+const size_t p_filesz = 68;
+const size_t p_memsz = 72;
 
 MLBIT(84) elfheader = {{
   0x7f, 0x45, 0x4c, 0x46, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -81,7 +81,7 @@ MLBIT(5)
 			0x31, 0xDB,			/* xor  ebx, ebx   */
 			0xCD, 0x80 } };			/* int  0x80       */
 
-const int prolog_meminit_offset = 1;
+const size_t prolog_meminit_offset = 1;
 MLBIT(5) prolog_ex = { { 0xB9, 0, 0, 0, 0 } };		/* mov  ecx, ???   */
 
 
@@ -91,15 +91,15 @@ static char	       *textbuf;
 
 /* The amount of memory allocated for the text buffer.
  */
-static int		textsize;
+static size_t		textsize;
 
 /* The first byte past the program being compiled in the text buffer.
  */
-static int		pos;
+static size_t		pos;
 
 /* Appends the given bytes to the program being compiled.
  */
-static void emit(void const *bytes, int size)
+static void emit(void const *bytes, size_t size)
 {
     if (pos + size > textsize) {
 	textsize += 4096;
@@ -123,15 +123,15 @@ static void emit(void const *bytes, int size)
 
 /* File to deposit the final executable.
  */
-static char * filename = "a.out";
+static const char * filename = "a.out";
 
 /* Stack for holding addresses of while loops.
  */
-static int  stack[256];
-static int *st;
+static size_t  stack[256];
+static size_t *st;
 
 int
-check_arg(char * arg)
+check_arg(const char * arg)
 {
     if (strcmp(arg, "-b") == 0) return 1;
     if (strncmp(arg, "-o", 2) == 0 && arg[2]) {

@@ -33,7 +33,7 @@ static int reg_known = 0, reg_val;
 
 static int enable_prt = 0;
 static char * sav_str_str = 0;
-static int sav_str_maxlen = 0, sav_str_len = 0;
+static unsigned int sav_str_maxlen = 0, sav_str_len = 0;
 
 static int deadloop = 0;
 

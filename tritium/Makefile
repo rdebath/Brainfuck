@@ -16,9 +16,10 @@ LDFLAGS=-ldl
 CC=gcc
 
 # for: make DEFS='$(MOREDEFS)'
-MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wshadow -Wpointer-arith -Wcast-align \
-    -Wstrict-prototypes -Wstrict-overflow=5 -Wwrite-strings -Waggregate-return \
-    -Wcast-qual -Wswitch-default -Wswitch-enum -Wconversion -Wunreachable-code
+MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
+	 -Wstrict-prototypes -Wstrict-overflow=5 -Wwrite-strings \
+	 -Waggregate-return -Wcast-qual -Wswitch-enum -Wconversion \
+	 -Wunreachable-code
 
 HAVE_TCC=$(wildcard /usr/include/libtcc.h)
 ifeq ($(HAVE_TCC),)

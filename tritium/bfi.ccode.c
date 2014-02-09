@@ -36,7 +36,7 @@
 #include "bfi.run.h"
 #include "bfi.ccode.h"
 
-static char * putname = "putch";
+static const char * putname = "putch";
 
 void
 pt(FILE* ofd, int indent, struct bfi * n)
@@ -452,10 +452,10 @@ print_ccode(FILE * ofd)
 	    }
 	    else
 	    {
-		int i = 0, j;
+		unsigned i = 0, j;
 		int got_perc = 0;
 		int lastc = 0;
-		int slen = 4;	/* First char + nul + ? */
+		unsigned slen = 4;	/* First char + nul + ? */
 		struct bfi * v = n;
 		char *s, *p;
 		while(v->next && v->next->type == T_PRT &&

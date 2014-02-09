@@ -33,7 +33,7 @@ static int lblcount = 0;
 static int icount = 0;
 
 int
-check_arg(char * arg)
+check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     return 0;

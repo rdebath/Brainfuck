@@ -16,82 +16,103 @@
  * is compilable as C.
  */
 
-char bf[] = "><+-.,[]";
+static const char bf[] = "><+-.,[]";
 
 /* Language "C" */
-char * cbyte[] = { "m+=1;", "m-=1;", "++*m;", "--*m;",
+static const char * cbyte[] = { "m+=1;", "m-=1;", "++*m;", "--*m;",
 		   "write(1,m,1);", "read(0,m,1);", "while(*m){", "}", 0 };
-char * cbyte_rle[] = { ";m+=1", ";m-=1", ";*m+=1", ";*m-=1",
+
+static const char * cbyte_rle[] = { ";m+=1", ";m-=1", ";*m+=1", ";*m-=1",
 		   ";write(1,m,1)", ";read(0,m,1)", ";while(*m){", ";}", "+1"};
 
-char * cint[] = { "m+=1;", "m-=1;", "++*m;", "--*m;",
+static const char * cint[] = { "m+=1;", "m-=1;", "++*m;", "--*m;",
 	"putchar(*m);", "{int _c=getchar();if(_c!=EOF)*m=_c;}",
 	"while(*m){", "}", 0 };
 
-char * cint_rle[] = { ";m+=1", ";m-=1", ";*m+=1", ";*m-=1",
+static const char * cint_rle[] = { ";m+=1", ";m-=1", ";*m+=1", ";*m-=1",
 	";putchar(*m)", ";{int _c=getchar();if(_c!=EOF)*m=_c;}",
 	";while(*m){", ";}", "+1" };
 
 /* Language "ook" */
-char * ook[] = {"Ook. Ook?", "Ook? Ook.", "Ook. Ook.", "Ook! Ook!",
+static const char * ook[] =
+		{"Ook. Ook?", "Ook? Ook.", "Ook. Ook.", "Ook! Ook!",
 		"Ook! Ook.", "Ook. Ook!", "Ook! Ook?", "Ook? Ook!"};
 
 /* Language "blub" */
-char *blub[] = {"blub. blub?", "blub? blub.", "blub. blub.", "blub! blub!",
+static const char *blub[] =
+		{"blub. blub?", "blub? blub.", "blub. blub.", "blub! blub!",
 		"blub! blub.", "blub. blub!", "blub! blub?", "blub? blub!"};
 
 /* Language "fuck fuck" */
-char *f__k[] = {"folk", "sing", "barb", "teas", "cask", "kerb", "able", "bait"};
+static const char *f__k[] =
+    {"folk", "sing", "barb", "teas", "cask", "kerb", "able", "bait"};
 
 /* Language "pogaack" */
-char * pogaack[] = {"pogack!", "pogaack!", "pogaaack!", "poock!",
-		    "pogaaack?", "poock?", "pogack?", "pogaack?"};
+static const char * pogaack[] =
+		{"pogack!", "pogaack!", "pogaaack!", "poock!",
+		"pogaaack?", "poock?", "pogack?", "pogaack?"};
 
 /* Language "triplet" */
-char * trip[] = { "OOI", "IOO", "III", "OOO", "OIO", "IOI", "IIO", "OII" };
+static const char * trip[] =
+    { "OOI", "IOO", "III", "OOO", "OIO", "IOI", "IIO", "OII" };
 
 /* Language "Descriptive BF" */
-char * nice[] = { "right", "left", "up", "down", "out", "in", "begin", "end" };
-char * bc[] = { "r", "l", "u", "d", "o", "i", "b", "e", "x" };
+static const char * nice[] =
+    { "right", "left", "up", "down", "out", "in", "begin", "end" };
+
+static const char * bc[] = { "r", "l", "u", "d", "o", "i", "b", "e", "x" };
 
 /* Order should be "there", "once", "was", "a", "fish", "named", "Fred" */
-char * fish[] = { "once", "there", "was", "a", "fish", "dead", "named", "Fred" };
+static const char * fish[] =
+    { "once", "there", "was", "a", "fish", "dead", "named", "Fred" };
 
 /* Silly (er) ones. */
-char * dotty[] = { "..", "::", ".:.", ".::", ":.::", ":...", ":.:.", ":..:" };
-char * lisp2[] = { "((", "))", "()(", "())", ")())", ")(((", ")()(", ")(()" };
+static const char * dotty[] =
+    { "..", "::", ".:.", ".::", ":.::", ":...", ":.:.", ":..:" };
+
+static const char * lisp2[] =
+    { "((", "))", "()(", "())", ")())", ")(((", ")()(", ")(()" };
 
 /* Language COW: Not quite as simple as some commands aren't direct replacements. */
-char * moo[] = {"moO", "mOo", "MoO", "MOo",
+static const char * moo[] = {"moO", "mOo", "MoO", "MOo",
 		"MMMMOOMooOOOmooMMM", "OOOMoo", "MOOmoOmOo", "MoOMOomoo"};
 
 /* BF Doubler doubles the cell size. */
-char * doubler[] = {">>>>", "<<<<", ">+<+[>-]>[->>+<]<<", ">+<[>-]>[->>-<]<<-",
-		    ".", ">>>[-]<<<[-],",
-		    ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "[+<",
-		    ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "]<",
-		    ">[-]>[-]<<"};
+static const char * doubler[] =
+    {">>>>", "<<<<", ">+<+[>-]>[->>+<]<<", ">+<[>-]>[->>-<]<<-",
+    ".", ">>>[-]<<<[-],",
+    ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "[+<",
+    ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "]<",
+    ">[-]>[-]<<"};
 
 /* Some random Chinese words */
-char *chinese[] = { "右", "左", "上", "下", "出", "出", "始", "末" };
+static const char *chinese[] =
+    { "右", "左", "上", "下", "出", "出", "始", "末" };
 
 /* Ρ″ */
-char *rhoprime[] = { "r′λ", "R", "λR", "r′", "Ρ″", "Ιⁿ", "(", ")" };
+static const char *rhoprime[] =
+    { "r′λ", "R", "λR", "r′", "Ρ″", "Ιⁿ", "(", ")" };
 
-char ** lang = 0;
-char ** c = 0;
-int linefix = EOF;
-char langver = -1;
-int col = 0;
-int maxcol = 72;
-int state = 0;
-int c_style = 0;
+/* https://github.com/mescam/zerolang */
+static const char *zero[] =
+    { "0+", "0-", "0++", "0--", "0.", "0?", "0/", "/0" };
 
-void risbf(int ch);
-void headsecks(int ch, int count);
+static const char ** lang = 0;
+static const char ** c = 0;
+static int linefix = EOF;
+static char langver = -1;
+static int col = 0;
+static int maxcol = 72;
+static int state = 0;
+static int c_style = 0;
+
+static int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
+
+static void risbf(int ch);
+static void headsecks(int ch, int count);
 
 int
-check_arg(char * arg)
+check_arg(const char * arg)
 {
     if (strcmp(arg, "-c") == 0) {
 	lang = cbyte; langver = 0; c_style = 2; return 1;
@@ -141,6 +162,9 @@ check_arg(char * arg)
     if (strcmp(arg, "-rho") == 0 || strcmp(arg, "-rhoprime") == 0) {
 	lang = rhoprime; langver = 1; c_style = 0; return 1;
     } else
+    if (strcmp(arg, "-zero") == 0) {
+	lang = zero; langver = 0; c_style = 0; return 1;
+    } else
 
     if (strcmp(arg, "-risbf") == 0) {
 	lang = 0; langver = 10; c_style = 0; return 1;
@@ -162,11 +186,13 @@ check_arg(char * arg)
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-w99    Width to line wrap after, default 72"
+	"\n\t"  "-rho    The original 1964 Ρ″ by Corrado Böhm (Rho double prime)"
 	"\n\t"  "-double BF to BF translation, cell size doubler."
 	"\n\t"  "-c      Plain C"
 	"\n\t"  "-rle    Odd RLE C translation"
 	"\n\t"  "-nice   Nice memorable C translation."
 	"\n\t"  "-mini   Compact C translation."
+	"\n\t"  "-double BF to BF translation, cell size doubler."
 	"\n\t"  "-fish   There once was a (dead) fish named Fred"
 	"\n\t"  "-trip   Triplet like translation"
 	"\n\t"  "-ook    Ook!"
@@ -180,6 +206,7 @@ check_arg(char * arg)
 	"\n\t"  "-dump   Token dump"
 	"\n\t"  "-pog    Pogaack."
 	"\n\t"  "-chi    In chinese."
+	"\n\t"  "-zero   'zerolang' from mescam on github"
 	);
 	return 1;
     } else
@@ -231,10 +258,11 @@ outcmd(int ch, int count)
     case 3:
 	while(count-->0){
 	    char * p = strchr(bf,ch);
+	    const char * l;
 	    if (!p) continue;
-	    p = lang[p-bf];
-	    while (*p)
-		pc(*p++);
+	    l = lang[p-bf];
+	    while (*l)
+		pc(*l++);
 	}
 	break;
 
@@ -275,7 +303,7 @@ outcmd(int ch, int count)
     }
 }
 
-void
+static void
 risbf(int ch)
 {
     switch(ch) {
@@ -302,9 +330,7 @@ risbf(int ch)
     }
 }
 
-int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
-
-void
+static void
 headsecks(int ch, int count)
 {
     char * p;

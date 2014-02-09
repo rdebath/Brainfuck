@@ -22,10 +22,11 @@ typedef int icell;
 #define MEMSIZE 65536
 #endif
 
-int *mem = 0, *mptr = 0, memlen = 0;
-icell * tape = 0;
+static int *mem = 0, *mptr = 0;
+static size_t memlen = 0;
+static icell * tape = 0;
 
-unsigned long tapelen = MEMSIZE+BOFF;
+static size_t tapelen = MEMSIZE+BOFF;
 
 #define TOKEN_LIST(Mac) \
     Mac(STOP) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
@@ -48,7 +49,7 @@ void dumpprog(int * p, int *ep);
 void dumpmem(int *tp);
 
 int
-check_arg(char * arg)
+check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     if (strcmp(arg, "-#") == 0) return 1;
@@ -184,7 +185,7 @@ outcmd(int ch, int count)
 void
 dumpmem(int *mp)
 {
-    int i, j = 0;
+    size_t i, j = 0;
     const icell msk = (bytecell)?0xFF:-1;
     for (i = 0; i < tapelen; i++) if (tape[i]&msk) j = i + 1;
     fprintf(stderr, "Ptr: %3d, mem:", (int)(mp-tape-BOFF));

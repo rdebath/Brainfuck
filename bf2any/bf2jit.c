@@ -15,7 +15,7 @@
 #include "dynasm/dasm_proto.h"
 
 void link_and_run(dasm_State **state);
-int tape_step = sizeof(int);
+size_t tape_step = sizeof(int);
 
 #if defined(__amd64__) || defined(_M_AMD64)
 #include "dynasm/dasm_x86.h"
@@ -28,13 +28,13 @@ int tape_step = sizeof(int);
 #endif
 
 #ifdef DASM_S_OK
-typedef int (*fnptr)(char* memory);
+typedef int (*fnptr)(char * memory);
 fnptr code = 0;
 size_t codelen;
-void * tapemem;
+char * tapemem;
 
 int
-check_arg(char * arg)
+check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     return 0;
@@ -74,8 +74,9 @@ link_and_run(dasm_State ** state)
     if (isatty(STDOUT_FILENO)) setbuf(stdout, 0);
     tapemem = calloc(32768, tape_step);
     code = (void *) codeptr;
-    code(tapemem + BOFF);
+    code(tapemem + tape_step * BOFF);
 
     assert(munmap(code, codelen) == 0);
+    free(tapemem);
 }
 #endif

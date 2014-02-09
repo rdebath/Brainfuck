@@ -16,7 +16,7 @@ int ind = 0;
 int loopid = 0;
 
 int
-check_arg(char * arg)
+check_arg(const char * arg)
 {
     return 0;
 }

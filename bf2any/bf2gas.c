@@ -42,7 +42,7 @@ int ind = 0;
 #endif
 
 int
-check_arg(char * arg)
+check_arg(const char * arg)
 {
     if (strcmp(arg, "-b") == 0) return 1;
     return 0;

@@ -201,7 +201,7 @@ print_dc(void)
 		used_lox = 1;
 #endif
 	    } else {
-		int i = 0, j;
+		unsigned i = 0, j;
 		struct bfi * v = n;
 		char *s, *p;
 		while(v->next && v->next->type == T_PRT &&

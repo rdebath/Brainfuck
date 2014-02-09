@@ -39,7 +39,7 @@ int outputmode = 3;
 int inputmode = 2;
 
 int
-check_arg(char * arg)
+check_arg(const char * arg)
 {
 #ifndef USE_STACK
     if (strcmp(arg, "-savestring") == 0) return 1;
@@ -69,7 +69,7 @@ check_arg(char * arg)
 }
 
 /* Note: calling exit() isn't posix */
-void endprog(int s) { exit(0); }
+void endprog(int s) { exit(s != SIGCHLD); }
 
 static char *
 dc_ltoa(long val)
@@ -255,17 +255,17 @@ print_dcstring(void)
 {
     char * str = get_string();
     char buf[80];
-    int i = 0;
+    size_t outlen = 0;
     int badchar = 0;
 
     if (!str) return;
 
     for(;; str++) {
-	if (i && (*str == 0 || badchar || i > sizeof(buf)-8))
+	if (outlen && (*str == 0 || badchar || outlen > sizeof(buf)-8))
 	{
-	    buf[i] = 0;
+	    buf[outlen] = 0;
 	    prv("[%s]P", buf);
-	    i = 0;
+	    outlen = 0;
 	}
 	if (badchar) {
 	    if (outputmode == 2)
@@ -283,6 +283,6 @@ print_dcstring(void)
 	    || *str == '[' || *str == ']')
 	    badchar = (*str & 0xFF);
 	else
-	    buf[i++] = *str;
+	    buf[outlen++] = *str;
     }
 }

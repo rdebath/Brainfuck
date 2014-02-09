@@ -39,7 +39,7 @@ line_no_indent(void)
 }
 
 int
-check_arg(char * arg)
+check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     else

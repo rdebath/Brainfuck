@@ -14,7 +14,7 @@ int ind = 0;
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
 
 int
-check_arg(char * arg)
+check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     return 0;

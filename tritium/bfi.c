@@ -99,7 +99,7 @@ enum codestyle { c_default,
 #include "bfi.be.def"
     };
 int do_codestyle = c_default;
-char * codestylename[] = { "std"
+const char * codestylename[] = { "std"
 #define XX 8
 #include "bfi.be.def"
 };
@@ -373,7 +373,7 @@ main(int argc, char ** argv)
                             case 'b': set_cell_size(strtol(ap,0,10)); break;
 			    case 'I':
 				{
-				    int len = 0, z;
+				    unsigned len = 0, z;
 				    z = (input_string!=0);
 				    if (z) len += strlen(input_string);
 				    len += strlen(ap) + 2;
@@ -2405,7 +2405,7 @@ flatten_loop(struct bfi * v, int constant_count)
 
     if (!is_znode && loop_step != -1)
     {
-	int sum, cnt;
+	int sum;
 	if (loop_step == 0) return 0; /* Infinite ! */
 	if (have_mult) return 0;
 
@@ -2415,8 +2415,8 @@ flatten_loop(struct bfi * v, int constant_count)
 
 	    /* I could solve the modulo division, but for eight bits
 	     * it's a lot simpler just to trial it. */
+	    unsigned short cnt = 0;
 	    sum = constant_count;
-	    cnt = 0;
 	    while(sum && cnt < 256) {
 		cnt++;
 		sum = ((sum + (loop_step & 0xFF)) & 0xFF);
@@ -2563,7 +2563,7 @@ classify_loop(struct bfi * v)
 	n2 = n1->next;
 	n2->prev = n1->prev;
 
-	/* And put it back, but it this is an if (or unconditional) put it
+	/* And put it back, but if this is an if (or unconditional) put it
 	 * back AFTER the loop. */
 	if (!is_znode) {
 	    n2 = v->jmp->prev;
@@ -3054,7 +3054,7 @@ print_codedump(void)
 
 		printf("outchar(%d)\n", n->count);
 	    } else {
-		int i = 0, j;
+		unsigned i = 0, j;
 		struct bfi * v = n;
 		char *s, *p;
 		while(v->next && v->next->type == T_PRT &&
@@ -3351,7 +3351,7 @@ void
 convert_tree_to_runarray(void)
 {
     struct bfi * n = bfprog;
-    int arraylen = 0;
+    size_t arraylen = 0;
     int * progarray = 0;
     int * p;
     int last_offset = 0;

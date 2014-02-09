@@ -7,8 +7,8 @@
 int bytecell = 0;
 int enable_optim = 0;
 int enable_bf_optim = 0;
-char * current_file;
 int enable_debug;
+const char * current_file;
 
 /* Brainfuck loader.
  *
@@ -225,7 +225,7 @@ int opt_supported = -1, byte_supported, nobyte_supported;
 int enable_rle = 0;
 
 int
-check_argv(char * arg)
+check_argv(const char * arg)
 {
     if (byte_supported && strcmp(arg, "-b") == 0) {
 	check_arg(arg);
