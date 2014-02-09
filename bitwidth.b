@@ -55,6 +55,9 @@ Multiply by 256 again to get 65536
 	properly wrap the values this will generate an incorrect
 	string
 
+	An optimisation barrier; unbalanced loops aren't easy
+	>+[<]>-<
+
 	Print a message
 	++>[-]++++++[<+++++++>-]<.------------.[-]
 	<[>+<[-]]>
