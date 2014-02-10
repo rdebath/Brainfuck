@@ -292,6 +292,13 @@ Usage(void)
 }
 
 void
+UsageErr(char * why)
+{
+    fprintf(stderr, "\nError because of: '%s'\n\n", why);
+    LongUsage(stderr);
+}
+
+void
 UsageInt64(void)
 {
     fprintf(stderr,
@@ -300,6 +307,91 @@ UsageInt64(void)
 	"optimiser may make changes that are unsafe for this code.\n",
 	sizeof(int)*8);
     exit(1);
+}
+
+int
+checkarg(char * opt, char * arg)
+{
+    int arg_is_num = 0;
+    if (opt[1] == '-' && opt[2] && opt[3]) return checkarg(opt+1, arg);
+    if (arg && (isdigit(arg[0]) || arg[0] == '-'))
+	arg_is_num = 1;
+
+    if (opt[2] == 0) {
+	switch(opt[1]) {
+	case 'h': LongUsage(stdout); break;
+	case 'v': verbose++; break;
+	case 'H': noheader=1; break;
+	case '#': debug_mode=1; break;
+	case 'r': do_run=1; break;
+	case 'A': do_run=0; break;
+#ifndef NO_EXT_BE
+#define XX 3
+#include "bfi.be.def"
+#endif
+	case 'm': opt_level=0; break;
+	case 'T': enable_trace=1; break;
+
+	case 'a': iostyle=0; break;
+	case 'u': iostyle=1; break;
+	case 'B': iostyle=2; break;
+
+	case 'O':
+	    if (!arg_is_num) { opt_level = 1; break; }
+	    opt_level = strtol(arg,0,10);
+	    return 2;
+	case 'E':
+	    if (!arg_is_num) return 0;
+	    eofcell=strtol(arg,0,10);
+	    return 2;
+	case 'b':
+	    if (!arg_is_num) {
+		set_cell_size(8);
+		return 1;
+	    } else {
+		set_cell_size(strtol(arg,0,10));
+		return 2;
+	    }
+	case 'I':
+	    if (arg == 0)
+		return 0;
+	    else
+	    {
+		unsigned len = 0, z;
+		z = (input_string!=0);
+		if (z) len += strlen(input_string);
+		len += strlen(arg) + 2;
+		input_string = realloc(input_string, len);
+		if(!input_string) {
+		    perror("realloc"); exit(1);
+		}
+		if (!z) *input_string = 0;
+		strcat(input_string, arg);
+		strcat(input_string, "\n");
+	    }
+	    return 2;
+	default:
+	    return 0;
+	}
+	return 1;
+
+    } else if (!strcmp(opt, "-Orun")) {
+	opt_runner = 1;
+	return 1;
+    } else if (!strcmp(opt, "-Oflat")) {
+	opt_no_repoint = 1;
+	return 1;
+    } else if (!strcmp(opt, "-help")) {
+	LongUsage(stdout);
+	return 1;
+    }
+
+#ifndef NO_EXT_BE
+#define XX 9
+#include "bfi.be.def"
+#endif
+
+    return 0;
 }
 
 int
@@ -318,81 +410,37 @@ main(int argc, char ** argv)
 
     filelist = calloc(argc, sizeof*filelist);
 
-    /* Traditional option processing. */
-    for(ar=1; ar<argc; ar++)
-        if(opton && argv[ar][0] == '-' && argv[ar][1] != 0)
-            for(p=argv[ar]+1;*p;p++)
-                switch(*p) {
-                    char ch, * ap;
-                    case 'h': LongUsage(stdout); break;
-                    case 'v': verbose++; break;
-                    case 'H': noheader=1; break;
-                    case '#': debug_mode=1; break;
-                    case 'r': do_run=1; break;
-                    case 'A': do_run=0; break;
-#ifndef NO_EXT_BE
-#define XX 3
-#include "bfi.be.def"
-#endif
-                    case 'm': opt_level=0; break;
-                    case 'T': enable_trace=1; break;
+    for(ar=1; ar<argc; ar++) {
+	if (opton && argv[ar][0] == '-' && argv[ar][1] != 0) {
+	    char optbuf[4];
+	    int f;
+	    if (argv[ar][1] == '-' && argv[ar][2] == 0) {
+		opton = 0;
+		continue;
+	    }
+	    if (argv[ar+1] && argv[ar+1][0] != '-')
+		f = checkarg(argv[ar], argv[ar+1]);
+	    else
+		f = checkarg(argv[ar], 0);
+	    if (f == 1) continue;
+	    if (f == 2) { ar++; continue; }
 
-                    case 'a': iostyle=0; break;
-                    case 'u': iostyle=1; break;
-                    case 'B': iostyle=2; break;
+	    optbuf[0] = '-';
+	    optbuf[1] = argv[ar][1];
+	    optbuf[2] = 0;
+	    if ((f = checkarg(optbuf, argv[ar]+2)) == 2) continue;
 
-                    default:
-			if (p==argv[ar]+1 && *p == '-') {
-			    if (p[1] == '\0') { opton = 0; break; }
-			    ch = 'W';
-			} else
-			    ch = *p;
-#ifdef TAIL_ALWAYS_ARG
-                        if (p[1]) { ap = p+1; p=" "; }
-#else
-#ifdef NO_NUL_ARG
-                        if (p==argv[ar]+1 && p[1]) { ap = p+1; p=" "; }
-#else
-                        if (p==argv[ar]+1) { ap = p+1; p=" "; }
-#endif
-#endif
-                        else {
-                            if (ar+1>=argc) Usage();
-                            ap = argv[++ar];
-                        }
-                        switch(ch) {
-                            case 'O':
-				if(*ap == 0) opt_level = 1;
-				else if (!strcmp(ap, "run"))
-				    opt_runner = 1;
-				else if (!strcmp(ap, "flat"))
-				    opt_no_repoint = 1;
-				else opt_level = strtol(ap,0,10);
-				break;
-                            case 'E': eofcell=strtol(ap,0,10); break;
-                            case 'b': set_cell_size(strtol(ap,0,10)); break;
-			    case 'I':
-				{
-				    unsigned len = 0, z;
-				    z = (input_string!=0);
-				    if (z) len += strlen(input_string);
-				    len += strlen(ap) + 2;
-				    input_string = realloc(input_string, len);
-				    if(!input_string) {
-					perror("realloc"); exit(1);
-				    }
-				    if (!z) *input_string = 0;
-				    strcat(input_string, ap);
-				    strcat(input_string, "\n");
-				}
-				break;
-                            default:  Usage();
-                        }
-                        break;
-                }
-        else {
+	    for(p=argv[ar]+1; *p; p++) {
+		optbuf[0] = '-';
+		optbuf[1] = *p;
+		optbuf[2] = 0;
+
+		if (checkarg(optbuf, 0) != 1)
+		    UsageErr(argv[ar]);
+	    }
+	} else
 	    filelist[filecount++] = argv[ar];
-        }
+    }
 
     if(filecount == 0)
       Usage();

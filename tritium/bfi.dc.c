@@ -11,6 +11,7 @@
 #include "bfi.run.h"
 
 static FILE * ofd;
+static int no_v7 = 0;
 
 /*
  * DC Registers:
@@ -66,6 +67,15 @@ prt_value(const char * prefix, int count, const char * suffix)
 	fprintf(ofd, "%s_%d%s", prefix, -count, suffix);
 }
 
+int
+checkarg_dc(char * opt, char * arg)
+{
+    if (!strcmp(opt, "-nov7")) {
+	no_v7 = 1;
+	return 1;
+    }
+}
+
 /* This is true for characters that are safe in a [ ] string */
 /* '\' if for bsd dc, '|' and '~' are for dc.sed */
 #define okay_for_printf(xc) \
@@ -79,10 +89,7 @@ print_dc(void)
     struct bfi * n = bfprog;
     int stackdepth = 0;
     int hello_world;
-    int used_lix = 0;
-#ifndef DISABLE_DC_V7
-    int used_lox = 0;
-#endif
+    int used_lix = 0, used_lox = 0;
     ofd = stdout;
 
     calculate_stats();
@@ -184,22 +191,22 @@ print_dc(void)
 	case T_PRT:
 	    if (n->count == -1) {
 		fetch_cell(n->offset);
-#ifdef DISABLE_DC_V7
-		fprintf(ofd, "aP\n");
-#else
-		fprintf(ofd, "lox\n");
-		used_lox = 1;
-#endif
+		if (no_v7)
+		    fprintf(ofd, "aP\n");
+		else {
+		    fprintf(ofd, "lox\n");
+		    used_lox = 1;
+		}
 		break;
 	    }
 
 	    if (!okay_for_printf(n->count)) {
-#ifdef DISABLE_DC_V7
-		prt_value("", n->count, "aP\n");
-#else
-		prt_value("", n->count, "lox\n");
-		used_lox = 1;
-#endif
+		if (no_v7)
+		    prt_value("", n->count, "aP\n");
+		else {
+		    prt_value("", n->count, "lox\n");
+		    used_lox = 1;
+		}
 	    } else {
 		unsigned i = 0, j;
 		struct bfi * v = n;
@@ -257,7 +264,6 @@ print_dc(void)
 
     fprintf(ofd, "q]SF\n");
 
-#ifndef DISABLE_DC_V7
     if (used_lox) {
 	int i;
 	/* Setup the Z register with a script to create the C array */
@@ -284,7 +290,7 @@ print_dc(void)
 	/* Restore A, B and Z */
 	fprintf(ofd, "0sALAsBLBsZLZd!=.\n");
     }
-#endif
+
     if (cell_mask > 0)
 	fprintf(ofd, "[%d+]sM [%d %% d0>M]sm\n", cell_mask+1, cell_mask+1);
 

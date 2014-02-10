@@ -41,6 +41,9 @@ it to the list and fill in it's entry.
 #elif XX == 8
 /* Comma strings */
 #define X(a,b,c,d,e,f) ,#a
+#elif XX == 9
+/* Call option func. */
+#define X(a,b,c,d,e,f)
 #else
 #define X(a,b,c,d,e,f)
 #endif
@@ -131,7 +134,8 @@ X(bf,BF,
 
 /****************************************************************************/
 X(dc,DC,
-    printf("   -D   Create code for dc(1).\n");                     ,
+    printf("   -D   Create code for dc(1).\n");
+    printf("   -nov7   Disable Unix V7 dc(1) support.\n");          ,
     case 'D': do_codestyle = c_dc; break;                           ,
     case c_dc: print_dc(); break;                                   ,
     /* No direct run */						    )
@@ -140,6 +144,11 @@ X(dc,DC,
 	eofcell = 6;
     if (cell_size == 0 && do_codestyle == c_dc)
 	set_cell_size(32);
+#endif
+#if XX == 9
+    {	int f = checkarg_dc(opt, arg);
+	if (f) return f;
+    }
 #endif
 
 /****************************************************************************/
