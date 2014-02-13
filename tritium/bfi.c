@@ -116,6 +116,7 @@ int opt_no_calc = 0;
 int opt_no_litprt = 0;
 int opt_no_endif = 0;
 int opt_no_repoint = 0;
+int opt_force_repoint = 0;
 
 int hard_left_limit = -1024;
 int enable_trace = 0;
@@ -378,9 +379,11 @@ checkarg(char * opt, char * arg)
     } else if (!strcmp(opt, "-Orun")) {
 	opt_runner = 1;
 	return 1;
-    } else if (!strcmp(opt, "-Oflat")) {
-	opt_no_repoint = 1;
-	return 1;
+    } else if (!strcmp(opt, "-fno-negtape")) { hard_left_limit = 0; return 1;
+    } else if (!strcmp(opt, "-fno-calctok")) { opt_no_calc = 1; return 1;
+    } else if (!strcmp(opt, "-fno-litprt")) { opt_no_litprt = 1; return 1;
+    } else if (!strcmp(opt, "-fno-repoint")) { opt_no_repoint = 1; return 1;
+    } else if (!strcmp(opt, "-frepoint")) { opt_force_repoint = 1; return 1;
     } else if (!strcmp(opt, "-help")) {
 	LongUsage(stdout);
 	return 1;
@@ -1299,8 +1302,10 @@ pointer_regen(void)
     int current_shift = 0;
 
     calculate_stats();
-    if (node_type_counts[T_MOV] == 0) return;
-    if (min_pointer > -32 && max_pointer < 32) return;
+    if (!opt_force_repoint) {
+	if (node_type_counts[T_MOV] == 0) return;
+	if (min_pointer > -32 && max_pointer < 32) return;
+    }
 
     while(n)
     {
