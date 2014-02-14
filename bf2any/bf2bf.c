@@ -224,7 +224,21 @@ pc(int ch)
     }
     if (ch) {
 	putchar(ch);
-	col++;
+	if ((ch&0xC0) != 0x80) /* Count UTF-8 */
+	    col++;
+    }
+}
+
+static void
+ps(const char * s)
+{
+    if (langver != 1) pc(' '); else pc(0);
+
+    while (*s) {
+	putchar(*s);
+	if ((*s&0xC0) != 0x80) /* Count UTF-8 */
+	    col++;
+	s++;
     }
 }
 
@@ -245,13 +259,9 @@ outcmd(int ch, int count)
 	while(count-->0){
 	    char * p = strchr(bf,ch);
 	    if (!p) continue;
-	    pc(0);
-	    col += printf("%s%s", (col&&langver!=1)?" ":"", lang[p-bf]);
+	    ps(lang[p-bf]);
 	    if (langver == 2)
-		while(count-->0){
-		    pc(0);
-		    col += printf("%s%s", (col&&langver!=1)?" ":"", lang[8]);
-		}
+		while(count-->0) ps(lang[8]);
 	}
 	break;
 
