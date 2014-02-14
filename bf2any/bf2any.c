@@ -35,6 +35,7 @@ const char * current_file;
  * Lastly it makes sure that brackets are balanced by removing or adding
  * extra ']' tokens.
  *
+ * The tokens are passed to the backend for conversion into the final code.
  */
 static char qcmd[64];
 static int qrep[64];
@@ -221,6 +222,9 @@ outrun(int ch, int repcnt)
     }
 }
 
+/*
+ *  Decode arguments for the FE
+ */
 int opt_supported = -1, byte_supported, nobyte_supported;
 int enable_rle = 0;
 
@@ -258,6 +262,19 @@ check_argv(const char * arg)
     return 1;
 }
 
+/*
+ * This main function is quite high density, it's functions are:
+ *  1) Configure the FE with the BE capabilities.
+ *  2) Despatch arguments to FE and BE argument checkers.
+ *  3) Open and read the BF file.
+ *  4) Decode the BF into calls of the outrun() function.
+ *  5) Run length encode calls to the outrun() function.
+ *  6) Ensure that '[', ']' commands balance.
+ *  7) Allow the '#' command only if enabled.
+ *  8) If enabled; decode input RLE (a number prefix on the "+-<>" commands)
+ *  9) If enabled; decode input quoted strings as BF print sequences.
+ * 10) If enabled; convert the '=' command into '[-]'.
+ */
 int
 main(int argc, char ** argv)
 {
@@ -265,6 +282,7 @@ main(int argc, char ** argv)
     int ch, lastch=']', c=0, m, b=0, lc=0;
     FILE * ifd;
     int digits = 0, number = 0, multi = 1;
+    int qstring = 0;
 
     byte_supported = check_arg("-b");
     nobyte_supported = check_arg("-no-byte");
@@ -283,7 +301,7 @@ main(int argc, char ** argv)
 	    "\t"    "-h      This message"
 	    "\n\t"  "-b      Force byte cells"
 	    "\n\t"  "-#      Turn on trace code."
-	    "\n\t"  "-R      Decode rle on input '+-<>' only.");
+	    "\n\t"  "-R      Decode rle on '+-<>', quoted strings and '='.");
 	    if (check_arg("-O"))
 		fprintf(stderr, "%s\n",
 		"\t"    "-O      Enable optimisation"
@@ -325,7 +343,22 @@ main(int argc, char ** argv)
     } else
 	current_file = argv[1];
     outrun('!', 0);
-    while((ch = fgetc(ifd)) != EOF && (ifd!=stdin || ch != '!')) {
+    while((ch = fgetc(ifd)) != EOF && (ifd!=stdin || ch != '!' || qstring)) {
+	/* Quoted strings are printed. (And set current cell) */
+	if (qstring) {
+	    if (ch == '"') {
+		qstring++;
+		if (qstring == 2) continue;
+		if (qstring == 3) qstring = 1;
+	    }
+	    if (qstring == 2) {
+		qstring = 0;
+	    } else {
+		outrun('[', 1); outrun('-', 1); outrun(']', 1);
+		outrun('+', ch); outrun('.', 1); lastch = '.';
+		continue;
+	    }
+	}
 	/* Source RLE decoding */
 	if (ch >= '0' && ch <= '9') {
 	    digits = 1;
@@ -339,7 +372,8 @@ main(int argc, char ** argv)
 	m = (ch == '>' || ch == '<' || ch == '+' || ch == '-');
 	/* These ones are not */
 	if(!m && ch != '[' && ch != ']' && ch != '.' && ch != ',' &&
-	    (ch != '#' || !enable_debug)) continue;
+	    (ch != '#' || !enable_debug) &&
+	    ((ch != '"' && ch != '=') || !enable_rle)) continue;
 	/* Check for loop comments; ie: ][ comment ] */
 	if (lc || (ch=='[' && lastch==']')) { lc += (ch=='[') - (ch==']'); continue; }
 	if (lc) continue;
@@ -349,6 +383,12 @@ main(int argc, char ** argv)
 	if (c) outrun(lastch, c);
 	if (!m) {
 	    /* Non RLE tokens here */
+	    if (ch == '"') { qstring++; continue; }
+	    if (ch == '=') {
+		outrun('[', 1); outrun('-', 1); outrun(']', 1);
+		lastch = ']';
+		continue;
+	    }
 	    if (!b && ch == ']') continue; /* Ignore too many ']' */
 	    b += (ch=='[') - (ch==']');
 	    if (lastch == '[' && ch == ']') outrun('X', 1);
