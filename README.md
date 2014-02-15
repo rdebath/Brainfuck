@@ -20,10 +20,17 @@ This repository contains various [brainfuck](http://esolangs.org/wiki/Brainfuck)
 
   In addition it highlights SOME of the other characters as comments.  Generally it tries (with moderate success) to distinguish between proper comments and sequences that are probably supposed to be comments but actually contain active BF command characters. In addition it tries to identify the 'dead code' style comment loops highlighting any BF command characters within the loop in the 'PreProc' style to distinguish them from commands that may actually be executed.
 
+3. BF 2 Bash.sh
 
-3. Brainfuck to anything. Well not exactly anything but the list includes ...
+  A brainfuck interpreter written entirely in Bash scripting, it contains no references to external commands and doesn't even invoke a subshell. It's a bit slow, but because it does a tiny bit of optimisation it is just about quick enough for LostKng.b.
+
+4. BF2C.awk
+
+  This awk script does a moderate amount of BF optimisation and converts the BF to a file that it feeds into the system C compiler. I hesitate to call the created language C, because, frankly it'd be a reasonable entry for the IOCCC. Even so the C compiler will compile it and this script will then invoke the created executable. This technically makes this a JIT runner.
+  
+5. Brainfuck to anything. Well not exactly anything but the list includes ...
   * run -- a direct interpreter -- blisteringly quick too for one without JIT.
-  * jit -- OTOH this one uses LuaJIT's Dynasm, it's the fastest one here.
+  * jit -- OTOH this one uses LuaJIT's Dynasm, it's the fastest bf2any program.
   * tcc -- Convert to C and run using LIBTCC -- Is quicker than bf2run ... just.
   * gcc -- Convert to C and run as a shared lib; very quick with -O2.
   * bf -- Ook, Blub, fuck fuck, "there once was a fish named Fred" and similar transliterations. Some can be compiled as C (*deoptimised*!)
@@ -50,3 +57,4 @@ This repository contains various [brainfuck](http://esolangs.org/wiki/Brainfuck)
   The ones marked *no-opt* are not optimised, except for run length encoding; the ones marked *deoptimised* have even the RLE reverted.
   They have all been tested using many of the BF programs from the [Esoteric Files Archive](https://github.com/graue/esofiles/tree/master/brainfuck/src) (And of course tortured!)
 
+6. Tritium (officially Ρ‴) this BF interpreter/compiler/JIT runner makes the bf2any programs look slow. It is simply the fastest JIT BF interpreter you'll find.
