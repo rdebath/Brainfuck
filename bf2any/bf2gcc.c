@@ -151,7 +151,7 @@ static void
 print_cstring(void)
 {
     char * str = get_string();
-    char buf[88];
+    char buf[256];
     int gotnl = 0, gotperc = 0;
     size_t outlen = 0;
 

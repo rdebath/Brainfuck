@@ -182,7 +182,7 @@ void outopt(int ch, int count)
 	if (enable_prt && tape->is_set && tape->v > 0 && tape->v < 128) {
 	    add_string(tape->v);
 
-	    if (sav_str_len >= 81000) /* Limit the buffer size. */
+	    if (sav_str_len >= 128*1024) /* Limit the buffer size. */
 	    {
 		add_string(0);
 		outcmd('"', 0);
