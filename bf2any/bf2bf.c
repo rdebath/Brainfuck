@@ -114,6 +114,8 @@ static void headsecks(int ch, int count);
 int
 check_arg(const char * arg)
 {
+    if (strcmp(arg, "-#") == 0) return 1;
+
     if (strcmp(arg, "-c") == 0) {
 	lang = cbyte; langver = 0; c_style = 2; return 1;
     } else

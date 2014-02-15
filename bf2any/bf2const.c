@@ -42,6 +42,7 @@ new_n(struct mem *p) {
     p->n = calloc(1, sizeof*p);
     p->n->p = p;
     p->n->is_set = first_run;
+    p->n->cleaned = first_run;
 }
 
 static void
@@ -49,6 +50,7 @@ new_p(struct mem *p) {
     p->p = calloc(1, sizeof*p);
     p->p->n = p;
     p->p->is_set = first_run;
+    p->p->cleaned = first_run;
 }
 
 static void add_string(int ch)
@@ -92,18 +94,27 @@ flush_tape(int no_output)
 		    p->is_set = p->v = 0;
 		}
 
-		if (p->cleaned && p->cleaned_val == p->v && p->is_set)
+		if (p->cleaned && p->cleaned_val == p->v && p->is_set) {
 		    p->is_set = p->v = 0;
-		p->cleaned = p->cleaned_val = 0;
-
-		if (tapeoff > outoff) { outcmd('>', tapeoff-outoff); outoff=tapeoff; }
-		if (tapeoff < outoff) { outcmd('<', outoff-tapeoff); outoff=tapeoff; }
-		if (p->is_set) {
-		    outcmd('=', p->v);
-		    p->v = p->is_set = 0;
+		    p->cleaned = p->cleaned_val = 0;
 		} else {
-		    if (p->v > 0) { outcmd('+', p->v); p->v=0; }
-		    if (p->v < 0) { outcmd('-', -p->v); p->v=0; }
+
+		    if (tapeoff > outoff) { outcmd('>', tapeoff-outoff); outoff=tapeoff; }
+		    if (tapeoff < outoff) { outcmd('<', outoff-tapeoff); outoff=tapeoff; }
+		    if (p->cleaned) {
+			if (p->v > p->cleaned_val)
+			    outcmd('+', p->v-p->cleaned_val);
+			if (p->v < p->cleaned_val)
+			    outcmd('-', p->cleaned_val-p->v);
+		    } else if (p->is_set) {
+			outcmd('=', p->v);
+		    } else {
+			if (p->v > 0) { outcmd('+', p->v); p->v=0; }
+			if (p->v < 0) { outcmd('-', -p->v); p->v=0; }
+		    }
+
+		    p->v = p->is_set = 0;
+		    p->cleaned = p->cleaned_val = 0;
 		}
 	    } else
 	    if (direction > 0 && p->n) {
@@ -131,58 +142,6 @@ flush_tape(int no_output)
     first_run = 0;
 }
 
-static void
-flush_cell(void)
-{
-
-    if (sav_str_len>0) {
-	add_string(0);
-	outcmd('"', 0);
-	sav_str_len = 0;
-    }
-    if(!tapezero) return;
-
-    if (curroff > 0) {
-	outcmd('>', curroff);
-	while(curroff > 0) {
-	    tapezero = tapezero->n;
-	    curroff--;
-	}
-    }
-
-    if (curroff < 0) {
-	outcmd('<', -curroff);
-	while(curroff < 0) {
-	    tapezero = tapezero->p;
-	    curroff++;
-	}
-    }
-
-    if (tape != tapezero) {
-	fprintf(stderr, "Assertion failed tape <> tapezero in "__FILE__"\n");
-	exit(1);
-    }
-
-    /* Range check */
-    if (bytecell) tape->v %= 256; /* Note: preserves sign but limits range. */
-
-    /* Already done */
-    if (tape->cleaned && tape->cleaned_val == tape->v && tape->is_set)
-	return;
-
-    if (tape->v || tape->is_set) {
-	if (tape->is_set) {
-	    outcmd('=', tape->v);
-	    tape->cleaned = 1; tape->cleaned_val = tape->v;
-	    /* tape->v = tape->is_set = 0; */
-
-	} else {
-	    if (tape->v > 0) { outcmd('+', tape->v); tape->v=0; }
-	    if (tape->v < 0) { outcmd('-', -tape->v); tape->v=0; }
-	}
-    }
-}
-
 void outopt(int ch, int count)
 {
     if (deadloop) {
@@ -203,7 +162,7 @@ void outopt(int ch, int count)
 	if (ch == '!') {
 	    enable_prt = check_arg("-savestring");
 	    flush_tape(1);
-	    tape->is_set = first_run = enable_optim;
+	    tape->cleaned = tape->is_set = first_run = 1;
 	} else if (ch == '~')
 	    flush_tape(1);
 	else
@@ -211,7 +170,7 @@ void outopt(int ch, int count)
 	if (ch) outcmd(ch, count);
 
 	/* Loops end with zero */
-	if (ch == ']' && enable_optim) {
+	if (ch == ']') {
 	    tape->is_set = 1;
 	    tape->v = 0;
 	    tape->cleaned = 1;
@@ -231,7 +190,7 @@ void outopt(int ch, int count)
 	    }
 	    break;
 	}
-	flush_cell();
+	flush_tape(0);
 	outcmd(ch, count);
 	return;
 
