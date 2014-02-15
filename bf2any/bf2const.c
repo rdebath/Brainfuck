@@ -27,7 +27,7 @@
 struct mem { struct mem *p, *n; int is_set; int v; int cleaned, cleaned_val;};
 static int first_run = 0;
 
-static struct mem *tape = 0, *tapezero = 0;
+static struct mem *tape = 0, *tapezero = 0, *freelist = 0;
 static int curroff = 0;
 static int reg_known = 0, reg_val;
 
@@ -39,16 +39,26 @@ static int deadloop = 0;
 
 static void
 new_n(struct mem *p) {
-    p->n = calloc(1, sizeof*p);
+    if (freelist) {
+	p->n = freelist;
+	freelist = freelist->n;
+    } else
+	p->n = calloc(1, sizeof*p);
     p->n->p = p;
+    p->n->n = 0;
     p->n->is_set = first_run;
     p->n->cleaned = first_run;
 }
 
 static void
 new_p(struct mem *p) {
-    p->p = calloc(1, sizeof*p);
+    if (freelist) {
+	p->p = freelist;
+	freelist = freelist->n;
+    } else
+	p->p = calloc(1, sizeof*p);
     p->p->n = p;
+    p->p->p = 0;
     p->p->is_set = first_run;
     p->p->cleaned = first_run;
 }
@@ -70,7 +80,7 @@ get_string(void)
 }
 
 static void
-flush_tape(int no_output)
+flush_tape(int no_output, int keep_knowns)
 {
     int outoff = 0, tapeoff = 0;
     int direction = 1;
@@ -87,36 +97,46 @@ flush_tape(int no_output)
 
 	for(;;)
 	{
-	    if (bytecell) p->v %= 256; /* Note: preserves sign but limits range. */
-	    if (p->v || p->is_set) {
-		if (no_output) {
-		    outoff=tapeoff;
-		    p->is_set = p->v = 0;
-		}
+	    if (no_output) {
+		p->is_set = p->v = 0;
+		p->cleaned = p->cleaned_val = 0;
+	    }
 
+	    if (bytecell) p->v %= 256; /* Note: preserves sign but limits range. */
+
+	    if (p->v || p->is_set) {
 		if (p->cleaned && p->cleaned_val == p->v && p->is_set) {
-		    p->is_set = p->v = 0;
-		    p->cleaned = p->cleaned_val = 0;
+		    if (!keep_knowns) {
+			p->is_set = p->v = 0;
+			p->cleaned = p->cleaned_val = 0;
+		    }
 		} else {
 
 		    if (tapeoff > outoff) { outcmd('>', tapeoff-outoff); outoff=tapeoff; }
 		    if (tapeoff < outoff) { outcmd('<', outoff-tapeoff); outoff=tapeoff; }
-		    if (p->cleaned) {
-			if (p->v > p->cleaned_val)
-			    outcmd('+', p->v-p->cleaned_val);
-			if (p->v < p->cleaned_val)
-			    outcmd('-', p->cleaned_val-p->v);
-		    } else if (p->is_set) {
-			outcmd('=', p->v);
+		    if (p->is_set) {
+			if (p->cleaned) {
+			    if (p->v > p->cleaned_val)
+				outcmd('+', p->v-p->cleaned_val);
+			    if (p->v < p->cleaned_val)
+				outcmd('-', p->cleaned_val-p->v);
+			} else
+			    outcmd('=', p->v);
 		    } else {
-			if (p->v > 0) { outcmd('+', p->v); p->v=0; }
-			if (p->v < 0) { outcmd('-', -p->v); p->v=0; }
+			if (p->v > 0) outcmd('+', p->v);
+			if (p->v < 0) outcmd('-', -p->v);
 		    }
 
-		    p->v = p->is_set = 0;
-		    p->cleaned = p->cleaned_val = 0;
+		    if (keep_knowns && p->is_set) {
+			p->cleaned = p->is_set;
+			p->cleaned_val = p->v;
+		    } else {
+			p->v = p->is_set = 0;
+			p->cleaned = p->cleaned_val = 0;
+		    }
 		}
-	    } else
+	    }
+
 	    if (direction > 0 && p->n) {
 		p=p->n; tapeoff ++;
 	    } else
@@ -129,16 +149,28 @@ flush_tape(int no_output)
 	    } else
 		break;
 	}
-	tapeoff = curroff;
-	if (no_output) outoff=tapeoff;
-	if (tapeoff > outoff) { outcmd('>', tapeoff-outoff); outoff=tapeoff; }
-	if (tapeoff < outoff) { outcmd('<', outoff-tapeoff); outoff=tapeoff; }
     }
-    if (!tapezero) tapezero = calloc(1, sizeof*tape);
-    tape = tapezero;
+
+    if (no_output) outoff = curroff;
+    if (curroff > outoff) { outcmd('>', curroff-outoff); outoff=curroff; }
+    if (curroff < outoff) { outcmd('<', outoff-curroff); outoff=curroff; }
+
+    if (!tapezero) tape = tapezero = calloc(1, sizeof*tape);
+
+    if (!keep_knowns) {
+	while(tape->p) tape = tape->p;
+	while(tapezero->n) tapezero = tapezero->n;
+	if (tape != tapezero) {
+	    tapezero->n = freelist;
+	    freelist = tape->n;
+	    tape->n = 0;
+	}
+	reg_known = 0;
+	reg_val = 0;
+    }
+
+    tapezero = tape;
     curroff = 0;
-    reg_known = 0;
-    reg_val = 0;
     first_run = 0;
 }
 
@@ -161,12 +193,12 @@ void outopt(int ch, int count)
     default:
 	if (ch == '!') {
 	    enable_prt = check_arg("-savestring");
-	    flush_tape(1);
+	    flush_tape(1,0);
 	    tape->cleaned = tape->is_set = first_run = 1;
-	} else if (ch == '~')
-	    flush_tape(1);
+	} else if (ch == '~' && enable_optim)
+	    flush_tape(1,0);
 	else
-	    flush_tape(0);
+	    flush_tape(0,0);
 	if (ch) outcmd(ch, count);
 
 	/* Loops end with zero */
@@ -190,7 +222,14 @@ void outopt(int ch, int count)
 	    }
 	    break;
 	}
-	flush_tape(0);
+	flush_tape(0,1);
+	outcmd(ch, count);
+	return;
+
+    case ',':
+	flush_tape(0,1);
+	tape->is_set = 0; tape->v = 0;
+	tape->cleaned = 0; tape->cleaned_val = 0;
 	outcmd(ch, count);
 	return;
 
@@ -203,7 +242,8 @@ void outopt(int ch, int count)
 
     case 'B':
 	if (!tape->is_set) {
-	    flush_tape(0);
+	    flush_tape(0,1);
+	    reg_known = 0; reg_val = 0;
 	    outcmd(ch, count);
 	    return;
 	}
@@ -220,15 +260,13 @@ void outopt(int ch, int count)
     case 'n':
     case 's':
 	if (!reg_known) {
-	    flush_tape(0);
+	    flush_tape(0,1);
+	    tape->is_set = 0; tape->v = 0;
+	    tape->cleaned = 0; tape->cleaned_val = 0;
 	    outcmd(ch, count);
 	    return;
 	}
 	switch(ch) {
-	case 'B':
-	    reg_known = 1;
-	    reg_val = tape->v;
-	    break;
 	case 'm':
 	case 'M':
 	    tape->v += reg_val * count;
