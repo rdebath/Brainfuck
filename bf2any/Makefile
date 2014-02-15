@@ -139,10 +139,10 @@ bf2jit.o: bf2jit.amd64.h bf2jit.i686.h
 	$(CC) $(CFLAGS) -I../tools $(TARGET_ARCH) -c -o $@ bf2jit.c
 
 bf2jit.amd64.h: bf2jit.x86.dasc
-	lua ../tools/dynasm/dynasm.lua -c -o bf2jit.amd64.h bf2jit.x86.dasc
+	../tools/dynasm/dynasm -c -o bf2jit.amd64.h bf2jit.x86.dasc
 
 bf2jit.i686.h: bf2jit.x86.dasc
-	lua ../tools/dynasm/dynasm.lua -c -D I386 -o bf2jit.i686.h bf2jit.x86.dasc
+	../tools/dynasm/dynasm -c -D I386 -o bf2jit.i686.h bf2jit.x86.dasc
 
 bf2cmd: bf2cmd.o bf2any.o bf2const.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)

@@ -56,7 +56,7 @@ pristine: clean
 	-rm -f bfi
 
 clean:
-	-rm -f *.o
+	-rm -f *.o bfi.dasm.amd64.h bfi.dasm.i686.h
 
 bfi.gnulit.o:	bfi.gnulit.c bfi.tree.h bfi.gnulit.h bfi.run.h
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ -fno-strict-aliasing bfi.gnulit.c
@@ -73,10 +73,10 @@ bfi.nasm.o: bfi.nasm.c bfi.tree.h bfi.nasm.h
 bfi.dasm.o: bfi.dasm.amd64.h bfi.dasm.i686.h bfi.dasm.h bfi.tree.h bfi.run.h
 
 bfi.dasm.amd64.h: bfi.dasm.x86.dasc
-	lua ../tools/dynasm/dynasm.lua -c -o bfi.dasm.amd64.h bfi.dasm.x86.dasc
+	../tools/dynasm/dynasm -c -o bfi.dasm.amd64.h bfi.dasm.x86.dasc
 
 bfi.dasm.i686.h: bfi.dasm.x86.dasc
-	lua ../tools/dynasm/dynasm.lua -c -D I386 -o bfi.dasm.i686.h bfi.dasm.x86.dasc
+	../tools/dynasm/dynasm -c -D I386 -o bfi.dasm.i686.h bfi.dasm.x86.dasc
 
 bfi.version.h: \
     bfi.c bfi.tree.h bfi.run.h bfi.be.def bfi.ccode.h bfi.gnulit.h bfi.nasm.h \

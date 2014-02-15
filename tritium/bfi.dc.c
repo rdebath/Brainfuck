@@ -74,6 +74,7 @@ checkarg_dc(char * opt, char * arg)
 	no_v7 = 1;
 	return 1;
     }
+    return 0;
 }
 
 /* This is true for characters that are safe in a [ ] string */
