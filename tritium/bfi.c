@@ -107,6 +107,7 @@ const char * codestylename[] = { "std"
 
 char const * program = "C";
 int verbose = 0;
+int help_flag = 0;
 int noheader = 0;
 int do_run = -1;
 
@@ -200,13 +201,16 @@ void run_progarray(int * progarray);
 void try_opt_runner(void);
 int update_opt_runner(struct bfi * n, int * mem, int offset);
 
-void LongUsage(FILE * fd)
+void LongUsage(FILE * fd, char * errormsg)
 {
 #ifdef NO_EXT_BE
     fprintf(fd, "%s: LITE version, compiled: %s\n", program, __DATE__);
 #else
     print_banner(fd, program);
 #endif
+    if(errormsg) {
+	fprintf(fd, "%s: %s\n", program, errormsg);
+    }
     fprintf(fd, "Usage: %s [options] [BF file]\n", program);
     if (fd != stdout) {
 	fprintf(fd, "   -h   Long help message. (Pipe it through more)\n");
@@ -216,10 +220,10 @@ void LongUsage(FILE * fd)
 	exit(1);
     }
 
-    printf("        If file is '-' read from stdin with '!' to end program\n"
-	   "        and begin the input to the BF program.\n"
-	   "        Note: ! is ignored inside any BF loop and before the first\n"
-	   "        BF instruction has been entered\n");
+    printf("        If the file is '-' this will read from the standard input and use\n"
+	   "        the character '!' to end the BF program and begin the input to it.\n"
+	   "        Note: ! is still ignored inside any BF loop and before the first\n"
+	   "        BF instruction has been entered.\n");
     printf("\n");
     printf("   -h   This message.\n");
     printf("   -v   Verbose, repeat for more.\n");
@@ -287,16 +291,17 @@ void LongUsage(FILE * fd)
 }
 
 void
-Usage(void)
+Usage(char * why)
 {
-    LongUsage(stderr);
+    LongUsage(stderr, why);
 }
 
 void
-UsageErr(char * why)
+UsageOptError(char * why)
 {
-    fprintf(stderr, "\nError because of: '%s'\n\n", why);
-    LongUsage(stderr);
+    char buf[256];
+    sprintf(buf, "Unknown option '%.200s'", why);
+    LongUsage(stderr, buf);
 }
 
 void
@@ -320,7 +325,7 @@ checkarg(char * opt, char * arg)
 
     if (opt[2] == 0) {
 	switch(opt[1]) {
-	case 'h': LongUsage(stdout); break;
+	case 'h': help_flag++; break;
 	case 'v': verbose++; break;
 	case 'H': noheader=1; break;
 	case '#': debug_mode=1; break;
@@ -384,9 +389,7 @@ checkarg(char * opt, char * arg)
     } else if (!strcmp(opt, "-fno-litprt")) { opt_no_litprt = 1; return 1;
     } else if (!strcmp(opt, "-fno-repoint")) { opt_no_repoint = 1; return 1;
     } else if (!strcmp(opt, "-frepoint")) { opt_force_repoint = 1; return 1;
-    } else if (!strcmp(opt, "-help")) {
-	LongUsage(stdout);
-	return 1;
+    } else if (!strcmp(opt, "-help")) { help_flag++; return 1;
     }
 
 #ifndef NO_EXT_BE
@@ -439,14 +442,16 @@ main(int argc, char ** argv)
 		optbuf[2] = 0;
 
 		if (checkarg(optbuf, 0) != 1)
-		    UsageErr(argv[ar]);
+		    UsageOptError(argv[ar]);
 	    }
 	} else
 	    filelist[filecount++] = argv[ar];
     }
 
+    if(help_flag)
+	LongUsage(stdout, 0);
     if(filecount == 0)
-      Usage();
+	Usage("Error: Filename or '-' must be specified");
 
 #ifdef NO_EXT_BE
     if (cell_size == 0) set_cell_size(32);
