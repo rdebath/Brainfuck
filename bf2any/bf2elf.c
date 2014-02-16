@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include "bf2any.h"
 
@@ -13,8 +15,6 @@
  * http://www.muppetlabs.com/~breadbox/software/elfkickers.html
  *
  * Portions (c) 1999-2001 by Brian Raiter
- *
- * Compile output with: chmod +x bfp
  *
  * This is a stable version of the elf-166 compiler in that this code
  * generator will make a valid executable for all known BF programs.
@@ -197,12 +197,18 @@ outcmd(int ch, int count)
 	p = pos + base_address;
 	insertobj(sizeof(elfheader) + sizeof(start) + prolog_meminit_offset, p);
 
-	if ((ofd = fopen(filename, "w")) == NULL) {
-	    perror(filename);
-	    exit(1);
-	} else {
-	    fwrite(textbuf, 1, pos, ofd);
-	    fclose(ofd);
+	{
+	    mode_t umsk = umask(S_IRWXG + S_IRWXO);
+	    if ((ofd = fopen(filename, "w")) == NULL) {
+		perror(filename);
+		exit(1);
+	    } else {
+		fwrite(textbuf, 1, pos, ofd);
+		fclose(ofd);
+		if (chmod(filename, (S_IRWXU + S_IRWXG + S_IRWXO) & ~umsk) < 0)
+		    perror(filename);
+	    }
+	    umask(umsk);
 	}
 	break;
     }
