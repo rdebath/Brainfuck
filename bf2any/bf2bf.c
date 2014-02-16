@@ -16,7 +16,30 @@
  * is compilable as C.
  */
 
+/* Language classes */
+
+#define C_HEADERS       0x100   /* Add C Header & footer */
+#define C_DEFINES       0x200   /* #defines in the header */
+#define C_RLE           0x400   /* #define for RLE in the header */
+
+#define L_BASE          (0xFF & langclass)
+
+#define L_WORDS         0       /* Words with spaces */
+
+#define L_CWORDS        (L_WORDS+C_HEADERS)
+#define L_CDWORDS       (L_WORDS+C_HEADERS+C_DEFINES)
+#define L_CRLE          (L_WORDS+C_HEADERS+C_DEFINES+C_RLE)
+
+#define L_JNWORD        1       /* Words NO spaces */
+#define L_CHARS         2       /* Add strings char by char. */
+
+#define L_TOKENS        0x10    /* Print the tokens one per line. */
+#define L_RISBF         0x11    /* while (count-->0) risbf(ch); */
+#define L_HEADSECKS     0x12    /* headsecks(token, count); */
+
+
 static const char bf[] = "><+-.,[]";
+static const char * bfout[] = { ">", "<", "+", "-", ".", ",", "[", "]" };
 
 /* Language "C" */
 static const char * cbyte[] = { "m+=1;", "m-=1;", "++*m;", "--*m;",
@@ -97,14 +120,13 @@ static const char *rhoprime[] =
 static const char *zero[] =
     { "0+", "0-", "0++", "0--", "0.", "0?", "0/", "/0" };
 
-static const char ** lang = 0;
+static int langclass = L_CHARS;
+static const char ** lang = bfout;
 static const char ** c = 0;
 static int linefix = EOF;
-static char langver = -1;
 static int col = 0;
 static int maxcol = 72;
 static int state = 0;
-static int c_style = 0;
 
 static int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
 
@@ -117,68 +139,68 @@ check_arg(const char * arg)
     if (strcmp(arg, "-#") == 0) return 1;
 
     if (strcmp(arg, "-c") == 0) {
-	lang = cbyte; langver = 0; c_style = 2; return 1;
+	lang = cbyte; langclass = L_CWORDS; return 1;
     } else
     if (strcmp(arg, "-db") == 0 || strcmp(arg, "-double") == 0) {
-	lang = doubler; langver = 3; c_style = 0; return 1;
+	lang = doubler; langclass = L_CHARS; return 1;
     } else
     if (strcmp(arg, "-n") == 0 || strcmp(arg, "-nice") == 0) {
-	lang = nice; langver = 0; c_style = 1; return 1;
+	lang = nice; langclass = L_CDWORDS; return 1;
     } else
     if (strcmp(arg, "-mini") == 0) {
-	lang = bc; langver = 0; c_style = 1; return 1;
+	lang = bc; langclass = L_CDWORDS; return 1;
     } else
     if (strcmp(arg, "-f") == 0 || strcmp(arg, "-fish") == 0) {
-	lang = fish; langver = 0; c_style = 1; return 1;
+	lang = fish; langclass = L_CDWORDS; return 1;
     } else
     if (strcmp(arg, "-trip") == 0 || strcmp(arg, "-triplet") == 0) {
-	lang = trip; langver = 0; c_style = 1; return 1;
+	lang = trip; langclass = L_CDWORDS; return 1;
     } else
     if (strcmp(arg, "-ook") == 0) {
-	lang = ook; langver = 0; c_style = 0; return 1;
+	lang = ook; langclass = L_WORDS; return 1;
     } else
     if (strcmp(arg, "-blub") == 0) {
-	lang = blub; langver = 0; c_style = 0; return 1;
+	lang = blub; langclass = L_WORDS; return 1;
     } else
     if (strcmp(arg, "-moo") == 0) {
-	lang = moo; langver = 1; c_style = 0; return 1;
+	lang = moo; langclass = L_JNWORD; return 1;
     } else
     if (strcmp(arg, "-fk") == 0) {
-	lang = f__k; langver = 0; c_style = 1; return 1;
+	lang = f__k; langclass = L_CDWORDS; return 1;
     } else
     if (strcmp(arg, "-pog") == 0 || strcmp(arg, "-pogaack") == 0) {
-	lang = pogaack; langver = 0; c_style = 0; return 1;
+	lang = pogaack; langclass = L_WORDS; return 1;
     } else
     if (strcmp(arg, "-:") == 0) {
-	lang = dotty; langver = 3; c_style = 0; return 1;
+	lang = dotty; langclass = L_CHARS; return 1;
     } else
     if (strcmp(arg, "-lisp") == 0) {
-	lang = lisp2; langver = 3; c_style = 0; return 1;
+	lang = lisp2; langclass = L_CHARS; return 1;
     } else
     if (strcmp(arg, "-chi") == 0 || strcmp(arg, "-chinese") == 0) {
-	lang = chinese; langver = 1; c_style = 0; return 1;
+	lang = chinese; langclass = L_JNWORD; return 1;
     } else
     if (strcmp(arg, "-head") == 0) {
-	lang = 0; langver = 11; c_style = 0; return 1;
+	lang = 0; langclass = L_HEADSECKS; return 1;
     } else
     if (strcmp(arg, "-rho") == 0 || strcmp(arg, "-rhoprime") == 0) {
-	lang = rhoprime; langver = 1; c_style = 0; return 1;
+	lang = rhoprime; langclass = L_JNWORD; return 1;
     } else
     if (strcmp(arg, "-zero") == 0) {
-	lang = zero; langver = 0; c_style = 0; return 1;
+	lang = zero; langclass = L_WORDS; return 1;
     } else
 
     if (strcmp(arg, "-risbf") == 0) {
-	lang = 0; langver = 10; c_style = 0; return 1;
+	lang = 0; langclass = L_RISBF; return 1;
     } else
     if (strcmp(arg, "-rle") == 0) {
-	lang = bc; langver = 2; c_style = 1; return 1;
+	lang = bc; langclass = L_CRLE; return 1;
     } else
     if (strcmp(arg, "-dump") == 0) {
-	lang = 0; langver = 4; c_style = 0; return 1;
+	lang = 0; langclass = L_TOKENS; return 1;
     } else
 
-    if (strcmp(arg, "-O") == 0 && langver == 4) {
+    if (strcmp(arg, "-O") == 0 && L_BASE == L_TOKENS) {
 	return 1;
     } else
     if (strncmp(arg, "-w", 2) == 0 && arg[2] >= '0' && arg[2] <= '9') {
@@ -234,7 +256,7 @@ pc(int ch)
 static void
 ps(const char * s)
 {
-    if (langver != 1) pc(' '); else pc(0);
+    if (L_BASE == L_WORDS && col != 0) pc(' '); else pc(0);
 
     while (*s) {
 	putchar(*s);
@@ -247,8 +269,10 @@ ps(const char * s)
 void
 outcmd(int ch, int count)
 {
+    char * p;
+
     if (ch == '!') {
-	if (langver != 2) {
+	if (!(langclass & C_RLE)) {
 	    if (bytecell) c = cbyte; else c = cint;
 	} else {
 	    if (bytecell) c = cbyte_rle; else c = cint_rle;
@@ -256,62 +280,62 @@ outcmd(int ch, int count)
 	if (lang == cbyte) lang = c;
     }
 
-    switch (langver) {
-    case 0: case 1: case 2:
-	while(count-->0){
-	    char * p = strchr(bf,ch);
-	    if (!p) continue;
-	    ps(lang[p-bf]);
-	    if (langver == 2)
-		while(count-->0) ps(lang[8]);
-	}
-	break;
-
-    case 3:
-	while(count-->0){
-	    char * p = strchr(bf,ch);
-	    const char * l;
-	    if (!p) continue;
-	    l = lang[p-bf];
-	    while (*l)
-		pc(*l++);
-	}
-	break;
-
-    case 4: printf("%c %d\n", ch, count); col = 0; break;
-
-    case 10: while (count-->0) risbf(ch); break;
-    case 11: headsecks(ch, count); break;
-    default: while (count-->0) pc(ch); break;
-    }
-
-    if (ch == '~') {
-	pc(0);
-	if (c_style == 1)
-	    col += printf("%s%s", col?" ":"", "_");
-	if (c_style == 2)
-	    col += printf("%s%s", col?" ":"", "return 0;}");
-	if(col) {
-	    if (linefix != EOF) putchar(linefix);
-	    putchar('\n');
-	}
-    }
-
-    if (ch == '!' && c_style) {
+    if (ch == '!' && (langclass & C_HEADERS) != 0) {
 	int i;
 	if (bytecell)
 	    printf("#include<unistd.h>\n");
 	else
 	    printf("#include<stdio.h>\n");
-	if (c_style == 1) {
-	    for (i=0; i<8 + (langver == 2); i++)
+	if (langclass & C_DEFINES) {
+	    for (i=0; i<8; i++)
 		printf("#define %s %s\n", lang[i], c[i]);
-	    printf("#define _ %sreturn 0;}\n", langver==2?";":"");
+	    if (langclass & C_RLE) {
+		printf("#define %s %s\n", lang[8], c[8]);
+		printf("#define _ ;return 0;}\n");
+	    } else
+		printf("#define _ return 0;}\n");
 	}
 	if (bytecell)
 	    printf("char mem[30000];int main(){register char*m=mem;\n");
 	else
 	    printf("int mem[30000];int main(){register int*m=mem;\n");
+    }
+
+    switch (L_BASE) {
+    case L_WORDS:
+    case L_JNWORD:
+	if (!(p = strchr(bf,ch))) break;
+	while(count-->0){
+	    ps(lang[p-bf]);
+	    if (langclass & C_RLE)
+		while(count-->0) ps(lang[8]);
+	}
+	break;
+
+    case L_CHARS:
+	if (!(p = strchr(bf,ch))) break;
+	while(count-->0){
+	    const char * l = lang[p-bf];
+	    while (*l)
+		pc(*l++);
+	}
+	break;
+
+    case L_TOKENS:	printf("%c %d\n", ch, count); col = 0; break;
+    case L_RISBF:	while (count-->0) risbf(ch); break;
+    case L_HEADSECKS:	headsecks(ch, count); break;
+    }
+
+    if (ch == '~') {
+	pc(0);
+	if (langclass & C_DEFINES)
+	    col += printf("%s%s", col?" ":"", "_");
+	else if (langclass & C_HEADERS)
+	    col += printf("%s%s", col?" ":"", "return 0;}");
+	if(col) {
+	    if (linefix != EOF) putchar(linefix);
+	    putchar('\n');
+	}
     }
 }
 
