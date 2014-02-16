@@ -63,6 +63,12 @@ new_p(struct mem *p) {
     p->p->cleaned = first_run;
 }
 
+static void clear_cell(struct mem *p)
+{
+    p->is_set = p->v = 0;
+    p->cleaned = p->cleaned_val = 0;
+}
+
 static void add_string(int ch)
 {
     while (sav_str_len+2 > sav_str_maxlen) {
@@ -97,19 +103,13 @@ flush_tape(int no_output, int keep_knowns)
 
 	for(;;)
 	{
-	    if (no_output) {
-		p->is_set = p->v = 0;
-		p->cleaned = p->cleaned_val = 0;
-	    }
+	    if (no_output) clear_cell(p);
 
 	    if (bytecell) p->v %= 256; /* Note: preserves sign but limits range. */
 
 	    if (p->v || p->is_set) {
 		if (p->cleaned && p->cleaned_val == p->v && p->is_set) {
-		    if (!keep_knowns) {
-			p->is_set = p->v = 0;
-			p->cleaned = p->cleaned_val = 0;
-		    }
+		    if (!keep_knowns) clear_cell(p);
 		} else {
 
 		    if (tapeoff > outoff) { outcmd('>', tapeoff-outoff); outoff=tapeoff; }
@@ -130,10 +130,8 @@ flush_tape(int no_output, int keep_knowns)
 		    if (keep_knowns && p->is_set) {
 			p->cleaned = p->is_set;
 			p->cleaned_val = p->v;
-		    } else {
-			p->v = p->is_set = 0;
-			p->cleaned = p->cleaned_val = 0;
-		    }
+		    } else
+			clear_cell(p);
 		}
 	    }
 
@@ -228,8 +226,7 @@ void outopt(int ch, int count)
 
     case ',':
 	flush_tape(0,1);
-	tape->is_set = 0; tape->v = 0;
-	tape->cleaned = 0; tape->cleaned_val = 0;
+	clear_cell(tape);
 	outcmd(ch, count);
 	return;
 
@@ -261,8 +258,7 @@ void outopt(int ch, int count)
     case 's':
 	if (!reg_known) {
 	    flush_tape(0,1);
-	    tape->is_set = 0; tape->v = 0;
-	    tape->cleaned = 0; tape->cleaned_val = 0;
+	    clear_cell(tape);
 	    outcmd(ch, count);
 	    return;
 	}
