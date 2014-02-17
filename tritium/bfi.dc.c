@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <limits.h>
 #include <string.h>
 
 #include "bfi.tree.h"
@@ -91,6 +92,7 @@ print_dc(void)
     int stackdepth = 0;
     int hello_world;
     int used_lix = 0, used_lox = 0;
+    int use_lmx = 0;
     ofd = stdout;
 
     calculate_stats();
@@ -114,6 +116,8 @@ print_dc(void)
 	fprintf(ofd, "[%dsp\n", -most_neg_maad_loop);
     else
 	fprintf(ofd, "[0sp\n");
+
+    use_lmx = ((cell_mask>0) || ((sizeof(long)>sizeof(int) && cell_size>0)));
 
     while(n)
     {
@@ -170,12 +174,12 @@ print_dc(void)
 	case T_END:
 	    stackdepth--;
 	    fetch_cell(n->offset);
-	    if (cell_mask > 0)	fprintf(ofd, "lmx ");
+	    if (use_lmx) fprintf(ofd, "lmx ");
 
 	    fprintf(ofd, "0!=b]Sb ");
 
 	    fetch_cell(n->offset);
-	    if (cell_mask > 0)	fprintf(ofd, "lmx ");
+	    if (use_lmx) fprintf(ofd, "lmx ");
 
 	    fprintf(ofd, "0!=bLbc\n");
 	    break;
@@ -184,7 +188,7 @@ print_dc(void)
 	    stackdepth--;
 	    fprintf(ofd, "]Sb ");
 	    fetch_cell(n->offset);
-	    if (cell_mask > 0)	fprintf(ofd, "lmx ");
+	    if (use_lmx) fprintf(ofd, "lmx ");
 
 	    fprintf(ofd, "0!=bLbc\n");
 	    break;
@@ -293,7 +297,13 @@ print_dc(void)
     }
 
     if (cell_mask > 0)
-	fprintf(ofd, "[%d+]sM [%d %% d0>M]sm\n", cell_mask+1, cell_mask+1);
+	fprintf(ofd, "[%u+]sM [%u %% d0>M]sm\n",
+		(unsigned)cell_mask+1, (unsigned)cell_mask+1);
+    else if (sizeof(long) > sizeof(int) && cell_size > 0) {
+	fprintf(ofd, "[%lu+]sM [%lu %% d0>M]sm\n",
+		(1UL << cell_size), (1UL << cell_size));
+	/* Hmm, how do I print the integer ULONG_MAX+1 ? */
+    }
 
     if (used_lix) {
 	if (input_string) {

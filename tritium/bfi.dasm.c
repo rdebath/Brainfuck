@@ -17,7 +17,7 @@
 void link_and_run(dasm_State **state);
 int tape_step = sizeof(int);
 
-#if defined(__amd64__) || defined(_M_AMD64)
+#if defined(__x86_64__) || defined(__amd64__) || defined(_M_AMD64)
 #include "dynasm/dasm_x86.h"
 #include "bfi.dasm.amd64.h"
 #define CPUID "x86_64"

@@ -52,6 +52,7 @@ characters after your favorite comment marker in a very visible form.
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <limits.h>
 #include <string.h>
 #include <ctype.h>
 #include <sys/time.h>
@@ -265,7 +266,8 @@ void LongUsage(FILE * fd, char * errormsg)
     printf("   -b8  Use 8 bit cells.\n");
     printf("   -b16 Use 16 bit cells.\n");
     printf("   -b32 Use 32 bit cells.\n");
-    printf("        Default for running now is %dbits.\n", (int)sizeof(int)*8);
+    printf("        Default for running now is %dbits.\n",
+			(int)sizeof(int)*CHAR_BIT);
     printf("        Default for C code is 'unknown', NASM can only be 8bit.\n");
     printf("        Other bitwidths also work (including 7..32)\n");
     printf("        Full Unicode characters need 21 bits.\n");
@@ -311,7 +313,7 @@ UsageInt64(void)
 	"You cannot *specify* a cell size > %zd bits on this machine.\n"
 	"Compiled C code can use larger cells using -DC=intmax_t, but beware the\n"
 	"optimiser may make changes that are unsafe for this code.\n",
-	sizeof(int)*8);
+	sizeof(int)*CHAR_BIT);
     exit(1);
 }
 
@@ -454,7 +456,7 @@ main(int argc, char ** argv)
 	Usage("Error: Filename or '-' must be specified");
 
 #ifdef NO_EXT_BE
-    if (cell_size == 0) set_cell_size(32);
+    if (cell_size == 0) set_cell_size(-1);
 
 #else
 #define XX 4
@@ -462,8 +464,8 @@ main(int argc, char ** argv)
 
     if (do_run == -1) do_run = (do_codestyle == c_default);
     if (do_run) opt_runner = 0; /* Run it in one go */
-    if (cell_size == 0 && (do_codestyle == c_default)) set_cell_size(32);
-    if (cell_size == 0 && opt_runner) set_cell_size(32);
+    if (cell_size == 0 && (do_codestyle == c_default)) set_cell_size(-1);
+    if (cell_size == 0 && opt_runner) set_cell_size(-1);
 
 #define XX 6		/* Check BE can cope with optimisation. */
 #include "bfi.be.def"
@@ -3247,8 +3249,8 @@ void
 set_cell_size(int cell_bits)
 {
     if (cell_bits == 0) cell_bits=8;
-    if (cell_bits >= (int)sizeof(int)*8 || cell_bits <= 0) {
-	cell_size = 32;
+    if (cell_bits >= (int)sizeof(int)*CHAR_BIT || cell_bits <= 0) {
+	cell_size = (int)sizeof(int)*CHAR_BIT;
 	cell_mask = -1;
     } else {
 	cell_size = cell_bits;
@@ -3263,11 +3265,11 @@ set_cell_size(int cell_bits)
     if (cell_size >= 0 && cell_size < 7) {
 	fprintf(stderr, "A minimum cell size of 7 bits is needed for ASCII.\n");
 	exit(1);
-    } else if (cell_size <= 8)
+    } else if (cell_size <= CHAR_BIT)
 	cell_type = "unsigned char";
-    else if (cell_size <= 16)
+    else if (cell_mask > 0 && cell_mask <= USHRT_MAX)
 	cell_type = "unsigned short";
-    else if ((size_t)cell_bits > sizeof(int)*8) {
+    else if (cell_bits > (int)sizeof(int)*CHAR_BIT) {
 	UsageInt64();
     } else
 	cell_type = "int";

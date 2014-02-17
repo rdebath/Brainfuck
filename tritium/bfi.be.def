@@ -142,8 +142,6 @@ X(dc,DC,
 #if XX == 4
     if (eofcell == 0 && do_codestyle == c_dc && input_string == 0)
 	eofcell = 6;
-    if (cell_size == 0 && do_codestyle == c_dc)
-	set_cell_size(32);
 #endif
 #if XX == 9
     {	int f = checkarg_dc(opt, arg);

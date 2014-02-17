@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <limits.h>
 #include <string.h>
 
 #ifndef DISABLE_TCCLIB
@@ -256,9 +257,9 @@ print_ccode(FILE * ofd)
     int use_multifunc;	    /* Create multiple functions ... TODO */
 
     if (cell_size > 0 &&
-	cell_size != sizeof(int)*8 &&
-	cell_size != sizeof(short)*8 &&
-	cell_size != sizeof(char)*8)
+	cell_size != sizeof(int)*CHAR_BIT &&
+	cell_size != sizeof(short)*CHAR_BIT &&
+	cell_size != sizeof(char)*CHAR_BIT)
 	add_mask = cell_mask;
 
     if (verbose)
@@ -528,6 +529,7 @@ print_ccode(FILE * ofd)
 		found_rail_runner = 1;
 	    }
 
+#ifdef __i386__
 	    /* TCCLIB generates a slow while() with two jumps in the loop,
 	     * and several memory accesses. This is the assembler we would
 	     * actually prefer.
@@ -571,11 +573,12 @@ print_ccode(FILE * ofd)
 		n=n->jmp;
 		break;
 	    }
+#endif
 
 	    /* TCCLIB generates a slow 'strlen', libc is better, but the
 	     * function call overhead is horrible.
 	     */
-	    if (found_rail_runner && cell_size == 8 && do_run &&
+	    if (found_rail_runner && cell_size == CHAR_BIT && do_run &&
 		add_mask <= 0 && n->next->count == 1) {
 		pt(ofd, indent,n);
 		fprintf(ofd, "if( m[%d] ) {\n", n->offset);
@@ -832,8 +835,12 @@ run_ccode(void)
 #ifndef CC
 #if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
 #if defined(__x86_64__)
+#if defined(__ILP32__)
+#define CC "gcc -mx32"
+#else
 #define CC "gcc -m64"
-#elif defined(__i586__)
+#endif
+#elif defined(__i386__)
 #define CC "gcc -m32"
 #else
 #define CC "gcc"

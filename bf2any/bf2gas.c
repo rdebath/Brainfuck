@@ -64,27 +64,6 @@ outcmd(int ch, int count)
 	printf("push %%rbp\n");
 	printf("mov %%rsp, %%rbp\n");
 	printf("mov $buffer, "CX"\n");
-
-#if 0
-        pushq   %rbp
-        movq    %rsp, %rbp
-        pushq   %r15
-        pushq   %r14
-        pushq   %r13
-        pushq   %r12
-        pushq   %rbx
-        subq    $24, %rsp
-	...
-        addq    $24, %rsp
-        popq    %rbx
-        popq    %r12
-        popq    %r13
-        popq    %r14
-        popq    %r15
-        popq    %rbp
-        ret
-#endif
-
 #endif
 	break;
     case '+': printf("addb $%d,("CX")\n", count); break;

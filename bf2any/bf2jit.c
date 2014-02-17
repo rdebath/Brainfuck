@@ -17,7 +17,7 @@
 void link_and_run(dasm_State **state);
 size_t tape_step = sizeof(int);
 
-#if defined(__amd64__) || defined(_M_AMD64)
+#if defined(__x86_64__) || defined(__amd64__) || defined(_M_AMD64)
 #include "dynasm/dasm_x86.h"
 #include "bf2jit.amd64.h"
 #elif defined(__i386__) || defined(_M_IX86)
