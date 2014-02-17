@@ -527,14 +527,13 @@ print_ccode(FILE * ofd)
 
 	case T_WHL:
 
-#ifndef DISABLE_TCCLIB
 	    found_rail_runner = 0;
 	    if (n->next->type == T_MOV &&
 		n->next->next && n->next->next->jmp == n) {
 		found_rail_runner = 1;
 	    }
 
-#ifdef __i386__
+#if !defined(DISABLE_TCCLIB) && defined(__i386__)
 	    /* TCCLIB generates a slow while() with two jumps in the loop,
 	     * and several memory accesses. This is the assembler we would
 	     * actually prefer.
@@ -583,7 +582,7 @@ print_ccode(FILE * ofd)
 	    /* TCCLIB generates a slow 'strlen', libc is better, but the
 	     * function call overhead is horrible.
 	     */
-	    if (found_rail_runner && cell_size == CHAR_BIT && do_run &&
+	    if (found_rail_runner && cell_size == CHAR_BIT &&
 		add_mask <= 0 && n->next->count == 1) {
 		pt(ofd, indent,n);
 		fprintf(ofd, "if( m[%d] ) {\n", n->offset);
@@ -605,7 +604,6 @@ print_ccode(FILE * ofd)
 		n=n->jmp;
 		break;
 	    }
-#endif
 
 	case T_CMULT:
 	case T_MULT:

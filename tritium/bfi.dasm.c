@@ -14,8 +14,19 @@
 
 #include "dynasm/dasm_proto.h"
 
-void link_and_run(dasm_State **state);
-int tape_step = sizeof(int);
+static void link_and_run(dasm_State **state);
+static int tape_step = sizeof(int);
+static int dump_code = 0;
+
+int
+checkarg_dynasm(char * opt, char * arg)
+{
+    if (!strcmp(opt, "-dump")) {
+	dump_code = 1;
+	return 1;
+    }
+    return 0;
+}
 
 #if defined(__x86_64__) || defined(__amd64__) || defined(_M_AMD64)
 #include "dynasm/dasm_x86.h"
@@ -43,7 +54,7 @@ typedef int (*fnptr)(char* memory);
 fnptr code = 0;
 size_t codelen;
 
-void
+static void
 link_and_run(dasm_State ** state)
 {
     size_t  size;
@@ -62,17 +73,20 @@ link_and_run(dasm_State ** state)
 
     assert(mprotect(codeptr, size, PROT_EXEC | PROT_READ) == 0);
 
-#if 0
     /* Write generated machine code to a temporary file.
     // View with:
     //  objdump -D -b binary -mi386 -Mx86,intel code.bin
     // or
     //  ndisasm -b32 code.bin
     */
-    FILE   *f = fopen("/tmp/code-dasm.bin", "w");
-    fwrite(codeptr, size, 1, f);
-    fclose(f);
-#endif
+    if (dump_code)
+    {
+	char *fname = "/tmp/code-dasm.bin";
+	FILE   *f = fopen(fname, "w");
+	fwrite(codeptr, size, 1, f);
+	fclose(f);
+	fprintf(stderr, "Dynasm "CPUID" code dumped to file '%s'\n", fname);
+    }
 
     if (verbose)
 	fprintf(stderr, "Compiled %d bytes of "CPUID" Dynasm code, running.\n", (int)codelen);

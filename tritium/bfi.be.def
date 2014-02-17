@@ -63,6 +63,11 @@ X(dynasm,DYNASM,
     }
     if (do_codestyle == c_dynasm && do_run == -1) do_run = 1;
 #endif
+#if XX == 9
+    {	int f = checkarg_dynasm(opt, arg);
+	if (f) return f;
+    }
+#endif
 #endif
 
 /****************************************************************************/

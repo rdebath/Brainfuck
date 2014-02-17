@@ -27,13 +27,15 @@
 |.define REG_B, ebx
 |.define REG_BL, bl
 |.define REG_C, ecx
+|.define REG_Z, edi
 |.else
 |.define REG_P, r15
 |.define REG_A, eax
 |.define REG_AL, al
-|.define REG_B, ebx
-|.define REG_BL, bl
+|.define REG_B, edx
+|.define REG_BL, dl
 |.define REG_C, ecx
+|.define REG_Z, ebx
 |.define PRM, rdi
 |.define PRM_D, edi
 |.endif
@@ -143,12 +145,14 @@ run_dynasm(void)
     | push r14
     | push r13
     | push r12
+    | push rbx
     |
     | mov  rbp, rsp
     | sub  rsp, 64 // Some shadow space for Windows (if this is ever ported).
     |
     | mov  REG_P, PRM
     |.endif
+    | xor  REG_Z, REG_Z
 
     while(n)
     {
@@ -166,13 +170,19 @@ run_dynasm(void)
         case T_ADD:
 	    load_acc_offset(offset);
 	    set_acc_offset(offset);
-	    | add REG_A, count
+	    if ((count != 128 && count >= 0) || count <= -128) {
+		| add REG_A, count
+	    } else {
+		| sub REG_A, -count
+	    }
 	    break;
 
 	case T_SET:
 	    set_acc_offset(offset);
 	    if (count == 0) {
 		| xor REG_A, REG_A
+//	    } else if (count >= -128 && count < 128) {
+//		| lea REG_A, [REG_Z+count]
 	    } else {
 		| mov REG_A, count
 	    }
@@ -180,13 +190,33 @@ run_dynasm(void)
 
 	case T_CALC:
 	    if (n->count2 != 0) {
+		int count2 = n->count2;
 		load_acc_offset(n->offset2);
 		set_acc_offset(offset);
 
-		if (n->count2 == -1) {
+		if (count2 == -2 || count2 == -3 || count2 == -5) {
 		    | neg REG_A
-		} else if (n->count2 != 1) {
-		    | imul REG_A, REG_A, (n->count2)
+		    count2 = -count2;
+		}
+
+		if (count2 == -1) {
+		    | neg REG_A
+		} else if (count2 == 2) {
+		    | add REG_A, REG_A
+		} else if (count2 == 3) {
+		    | lea REG_A, [REG_A+REG_A*2]
+		} else if (count2 == 3) {
+		    | lea REG_A, [REG_A+REG_A*2]
+		} else if (count2 == 5) {
+		    | lea REG_A, [REG_A+REG_A*4]
+		} else if (count2 == 6) {
+		    | lea REG_A, [REG_A+REG_A*2]
+		    | add REG_A, REG_A
+		} else if (count2 == 10) {
+		    | lea REG_A, [REG_A+REG_A*4]
+		    | add REG_A, REG_A
+		} else if (count2 != 1) {
+		    | imul REG_A, REG_A, (count2)
 		}
 	    } else {
 		fprintf(stderr, "Warning: T_CALC with count2 == 0 !?\n");
@@ -195,15 +225,35 @@ run_dynasm(void)
 	    }
 
 	    if (n->count3 != 0) {
+		int count3 = n->count3;
+
 		if (tape_step > 1) {
 		    | mov REG_B, [REG_P+ (n->offset3*tape_step) ]
 		} else {
 		    | movzx REG_B, byte [REG_P+ (n->offset3) ]
 		}
-		if (n->count3 == -1) {
+
+		if (count3 == -2 || count3 == -3 || count3 == -5) {
 		    | neg REG_B
-		} else if (n->count3 != 1) {
-		    | imul REG_B, REG_B, (n->count3)
+		    count3 = -count3;
+		}
+
+		if (count3 == -1) {
+		    | neg REG_B
+		} else if (count3 == 2) {
+		    | add REG_B, REG_B
+		} else if (count3 == 3) {
+		    | lea REG_B, [REG_B+REG_B*2]
+		} else if (count3 == 5) {
+		    | lea REG_B, [REG_B+REG_B*4]
+		} else if (count3 == 6) {
+		    | lea REG_B, [REG_B+REG_B*2]
+		    | add REG_B, REG_B
+		} else if (count3 == 10) {
+		    | lea REG_B, [REG_B+REG_B*4]
+		    | add REG_B, REG_B
+		} else if (count3 != 1) {
+		    | imul REG_B, REG_B, (count3)
 		}
 		| add REG_A, REG_B
 	    }
@@ -230,7 +280,7 @@ run_dynasm(void)
 	    dasm_growpc(Dst, maxpc);
 
 	    if (tape_step == 1) {
-                | cmp   REG_AL, 0
+                | test	REG_AL, REG_AL
 	    } else {
 		| test  REG_A, REG_A
 	    }
@@ -250,7 +300,7 @@ run_dynasm(void)
 	    }
 
 	    if (tape_step == 1) {
-                | cmp   REG_AL, 0
+                | test	REG_AL, REG_AL
 	    } else {
 		| test   REG_A, REG_A
 	    }
@@ -273,7 +323,11 @@ run_dynasm(void)
 		acc_loaded = 0;
 
 		if (cell_mask > 0 && acc_hi_dirty) {
-		    | and REG_A, cell_mask
+		    if (cell_mask == 0xFF) {
+			| movzx REG_A, REG_AL
+		    } else {
+			| and REG_A, cell_mask
+		    }
 		}
 
 		|.if I386
@@ -289,9 +343,8 @@ run_dynasm(void)
 	    }
 	    /* TODO: Strings */
 	    acc_loaded = 0;
-	    if (count >= 0 && count < 256) {
-		| xor REG_A, REG_A
-		| mov REG_AL, byte (count)
+	    if (count >= -128 && count < 128) {
+		| lea REG_A, [REG_Z+count]
 	    } else {
 		| mov REG_A, (count)
 	    }
@@ -356,6 +409,7 @@ run_dynasm(void)
     |.else
     | xor rax, rax
     | mov rsp, rbp
+    | pop rbx
     | pop r12
     | pop r13
     | pop r14
