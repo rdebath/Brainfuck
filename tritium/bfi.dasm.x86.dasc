@@ -120,7 +120,6 @@ run_dynasm(void)
 {
     struct bfi * n = bfprog;
 
-    calculate_stats();
     if (cell_size == 8) tape_step = 1; else
     tape_step = sizeof(int);
 

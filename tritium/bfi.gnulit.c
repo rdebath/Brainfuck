@@ -157,7 +157,6 @@ run_gnulightning(void)
     jit_node_t** loopstack = 0;
 #endif
 
-    calculate_stats();
     if (cell_size == 8)
 	tape_step = 1;
 

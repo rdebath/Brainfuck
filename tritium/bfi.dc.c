@@ -95,7 +95,6 @@ print_dc(void)
     int use_lmx = 0;
     ofd = stdout;
 
-    calculate_stats();
     hello_world = (total_nodes == node_type_counts[T_PRT] && !noheader);
 
     if (hello_world) {

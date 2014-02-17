@@ -273,7 +273,7 @@ void LongUsage(FILE * fd, char * errormsg)
     printf("        Full Unicode characters need 21 bits.\n");
     printf("        The optimiser may be less effective if this is not specified.\n");
     printf("\n");
-    printf("   -En  End of file processing.\n");
+    printf("   -E   End of file processing.\n");
     printf("   -E1      End of file gives no change for ',' command.\n");
     printf("   -E2      End of file gives -1.\n");
     printf("   -E3      End of file gives 0.\n");
@@ -349,8 +349,11 @@ checkarg(char * opt, char * arg)
 	    opt_level = strtol(arg,0,10);
 	    return 2;
 	case 'E':
-	    if (!arg_is_num) return 0;
-	    eofcell=strtol(arg,0,10);
+	    if (!arg_is_num) {
+		eofcell = 4;	/* tape[cell] = getchar(); */
+		return 1;
+	    } else
+		eofcell=strtol(arg,0,10);
 	    return 2;
 	case 'b':
 	    if (!arg_is_num) {
@@ -411,7 +414,6 @@ main(int argc, char ** argv)
     int filecount = 0;
 
     program = argv[0];
-    if (isatty(STDOUT_FILENO)) setbuf(stdout, 0);
     setlocale(LC_ALL, "");
 
     if (!strcmp("UTF-8", nl_langinfo(CODESET))) iostyle = 1;
@@ -801,14 +803,22 @@ process_file(void)
 	print_tree_stats();
 	if (verbose>1)
 	    printtree();
-    }
+    } else
+	calculate_stats(); /* is in print_tree_stats() */
 
 #ifndef NO_EXT_BE
+    if (do_run && total_nodes == node_type_counts[T_PRT])
+	do_codestyle = c_default; /* Be lazy for a 'Hello World'. */
+    else if (do_run && isatty(STDOUT_FILENO))
+	setbuf(stdout, 0);
+
     if (do_codestyle == c_default) {
 #endif
 
 	if (do_run) {
-	    if (verbose>2 || debug_mode || enable_trace) {
+	    if (verbose>2 || debug_mode || enable_trace
+		|| total_nodes == node_type_counts[T_PRT]) {
+
 		if (verbose)
 		    fprintf(stderr, "Starting profiling interpreter\n");
 		run_tree();
@@ -828,6 +838,7 @@ process_file(void)
 #ifndef NO_EXT_BE
     } else {
 	if (do_run) {
+
 	    if (verbose)
 		fprintf(stderr, "Running tree using '%s' generator\n",
 			codestylename[do_codestyle]);
@@ -894,8 +905,10 @@ calculate_stats(void)
 	    if (n->count > most_positive_mov)
 		most_positive_mov = n->count;
 	}
-	if (min_pointer > n->offset) min_pointer = n->offset;
-	if (max_pointer < n->offset) max_pointer = n->offset;
+	if (t != T_PRT || n->count == -1) {
+	    if (min_pointer > n->offset) min_pointer = n->offset;
+	    if (max_pointer < n->offset) max_pointer = n->offset;
+	}
 	if (n->profile)
 	    profile_hits += n->profile;
 
@@ -2957,8 +2970,6 @@ print_codedump(void)
 {
     struct bfi * n = bfprog;
     int memsz = 32768;
-
-    calculate_stats();
 
     if (!noheader) {
 	printf("%s%s%s%s%s\n",

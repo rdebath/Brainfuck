@@ -38,6 +38,7 @@
 #include "bfi.ccode.h"
 
 static const char * putname = "putch";
+static int use_direct_getchar = 0;
 
 void
 pt(FILE* ofd, int indent, struct bfi * n)
@@ -66,8 +67,6 @@ print_c_header(FILE * ofd)
     int l_iostyle = iostyle;
 
     if (cell_mask > 0 && cell_size < 8 && l_iostyle == 1) l_iostyle = 0;
-
-    calculate_stats();
 
     /* Hello world mode ? */
     if (!enable_trace && !do_run && total_nodes == node_type_counts[T_PRT]) {
@@ -107,9 +106,9 @@ print_c_header(FILE * ofd)
 
     if (node_type_counts[T_INP] != 0 && !do_run)
     {
-	if (l_iostyle == 2 && (eofcell == 4 || (eofcell == 2 && EOF == -1)))
-	    fprintf(ofd, "#define getch(oldch) getchar()\n");
-	else {
+	if (l_iostyle == 2 && (eofcell == 4 || (eofcell == 2 && EOF == -1))) {
+	    use_direct_getchar = 1;
+	} else {
 	    if (l_iostyle == 1) {
 		fprintf(ofd, "#include <locale.h>\n");
 		fprintf(ofd, "#include <wchar.h>\n\n");
@@ -501,10 +500,16 @@ print_ccode(FILE * ofd)
 
 	case T_INP:
 	    if (!disable_indent) pt(ofd, indent,n);
-	    if (n->offset == 0)
+	    if (use_direct_getchar) {
+		if (n->offset == 0)
+		    fprintf(ofd, "*m = getchar();\n");
+		else
+		    fprintf(ofd, "m[%d] = getchar();\n", n->offset);
+	    } else if (n->offset == 0)
 		fprintf(ofd, "*m = getch(*m);\n");
 	    else
 		fprintf(ofd, "m[%d] = getch(m[%d]);\n", n->offset, n->offset);
+
 	    if (enable_trace) {
 		pt(ofd, indent,0);
 		fprintf(ofd, "t(%d,%d,\"\",m+ %d)\n", n->line, n->col, n->offset);

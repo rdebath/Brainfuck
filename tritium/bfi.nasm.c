@@ -27,7 +27,6 @@ print_nasm(void)
     memset(charmap, 0, sizeof(charmap));
     curr_line = -1;
 
-    calculate_stats();
     hello_world = (total_nodes == node_type_counts[T_PRT] && !noheader);
 
     if (hello_world) {
