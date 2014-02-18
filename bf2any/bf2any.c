@@ -7,6 +7,7 @@
 int bytecell = 0;
 int enable_optim = 0;
 int enable_bf_optim = 0;
+int enable_mov_optim = 0;
 int enable_debug;
 const char * current_file;
 
@@ -46,15 +47,39 @@ static int madd_inc[32];
 static int madd_zmode[32];
 static int madd_count = 0;
 
+static int simple_mov_count = 0;
+
 static void
 outrun(int ch, int repcnt)
 {
     if (!enable_optim) {
-	if (!enable_bf_optim)
+	/* This is a very simple optimisation of pointer movements, it's
+	 * normally disabled as the full optimisation does this too.
+	 */
+	if (enable_mov_optim) {
+	    if (ch == '>') { simple_mov_count += repcnt; return; }
+	    if (ch == '<') { simple_mov_count -= repcnt; return; }
+	    if (simple_mov_count > 0) outcmd('>', simple_mov_count);
+	    if (simple_mov_count < 0) outcmd('<', -simple_mov_count);
+	    simple_mov_count = 0;
 	    outcmd(ch, repcnt);
-	else
+	    return;
+	}
+
+	/* This is just the constant folding optimisations; if the input to
+	 * that stage is pure BF the output will be too.
+	 */
+	if (enable_bf_optim) {
 	    outopt(ch, repcnt);
+	    return;
+	}
+
+	/* Disable optimisations; input codes are sent directly to BE */
+	outcmd(ch, repcnt);
+	return;
+
     } else {
+	/* Full normal BF optimisations, hunting for MAAD loops. */
 	int i, mov, inc, loopz;
 
 	/* Sweep everything from the buffer into outopt ? */
@@ -247,6 +272,10 @@ check_argv(const char * arg)
 	opt_supported = enable_optim = check_arg(arg);
     } else if (strcmp(arg, "-Obf") == 0) {
 	enable_bf_optim=1;
+	opt_supported = enable_optim = 0;
+    } else if (strcmp(arg, "-Omov") == 0) {
+	enable_mov_optim=1;
+	opt_supported = enable_optim = 0;
 
     } else if (strcmp(arg, "-#") == 0 && check_arg(arg)) {
 	enable_debug++;
