@@ -24,13 +24,12 @@
 
 #ifndef DISABLE_TCCLIB
 #include <libtcc.h>
-#else
+#endif
+
 #ifndef DISABLE_DLOPEN
 #include <dlfcn.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#define USE_DLOPEN
-#endif
 #endif
 
 #include "bfi.tree.h"
@@ -39,6 +38,19 @@
 
 static const char * putname = "putch";
 static int use_direct_getchar = 0;
+#if defined(DISABLE_DLOPEN)
+static const int use_dlopen = 0;
+#else
+static int use_dlopen = 0;
+static int choose_runner = -1;
+#endif
+
+#ifndef DISABLE_TCCLIB
+void run_tccode(void);
+#endif
+#ifndef DISABLE_DLOPEN
+void run_gccode(void);
+#endif
 
 void
 pt(FILE* ofd, int indent, struct bfi * n)
@@ -71,6 +83,7 @@ print_c_header(FILE * ofd)
     /* Hello world mode ? */
     if (!enable_trace && !do_run && total_nodes == node_type_counts[T_PRT]) {
 	int okay = 1;
+	int ascii_only = 1;
 	struct bfi * n = bfprog;
 	/* Check the string; be careful. */
 	while(n && okay) {
@@ -78,8 +91,15 @@ print_c_header(FILE * ofd)
 		|| n->count > '~' || n->count == '%' || n->count == '\\'
 		|| n->count == '"')
 		okay = 0;
+
+	    if (n->type == T_PRT && (n->count <= 0 || n->count > 127))
+		ascii_only = 0;
+	    if (n->type == T_INP) ascii_only = 0;
+
 	    n = n->next;
 	}
+
+	if (ascii_only) l_iostyle = 0;
 
 	if (okay) {
 	    fprintf(ofd, "#include <stdio.h>\n\n");
@@ -89,12 +109,12 @@ print_c_header(FILE * ofd)
 	}
     }
 
-#ifdef USE_DLOPEN
-    if (do_run) funcname = "brainfuck";
-#endif
+    if (do_run && use_dlopen) funcname = "brainfuck";
 
     fprintf(ofd, "#include <stdio.h>\n");
     fprintf(ofd, "#include <stdlib.h>\n\n");
+    if( cell_size == CHAR_BIT )
+	fprintf(ofd, "#include <string.h>\n\n");
 
     if (cell_size == 0) {
 	fprintf(ofd, "# ifdef C\n");
@@ -181,17 +201,17 @@ print_c_header(FILE * ofd)
     }
 
     if (do_run) {
-#ifdef USE_DLOPEN
-	fprintf(ofd, "#define mem brainfuck_memptr\n");
-	fprintf(ofd, "%s *mem;\n", cell_type);
-	fprintf(ofd, "#define putch (*brainfuck_putch)\n");
-	fprintf(ofd, "#define getch (*brainfuck_getch)\n");
-	fprintf(ofd, "void (*brainfuck_putch)(int ch);\n");
-	fprintf(ofd, "int (*brainfuck_getch)(int ch);\n");
-#else
-	fprintf(ofd, "extern void putch(int ch);\n");
-	fprintf(ofd, "extern int getch(int ch);\n");
-#endif
+	if (use_dlopen) {
+	    fprintf(ofd, "#define mem brainfuck_memptr\n");
+	    fprintf(ofd, "%s *mem;\n", cell_type);
+	    fprintf(ofd, "#define putch (*brainfuck_putch)\n");
+	    fprintf(ofd, "#define getch (*brainfuck_getch)\n");
+	    fprintf(ofd, "void (*brainfuck_putch)(int ch);\n");
+	    fprintf(ofd, "int (*brainfuck_getch)(int ch);\n");
+	} else {
+	    fprintf(ofd, "extern void putch(int ch);\n");
+	    fprintf(ofd, "extern int getch(int ch);\n");
+	}
     }
 
     if (enable_trace)
@@ -223,10 +243,8 @@ print_c_header(FILE * ofd)
     } else {
 	if (!do_run)
 	    fprintf(ofd, "static %s mem[%d];\n", cell_type, memsize);
-	else {
-#ifndef USE_DLOPEN
+	else if (!use_dlopen) {
 	    fprintf(ofd, "extern %s mem[];\n", cell_type);
-#endif
 	}
 	fprintf(ofd, "int %s(void){\n", funcname);
 	fprintf(ofd, "  register %s * m;\n", cell_type);
@@ -250,9 +268,7 @@ print_ccode(FILE * ofd)
     int indent = 0, disable_indent = 0;
     struct bfi * n = bfprog;
     int add_mask = 0;
-#ifndef DISABLE_TCCLIB
     int found_rail_runner;
-#endif
     int use_multifunc;	    /* Create multiple functions ... TODO */
 
     if (cell_size > 0 &&
@@ -661,11 +677,48 @@ print_ccode(FILE * ofd)
 	fprintf(ofd, "  return 0;\n}\n");
 }
 
+#if !defined(DISABLE_TCCLIB) || !defined(DISABLE_DLOPEN)
+
+int
+checkarg_ccode(char * opt, char * arg)
+{
+    if (!strcmp(opt, "-ltcc")) {
+	choose_runner = 0;
+	return 1;
+    }
+    if (!strcmp(opt, "-ldl")) {
+	choose_runner = 1;
+	return 1;
+    }
+    return 0;
+}
+
+void
+run_ccode(void)
+{
+#if defined(DISABLE_TCCLIB)
+    use_dlopen = 1;
+    run_gccode();
+#elif defined(DISABLE_DLOPEN)
+    run_tccode();
+#else
+    if (choose_runner >= 0)
+	use_dlopen = choose_runner;
+    else
+	use_dlopen = (total_nodes < 4000);
+    if (use_dlopen)
+	run_gccode();
+    else
+	run_tccode();
+#endif
+}
+#endif
+
 #ifndef DISABLE_TCCLIB
 typedef void (*void_func)(void);
 
 void
-run_ccode(void)
+run_tccode(void)
 {
     char * ccode;
     size_t ccodelen;
@@ -805,23 +858,27 @@ static char * args[] = {"tcclib", 0};
 #endif
 
 
-#ifdef USE_DLOPEN
+#ifndef DISABLE_DLOPEN
+#define BFBASE "bfpgm"
+
 static void compile_and_run(void);
 
 static char tmpdir[] = "/tmp/bfrun.XXXXXX";
 static char ccode_name[sizeof(tmpdir)+16];
 static char dl_name[sizeof(tmpdir)+16];
+static char obj_name[sizeof(tmpdir)+16];
 
 void
-run_ccode(void)
+run_gccode(void)
 {
     FILE * ofd;
     if( mkdtemp(tmpdir) == 0 ) {
 	perror("mkdtemp()");
 	exit(1);
     }
-    strcpy(ccode_name, tmpdir); strcat(ccode_name, "/bfpgm.c");
-    strcpy(dl_name, tmpdir); strcat(dl_name, "/bfpgm.so");
+    strcpy(ccode_name, tmpdir); strcat(ccode_name, "/"BFBASE".c");
+    strcpy(dl_name, tmpdir); strcat(dl_name, "/"BFBASE".so");
+    strcpy(obj_name, tmpdir); strcat(obj_name, "/"BFBASE".o");
     ofd = fopen(ccode_name, "w");
     print_ccode(ofd);
     fclose(ofd);
@@ -850,6 +907,7 @@ run_ccode(void)
 #endif
 #else
 #define CC "cc"
+#define DLOPEN_ABS_PATH
 #endif
 #endif
 
@@ -867,9 +925,22 @@ compile_and_run(void)
     if (verbose)
 	fprintf(stderr, "Running C Code using \""CC" -shared\" and dlopen().\n");
 
-    sprintf(cmdbuf, CC" %s -shared -fPIC -o %s %s",
-	    "", dl_name, ccode_name);
+#ifdef DLOPEN_ABS_PATH
+    sprintf(cmdbuf, "%s -shared -fPIC -o %s %s",
+                CC, dl_name, ccode_name);
     ret = system(cmdbuf);
+#else
+    /* Like this so that ccache has an absolute path and distinct compile. */
+    sprintf(cmdbuf, "cd %s; %s -fPIC -c -o %s %s",
+	    tmpdir, CC, BFBASE".o", BFBASE".c");
+    ret = system(cmdbuf);
+
+    if (ret != -1) {
+	sprintf(cmdbuf, "cd %s; %s -shared -fPIC -o %s %s",
+		tmpdir, CC, dl_name, BFBASE".o");
+	ret = system(cmdbuf);
+    }
+#endif
 
     if (ret == -1) {
 	perror("Calling C compiler failed");
@@ -894,6 +965,7 @@ compile_and_run(void)
 
     unlink(ccode_name);
     unlink(dl_name);
+    unlink(obj_name);
     rmdir(tmpdir);
 
     (*runfunc)();

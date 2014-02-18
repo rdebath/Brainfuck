@@ -3,8 +3,8 @@
 PGM=$(readlink -f "$0")
 
 LUA=/usr/bin/luajit
-[ -x "$LUA" ] || LUA=/usr/bin/lua
 [ -x "$LUA" ] || LUA="`which luajit`"
+[ -x "$LUA" ] || LUA=/usr/bin/lua
 [ -x "$LUA" ] || LUA=lua
 
 exec $LUA $PGM.lua "$@"

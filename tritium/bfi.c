@@ -466,8 +466,8 @@ main(int argc, char ** argv)
 
     if (do_run == -1) do_run = (do_codestyle == c_default);
     if (do_run) opt_runner = 0; /* Run it in one go */
-    if (cell_size == 0 && (do_codestyle == c_default)) set_cell_size(-1);
-    if (cell_size == 0 && opt_runner) set_cell_size(-1);
+    if (cell_size == 0 && (do_codestyle == c_default || do_run || opt_runner))
+	set_cell_size(-1);
 
 #define XX 6		/* Check BE can cope with optimisation. */
 #include "bfi.be.def"
@@ -3259,7 +3259,6 @@ putch(int ch)
 void
 set_cell_size(int cell_bits)
 {
-    if (cell_bits == 0) cell_bits=8;
     if (cell_bits >= (int)sizeof(int)*CHAR_BIT || cell_bits <= 0) {
 	cell_size = (int)sizeof(int)*CHAR_BIT;
 	cell_mask = -1;

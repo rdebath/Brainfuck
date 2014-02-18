@@ -101,6 +101,11 @@ X(ccode,CCODE,
 	do_codestyle = c_ccode;
     }
 #endif
+#if XX == 9
+    {	int f = checkarg_ccode(opt, arg);
+	if (f) return f;
+    }
+#endif
 #else
 X(ccode,CCODE,
     printf("   -c   Create C code.\n");				    ,
