@@ -440,7 +440,7 @@ main(int argc, char ** argv)
 	    optbuf[2] = 0;
 	    if ((f = checkarg(optbuf, argv[ar]+2)) == 2) continue;
 
-	    for(p=argv[ar]+1; *p; p++) {
+	    for(p=argv[ar]+1+(f==1); *p; p++) {
 		optbuf[0] = '-';
 		optbuf[1] = *p;
 		optbuf[2] = 0;
