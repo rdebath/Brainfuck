@@ -120,6 +120,10 @@ static const char *rhoprime[] =
 static const char *zero[] =
     { "0+", "0-", "0++", "0--", "0.", "0?", "0/", "/0" };
 
+/* Language "nyan" (may need prefix and suffix of "nyan") */
+static const char *nyan[] =
+    {"anna", "nana", "nnya", "nnna", "anan", "nnay", "annn", "naaa"};
+
 static int langclass = L_CHARS;
 static const char ** lang = bfout;
 static const char ** c = 0;
@@ -189,6 +193,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-zero") == 0) {
 	lang = zero; langclass = L_WORDS; return 1;
     } else
+    if (strcmp(arg, "-nyan") == 0) {
+	lang = nyan; langclass = L_JNWORD; return 1;
+    } else
 
     if (strcmp(arg, "-risbf") == 0) {
 	lang = 0; langclass = L_RISBF; return 1;
@@ -231,6 +238,7 @@ check_arg(const char * arg)
 	"\n\t"  "-pog    Pogaack."
 	"\n\t"  "-chi    In chinese."
 	"\n\t"  "-zero   'zerolang' from mescam on github"
+	"\n\t"  "-nyan   'nyan-script' from tommyschaefer on github"
 	);
 	return 1;
     } else
