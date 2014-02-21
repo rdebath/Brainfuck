@@ -33,12 +33,17 @@ int ind = 0;
 #define prv(s,v) printf("%*s" s "\n", ind*4, "", (v))
 
 static void print_cstring(void);
+static int use_macro = 0;
 
 int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     if (strcmp(arg, "-savestring") == 0) return 1;
+    if (strcmp(arg, "-mac") == 0) {
+	use_macro = 1;
+	return 1;
+    }
     return 0;
 }
 
@@ -92,24 +97,26 @@ outcmd(int ch, int count)
 	);
 	puts("");
 
-#ifdef ALLOW_INLINE_KEYWORD
-	printf("%s",
-	    "static inline\n"
-	    "mpz_t *\n"
-	    "move_ptr(mpz_t *p, int off) {\n"
-	    "    p += off;\n"
-	    "    if ((off>0 || p >= mem) && (off<0 || p < mem+memsize)) return p;\n"
-	    "    return alloc_ptr(p);\n"
-	    "}\n"
-	);
-#else
-	printf("%s",
-	    "#define move_ptr(P,O) (((P)+=(O), \\\n"
-	    "        ((O)>=0 && (P)>=mem+memsize) || \\\n"
-	    "        ((O)<=0 && (P)<mem) ) ? \\\n"
-	    "            alloc_ptr(P): (P) )\n"
-	);
-#endif
+	if (!use_macro) {
+	    /* #include rant about different semantics of inline keyword */
+	    /* => inline func must not be static and must only exist in one file */
+	    printf("%s",
+		"inline\n"
+		"mpz_t *\n"
+		"move_ptr(mpz_t *p, int off) {\n"
+		"    p += off;\n"
+		"    if ((off>0 || p >= mem) && (off<0 || p < mem+memsize)) return p;\n"
+		"    return alloc_ptr(p);\n"
+		"}\n"
+	    );
+	} else {
+	    printf("%s",
+		"#define move_ptr(P,O) (((P)+=(O), \\\n"
+		"        ((O)>=0 && (P)>=mem+memsize) || \\\n"
+		"        ((O)<=0 && (P)<mem) ) ? \\\n"
+		"            alloc_ptr(P): (P) )\n"
+	    );
+	}
 
 	puts("");
 
