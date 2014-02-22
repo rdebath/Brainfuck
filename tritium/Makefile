@@ -25,7 +25,7 @@
 all: bfi
 
 CC=gcc
-CFLAGS=-O3 -Wall -Wshadow -I$(TOOLDIR) $(DEFS) $(CONF)
+CFLAGS=-O3 -Wall -Wshadow -idirafter $(TOOLDIR) $(DEFS) $(CONF)
 LDFLAGS=
 TOOLDIR=../tools
 
