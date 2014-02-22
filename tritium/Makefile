@@ -71,9 +71,10 @@ bfi.version.h: $(wildcard *.c) bfi.tree.h bfi.run.h bfi.be.def
 # Auto configure
 
 DO_TCC=$(wildcard /usr/include/libtcc.h)
-DO_LIGHT=$(wildcard /usr/include/lightning.h)
 DO_LIBDL=$(wildcard /usr/include/dlfcn.h)
 DO_DYNASM=$(wildcard $(TOOLDIR)/dynasm/dynasm)
+DO_MYLIGHT=$(wildcard $(TOOLDIR)/lightning.h)
+DO_LIGHT=$(wildcard /usr/include/lightning.h)
 
 ifeq ($(DO_LIBDL),)
 CONF_LIBDL=-DDISABLE_DLOPEN
@@ -94,16 +95,15 @@ endif
 endif
 
 ifeq ($(DO_LIGHT),)
+ifeq ($(DO_MYLIGHT),)
 CONF_LIGHTNING=-DDISABLE_GNULIGHTNING
 LIBS_LIGHTNING=
+endif
 else
-DO_LIGHT2=$(wildcard /usr/include/lightning/asm.h)
-ifeq ($(DO_LIGHT2),)
+DO_LIGHT2=$(wildcard /usr/include/lightning/jit_*.h)
+ifneq ($(DO_LIGHT2),)
 CONF_LIGHTNING=
 LIBS_LIGHTNING=-llightning
-else
-CONF_LIGHTNING=
-LIBS_LIGHTNING=
 endif
 endif
 

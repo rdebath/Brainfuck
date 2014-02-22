@@ -3307,6 +3307,9 @@ void *
 map_hugeram(void)
 {
     void * mp;
+    if (cell_array_pointer != 0)
+	return cell_array_pointer;
+
     cell_array_alloc_len = MEMSIZE + 2*MEMGUARD;
 
     /* Map the memory and two guard regions */
@@ -3328,7 +3331,8 @@ map_hugeram(void)
     }
 
     if (cell_array_alloc_len < MEMSIZE)
-	fprintf(stderr, "Warning: Only able to map part of cell array, continuing.\n");
+	if (verbose)
+	    fprintf(stderr, "Warning: Only able to map part of cell array, continuing.\n");
 
     cell_array_low_addr = mp;
 
@@ -3598,7 +3602,7 @@ convert_tree_to_runarray(void)
     free(progarray);
 }
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
 __attribute((optimize(3),hot,aligned(64)))
 #endif
 void

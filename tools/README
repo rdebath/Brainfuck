@@ -1,0 +1,12 @@
+DynASM
+	Dynamic assembler from LuaJIT 2.0.2
+	Project Homepage: http://luajit.org/
+
+	Tested and runs correctly on x86 and x86_x64.
+
+lightning-1.2.tar.gz
+	GNU Lightning v1.2 for i686, PowerPC and sparc
+
+	Minor modifications so it will work without autoconf and fail
+	softly on other processors.
+

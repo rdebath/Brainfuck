@@ -14,15 +14,18 @@
 #include "bfi.tree.h"
 
 #ifndef DISABLE_GNULIGHTNING
+#define LIGHTNING_DETECT
 #include <lightning.h>
 
 #ifdef jit_set_ip
 #define GNULIGHTv1
-#else
+#elif defined(JIT_R0)
 #define GNULIGHTv2
 #endif
 
 #include "bfi.run.h"
+
+#if defined(GNULIGHTv1) || defined(GNULIGHTv2)
 
 /* GNU lightning's macros upset GCC a little ... */
 #pragma GCC diagnostic ignored "-Wunused-value"
@@ -148,6 +151,7 @@ run_gnulightning(void)
 {
     struct bfi * n = bfprog;
     int maxstack = 0, stackptr = 0;
+    void * tape_memory = 0;
 #ifdef GNULIGHTv1
     jit_insn** loopstack = 0;
     jit_insn *codeBuffer;
@@ -159,6 +163,8 @@ run_gnulightning(void)
 
     if (cell_size == 8)
 	tape_step = 1;
+
+    tape_memory = map_hugeram();
 
 #ifdef GNULIGHTv1
     /* TODO: Use mmap for allocating memory, the x86 execute protection
@@ -178,7 +184,7 @@ run_gnulightning(void)
     /* Function call prolog */
     jit_prolog(0);
     /* Get the data area pointer */
-    jit_movi_p(REG_P, map_hugeram());
+    jit_movi_p(REG_P, tape_memory);
 #endif
 
 #ifdef GNULIGHTv2
@@ -188,7 +194,7 @@ run_gnulightning(void)
     jit_prolog();
 
     /* Get the data area pointer */
-    jit_movi(REG_P, (jit_word_t) map_hugeram());
+    jit_movi(REG_P, (jit_word_t) tape_memory);
 #endif
 
     while(n)
@@ -528,4 +534,14 @@ run_gnulightning(void)
     /* TODO -- Free allocated memory */
 }
 
+#else
+#warning "GNU Lightning did not configure successfully."
+int gnulightning_ok = 0;
+void
+run_gnulightning(void)
+{
+    fprintf(stderr, "GNU Lightning isn't configured\n");
+    exit(1);
+}
+#endif
 #endif
