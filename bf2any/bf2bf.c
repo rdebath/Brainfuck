@@ -36,6 +36,7 @@
 #define L_TOKENS        0x10    /* Print the tokens one per line. */
 #define L_RISBF         0x11    /* while (count-->0) risbf(ch); */
 #define L_HEADSECKS     0x12    /* headsecks(token, count); */
+#define L_BFRLE         0x13    /* bfrle(token, count); */
 
 
 static const char bf[] = "><+-.,[]";
@@ -136,6 +137,7 @@ static int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
 
 static void risbf(int ch);
 static void headsecks(int ch, int count);
+static void bfrle(int ch, int count);
 
 int
 check_arg(const char * arg)
@@ -186,6 +188,9 @@ check_arg(const char * arg)
     } else
     if (strcmp(arg, "-head") == 0) {
 	lang = 0; langclass = L_HEADSECKS; return 1;
+    } else
+    if (strcmp(arg, "-bfrle") == 0) {
+	lang = 0; langclass = L_BFRLE; return 1;
     } else
     if (strcmp(arg, "-rho") == 0 || strcmp(arg, "-rhoprime") == 0) {
 	lang = rhoprime; langclass = L_JNWORD; return 1;
@@ -332,6 +337,7 @@ outcmd(int ch, int count)
     case L_TOKENS:	printf("%c %d\n", ch, count); col = 0; break;
     case L_RISBF:	while (count-->0) risbf(ch); break;
     case L_HEADSECKS:	headsecks(ch, count); break;
+    case L_BFRLE:	bfrle(ch, count); break;
     }
 
     if (ch == '~') {
@@ -397,4 +403,18 @@ headsecks(int ch, int count)
 	if (ch == 0) rset += 8;
 	pc('A' -1 + ch + rset);
     }
+}
+
+static void
+bfrle(int ch, int count)
+{
+    char * p;
+
+    if (! (p = strchr(bf,ch))) return;
+
+    if (count > 2 && (p-bf) < 4) {
+	pc(0);
+	col += printf("%d%c", count, ch);
+    } else while (count-- > 0)
+	pc(ch);
 }
