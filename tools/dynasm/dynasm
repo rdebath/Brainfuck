@@ -7,4 +7,20 @@ LUA=/usr/bin/luajit
 [ -x "$LUA" ] || LUA=/usr/bin/lua
 [ -x "$LUA" ] || LUA=lua
 
+$LUA $PGM.lua -A x86 >/dev/null 2>&1 || {
+    # No useful lua try the mini.
+    dir="`dirname \"$PGM\"`"
+    [ -f "$dir/minilua.c" -a ! -x "$dir/minilua" ] && {
+	echo A suitable real lua was not found, building minilua ...
+	cc -o "$dir/minilua" "$dir/minilua.c" -lm
+    }
+
+    LUA="$dir/minilua"
+
+    $LUA $PGM.lua -A x86 >/dev/null 2>&1 || {
+	echo Unable to find a suitable lua to run DynASM
+	exit 1
+    }
+}
+
 exec $LUA $PGM.lua "$@"
