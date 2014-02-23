@@ -140,10 +140,27 @@ static void puts_without_nl(char * s) { fputs(s, stdout); }
 
 static void failout(void) { fprintf(stderr, "STOP Command executed.\n"); exit(1); }
 
+struct freecell { struct freecell * next; void * memp; } * saved_pointers = 0;
+
 static void
 save_ptr_for_free(void * memp)
 {
-    /* TODO */
+    struct freecell * n = malloc(sizeof*n);
+    if (!n) {perror("malloc"); return; }
+    n->next = saved_pointers;
+    n->memp = memp;
+    saved_pointers = n;
+}
+
+static void
+free_saved_memory(void)
+{
+    while(saved_pointers) {
+	struct freecell * n = saved_pointers;
+	saved_pointers = saved_pointers->next;
+	free(n->memp);
+	free(n);
+    }
 }
 
 void
@@ -531,7 +548,9 @@ run_gnulightning(void)
     finish_jit();
 #endif
 
-    /* TODO -- Free allocated memory */
+    codeptr = 0;
+    if (loopstack) { free(loopstack); loopstack = 0; }
+    free_saved_memory();
 }
 
 #else

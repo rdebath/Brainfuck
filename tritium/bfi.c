@@ -191,6 +191,7 @@ struct bfi * add_node_after(struct bfi * p);
 void run_tree(void);
 void print_codedump(void);
 void * map_hugeram(void);
+void unmap_hugeram(void);
 void trap_sigsegv(void);
 int getch(int oldch);
 void putch(int oldch);
@@ -479,9 +480,11 @@ main(int argc, char ** argv)
 
     for(ar = 0; ar<filecount; ar++)
 	load_file(filelist[ar], ar==0, ar+1>=filecount);
+    free(filelist); filelist = 0;
 
     process_file();
 
+    delete_tree();
     exit(0);
 }
 
@@ -832,6 +835,8 @@ process_file(void)
 		    fprintf(stderr, "Starting array interpreter\n");
 		convert_tree_to_runarray();
 	    }
+
+	    unmap_hugeram();
 	} else
 	    print_codedump();
 
@@ -852,6 +857,8 @@ process_file(void)
 #define XX 7
 #include "bfi.be.def"
 	    }
+
+	    unmap_hugeram();
 	} else {
 	    if (verbose)
 		fprintf(stderr, "Generating '%s' style output code\n",
@@ -3291,13 +3298,24 @@ map_hugeram(void)
 {
     if(cell_array_pointer==0) {
 	if (hard_left_limit<0) {
-	    cell_array_pointer = tcalloc(MEMSIZE-hard_left_limit, sizeof(int));
-	    cell_array_pointer = (char *)cell_array_pointer
-			       - hard_left_limit*sizeof(int);
-	} else
-	    cell_array_pointer = tcalloc(MEMSIZE, sizeof(int));
+	    cell_array_low_addr = tcalloc(MEMSIZE-hard_left_limit, sizeof(int));
+	    cell_array_pointer = (char *)cell_array_low_addr - hard_left_limit*sizeof(int);
+	} else {
+	    cell_array_low_addr = tcalloc(MEMSIZE, sizeof(int));
+	    cell_array_pointer = cell_array_low_addr;
+	}
     }
     return cell_array_pointer;
+}
+
+void
+unmap_hugeram(void)
+{
+    if(cell_array_pointer==0) return;
+    free(cell_array_low_addr)
+    cell_array_pointer = 0;
+    cell_array_low_addr = 0;
+    cell_array_alloc_len = 0;
 }
 #endif
 
@@ -3353,6 +3371,16 @@ map_hugeram(void)
 	cell_array_pointer += MEMSKIP;
 
     return cell_array_pointer;
+}
+
+void
+unmap_hugeram(void)
+{
+    if(cell_array_pointer==0) return;
+    if(munmap(cell_array_low_addr, cell_array_alloc_len))
+	perror("munmap tape");
+    cell_array_pointer = 0;
+    cell_array_low_addr = 0;
 }
 
 void
