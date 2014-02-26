@@ -22,6 +22,9 @@
 #
 # make DO_TCC= DO_LIGHT= DO_LIBDL= DO_DYNASM=
 
+# Always run the version check script.
+VERSTRING := $(shell sh version.sh bfi.version.h)
+
 all: bfi
 
 CC=gcc
@@ -64,9 +67,6 @@ bfi.dasm.amd64.h: bfi.dasm.x86.dasc
 
 bfi.dasm.i686.h: bfi.dasm.x86.dasc
 	$(TOOLDIR)/dynasm/dynasm -c -D I386 -o bfi.dasm.i686.h bfi.dasm.x86.dasc
-
-bfi.version.h: $(wildcard *.c) bfi.tree.h bfi.run.h bfi.be.def 
-	@sh version.sh > bfi.version.h
 
 # Auto configure
 

@@ -1,5 +1,5 @@
 #!/bin/sh
-[ -n "$1" ] && cd $1
+[ -n "$2" ] && cd $2
 
 MAJOR=0
 MINOR=10
@@ -7,7 +7,8 @@ MINOR=10
 SUFFIX="-post"
 BUILD=0
 
-git_status() {
+git_describe() {
+    # More detail than git describe --tagso
     TAG=`git tag -l v$MAJOR.$MINOR`
     if [ `git rev-list origin -n 1 2>/dev/null | wc -l` -eq 0 ]
     then ORIGIN=HEAD
@@ -35,8 +36,8 @@ git_status() {
     [ "$OVER" -gt "$VER" ] &&
 	echo WARNING: Origin is ahead of your current HEAD by $((OVER-VER)) commits. 1>&2
 
-    [ "$DIFF" -ne 0 ] && SUFFIX="$SUFFIX.$DIFF"
-    [ "$MOD" -ne 0 -a "$DIFF" -eq 0 ] && SUFFIX="${SUFFIX}.0"
+    [ "$DIFF" -ne 0 ] && SUFFIX="$SUFFIX+$DIFF"
+    [ "$MOD" -ne 0 -a "$DIFF" -eq 0 ] && SUFFIX="${SUFFIX}+0"
     [ "$MOD" -ne 0 ] && SUFFIX="${SUFFIX}.${MOD}"
 
     [ "$TAG" = "" ] && SUFFIX="$SUFFIX-pre"
@@ -45,10 +46,26 @@ git_status() {
     BUILD="$VER"
 }
 
-((type git && git status ) >/dev/null 2>&1) && git_status
+((type git && git status ) >/dev/null 2>&1) && git_describe
 
+if [ -n "$1" ]
+then TMPFILE="$1".tmp
+else TMPFILE=/dev/stdout
+fi
+
+{
 echo "#define VERSION_MAJOR    $MAJOR"
 echo "#define VERSION_MINOR    $MINOR"
 echo "#define VERSION_BUILD    $BUILD"
 echo "#define VERSION_SUFFIX   \"$SUFFIX\""
-echo "#define BUILD_DATE       \"`date --rfc-3339=seconds`\""
+} > "$TMPFILE"
+
+[ -n "$1" ] && {
+    if ! cmp -s "$TMPFILE" "$1"
+    then
+	mv "$TMPFILE" "$1"
+    else rm -f "$TMPFILE"
+    fi
+}
+
+exit 0

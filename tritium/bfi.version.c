@@ -11,5 +11,5 @@
 void
 print_banner(FILE * fd, char const * program)
 {
-    fprintf(fd, "%s: Version "VERSION", date "BUILD_DATE"\n", program);
+    fprintf(fd, "%s: Version "VERSION"\n", program);
 }
