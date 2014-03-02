@@ -15,6 +15,9 @@ static int hello_world = 0;
 
 static char * curfile = "brainfuck"; /* Hmmm */
 
+/* loop_class: condition at 1=> end, 2=>start, 3=>both */
+static int loop_class = 3;
+
 void
 print_nasm(void)
 {
@@ -173,12 +176,12 @@ print_nasm(void)
 	    break;
 
 	case T_CALC:
-	    if (0) {
+#if 0
 		printf("; CALC [ecx+%d] = %d + [ecx+%d]*%d + [ecx+%d]*%d\n",
 			n->offset, n->count,
 			n->offset2, n->count2,
 			n->offset3, n->count3);
-	    }
+#endif
 
 	    if (n->count2 == 1 && n->count3 == 0) {
 		/* m[1] = m[2]*1 + m[3]*0 */
@@ -272,9 +275,6 @@ print_nasm(void)
 	    }
 	    break;
 
-/* LoopClass: condition at 1=> end, 2=>start, 3=>both */
-#define LoopClass 3
-
 	case T_MULT: case T_CMULT: case T_IF: case T_FOR:
 	case T_WHL:
 
@@ -289,12 +289,12 @@ print_nasm(void)
 //	    else
 		neartok = "";
 
-	    if (n->type == T_IF || (LoopClass & 2) == 2) {
-		if ((LoopClass & 1) == 0)
+	    if (n->type == T_IF || (loop_class & 2) == 2) {
+		if ((loop_class & 1) == 0)
 		    printf("start_%d:\n", n->count);
 		printf("\tcmp dh,byte [ecx+%d]\n", n->offset);
 		printf("\tjz%s end_%d\n", neartok, n->count);
-		if ((LoopClass & 1) == 1 && n->type != T_IF)
+		if ((loop_class & 1) == 1 && n->type != T_IF)
 		    printf("loop_%d:\n", n->count);
 	    } else {
 		printf("\tjmp%s last_%d\n", neartok, n->count);
@@ -310,19 +310,19 @@ print_nasm(void)
 
 	    if (n->jmp->type == T_IF) {
 		printf("end_%d:\n", n->jmp->count);
-	    } else if ((LoopClass & 1) == 0) {
+	    } else if ((loop_class & 1) == 0) {
 		printf("\tjmp%s start_%d\n", neartok, n->jmp->count);
 		printf("end_%d:\n", n->jmp->count);
 	    } else {
-		if ((LoopClass & 2) == 0)
+		if ((loop_class & 2) == 0)
 		    printf("last_%d:\n", n->jmp->count);
 		printf("\tcmp dh,byte [ecx+%d]\n", n->jmp->offset);
 		printf("\tjnz%s loop_%d\n", neartok, n->jmp->count);
-		if ((LoopClass & 2) == 2)
+		if ((loop_class & 2) == 2)
 		    printf("end_%d:\n", n->jmp->count);
 	    }
 
-	    if ((LoopClass & 2) == 2)
+	    if ((loop_class & 2) == 2)
 		while(n->next && n->next->type == T_END && n->offset == n->next->offset) {
 		    n=n->next;
 		    printf("end_%d:\n", n->jmp->count);

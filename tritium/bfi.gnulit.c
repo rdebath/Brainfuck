@@ -28,11 +28,13 @@
 #if defined(GNULIGHTv1) || defined(GNULIGHTv2)
 
 /* GNU lightning's macros upset GCC a little ... */
+#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=3))
 #pragma GCC diagnostic ignored "-Wunused-value"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wpointer-to-int-cast"
 #pragma GCC optimize("no-strict-aliasing")
 #pragma GCC optimize(1)
+#endif
 
 #ifdef GNULIGHTv1
 #define jit_addi jit_addi_i
@@ -470,7 +472,6 @@ run_gnulightning(void)
 		    n->offset2, n->count2,
 		    n->offset3, n->count3);
 	    exit(1);
-	    break;
 	}
 	n=n->next;
 

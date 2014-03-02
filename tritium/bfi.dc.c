@@ -261,7 +261,6 @@ print_dc(void)
 		    n->offset2, n->count2,
 		    n->offset3, n->count3);
 	    exit(1);
-	    break;
 	}
 	n=n->next;
     }

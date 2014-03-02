@@ -203,7 +203,7 @@ void run_progarray(int * progarray);
 void try_opt_runner(void);
 int update_opt_runner(struct bfi * n, int * mem, int offset);
 
-void LongUsage(FILE * fd, char * errormsg)
+void LongUsage(FILE * fd, const char * errormsg)
 {
 #ifdef NO_EXT_BE
     fprintf(fd, "%s: LITE version, compiled: %s\n", program, __DATE__);
@@ -294,7 +294,7 @@ void LongUsage(FILE * fd, char * errormsg)
 }
 
 void
-Usage(char * why)
+Usage(const char * why)
 {
     LongUsage(stderr, why);
 }
@@ -870,7 +870,6 @@ process_file(void)
 				"have a code output option available.\n",
 				codestylename[do_codestyle]);
 		exit(1);
-		break;
 #define XX 5
 #include "bfi.be.def"
 	    }
@@ -1777,9 +1776,10 @@ find_known_value_recursion(struct bfi * n, int v_offset,
 		n = 0;
 	    }
 	    goto break_break;
-#endif
+#else
 	    unmatched_ends++;
 	    break;
+#endif
 
 	case T_IF:
 	    /* Can search past an IF because it has only one entry point. */

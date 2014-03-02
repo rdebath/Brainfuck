@@ -81,7 +81,7 @@ link_and_run(dasm_State ** state)
     */
     if (dump_code)
     {
-	char *fname = "/tmp/code-dasm.bin";
+	const char *fname = "/tmp/code-dasm.bin";
 	FILE   *f = fopen(fname, "w");
 	fwrite(codeptr, size, 1, f);
 	fclose(f);
