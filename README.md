@@ -11,8 +11,18 @@ This repository contains various [brainfuck](http://esolangs.org/wiki/Brainfuck)
 
   Though before you try it you might like to try this slightly less nasty Hello World! 
 
-      >++++++++[<+++++++++>-]<.>>+>+>++>[-]+<[>[->+<<++++>]<<]>.+++++++..+++.>
-      >+++++++.<<<[[-]<[-]>]<+++++++++++++++.>>.+++.------.--------.>>+.>++++.
+  ```brainfuck
+  1 [][][][][][][][][][][][][][][][][][][][][][][][][][][][][][]
+  2 []>+>+>++>++<[>[->++++<<+++>]<<]>----.>->+.+++++++..+++.<+[]
+  3 [ This is hellbox, a 104 command Hello World               ]
+  4 [   >+>+>++>++<[>[->++++<<+++>]<<]>----.>>+.+++++++..+++   ]
+  5 [   .>.<<<+++++++++++++++.>>.+++.------.--------.>+.>++.   ]
+  6 [ -- Robert de Bath -- 2014                                ]
+  7 []>>.<<<+++++++++++++++.>>.+++.------.--------.>+.+>++.<<<[]
+  8 [][][][][][][][][][][][][][][][][][][][][][][][][][][][][][]
+  ```
+  
+  Lines 2 and 7 are the code that should be run, lines 1 and 8 are decorative and lines 2 to 6 can contain anything where each line is enclosed in [] and contains balanced brackets.
 
 2. VIM Syntax highlighting file for brainfuck.
 
