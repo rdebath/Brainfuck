@@ -183,7 +183,7 @@ void outopt(int ch, int count)
 	if (ch == ']') deadloop--;
 	return;
     }
-    if (ch == '[') {
+    if (ch == '[' && !keep_dead_code) {
 	if (tape->is_set && tape->v == 0) {
 	    deadloop++;
 	    return;

@@ -32,6 +32,7 @@
 
 #define L_JNWORD        1       /* Words NO spaces */
 #define L_CHARS         2       /* Add strings char by char. */
+#define L_BF            3       /* Generated code is BF. */
 
 #define L_TOKENS        0x10    /* Print the tokens one per line. */
 #define L_RISBF         0x11    /* while (count-->0) risbf(ch); */
@@ -109,6 +110,26 @@ static const char * doubler[] =
     ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "]<",
     ">[-]>[-]<<"};
 
+static const char * bfquad[] = {
+    ">>>>>", "<<<<<",
+
+    "+>+[<->[->>>>+<<<<]]>>>>[-<<<<+>>>>]<<<<<[>>+[<<->>[->>>+<<<]]>>>[-<<<+"
+    ">>>]<<<<<[>>>+[<<<->>>[->>+<<]]>>[-<<+>>]<<<<<[->>>>+<<<<]]]",
+
+    "+>[<->[->>>>+<<<<]]>>>>[-<<<<+>>>>]<<<<<[>>[<<->>[->>>+<<<]]>>>[-<<<+>>>"
+    "]<<<<<[>>>[<<<->>>[->>+<<]]>>[-<<+>>]<<<<<[->>>>-<<<<]>>>-<<<]>>-<<]>-<",
+
+    ">.<", ">[-]>[-]>[-]>[-]<<<,<",
+
+    ">[<+>[->>>>+<<<<]]>>>>[-<<<<+>>>>]" "<<<[<<+>>[->>>+<<<]]>>>[-<<<+>>>]"
+    "<<[<<<+>>>[->>+<<]]>>[-<<+>>]" "<[<<<<+>>>>[->+<]]>[-<+>]" "<<<<<[[-]",
+
+    ">[<+>[->>>>+<<<<]]>>>>[-<<<<+>>>>]" "<<<[<<+>>[->>>+<<<]]>>>[-<<<+>>>]"
+    "<<[<<<+>>>[->>+<<]]>>[-<<+>>]" "<[<<<<+>>>>[->+<]]>[-<+>]" "<<<<<]",
+
+    "[-]>>>>>[-]<<<<<"
+    };
+
 /* Some random Chinese words */
 static const char *chinese[] =
     { "右", "左", "上", "下", "出", "出", "始", "末" };
@@ -132,6 +153,7 @@ static int linefix = EOF;
 static int col = 0;
 static int maxcol = 72;
 static int state = 0;
+static int bf_mov = 0;
 
 static int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
 
@@ -148,7 +170,10 @@ check_arg(const char * arg)
 	lang = cbyte; langclass = L_CWORDS; return 1;
     } else
     if (strcmp(arg, "-db") == 0 || strcmp(arg, "-double") == 0) {
-	lang = doubler; langclass = L_CHARS; return 1;
+	lang = doubler; langclass = L_BF; return 1;
+    } else
+    if (strcmp(arg, "-quad") == 0) {
+	lang = bfquad; langclass = L_BF; return 1;
     } else
     if (strcmp(arg, "-n") == 0 || strcmp(arg, "-nice") == 0) {
 	lang = nice; langclass = L_CDWORDS; return 1;
@@ -253,6 +278,20 @@ check_arg(const char * arg)
 static void
 pc(int ch)
 {
+    if (L_BASE == L_BF) {
+	if (ch == '>') bf_mov++;
+	else if (ch == '<') bf_mov--;
+	else {
+	    int tmp = langclass;
+	    langclass = L_CHARS;
+	    while (bf_mov>0) {bf_mov--; pc('>'); }
+	    while (bf_mov<0) {bf_mov++; pc('<'); }
+	    pc(ch);
+	    langclass = tmp;
+	}
+	return;
+    }
+
     if (col>=maxcol && maxcol) {
 	if (linefix != EOF) putchar(linefix);
 	putchar('\n');
@@ -326,6 +365,7 @@ outcmd(int ch, int count)
 	break;
 
     case L_CHARS:
+    case L_BF:
 	if (!(p = strchr(bf,ch))) break;
 	while(count-->0){
 	    const char * l = lang[p-bf];

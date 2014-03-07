@@ -8,6 +8,7 @@ int bytecell = 0;
 int enable_optim = 0;
 int enable_bf_optim = 0;
 int enable_mov_optim = 0;
+int keep_dead_code = 0;
 int enable_debug;
 const char * current_file;
 
@@ -263,11 +264,12 @@ check_argv(const char * arg)
 	check_arg(arg);
 	bytecell=0;
 
-    } else if (strcmp(arg, "-m") == 0 && check_arg("-O")) {
+    } else if (strcmp(arg, "-m") == 0) {
 	if (opt_supported == -1)
 	    opt_supported = enable_optim = check_arg("-O");
 	check_arg(arg);
 	enable_optim=0;
+	keep_dead_code = 1;
     } else if (strcmp(arg, "-O") == 0 && check_arg("-O")) {
 	opt_supported = enable_optim = check_arg(arg);
     } else if (strcmp(arg, "-Obf") == 0) {
@@ -330,11 +332,11 @@ main(int argc, char ** argv)
 	    "\t"    "-h      This message"
 	    "\n\t"  "-b      Force byte cells"
 	    "\n\t"  "-#      Turn on trace code."
-	    "\n\t"  "-R      Decode rle on '+-<>', quoted strings and '='.");
+	    "\n\t"  "-R      Decode rle on '+-<>', quoted strings and '='."
+	    "\n\t"  "-m      Disable optimisation (including dead loop removal)");
 	    if (check_arg("-O"))
 		fprintf(stderr, "%s\n",
-		"\t"    "-O      Enable optimisation"
-		"\n\t"  "-m      Disable optimisation");
+		"\t"    "-O      Enable optimisation");
 
 	    check_arg(argv[1]);
 	    exit(0);
@@ -404,7 +406,9 @@ main(int argc, char ** argv)
 	    (ch != '#' || !enable_debug) &&
 	    ((ch != '"' && ch != '=') || !enable_rle)) continue;
 	/* Check for loop comments; ie: ][ comment ] */
-	if (lc || (ch=='[' && lastch==']')) { lc += (ch=='[') - (ch==']'); continue; }
+	if (lc || (ch=='[' && lastch==']' && !keep_dead_code)) {
+	    lc += (ch=='[') - (ch==']'); continue;
+	}
 	if (lc) continue;
 	/* Do the RLE */
 	if (m && ch == lastch) { c+=multi; continue; }
