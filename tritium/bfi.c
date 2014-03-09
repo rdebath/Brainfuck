@@ -3361,9 +3361,14 @@ map_hugeram(void)
 #endif
 
     if (MEMGUARD > 0) {
-	/* unmap the guard regions */
-	munmap(mp, MEMGUARD); mp += MEMGUARD;
-	munmap(mp+cell_array_alloc_len-2*MEMGUARD, MEMGUARD);
+	/*
+	 * Now, unmap the guard regions ... NO we must disable
+	 * access to the guard regions, otherwise they may get remapped. ...
+	 * That would be bad.
+	 */
+	mprotect(mp, MEMGUARD, PROT_NONE);
+	mp += MEMGUARD;
+	mprotect(mp+cell_array_alloc_len-2*MEMGUARD, MEMGUARD, PROT_NONE);
     }
 
     cell_array_pointer = mp;

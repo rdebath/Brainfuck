@@ -22,7 +22,7 @@ This repository contains various [brainfuck](http://esolangs.org/wiki/Brainfuck)
   8 [][][][][][][][][][][][][][][][][][][][][][][][][][][][][][]
   ```
   
-  Lines 2 and 7 are the code that should be run, lines 1 and 8 are decorative and lines 2 to 6 can contain anything where each line is enclosed in [] and contains balanced brackets.
+  Lines 2 and 7 are the code that should be run, lines 1 and 8 are decorative and lines 3 to 6 can contain anything where each line is enclosed in [] and contains balanced brackets.
 
 2. VIM Syntax highlighting file for brainfuck.
 
