@@ -323,7 +323,7 @@ checkarg(char * opt, char * arg)
 {
     int arg_is_num = 0;
     if (opt[1] == '-' && opt[2] && opt[3]) return checkarg(opt+1, arg);
-    if (arg && (isdigit(arg[0]) || arg[0] == '-'))
+    if (arg && ((arg[0] >= '0' && arg[0] <= '9') || arg[0] == '-'))
 	arg_is_num = 1;
 
     if (opt[2] == 0) {
@@ -3321,6 +3321,9 @@ unmap_hugeram(void)
 
 /* -- */
 #ifdef USEHUGERAM
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS MAP_ANON
+#endif
 void *
 map_hugeram(void)
 {

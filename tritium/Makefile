@@ -83,7 +83,9 @@ CONF_TCCLIB=-DDISABLE_TCCLIB
 LIBS_TCCLIB=
 else
 CONF_LIBDL=
+ifneq ($(wildcard /usr/include/bits/dlfcn.h),)
 LIBS_LIBDL=-ldl
+endif
 
 ifeq ($(DO_TCC),)
 CONF_TCCLIB=-DDISABLE_TCCLIB
