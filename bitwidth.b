@@ -26,10 +26,12 @@
 	this is a test for proper functioning of the ability to skip over
 	a loop that's never executed but isn't actually a comment loop
 
+	Secondly there's a NOP movement between the two 'l' characters
+
 	Also there's some commented out code afterwards
 
 	[-]>[-]++++++++[<+++++++++>-]<.>+++++[<+++++>-]<++++.
-	+++++++..+++.
+	+++++++.><.+++.
 	[-] [[-]++>[-]+++++[<++++++>-]<.++>+++++++[<+++++++>-]<.+>+
 	+++[<+++++>-]<.+.+++++++++++.------------.---.----.+++.>++++
 	++++[<-------->-]<---.>++++[<----->-]<---.[-][]]
@@ -145,7 +147,7 @@ Multiply by 256 again to get 65536
 	>
 	    +[>[
 		Print the exclamation point
-		[-]+++>[-]+++++[<++++++>-]<.
+		[-]+++>[-]+++++[<+++2+++>-]<.
 
 	    <[-]>[-]]+<]
 	<

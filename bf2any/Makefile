@@ -32,7 +32,7 @@ TCCFLAG=
 TCCLIBS=-ltcc $(LIBDL)
 TCCDEP=bf2tcc.lib-on
 endif
-ifneq ($(wildcard /usr/include/bits/dlfcn.h),)
+ifeq ($(findstring BSD,$(shell uname -s)),)
 LIBDL=-ldl
 endif
 

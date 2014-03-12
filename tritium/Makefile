@@ -83,7 +83,7 @@ CONF_TCCLIB=-DDISABLE_TCCLIB
 LIBS_TCCLIB=
 else
 CONF_LIBDL=
-ifneq ($(wildcard /usr/include/bits/dlfcn.h),)
+ifeq ($(findstring BSD,$(shell uname -s)),)
 LIBS_LIBDL=-ldl
 endif
 
