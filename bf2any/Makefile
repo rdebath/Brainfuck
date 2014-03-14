@@ -6,15 +6,15 @@
 # or
 #	export TARGET_ARCH=-m64
 #
-# Both bf2gcc and bf2jit are multiarch aware on i386 vs amd64. (The kernel must
-# be 64bit for a 64bit application, but the userspace works both ways)
+# Both bf2crun and bf2jit are multiarch aware on i386 vs amd64. (The kernel
+# must be 64bit for a 64bit application, but the userspace works both ways)
 
 LDLIBS=
 
 ALLEXE=\
 	bf2asmjs bf2awk bf2bas bf2bash bf2bf bf2cgmp bf2clojure bf2dc \
-	bf2gas32 bf2gas64 bf2gcc bf2lua bf2neko bf2pas bf2perl bf2php \
-	bf2ps1 bf2py bf2rb bf2rc bf2run bf2sh bf2tcc bf2slang \
+	bf2gas32 bf2gas64 bf2crun bf2lua bf2neko bf2pas bf2perl bf2php \
+	bf2ps1 bf2py bf2rb bf2rc bf2run bf2sh bf2slang \
 	bf2cmd bf2elf bf2go bf2julia bf2d
 
 TOOLDIR=../tools
@@ -26,11 +26,11 @@ HAVE_TCC=$(wildcard /usr/include/libtcc.h)
 ifeq ($(HAVE_TCC),)
 TCCFLAG=-DNO_LIBTCC
 TCCLIBS=
-TCCDEP=bf2tcc.lib-off
+TCCDEP=libtcc.lib-off
 else
 TCCFLAG=
-TCCLIBS=-ltcc $(LIBDL)
-TCCDEP=bf2tcc.lib-on
+TCCLIBS=-ltcc
+TCCDEP=libtcc.lib-on
 endif
 ifeq ($(findstring BSD,$(shell uname -s)),)
 LIBDL=-ldl
@@ -40,7 +40,7 @@ all:	bf2any.o bf2const.o $(ALLEXE)
 
 clean:
 	-rm -f $(ALLEXE)
-	-rm -f bf2tcc.lib-off bf2tcc.lib-on bf2jit.amd64.h bf2jit.i686.h
+	-rm -f libtcc.lib-off libtcc.lib-on bf2jit.amd64.h bf2jit.i686.h
 	-rm -f *.o
 
 CFLAGS=-O3 -Wall -Wshadow -DBOFF=256 $(DEFS)
@@ -53,23 +53,6 @@ MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 
 bf2bf: bf2bf.o bf2any.o bf2const.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2tcc: bf2tcc.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(TCCLIBS)
-
-bf2tcc.o: bf2tcc.c $(TCCDEP)
-	$(CC) $(CFLAGS) $(TCCFLAG) -c -o $@ bf2tcc.c $(TARGET_ARCH)
-
-bf2tcc.lib-on:
-	-@rm -f bf2tcc.lib-off
-	@touch bf2tcc.lib-on
-
-bf2tcc.lib-off:
-	-@rm -f bf2tcc.lib-on
-	@touch bf2tcc.lib-off
-
-bf2gcc: bf2gcc.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(LIBDL)
 
 bf2lua:	bf2lua.o bf2any.o bf2const.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
@@ -166,3 +149,18 @@ bf2julia: bf2julia.o bf2any.o bf2const.o
 
 bf2d: bf2d.o bf2any.o bf2const.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
+
+bf2crun: bf2crun.o bf2any.o bf2const.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(TCCLIBS) $(LIBDL)
+
+bf2crun.o: bf2crun.c $(TCCDEP)
+	$(CC) $(CFLAGS) $(TCCFLAG) -c -o $@ bf2crun.c $(TARGET_ARCH)
+
+libtcc.lib-on:
+	-@rm -f libtcc.lib-off
+	@touch libtcc.lib-on
+
+libtcc.lib-off:
+	-@rm -f libtcc.lib-on
+	@touch libtcc.lib-off
+

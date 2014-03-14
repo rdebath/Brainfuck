@@ -170,7 +170,12 @@ check_arg(const char * arg)
 	lang = cbyte; langclass = L_CWORDS; return 1;
     } else
     if (strcmp(arg, "-db") == 0 || strcmp(arg, "-double") == 0) {
-	lang = doubler; langclass = L_BF; return 1;
+	if (lang == doubler)
+	    lang = bfquad;
+	else
+	    lang = doubler;
+	langclass = L_BF;
+	return 1;
     } else
     if (strcmp(arg, "-quad") == 0) {
 	lang = bfquad; langclass = L_BF; return 1;
@@ -249,11 +254,11 @@ check_arg(const char * arg)
 	"\t"    "-w99    Width to line wrap after, default 72"
 	"\n\t"  "-rho    The original 1964 Ρ″ by Corrado Böhm (Rho double prime)"
 	"\n\t"  "-double BF to BF translation, cell size doubler."
+	"\n\t"  "-quad   BF to BF translation, cell size double doubler."
 	"\n\t"  "-c      Plain C"
 	"\n\t"  "-rle    Odd RLE C translation"
 	"\n\t"  "-nice   Nice memorable C translation."
 	"\n\t"  "-mini   Compact C translation."
-	"\n\t"  "-double BF to BF translation, cell size doubler."
 	"\n\t"  "-fish   There once was a (dead) fish named Fred"
 	"\n\t"  "-trip   Triplet like translation"
 	"\n\t"  "-ook    Ook!"

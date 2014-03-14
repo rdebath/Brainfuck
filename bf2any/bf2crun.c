@@ -2,60 +2,96 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <dlfcn.h>
 
+#ifndef NO_DLOPEN
+#include <dlfcn.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <signal.h>
+#endif
+
+#ifndef NO_LIBTCC
+#include <libtcc.h>
+#else
+#warning "Compiling without libtcc support"
+#endif
 
 #include "bf2any.h"
 
 /*
  * GCC-O0 translation from BF, runs at about 2,700,000,000 instructions per second.
  * GCC-O2 translation from BF, runs at about 4,300,000,000 instructions per second.
+ * TCC translation from BF, runs at about 1,200,000,000 instructions per second.
+ *
  * BCC translation from BF, runs at about 3,000,000,000 instructions per second.
  *	bcc -ansi -Ml -z -o bf bf.c
  */
 
 int ind = 0;
-int runmode = 1;
+enum { no_run, run_libtcc, run_dll } runmode = run_libtcc;
 FILE * ofd;
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
 #define prv2(s,v,v2)    fprintf(ofd, "%*s" s "\n", ind*4, "", (v), (v2))
 
-static void compile_and_run(void);
+#ifndef NO_LIBTCC
+static void compile_and_run_libtcc(void);
+#endif
+#ifndef NO_DLOPEN
+static void compile_and_run_dll(void);
+#endif
 static void print_cstring(void);
 
 static int imov = 0;
-static const char * opt_flag = "-O0";
+static int verbose = 0;
 
+static const char * cc_cmd = 0;
+static const char * opt_flag = "-O0";
 static char tmpdir[] = "/tmp/bfrun.XXXXXX";
 static char ccode_name[sizeof(tmpdir)+16];
 static char dl_name[sizeof(tmpdir)+16];
+
+char * ccode = 0;
+size_t ccodesize = 0;
 
 int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     if (strcmp(arg, "-savestring") == 0) return 1;
-    if (strncmp(arg, "-O", 2) == 0) {
-	opt_flag = arg;
-	return 1;
-    } else
-    if (strcmp(arg, "-r") == 0) {
-	runmode=1; return 1;
-    }
-    else if (strcmp(arg, "-d") == 0) {
-	runmode=0; return 1;
-    } else
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-d      Dump code"
-	"\n\t"  "-r      Run program");
+	"\n\t"  "-ldl    Use dlopen to run compiled code."
+	"\n\t"  "-ltcc   Use libtcc to run code."
+	"\n\t"  "-Cclang Choose a different C compiler"
+	"\n\t"  "-Ox     Pass -Ox to C compiler."
+	);
 	return 1;
     } else
-    return 0;
+    if (strncmp(arg, "-O", 2) == 0) {
+	opt_flag = arg; return 1;
+    } else
+    if (strncmp(arg, "-C", 2) == 0 && arg[2]) {
+	cc_cmd = arg + 2; return 1;
+    } else
+    if (strcmp(arg, "-v") == 0) {
+	verbose++; return 1;
+    } else
+    if (strcmp(arg, "-d") == 0) {
+	runmode = no_run; return 1;
+    } else
+#ifndef NO_DLOPEN
+    if (strcmp(arg, "-ldl") == 0) {
+	runmode = run_dll; return 1;
+    } else
+#endif
+#ifndef NO_LIBTCC
+    if (strcmp(arg, "-ltcc") == 0) {
+	runmode = run_libtcc; return 1;
+    } else
+#endif
+	return 0;
 }
 
 void
@@ -83,7 +119,14 @@ outcmd(int ch, int count)
 
     switch(ch) {
     case '!':
-	if (runmode) {
+#ifndef NO_LIBTCC
+	if (runmode == run_libtcc) {
+	    ofd = open_memstream(&ccode, &ccodesize);
+	} else
+#endif
+#ifndef NO_DLOPEN
+	if (runmode != no_run) {
+	    runmode = run_dll;
 	    if( mkdtemp(tmpdir) == 0 ) {
 		perror("mkdtemp()");
 		exit(1);
@@ -92,10 +135,17 @@ outcmd(int ch, int count)
 	    strcpy(dl_name, tmpdir); strcat(dl_name, "/bfpgm.so");
 	    ofd = fopen(ccode_name, "w");
 	} else
+#endif
+	{
+	    runmode = no_run;
 	    ofd = stdout;
+	}
+
+	/* Annoyingly most C compilers don't like this line. */
+	/* pr("#!/usr/bin/tcc -run"); */
 
 	pr("#include <stdio.h>");
-	if (runmode) {
+	if (runmode == run_dll) {
 	    pr("int brainfuck(void){");
 	    ind++;
 	} else {
@@ -110,7 +160,7 @@ outcmd(int ch, int count)
 	    pr("static int mem[30000];");
 	    prv("register int v, *m = mem + %d;", BOFF);
 	}
-	if (!runmode)
+	if (runmode == no_run)
 	    pr("setbuf(stdout,0);");
 	break;
 
@@ -141,11 +191,20 @@ outcmd(int ch, int count)
     if (ch != '~') return;
     pr("return 0;\n}");
 
-    if (!runmode) return;
+    if (runmode == no_run) return;
+
     fclose(ofd);
     setbuf(stdout,0);
 
-    compile_and_run();
+#ifndef NO_LIBTCC
+    if (runmode == run_libtcc)
+	compile_and_run_libtcc();
+    else
+#endif
+#ifndef NO_DLOPEN
+	compile_and_run_dll()
+#endif
+	;
 }
 
 static void
@@ -201,7 +260,7 @@ print_cstring(void)
 
 /* If we're 32 bit on a 64bit or vs.versa. we need an extra option */
 #ifndef CC
-#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
+#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=2))
 #if defined(__x86_64__)
 #if defined(__ILP32__)
 #define CC "gcc -mx32"
@@ -225,14 +284,19 @@ static void (*runfunc)(void);
 static void *handle;
 
 static void
-compile_and_run(void)
+compile_and_run_dll(void)
 {
     char cmdbuf[256];
     int ret;
+    const char * cc = CC;
     setbuf(stdout,0);
 
-    sprintf(cmdbuf, CC " %s -w -shared -fPIC -o %s %s",
-	    opt_flag, dl_name, ccode_name);
+    if (cc_cmd) cc = cc_cmd;
+
+    sprintf(cmdbuf, "%s %s -w -shared -fPIC -o %s %s",
+	    cc, opt_flag, dl_name, ccode_name);
+    if (verbose)
+	fprintf(stderr, "Compiling with '%s'\n", cmdbuf);
     ret = system(cmdbuf);
 
     if (ret == -1) {
@@ -254,6 +318,8 @@ compile_and_run(void)
 	exit(1);
     }
 
+    if (verbose)
+	fprintf(stderr, "Loading with dlopen\n");
     loaddll(dl_name);
 
     unlink(ccode_name);
@@ -292,3 +358,23 @@ loaddll(const char * dlname)
     return 0;
 }
 
+#ifndef NO_LIBTCC
+static void
+compile_and_run_libtcc(void)
+{
+    TCCState *s;
+    int rv;
+
+    if (verbose)
+	fprintf(stderr, "Compiling and running with libtcc\n");
+    s = tcc_new();
+    if (s == NULL) { perror("tcc_new()"); exit(7); }
+    tcc_set_output_type(s, TCC_OUTPUT_MEMORY);
+    tcc_compile_string(s, ccode);
+
+    rv = tcc_run(s, 0, 0);
+    if (rv) fprintf(stderr, "tcc_run returned %d\n", rv);
+    tcc_delete(s);
+    free(ccode);
+}
+#endif
