@@ -353,6 +353,10 @@ print_ccode(FILE * ofd)
 
 	case T_SET:
 	    if (!disable_indent) pt(ofd, indent,n);
+	    if (cell_size <= 0 && (n->count < -128 || n->count >= 256)) {
+		fprintf(ofd, "m[%d] = (%s) %d;\n",
+		    n->offset, cell_type, n->count);
+	    } else
 	    if(n->offset == 0)
 		fprintf(ofd, "*m = %d;\n", n->count);
 	    else
