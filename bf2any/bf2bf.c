@@ -41,7 +41,7 @@
 
 
 static const char bf[] = "><+-.,[]";
-static const char * bfout[] = { ">", "<", "+", "-", ".", ",", "[", "]" };
+static const char * bfout[] = { ">", "<", "+", "-", ".", ",", "[", "]", 0 };
 
 /* Language "C" */
 static const char * cbyte[] = { "m+=1;", "m-=1;", "++*m;", "--*m;",
@@ -157,9 +157,14 @@ static int bf_mov = 0;
 
 static int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
 
+static int bf_multi = 0;
+struct instruction { int ch; int count; struct instruction * next; } *pgm = 0, *last = 0;
+
 static void risbf(int ch);
 static void headsecks(int ch, int count);
 static void bfrle(int ch, int count);
+static void bftranslate(int ch, int count);
+static void bfreprint(void);
 
 int
 check_arg(const char * arg)
@@ -169,15 +174,16 @@ check_arg(const char * arg)
     if (strcmp(arg, "-c") == 0) {
 	lang = cbyte; langclass = L_CWORDS; return 1;
     } else
+    if (strcmp(arg, "-single") == 0) {
+	bf_multi |= 1;
+	lang = bfout; langclass = L_BF; return 1;
+    } else
     if (strcmp(arg, "-db") == 0 || strcmp(arg, "-double") == 0) {
-	if (lang == doubler)
-	    lang = bfquad;
-	else
-	    lang = doubler;
-	langclass = L_BF;
-	return 1;
+	bf_multi |= 2;
+	lang = doubler; langclass = L_BF; return 1;
     } else
     if (strcmp(arg, "-quad") == 0) {
+	bf_multi |= 4;
 	lang = bfquad; langclass = L_BF; return 1;
     } else
     if (strcmp(arg, "-n") == 0 || strcmp(arg, "-nice") == 0) {
@@ -186,7 +192,7 @@ check_arg(const char * arg)
     if (strcmp(arg, "-mini") == 0) {
 	lang = bc; langclass = L_CDWORDS; return 1;
     } else
-    if (strcmp(arg, "-f") == 0 || strcmp(arg, "-fish") == 0) {
+    if (strcmp(arg, "-fish") == 0) {
 	lang = fish; langclass = L_CDWORDS; return 1;
     } else
     if (strcmp(arg, "-trip") == 0 || strcmp(arg, "-triplet") == 0) {
@@ -253,8 +259,6 @@ check_arg(const char * arg)
 	fprintf(stderr, "%s\n",
 	"\t"    "-w99    Width to line wrap after, default 72"
 	"\n\t"  "-rho    The original 1964 Ρ″ by Corrado Böhm (Rho double prime)"
-	"\n\t"  "-double BF to BF translation, cell size doubler."
-	"\n\t"  "-quad   BF to BF translation, cell size double doubler."
 	"\n\t"  "-c      Plain C"
 	"\n\t"  "-rle    Odd RLE C translation"
 	"\n\t"  "-nice   Nice memorable C translation."
@@ -274,6 +278,11 @@ check_arg(const char * arg)
 	"\n\t"  "-chi    In chinese."
 	"\n\t"  "-zero   'zerolang' from mescam on github"
 	"\n\t"  "-nyan   'nyan-script' from tommyschaefer on github"
+	"\n\t"  ""
+	"\n\t"  "-single BF to BF translation."
+	"\n\t"  "-double BF to BF translation, cell size doubler."
+	"\n\t"  "-quad   BF to BF translation, cell size double doubler."
+	"\n\t"  "        These can be combined and will autodetect cell size."
 	);
 	return 1;
     } else
@@ -323,6 +332,12 @@ ps(const char * s)
     }
 }
 
+static void
+pmc(const char * s)
+{
+    while (*s) pc(*s++);
+}
+
 void
 outcmd(int ch, int count)
 {
@@ -370,18 +385,14 @@ outcmd(int ch, int count)
 	break;
 
     case L_CHARS:
-    case L_BF:
 	if (!(p = strchr(bf,ch))) break;
-	while(count-->0){
-	    const char * l = lang[p-bf];
-	    while (*l)
-		pc(*l++);
-	}
+	while(count-->0) pmc(lang[p-bf]);
 	break;
 
     case L_TOKENS:	printf("%c %d\n", ch, count); col = 0; break;
     case L_RISBF:	while (count-->0) risbf(ch); break;
     case L_HEADSECKS:	headsecks(ch, count); break;
+    case L_BF:		bftranslate(ch, count); break;
     case L_BFRLE:	bfrle(ch, count); break;
     }
 
@@ -462,4 +473,106 @@ bfrle(int ch, int count)
 	col += printf("%d%c", count, ch);
     } else while (count-- > 0)
 	pc(ch);
+}
+
+/*
+ *  This will output multiple copies of the input code with auto detection
+ *  of the bit sizes. The autodetect is VERY easy to prove by static analysis
+ *  so, in theory, only one of them should make it into the final executable.
+ *
+ *  NB: The bf2const routines are capable of this.
+ *
+ *  In addition the temps required by the double and quad conversions
+ *  are explicitly zeroed after each pointer movement. This should also
+ *  aid more complex forms of static analysis.
+ *
+ */
+static void
+bftranslate(int ch, int count)
+{
+    char * p;
+    if ((p = strchr(bf,ch))) {
+	if (bf_multi) {
+	    struct instruction * n = calloc(1, sizeof*n);
+	    if (!n) { perror("bf2multi"); exit(42); }
+
+	    n->ch = ch;
+	    n->count = count;
+	    if (!last) pgm = n; else last->next = n;
+	    last = n;
+	} else
+	    while(count-->0) pmc(lang[p-bf]);
+	return;
+    }
+
+    if (ch == '!') {
+	if (bf_multi == 1 || bf_multi == 2 || bf_multi == 4)
+	    bf_multi = 0;
+    }
+
+    if (ch == '~' && bf_multi) {
+	if (bf_multi == 7) {
+	    /* This line generates 256 to check for larger than byte cells. */
+	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]+<[");
+
+	    /* This line generates 65536 to check for larger than 16bit cells. */
+	    pmc("[-]>[-]++[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]+<[");
+	    pmc(">>");
+
+	    lang = bfout; bfreprint();
+
+	    pmc("<<[-]]");
+
+	    /* This line generates 65536 to check for cells upto 16 bits */
+	    pmc("[-]>[-]++[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]+<[>-<[-]]>[");
+	    pmc(">");
+
+	    lang = doubler; bfreprint();
+
+	    pmc("<[-]]<");
+	    pmc("[-]]");
+
+	    /* This line generates 256 to check for cells upto 8 bits */
+	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]+<[>-<[-]]>[>");
+
+	    lang = bfquad; bfreprint();
+
+	    pmc("<[-]]<");
+	} else {
+	    /* This line generates 256 to check for larger than byte cells. */
+	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]+<[");
+	    pmc(">>");
+
+	    if (bf_multi == 6) lang = doubler; else lang = bfout;
+	    bfreprint();
+
+	    pmc("<<[-]]");
+
+	    /* This line generates 256 to check for cells upto 8 bits */
+	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]+<[>-<[-]]>[>");
+
+	    if(bf_multi >= 4) lang = bfquad; else lang = doubler;
+	    bfreprint();
+
+	    pmc("<[-]]<");
+	}
+    }
+}
+
+static void
+bfreprint(void)
+{
+    int lastmov = 1;
+    struct instruction * n = pgm;
+    for(; n; n=n->next) {
+	int ch = n->ch;
+	int count = n->count;
+	char * p;
+	if ((p = strchr(bf,ch))) {
+	    if (lastmov && lang[8])
+		pmc(lang[8]);
+	    while(count-->0) pmc(lang[p-bf]);
+	    lastmov = (ch == '>' || ch == '<');
+	}
+    }
 }
