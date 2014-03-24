@@ -102,14 +102,99 @@ static const char * lisp2[] =
 static const char * moo[] = {"moO", "mOo", "MoO", "MOo",
 		"MMMMOOMooOOOmooMMM", "OOOMoo", "MOOmoOmOo", "MoOMOomoo"};
 
+/* Some random Chinese words */
+static const char *chinese[] =
+    { "右", "左", "上", "下", "出", "出", "始", "末" };
+
+/* Ρ″ */
+static const char *rhoprime[] =
+    { "r′λ", "R", "λR", "r′", "Ρ″", "Ιⁿ", "(", ")" };
+
+/* https://github.com/mescam/zerolang */
+static const char *zero[] =
+    { "0+", "0-", "0++", "0--", "0.", "0?", "0/", "/0" };
+
+/* Language "nyan" (may need prefix and suffix of "nyan") */
+static const char *nyan[] =
+    {"anna", "nana", "nnya", "nnna", "anan", "nnay", "annn", "naaa"};
+
 /* BF Doubler doubles the cell size. */
-static const char * doubler[] =
+/* 12 cost, cells in LXXH order, with tmpzero */
+static const char * doubler_12[] =
     {">>>>", "<<<<", ">+<+[>-]>[->>+<]<<", ">+<[>-]>[->>-<]<<-",
     ".", ">>>[-]<<<[-],",
     ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "[+<",
     ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "]<",
     ">[-]>[-]<<"};
 
+/* 12 cost, cells in LXXH order */
+static const char * doubler_12nz[] =
+    {">>>>", "<<<<", ">+<+[>-]>[->>+<]<<", ">+<[>-]>[->>-<]<<-",
+    ".", ">>>[-]<<<[-],",
+    ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "[+<",
+    ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "]<",
+    0};
+
+/* 17 cost, cells in XXLHXX order uses [>] */
+static const char * doubler_17a[] =
+    {
+    ">>>>", "<<<<",
+    ">>+[>>+<<<]>>>[>]<[-<->]<+<<<", ">>[>>+<<<]>>>[>]<[-<+>]<-<-<<",
+    ">>.<<", ">>>[-]<[-],<<",
+    ">>[>>+<<<]>>>[>]<[->+<]<[<<+>>>]<<<[<]>>>>>[-<<<<+>>>>]<<<<" "[[-]<",
+    ">>[>>+<<<]>>>[>]<[->+<]<[<<+>>>]<<<[<]>>>>>[-<<<<+>>>>]<<<<" "]<",
+    0};
+
+/* 17 cost, cells in XXLHXX order */
+static const char * doubler_17b[] =
+    {
+    ">>>>", "<<<<",
+    ">>+[>>+>]<[<<<]>>>[-<->]<+<<<", ">>[>>+>]<[<<<]>>>[-<+>]<-<-<<",
+    ">>.<<", ">>>[-]<[-],<<",
+    ">>[>>+>]<[<<<]>>>[->+<]<[<<+>>>]<<<[<]>>>>>[-<<<<+>>>>]<<<<" "[[-]<",
+    ">>[>>+>]<[<<<]>>>[->+<]<[<<+>>>]<<<[<]>>>>>[-<<<<+>>>>]<<<<" "]<",
+    0};
+
+/* Copy cell cost, cells in XLHX order, with tmpzero */
+static const char * doubler_copy[] =
+    {
+    ">>>", "<<<",
+    "+>+[<->[->>+<<]]>>[-<<+>>]<<<[->>+<<]",
+    "+>[<->[->>+<<]]>>[-<<+>>]<<<[->>-<<]>-<",
+    ">.<", ">[-]>[-]<,<",
+    ">[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<" "[[-]",
+    ">[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<" "]",
+    "[-]>>>[-]<<<"
+    };
+
+/* Copy cell cost, cells in XLHX order */
+static const char * doubler_copynz[] =
+    {
+    ">>>", "<<<",
+    "+>+[<->[->>+<<]]>>[-<<+>>]<<<[->>+<<]",
+    "+>[<->[->>+<<]]>>[-<<+>>]<<<[->>-<<]>-<",
+    ">.<", ">[-]>[-]<,<",
+    ">[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<" "[[-]",
+    ">[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<" "]",
+    0};
+
+/* Copy cell cost(+), cells in XLHX..X order */
+/* http://esolangs.org/wiki/Brainfuck_bitwidth_conversions  */
+static const char * doubler_esolang[] =
+    {
+    ">>>",
+    "<<<",
+    ">+" "[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[-" ">>+<<" "]",
+    ">[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[-" ">>-<<" "]>-<",
+    ">.<",
+    ">[-]>[-]<,<",
+    ">[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<" "[[-]<<<+>>>]<"
+	  "[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<" "[[-]<<<+>>>]<<<" "[[-]",
+    ">[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<" "[[-]<<<+>>>]<"
+	  "[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<" "[[-]<<<+>>>]<<<" "]",
+    0};
+
+/* Copy cell cost, cells in XLMNHX order */
 static const char * bfquad[] = {
     ">>>>>", "<<<<<",
 
@@ -130,22 +215,6 @@ static const char * bfquad[] = {
     "[-]>>>>>[-]<<<<<"
     };
 
-/* Some random Chinese words */
-static const char *chinese[] =
-    { "右", "左", "上", "下", "出", "出", "始", "末" };
-
-/* Ρ″ */
-static const char *rhoprime[] =
-    { "r′λ", "R", "λR", "r′", "Ρ″", "Ιⁿ", "(", ")" };
-
-/* https://github.com/mescam/zerolang */
-static const char *zero[] =
-    { "0+", "0-", "0++", "0--", "0.", "0?", "0/", "/0" };
-
-/* Language "nyan" (may need prefix and suffix of "nyan") */
-static const char *nyan[] =
-    {"anna", "nana", "nnya", "nnna", "anan", "nnay", "annn", "naaa"};
-
 static int langclass = L_CHARS;
 static const char ** lang = bfout;
 static const char ** c = 0;
@@ -157,8 +226,9 @@ static int bf_mov = 0;
 
 static int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
 
-static int bf_multi = 0;
+static int bf_multi = 0, bf_lastmov = 1;
 struct instruction { int ch; int count; struct instruction * next; } *pgm = 0, *last = 0;
+const char ** doubler = doubler_12;
 
 static void risbf(int ch);
 static void headsecks(int ch, int count);
@@ -185,6 +255,34 @@ check_arg(const char * arg)
     if (strcmp(arg, "-quad") == 0) {
 	bf_multi |= 4;
 	lang = bfquad; langclass = L_BF; return 1;
+    } else
+    if (strcmp(arg, "-dbl12") == 0) {
+	lang = doubler = doubler_12;
+	langclass = L_BF; return 1;
+    } else
+    if (strcmp(arg, "-dbl12nz") == 0) {
+	lang = doubler = doubler_12nz;
+	langclass = L_BF; return 1;
+    } else
+    if (strcmp(arg, "-dbl17a") == 0) {
+	lang = doubler = doubler_17a;
+	langclass = L_BF; return 1;
+    } else
+    if (strcmp(arg, "-dbl17b") == 0) {
+	lang = doubler = doubler_17b;
+	langclass = L_BF; return 1;
+    } else
+    if (strcmp(arg, "-dblcopy") == 0) {
+	lang = doubler = doubler_copy;
+	langclass = L_BF; return 1;
+    } else
+    if (strcmp(arg, "-dblcpnz") == 0) {
+	lang = doubler = doubler_copynz;
+	langclass = L_BF; return 1;
+    } else
+    if (strcmp(arg, "-dbleso") == 0) {
+	lang = doubler = doubler_esolang;
+	langclass = L_BF; return 1;
     } else
     if (strcmp(arg, "-n") == 0 || strcmp(arg, "-nice") == 0) {
 	lang = nice; langclass = L_CDWORDS; return 1;
@@ -500,8 +598,12 @@ bftranslate(int ch, int count)
 	    n->count = count;
 	    if (!last) pgm = n; else last->next = n;
 	    last = n;
-	} else
+	} else {
+	    if (bf_lastmov && lang[8])
+		pmc(lang[8]);
 	    while(count-->0) pmc(lang[p-bf]);
+	    bf_lastmov = (ch == '>' || ch == '<');
+	}
 	return;
     }
 
@@ -562,17 +664,17 @@ bftranslate(int ch, int count)
 static void
 bfreprint(void)
 {
-    int lastmov = 1;
+    bf_lastmov = 1;
     struct instruction * n = pgm;
     for(; n; n=n->next) {
 	int ch = n->ch;
 	int count = n->count;
 	char * p;
 	if ((p = strchr(bf,ch))) {
-	    if (lastmov && lang[8])
+	    if (bf_lastmov && lang[8])
 		pmc(lang[8]);
 	    while(count-->0) pmc(lang[p-bf]);
-	    lastmov = (ch == '>' || ch == '<');
+	    bf_lastmov = (ch == '>' || ch == '<');
 	}
     }
 }
