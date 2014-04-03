@@ -336,7 +336,7 @@ run_dynasm(void)
 		| pop eax
 		|.else
 		| mov PRM_D, REG_A
-		| mov64 rax, (uintptr_t) putch
+		| mov64 rax, (uint64_t)(uintptr_t) putch
 		| call  rax
 		|.endif
 		break;
@@ -354,7 +354,7 @@ run_dynasm(void)
 	    | pop eax
 	    |.else
 	    | mov PRM_D, REG_A
-	    | mov64 rax, (uintptr_t) putch
+	    | mov64 rax, (uint64_t)(uintptr_t) putch
 	    | call  rax
 	    |.endif
 	    break;
@@ -369,7 +369,7 @@ run_dynasm(void)
 	    | pop REG_B
 	    |.else
 	    | mov PRM_D, REG_A
-	    | mov64 rax, (uintptr_t) getch
+	    | mov64 rax, (uint64_t)(uintptr_t) getch
 	    | call  rax
 	    |.endif
 	    /* Note: REG_A must be eax/rax */
@@ -379,7 +379,7 @@ run_dynasm(void)
 	    |.if I386
 	    | call &failout
 	    |.else
-	    | mov64 rax, (uintptr_t) failout
+	    | mov64 rax, (uint64_t)(uintptr_t) failout
 	    | call  rax
 	    |.endif
 	    break;
