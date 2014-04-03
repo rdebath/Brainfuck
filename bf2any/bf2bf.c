@@ -104,7 +104,7 @@ static const char * moo[] = {"moO", "mOo", "MoO", "MOo",
 
 /* Some random Chinese words */
 static const char *chinese[] =
-    { "右", "左", "上", "下", "出", "出", "始", "末" };
+    { "右", "左", "上", "下", "出", "里", "始", "末" };
 
 /* Ρ″ */
 static const char *rhoprime[] =

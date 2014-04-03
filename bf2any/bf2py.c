@@ -33,8 +33,14 @@ outcmd(int ch, int count)
 #else
 	printf("import os\n");
 #endif
+#ifdef USEARRAY
 	printf("m = [0] * 60000\n");
-	printf("p = 0\n");
+#else
+	/* Dynamic arrays are 20% slower! */
+	printf("from collections import defaultdict\n");
+	printf("m = defaultdict(int)\n");
+#endif
+	printf("p = %d\n", BOFF);
 	break;
 
     case '=': I; printf("m[p] = %d\n", count); break;

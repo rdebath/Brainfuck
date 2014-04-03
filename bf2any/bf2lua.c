@@ -67,8 +67,11 @@ outcmd(int ch, int count)
 
     printf("#!/usr/bin/lua\n");
     printf("local m = setmetatable({},{__index=function() return 0 end})\n");
-    printf("local p = %d\n", BOFF);
+    printf("local p = 1\n");
     printf("local v = 0\n");
+    /* Arrays are faster if populated from 1, negative indexes are ok.
+       Luajit likes zero. */
+    printf("for i=0,32 do m[i] = 0 end\n");
     printf("\n");
 
     if (icount < MAXWHILE) {
