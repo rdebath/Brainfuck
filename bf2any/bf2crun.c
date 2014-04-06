@@ -28,6 +28,7 @@
  */
 
 int ind = 0;
+int tapelen = 30000;
 enum { no_run, run_libtcc, run_dll } runmode = run_libtcc;
 FILE * ofd;
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
@@ -59,6 +60,10 @@ check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     if (strcmp(arg, "-savestring") == 0) return 1;
+    if (strncmp(arg, "-M", 2) == 0) {
+	tapelen = strtoul(arg+2, 0, 10) + BOFF;
+	return 1;
+    }
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-d      Dump code"
@@ -153,11 +158,11 @@ outcmd(int ch, int count)
 	    ind++;
 	}
 	if (bytecell) {
-	    pr("static char mem[30000];");
+	    prv("static char mem[%d];", tapelen);
 	    prv("register char *m = mem + %d;", BOFF);
 	    pr("register int v;");
 	} else {
-	    pr("static int mem[30000];");
+	    prv("static int mem[%d];", tapelen);
 	    prv("register int v, *m = mem + %d;", BOFF);
 	}
 	if (runmode == no_run)

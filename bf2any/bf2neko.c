@@ -12,12 +12,17 @@
  */
 
 int ind = 0;
+int tapelen = 30000;
 #define I printf("%*s", ind*4, "")
 
 int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
+    if (strncmp(arg, "-M", 2) == 0) {
+	tapelen = strtoul(arg+2, 0, 10) + BOFF;
+	return 1;
+    }
     return 0;
 }
 
@@ -26,8 +31,8 @@ outcmd(int ch, int count)
 {
     switch(ch) {
     case '!':
-	printf( "%s%d%s",
-	    "var m = $amake(30000);\n"
+	printf( "%s%d%s%d%s",
+	    "var m = $amake(",tapelen,");\n"
 	    "var p = 0;\n"
 	    "var s = $smake(1);\n"
 	    "var file_read_char = $loader.loadprim(\"std@file_read_char\",1)\n"

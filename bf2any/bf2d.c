@@ -15,6 +15,7 @@
 
 int ind = 0;
 FILE * ofd;
+int tapelen = 30000;
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
 
@@ -25,6 +26,10 @@ check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     if (strcmp(arg, "-savestring") == 0) return 1;
+    if (strncmp(arg, "-M", 2) == 0) {
+	tapelen = strtoul(arg+2, 0, 10) + BOFF;
+	return 1;
+    }
     return 0;
 }
 
@@ -39,11 +44,11 @@ outcmd(int ch, int count)
 	pr("void main(){");
 	ind++;
 	if (bytecell) {
-	    pr("char[] mem; mem.length = 32768; mem[] = 0;");
+	    prv("char[] mem; mem.length = %d; mem[] = 0;", tapelen);
 	    prv("int m = %d;", BOFF);
 	    pr("register int v;");
 	} else {
-	    pr("int[] mem; mem.length = 32768; mem[] = 0;");
+	    prv("int[] mem; mem.length = %d; mem[] = 0;", tapelen);
 	    prv("int v, m = %d;", BOFF);
 	}
 	pr("stdout.setvbuf(0, _IONBF);");

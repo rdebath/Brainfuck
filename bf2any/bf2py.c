@@ -14,11 +14,16 @@
 
 int ind = 0;
 #define I printf("%*s", ind*4, "")
+int tapelen = 0;
 
 int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
+    if (strncmp(arg, "-M", 2) == 0) {
+	tapelen = strtoul(arg+2, 0, 10) + BOFF;
+	return 1;
+    }
     return 0;
 }
 
@@ -33,13 +38,13 @@ outcmd(int ch, int count)
 #else
 	printf("import os\n");
 #endif
-#ifdef USEARRAY
-	printf("m = [0] * 60000\n");
-#else
-	/* Dynamic arrays are 20% slower! */
-	printf("from collections import defaultdict\n");
-	printf("m = defaultdict(int)\n");
-#endif
+	if (tapelen>0) {
+	    printf("m = [0] * %d\n", tapelen);
+	} else {
+	    /* Dynamic arrays are 20% slower! */
+	    printf("from collections import defaultdict\n");
+	    printf("m = defaultdict(int)\n");
+	}
 	printf("p = %d\n", BOFF);
 	break;
 

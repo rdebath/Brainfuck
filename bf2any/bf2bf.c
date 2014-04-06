@@ -223,6 +223,7 @@ static int col = 0;
 static int maxcol = 72;
 static int state = 0;
 static int bf_mov = 0;
+static int tapelen = 30000;
 
 static int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
 
@@ -241,6 +242,10 @@ check_arg(const char * arg)
 {
     if (strcmp(arg, "-#") == 0) return 1;
 
+    if (strncmp(arg, "-M", 2) == 0) {
+	tapelen = strtoul(arg+2, 0, 10);
+	return 1;
+    } else
     if (strcmp(arg, "-c") == 0) {
 	lang = cbyte; langclass = L_CWORDS; return 1;
     } else
@@ -368,6 +373,7 @@ check_arg(const char * arg)
 	"\n\t"  "-moo    Cow -- http://www.frank-buss.de/cow.html"
 	"\n\t"  "-fk     fuck fuck"
 	"\n\t"  "-head   Headsecks."
+	"\n\t"  "-bfrle  Convert to BF RLE as used by -R."
 	"\n\t"  "-:      Dotty"
 	"\n\t"  "-lisp   Lisp Zero"
 	"\n\t"  "-risbf  RISBF"
@@ -466,9 +472,9 @@ outcmd(int ch, int count)
 		printf("#define _ return 0;}\n");
 	}
 	if (bytecell)
-	    printf("char mem[30000];int main(){register char*m=mem;\n");
+	    printf("char mem[%d];int main(){register char*m=mem;\n", tapelen);
 	else
-	    printf("int mem[30000];int main(){register int*m=mem;\n");
+	    printf("int mem[%d];int main(){register int*m=mem;\n", tapelen);
     }
 
     switch (L_BASE) {
@@ -614,10 +620,10 @@ bftranslate(int ch, int count)
 
     if (ch == '~' && bf_multi) {
 	if (bf_multi == 7) {
-	    /* This line generates 256 to check for larger than byte cells. */
-	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]+<[");
+	    /* This generates 256 to check for larger than byte cells. */
+	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]<[");
 
-	    /* This line generates 65536 to check for larger than 16bit cells. */
+	    /* This generates 65536 to check for larger than 16bit cells. */
 	    pmc("[-]>[-]++[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]+<[");
 	    pmc(">>");
 
@@ -625,8 +631,9 @@ bftranslate(int ch, int count)
 
 	    pmc("<<[-]]");
 
-	    /* This line generates 65536 to check for cells upto 16 bits */
-	    pmc("[-]>[-]++[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]+<[>-<[-]]>[");
+	    /* This generates 65536 to check for cells upto 16 bits */
+	    /* pmc("[-]"); */
+	    pmc(">[-]++[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]+<[>-<[-]]>[");
 	    pmc(">");
 
 	    lang = doubler; bfreprint();
@@ -634,15 +641,19 @@ bftranslate(int ch, int count)
 	    pmc("<[-]]<");
 	    pmc("[-]]");
 
-	    /* This line generates 256 to check for cells upto 8 bits */
+	    /* This generates 256 to check for cells upto 8 bits */
 	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]+<[>-<[-]]>[>");
 
 	    lang = bfquad; bfreprint();
 
 	    pmc("<[-]]<");
 	} else {
-	    /* This line generates 256 to check for larger than byte cells. */
-	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]+<[");
+	    /* The two cell size checks here are independent, they can be
+	     * reordered or one removed.
+	     */
+
+	    /* This generates 256 to check for larger than byte cells. */
+	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]<[");
 	    pmc(">>");
 
 	    if (bf_multi == 6) lang = doubler; else lang = bfout;
@@ -650,7 +661,7 @@ bftranslate(int ch, int count)
 
 	    pmc("<<[-]]");
 
-	    /* This line generates 256 to check for cells upto 8 bits */
+	    /* This generates 256 to check for cells upto 8 bits */
 	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]+<[>-<[-]]>[>");
 
 	    if(bf_multi >= 4) lang = bfquad; else lang = doubler;

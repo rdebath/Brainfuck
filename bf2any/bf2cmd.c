@@ -14,10 +14,15 @@ int do_input = 0;
 int do_output = 0;
 int ind = 0;
 int loopid = 0;
+int tapelen = 1000;
 
 int
 check_arg(const char * arg)
 {
+    if (strncmp(arg, "-M", 2) == 0) {
+	tapelen = strtoul(arg+2, 0, 10) + (enable_optim?BOFF:0);
+	return 1;
+    } else
     return 0;
 }
 
@@ -26,9 +31,9 @@ outcmd(int ch, int count)
 {
     switch(ch) {
     case '!':
-	printf( "%s%d%s",
+	printf( "%s%d%s%d%s",
 	    "@ECHO OFF\r\n"
-	    "SET MEMSIZE=3000\r\n"
+	    "SET MEMSIZE=",tapelen,"\r\n"
 	    "SET /A I_=MEMSIZE-1\r\n"
 	    "FOR /L %%P IN (0,1,%I_%) DO SET MEMORY%%P=0\r\n"
 	    "SET PTR=",enable_optim?BOFF:0,"\r\n"

@@ -12,6 +12,7 @@
  */
 
 int ind = 0;
+int tapelen = 30000;
 #define I printf("%*s", ind*4, "")
 
 static const char * ctype = "int";
@@ -24,6 +25,10 @@ check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     if (strcmp(arg, "-savestring") == 0) return 1;
+    if (strncmp(arg, "-M", 2) == 0) {
+	tapelen = strtoul(arg+2, 0, 10) + BOFF;
+	return 1;
+    }
     return 0;
 }
 
@@ -34,11 +39,11 @@ outcmd(int ch, int count)
     case '!':
 	if (bytecell) { ctype = "byte"; vmask = 255; }
 
-	printf( "%s%s%s%d%s%s%s",
+	printf( "%s%d%s%s%s%d%s%s%s",
 		"package main\n"
 		"import(\"fmt\"\n"
 		"    \"os\")\n"
-		"var m [65535]", ctype, "\n"
+		"var m [",tapelen,"]", ctype, "\n"
 		"var p = ",BOFF,"\n"
 		"var v ", ctype, "\n"
 		"func main() {\n"

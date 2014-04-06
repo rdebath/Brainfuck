@@ -10,6 +10,7 @@
 
 int ind = 0;
 #define I printf("%*s", ind*4, "")
+int tapelen = 0;
 
 static void print_cstring(void);
 
@@ -18,6 +19,10 @@ check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     if (strcmp(arg, "-savestring") == 0) return 1;
+    if (strncmp(arg, "-M", 2) == 0) {
+	tapelen = strtoul(arg+2, 0, 10) + BOFF;
+	return 1;
+    }
     return 0;
 }
 
@@ -26,10 +31,15 @@ outcmd(int ch, int count)
 {
     switch(ch) {
     case '!':
-	printf( "%s%d%s",
-		"#!/usr/bin/ruby\n"
-		"m = Array.new(32768, 0)\n"
-		"p = ", BOFF, "\n");
+	puts("#!/usr/bin/ruby");
+	/* Using push is about 20% slower, using a Hash is a LOT slower! */
+	if (tapelen > 0)
+	    printf("m = Array.new(%d, 0)\n",tapelen);
+	else {
+	    puts("m = Array.new");
+	    tapelen = 0;
+	}
+	printf("%s%d%s", "p = ", BOFF, "\n");
 	break;
 
     case '=': I; printf("m[p] = %d\n", count); break;
@@ -50,7 +60,12 @@ outcmd(int ch, int count)
     case '+': I; printf("m[p] += %d\n", count); break;
     case '-': I; printf("m[p] -= %d\n", count); break;
     case '<': I; printf("p -= %d\n", count); break;
-    case '>': I; printf("p += %d\n", count); break;
+    case '>':
+	I; printf("p += %d\n", count);
+	if (!tapelen) {
+	    I; puts("m.push(0) while p>=m.length");
+	}
+	break;
     case '[':
 	if(bytecell) { I; printf("m[p] &= 255\n"); }
 	I; printf("while m[p] != 0\n");

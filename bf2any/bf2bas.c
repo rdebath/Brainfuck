@@ -21,6 +21,7 @@ int ind = 0;
 int lineno = 0;
 int lineinc = 1;
 int open_doloop = 0; /* So we don't get an "unused variable" warning */
+int tapelen = 30000;
 
 enum { loop_wend, loop_while, loop_do, loop_goto } loop_style = loop_do;
 enum { init_none, init_dim, init_global, init_main } init_style = init_dim;
@@ -45,6 +46,10 @@ check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     else
+    if (strncmp(arg, "-M", 2) == 0) {
+	tapelen = strtoul(arg+2, 0, 10) + BOFF;
+	return 1;
+    } else
     if (strcmp("-wend", arg) ==0) {
 	init_style = init_dim;
 	loop_style = loop_wend;
@@ -112,11 +117,11 @@ outcmd(int ch, int count)
 	    case init_none:
 		break;
 	    case init_dim:
-		I; printf("DIM M(32700)\n");
+		I; printf("DIM M(%d)\n", tapelen);
 		I; printf("P = %d\n", BOFF);
 		break;
 	    case init_global:
-		I; printf("GLOBAL M TYPE int ARRAY 30000\n");
+		I; printf("GLOBAL M TYPE int ARRAY %d\n", tapelen);
 		I; printf("P = %d\n", BOFF);
 		break;
 	    case init_main:
@@ -127,7 +132,7 @@ outcmd(int ch, int count)
 		/* Using "Dim M(32700) As Byte" means we have to fix overflows
 		 * rather than having an automatic wrap.
 		 */
-		I; printf("Dim M(32700) As Integer\n");
+		I; printf("Dim M(%d) As Integer\n", tapelen);
 		I; printf("Dim P As Integer\n");
 		// I; printf("Dim V As Integer ' Sigh, yes I know, sometimes unused.\n");
 		I; printf("P = %d\n", BOFF);

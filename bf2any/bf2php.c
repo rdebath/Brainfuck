@@ -9,12 +9,17 @@
  */
 
 int ind = 0;
+int tapelen = 30000;
 #define I printf("%*s", ind*4, "")
 
 int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
+    if (strncmp(arg, "-M", 2) == 0) {
+	tapelen = strtoul(arg+2, 0, 10) + BOFF;
+	return 1;
+    }
     return 0;
 }
 
@@ -23,9 +28,9 @@ outcmd(int ch, int count)
 {
     switch(ch) {
     case '!':
-	printf( "%s%d%s",
+	printf( "%s%d%s%d%s",
 		"<?php\n"
-		"$m=array_fill(0, 65535, 0);\n"
+		"$m=array_fill(0, ",tapelen,", 0);\n"
 		"$p=",BOFF,";\n");
 	break;
 
