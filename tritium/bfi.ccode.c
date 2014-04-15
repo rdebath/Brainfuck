@@ -39,6 +39,8 @@
 
 static const char * putname = "putch";
 static int use_direct_getchar = 0;
+static int use_dynmem = 0;
+static int memsize = 30000;
 #if defined(DISABLE_DLOPEN)
 static const int use_dlopen = 0;
 #else
@@ -52,6 +54,38 @@ void run_tccode(void);
 #ifndef DISABLE_DLOPEN
 void run_gccode(void);
 #endif
+
+int
+checkarg_ccode(char * opt, char * arg)
+{
+#if !defined(DISABLE_TCCLIB)
+    if (!strcmp(opt, "-ltcc")) {
+	choose_runner = 0;
+	return 1;
+    }
+#endif
+#if !defined(DISABLE_DLOPEN)
+    if (!strcmp(opt, "-ldl")) {
+	choose_runner = 1;
+	return 1;
+    }
+#endif
+    if (!strcmp(opt, "-dynmem")) {
+	use_dynmem = 1;
+	return 1;
+    }
+    if (!strcmp(opt, "-mem")) {
+	if (arg == 0 || arg[0] < '0' || arg[0] > '9') {
+	    use_dynmem = 1;
+	    return 1;
+	} else {
+	    memsize = strtol(arg,0,10);
+	    use_dynmem = (memsize <= 0);
+	    return 2;
+	}
+    }
+    return 0;
+}
 
 void
 pt(FILE* ofd, int indent, struct bfi * n)
@@ -74,9 +108,7 @@ pt(FILE* ofd, int indent, struct bfi * n)
 void
 print_c_header(FILE * ofd)
 {
-    int memsize = 60000;
     int memoffset = 0;
-    char const * funcname = "main";
     int l_iostyle = iostyle;
 
     if (cell_mask > 0 && cell_size < 8 && l_iostyle == 1) l_iostyle = 0;
@@ -88,9 +120,9 @@ print_c_header(FILE * ofd)
 	struct bfi * n = bfprog;
 	/* Check the string; be careful. */
 	while(n && okay) {
-	    if (n->type != T_PRT || (n->count < ' ' && n->count != '\n')
-		|| n->count > '~' || n->count == '%' || n->count == '\\'
-		|| n->count == '"')
+	    if (n->type != T_PRT || n->count > '~'
+		|| (n->count < ' ' && n->count != '\n' && n->count != '\033')
+		)
 		okay = 0;
 
 	    if (n->type == T_PRT && (n->count <= 0 || n->count > 127))
@@ -110,12 +142,11 @@ print_c_header(FILE * ofd)
 	}
     }
 
-    if (do_run && use_dlopen) funcname = "brainfuck";
-
     fprintf(ofd, "#include <stdio.h>\n");
-    fprintf(ofd, "#include <stdlib.h>\n\n");
-    if( cell_size == CHAR_BIT )
-	fprintf(ofd, "#include <string.h>\n\n");
+    fprintf(ofd, "#include <stdlib.h>\n");
+    if( cell_size == CHAR_BIT || use_dynmem )
+	fprintf(ofd, "#include <string.h>\n");
+    fprintf(ofd, "\n");
 
     if (cell_size == 0) {
 	fprintf(ofd, "# ifdef C\n");
@@ -123,82 +154,6 @@ print_c_header(FILE * ofd)
 	fprintf(ofd, "# else\n");
 	fprintf(ofd, "# define C int\n");
 	fprintf(ofd, "# endif\n\n");
-    }
-
-    if (node_type_counts[T_INP] != 0 && !do_run)
-    {
-	if (l_iostyle == 2 && (eofcell == 4 || (eofcell == 2 && EOF == -1))) {
-	    use_direct_getchar = 1;
-	} else {
-	    if (l_iostyle == 1) {
-		fprintf(ofd, "#include <locale.h>\n");
-		fprintf(ofd, "#include <wchar.h>\n\n");
-	    }
-	    fprintf(ofd, "static int\n");
-	    fprintf(ofd, "getch(int oldch)\n");
-	    fprintf(ofd, "{\n");
-	    fprintf(ofd, "  int ch;\n");
-	    if (l_iostyle == 2) {
-		fprintf(ofd, "  ch = getchar();\n");
-	    } else {
-		fprintf(ofd, "  do {\n");
-		if (l_iostyle == 1)
-		    fprintf(ofd, "\tch = getwchar();\n");
-		else
-		    fprintf(ofd, "\tch = getchar();\n");
-		fprintf(ofd, "  } while (ch == '\\r');\n");
-	    }
-	    switch(eofcell) {
-	    default:
-		fprintf(ofd, "#ifndef EOFCELL\n");
-		fprintf(ofd, "  if (ch != EOF) return ch;\n");
-		fprintf(ofd, "  return oldch;\n");
-		fprintf(ofd, "#else\n");
-		fprintf(ofd, "#if EOFCELL == EOF\n");
-		fprintf(ofd, "  return ch;\n");
-		fprintf(ofd, "#else\n");
-		fprintf(ofd, "  if (ch != EOF) return ch;\n");
-		fprintf(ofd, "  return EOFCELL;\n");
-		fprintf(ofd, "#endif\n");
-		fprintf(ofd, "#endif\n");
-		break;
-	    case 1:
-		fprintf(ofd, "  if (ch != EOF) return ch;\n");
-		fprintf(ofd, "  return oldch;\n");
-		break;
-	    case 3:
-		fprintf(ofd, "  if (ch != EOF) return ch;\n");
-		fprintf(ofd, "  return 0;\n");
-		break;
-	    case 2:
-#if EOF != -1
-		fprintf(ofd, "  if (ch != EOF) return ch;\n");
-		fprintf(ofd, "  return -1;\n");
-		break;
-#endif
-	    case 4:
-		fprintf(ofd, "  return ch;\n");
-		break;
-	    }
-	    fprintf(ofd, "}\n\n");
-	}
-    }
-
-    if (node_type_counts[T_PRT] != 0 && !do_run) {
-	switch(l_iostyle)
-	{
-	case 0: case 2:
-	    putname = "putchar";
-	    break;
-	case 1:
-	    fprintf(ofd, "static void putch(int ch)\n{\n"
-			"  if(ch>127)\n"
-			"\tprintf(\"%%lc\",ch);\n"
-			"  else\n"
-			"\tputchar(ch);\n"
-			"}\n\n");
-	    break;
-	}
     }
 
     if (do_run) {
@@ -209,9 +164,173 @@ print_c_header(FILE * ofd)
 	    fprintf(ofd, "#define getch (*brainfuck_getch)\n");
 	    fprintf(ofd, "void (*brainfuck_putch)(int ch);\n");
 	    fprintf(ofd, "int (*brainfuck_getch)(int ch);\n");
+	    fprintf(ofd, "int brainfuck(void){\n");
+	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
 	} else {
 	    fprintf(ofd, "extern void putch(int ch);\n");
 	    fprintf(ofd, "extern int getch(int ch);\n");
+	    fprintf(ofd, "extern %s mem[];\n", cell_type);
+	    fprintf(ofd, "int main(void){\n");
+	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
+	}
+    }
+    else
+    {
+	if (node_type_counts[T_INP] != 0)
+	{
+	    if (l_iostyle == 2 && (eofcell == 4 || (eofcell == 2 && EOF == -1))) {
+		use_direct_getchar = 1;
+	    } else {
+		if (l_iostyle == 1) {
+		    fprintf(ofd, "#include <locale.h>\n");
+		    fprintf(ofd, "#include <wchar.h>\n\n");
+		}
+		fprintf(ofd, "static int\n");
+		fprintf(ofd, "getch(int oldch)\n");
+		fprintf(ofd, "{\n");
+		fprintf(ofd, "  int ch;\n");
+		if (l_iostyle == 2) {
+		    fprintf(ofd, "  ch = getchar();\n");
+		} else {
+		    fprintf(ofd, "  do {\n");
+		    if (l_iostyle == 1)
+			fprintf(ofd, "\tch = getwchar();\n");
+		    else
+			fprintf(ofd, "\tch = getchar();\n");
+		    fprintf(ofd, "  } while (ch == '\\r');\n");
+		}
+		switch(eofcell) {
+		default:
+		    fprintf(ofd, "#ifndef EOFCELL\n");
+		    fprintf(ofd, "  if (ch != EOF) return ch;\n");
+		    fprintf(ofd, "  return oldch;\n");
+		    fprintf(ofd, "#else\n");
+		    fprintf(ofd, "#if EOFCELL == EOF\n");
+		    fprintf(ofd, "  return ch;\n");
+		    fprintf(ofd, "#else\n");
+		    fprintf(ofd, "  if (ch != EOF) return ch;\n");
+		    fprintf(ofd, "  return EOFCELL;\n");
+		    fprintf(ofd, "#endif\n");
+		    fprintf(ofd, "#endif\n");
+		    break;
+		case 1:
+		    fprintf(ofd, "  if (ch != EOF) return ch;\n");
+		    fprintf(ofd, "  return oldch;\n");
+		    break;
+		case 3:
+		    fprintf(ofd, "  if (ch != EOF) return ch;\n");
+		    fprintf(ofd, "  return 0;\n");
+		    break;
+		case 2:
+    #if EOF != -1
+		    fprintf(ofd, "  if (ch != EOF) return ch;\n");
+		    fprintf(ofd, "  return -1;\n");
+		    break;
+    #endif
+		case 4:
+		    fprintf(ofd, "  return ch;\n");
+		    break;
+		}
+		fprintf(ofd, "}\n\n");
+	    }
+	}
+
+	if (node_type_counts[T_PRT] != 0) {
+	    switch(l_iostyle)
+	    {
+	    case 0: case 2:
+		putname = "putchar";
+		break;
+	    case 1:
+		fprintf(ofd, "static void putch(int ch)\n{\n"
+			    "  if(ch>127)\n"
+			    "\tprintf(\"%%lc\",ch);\n"
+			    "  else\n"
+			    "\tputchar(ch);\n"
+			    "}\n\n");
+		break;
+	    }
+	}
+
+	if (node_type_counts[T_MOV] == 0) {
+	    if (min_pointer >= 0)
+		memsize = max_pointer+1;
+	    else {
+		memoffset = -min_pointer;
+		memsize = max_pointer-min_pointer+1;
+	    }
+	}
+	if (hard_left_limit<0) {
+	    memoffset = -most_neg_maad_loop;
+	    memsize += memoffset;
+	}
+
+	if (node_type_counts[T_MOV] == 0 && memoffset == 0) {
+	    fprintf(ofd, "static %s m[%d];\n", cell_type, max_pointer+1);
+	    fprintf(ofd, "int main(void){\n");
+	    if (enable_trace)
+		fprintf(ofd, "#define mem m\n");
+	} else if (!use_dynmem) {
+	    fprintf(ofd, "static %s mem[%d];\n", cell_type, memsize);
+	    fprintf(ofd, "int main(void){\n");
+
+	    if (memoffset > 0)
+		fprintf(ofd, "  register %s * m = mem + %d;\n",
+			cell_type, memoffset);
+	    else
+		fprintf(ofd, "  register %s * m = mem;\n", cell_type);
+	} else {
+
+	    printf("#define CELL %s\n", cell_type);
+	    printf("#define MINOFF (%d)\n", min_pointer);
+	    printf("#define MAXOFF (%d)\n", max_pointer);
+	    printf("#define MINALLOC 16\n");
+
+	    puts( "\n"	"CELL * mem = 0;"
+		"\n"	"int memsize = 0;"
+		"\n"	""
+		"\n"	"static CELL *"
+		"\n"	"alloc_ptr(CELL *p)"
+		"\n"	"{"
+		"\n"	"    int amt, memoff, i, off;"
+		"\n"	"    if (p >= mem && p < mem+memsize) return p;"
+		"\n"	""
+		"\n"	"    memoff = p-mem; off = 0;"
+		"\n"	"    if (memoff<0) off = -memoff;"
+		"\n"	"    else if(memoff>=memsize) off = memoff-memsize;"
+		"\n"	"    amt = (off / MINALLOC + 1) * MINALLOC;"
+		"\n"	"    mem = realloc(mem, (memsize+amt)*sizeof(*mem));"
+		"\n"	"    if (memoff<0) {"
+		"\n"	"        memmove(mem+amt, mem, memsize*sizeof(*mem));"
+		"\n"	"        for(i=0; i<amt; i++)"
+		"\n"	"            mem[i] = 0;"
+		"\n"	"        memoff += amt;"
+		"\n"	"    } else {"
+		"\n"	"        for(i=0; i<amt; i++)"
+		"\n"	"            mem[memsize+i] = 0;"
+		"\n"	"    }"
+		"\n"	"    memsize += amt;"
+		"\n"	"    return mem+memoff;"
+		"\n"	"}"
+		"\n"	""
+		"\n"	"static inline CELL *"
+		"\n"	"move_ptr(CELL *p, int off) {"
+		"\n"	"    p += off;"
+		"\n"	"    if (off>=0 && p+MAXOFF >= mem+memsize)"
+		"\n"	"        p = alloc_ptr(p+MAXOFF)-MAXOFF;"
+		"\n"	"    if (off<=0 && p+MINOFF <= mem)"
+		"\n"	"        p = alloc_ptr(p+MINOFF)-MINOFF;"
+		"\n"	"    return p;"
+		"\n"	"}"
+		"\n"	""
+		"\n"	"int main(void){"
+		"\n"	"  register CELL * m = move_ptr(alloc_ptr(mem),0);" );
+	}
+
+	if (node_type_counts[T_INP] != 0) {
+	    fprintf(ofd, "  setbuf(stdout, 0);\n");
+	    if (l_iostyle == 1)
+		fprintf(ofd, "  setlocale(LC_ALL, \"\");\n");
 	}
     }
 
@@ -220,47 +339,6 @@ print_c_header(FILE * ofd)
 		"mem[%d]=%d%s\\n\", \\\n\tp1, p2, p3,"
 		" p4-mem, (p4>=mem?*(p4):0), p4>=mem?\"\":\" SIGSEG\");\n\n",
 	    ofd);
-
-    if (node_type_counts[T_MOV] == 0) {
-	if (min_pointer >= 0)
-	    memsize = max_pointer+1;
-	else {
-	    memoffset = -min_pointer;
-	    memsize = max_pointer-min_pointer+1;
-	}
-    }
-    if (hard_left_limit<0) {
-	memoffset = -most_neg_maad_loop;
-	memsize += memoffset;
-	if (memsize < 65536)
-	    memsize = 65536;
-    }
-
-    if (node_type_counts[T_MOV] == 0 && memoffset == 0 && !do_run) {
-	fprintf(ofd, "static %s m[%d];\n", cell_type, max_pointer+1);
-	fprintf(ofd, "int %s(void){\n", funcname);
-	if (enable_trace)
-	    fprintf(ofd, "#define mem m\n");
-    } else {
-	if (!do_run)
-	    fprintf(ofd, "static %s mem[%d];\n", cell_type, memsize);
-	else if (!use_dlopen) {
-	    fprintf(ofd, "extern %s mem[];\n", cell_type);
-	}
-	fprintf(ofd, "int %s(void){\n", funcname);
-	fprintf(ofd, "  register %s * m;\n", cell_type);
-
-	if (memoffset > 0 && !do_run)
-	    fprintf(ofd, "  m = mem + %d;\n", memoffset);
-	else
-	    fprintf(ofd, "  m = mem;\n");
-    }
-
-    if (node_type_counts[T_INP] != 0 && !do_run) {
-	fprintf(ofd, "  setbuf(stdout, 0);\n");
-	if (l_iostyle == 1)
-	    fprintf(ofd, "  setlocale(LC_ALL, \"\");\n");
-    }
 }
 
 void
@@ -308,7 +386,9 @@ print_ccode(FILE * ofd)
 	{
 	case T_MOV:
 	    if (!disable_indent) pt(ofd, indent,n);
-	    if (n->count == 1)
+	    if (!do_run && use_dynmem && n->count>0)
+		fprintf(ofd, "m = move_ptr(m,%d);\n", n->count);
+	    else if (n->count == 1)
 		fprintf(ofd, "++m;\n");
 	    else if (n->count == -1)
 		fprintf(ofd, "--m;\n");
@@ -606,11 +686,11 @@ print_ccode(FILE * ofd)
 	    if (found_rail_runner && cell_size == CHAR_BIT &&
 		add_mask <= 0 && n->next->count == 1) {
 		pt(ofd, indent,n);
-		fprintf(ofd, "if( m[%d] ) {\n", n->offset);
+		fprintf(ofd, "if(m[%d]) {\n", n->offset);
 		pt(ofd, indent+1,n);
 		fprintf(ofd, "m++;\n");
 		pt(ofd, indent+1,n);
-		fprintf(ofd, "if( m[%d] ) {\n", n->offset);
+		fprintf(ofd, "if(m[%d]) {\n", n->offset);
 		pt(ofd, indent+2,n);
 		fprintf(ofd, "m++;\n");
 		pt(ofd, indent+2,n);
@@ -683,21 +763,6 @@ print_ccode(FILE * ofd)
 }
 
 #if !defined(DISABLE_TCCLIB) || !defined(DISABLE_DLOPEN)
-
-int
-checkarg_ccode(char * opt, char * arg)
-{
-    if (!strcmp(opt, "-ltcc")) {
-	choose_runner = 0;
-	return 1;
-    }
-    if (!strcmp(opt, "-ldl")) {
-	choose_runner = 1;
-	return 1;
-    }
-    return 0;
-}
-
 void
 run_ccode(void)
 {
