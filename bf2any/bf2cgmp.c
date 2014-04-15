@@ -99,9 +99,8 @@ outcmd(int ch, int count)
 
 	if (!use_macro) {
 	    /* #include rant about different semantics of inline keyword */
-	    /* => inline func must not be static and must only exist in one file */
 	    printf("%s",
-		"inline\n"
+		"static inline\n"
 		"mpz_t *\n"
 		"move_ptr(mpz_t *p, int off) {\n"
 		"    p += off;\n"

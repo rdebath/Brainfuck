@@ -104,6 +104,8 @@ outcmd(int ch, int count)
 {
     if (imov && ch != '>' && ch != '<') {
 	int mov = imov;
+
+#if 0
 	imov = 0;
 
 	switch(ch) {
@@ -115,7 +117,24 @@ outcmd(int ch, int count)
 	case 'N': prv2("*(m+=%d) -= v*%d;", mov, count); return;
 	case 'S': prv("*(m+=%d) += v;", mov); return;
 	}
+#else
+	switch(ch) {
+	case '=': prv2("m[%d] = %d;", mov, count); return;
+	case 'B': prv("v= m[%d];", mov); return;
+	case 'M': prv2("m[%d] += v*%d;", mov, count); return;
+	case 'N': prv2("m[%d] -= v*%d;", mov, count); return;
+	case 'S': prv("m[%d] += v;", mov); return;
+	case 'Q': prv2("if(v) m[%d] = %d;", mov, count); return;
+	case 'm': prv2("if(v) m[%d] += v*%d;", mov, count); return;
+	case 'n': prv2("if(v) m[%d] -= v*%d;", mov, count); return;
+	case 's': prv("if(v) m[%d] += v;", mov); return;
+	case '+': prv2("m[%d] +=%d;", mov, count); return;
+	case '-': prv2("m[%d] -=%d;", mov, count); return;
+        case '.': prv("putchar(m[%d]);", mov); return;
+	}
+#endif
 
+	imov = 0;
 	if (mov > 0)
 	    prv("m += %d;", mov);
 	else if (mov < 0)
