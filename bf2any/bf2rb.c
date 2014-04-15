@@ -11,6 +11,7 @@
 int ind = 0;
 #define I printf("%*s", ind*4, "")
 int tapelen = 0;
+int safetapeoff = 0, curtapeoff = 0;
 
 static void print_cstring(void);
 
@@ -40,6 +41,8 @@ outcmd(int ch, int count)
 	    tapelen = 0;
 	}
 	printf("%s%d%s", "p = ", BOFF, "\n");
+	if (!tapelen)
+	    puts("m.push(0) while p>=m.length");
 	break;
 
     case '=': I; printf("m[p] = %d\n", count); break;
@@ -59,10 +62,15 @@ outcmd(int ch, int count)
 
     case '+': I; printf("m[p] += %d\n", count); break;
     case '-': I; printf("m[p] -= %d\n", count); break;
-    case '<': I; printf("p -= %d\n", count); break;
+    case '<':
+	I; printf("p -= %d\n", count);
+	curtapeoff -= count;
+	break;
     case '>':
 	I; printf("p += %d\n", count);
-	if (!tapelen) {
+	curtapeoff += count;
+	if (!tapelen && curtapeoff > safetapeoff) {
+	    safetapeoff = curtapeoff;
 	    I; puts("m.push(0) while p>=m.length");
 	}
 	break;
@@ -70,10 +78,12 @@ outcmd(int ch, int count)
 	if(bytecell) { I; printf("m[p] &= 255\n"); }
 	I; printf("while m[p] != 0\n");
 	ind++;
+	curtapeoff = safetapeoff = 0;
 	break;
     case ']':
 	if(bytecell) { I; printf("m[p] &= 255\n"); }
 	ind--; I; printf("end\n");
+	curtapeoff = safetapeoff = 0;
 	break;
     case '.': I; printf("print (m[p]&255).chr\n"); break;
     /* See also:	 print m[p].chr(Encoding::UTF_8) */
