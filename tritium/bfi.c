@@ -2258,6 +2258,13 @@ find_known_calc_state(struct bfi * v)
     }
 
     if (v->count2 && v->count3 && v->offset2 == v->offset3) {
+	/* This is an unlikely overflow. */
+	if (cell_size<=0 &&
+	    (double)v->count2 + (double)v->count3 != (double)(v->count2+v->count3)) {
+	    fprintf(stderr, "T_CALC merge overflow @(%d,%d)\n", v->line, v->col);
+	    return 0;
+	}
+
 	/* Merge identical sides */
 	v->count2 += v->count3;
 	v->count3 = 0;
@@ -2306,6 +2313,30 @@ find_known_calc_state(struct bfi * v)
 	find_known_value(v->prev, v->offset3,
 		    &n3, &const_found3, &known_value3, &non_zero_unsafe3);
 	n3_valid = 1;
+    }
+
+    if (const_found2 && cell_size<=0) {
+	/* If the calc might overflow ignore the constant */
+	int cnt1 = v->count + v->count2 * known_value2;
+	double cnt2 = (double)v->count + (double)v->count2 * (double)known_value2;
+	if ((double)cnt1 != cnt2) {
+	    if (verbose>5)
+		fprintf(stderr, "T_CALC const2 overflow %d != %.0f @(%d,%d)\n",
+				cnt1, cnt2, v->line, v->col);
+	    const_found2 = 0;
+	}
+    }
+
+    if (const_found3 && cell_size<=0) {
+	/* If the calc might overflow ignore the constant */
+	int cnt1 = v->count + v->count3 * known_value3;
+	double cnt2 = (double)v->count + (double)v->count3 * (double)known_value3;
+	if ((double)cnt1 != cnt2) {
+	    if (verbose>5)
+		fprintf(stderr, "T_CALC const3 overflow %d != %.0f @(%d,%d)\n",
+				cnt1, cnt2, v->line, v->col);
+	    const_found3 = 0;
+	}
     }
 
     if (const_found2) {
@@ -2539,7 +2570,42 @@ flatten_loop(struct bfi * v, int constant_count)
     if (is_znode)
 	constant_count = 1;
 
-    if (verbose>5) fprintf(stderr, "  Loop replaced with T_NOP.\n");
+    /* Check for overflows. */
+    if (cell_size<=0) {
+	n = v->next;
+	while(1)
+	{
+	    int newcount1 = 0;
+	    double newcount2 = 0;
+
+	    if (n->type == T_END || n->type == T_ENDIF) break;
+	    if (n->type == T_ADD) {
+		newcount1 = n->count * constant_count;
+		newcount2 = (double)n->count * (double)constant_count;
+		if ((double)newcount1 != newcount2) {
+		    if (verbose>5) fprintf(stderr, "  Loop calculation overflow @(%d,%d)\n", n->line, n->col);
+		    return 0;
+		}
+	    }
+	    if (n->type == T_CALC) {
+		/* n->count2 = pow(n->count2, constant_count) */
+		int i, j = n->count2;
+		newcount1 = j;
+		newcount2 = (double)j;
+		for(i=0; i<constant_count-1; i++) {
+		    newcount1 = newcount1 * j;
+		    newcount2 = newcount2 * j;
+		}
+		if ((double)newcount1 != newcount2) {
+		    if (verbose>5) fprintf(stderr, "  Loop power calculation overflow @(%d,%d)\n", n->line, n->col);
+		    return 0;
+		}
+	    }
+	    n=n->next;
+	}
+    }
+
+    if (verbose>5) fprintf(stderr, "  Loop replaced with T_NOP. @(%d,%d)\n", v->line, v->col);
     n = v->next;
     while(1)
     {
@@ -2661,17 +2727,17 @@ classify_loop(struct bfi * v)
     }
 
     if (!has_add && !has_equ) {
-	if (verbose>5) fprintf(stderr, "Loop flattened to single run\n");
+	if (verbose>5) fprintf(stderr, "Loop flattened to single run @(%d,%d)\n", v->line, v->col);
 	n->type = T_NOP;
 	v->type = T_NOP;
 	dec_node->type = T_SET;
 	dec_node->count = 0;
     } else if (is_znode) {
-	if (verbose>5) fprintf(stderr, "Loop flattened to T_IF\n");
+	if (verbose>5) fprintf(stderr, "Loop flattened to T_IF @(%d,%d)\n", v->line, v->col);
 	v->type = T_IF;
 	v->jmp->type = T_ENDIF;
     } else {
-	if (verbose>5) fprintf(stderr, "Loop flattened to multiply\n");
+	if (verbose>5) fprintf(stderr, "Loop flattened to multiply @(%d,%d)\n", v->line, v->col);
 	v->type = T_CMULT;
 	/* Without T_SET if all offsets >= Loop offset we don't need the if. */
 	/* BUT: Any access below the loop can possibly be before the start
@@ -2719,11 +2785,11 @@ flatten_multiplier(struct bfi * v)
     }
 
     if (v->type == T_MULT) {
-	if (verbose>5) fprintf(stderr, "Multiplier flattened to single run\n");
+	if (verbose>5) fprintf(stderr, "Multiplier flattened to single run @(%d,%d)\n", v->line, v->col);
 	v->type = T_NOP;
 	n->type = T_NOP;
     } else {
-	if (verbose>5) fprintf(stderr, "Multiplier flattened to T_IF\n");
+	if (verbose>5) fprintf(stderr, "Multiplier flattened to T_IF @(%d,%d)\n", v->line, v->col);
 	v->type = T_IF;
 	n->type = T_ENDIF;
 	if (dec_node) {
