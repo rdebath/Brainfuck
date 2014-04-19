@@ -46,6 +46,7 @@ static const int use_dlopen = 0;
 #else
 static int use_dlopen = 0;
 static int choose_runner = -1;
+static char * cc_cmd = 0;
 #endif
 
 #ifndef DISABLE_TCCLIB
@@ -68,6 +69,11 @@ checkarg_ccode(char * opt, char * arg)
     if (!strcmp(opt, "-ldl")) {
 	choose_runner = 1;
 	return 1;
+    }
+    if (!strcmp(opt, "-cc") && arg) {
+	cc_cmd = strdup(arg);
+	choose_runner = 1;
+	return 2;
     }
 #endif
     if (!strcmp(opt, "-dynmem")) {
@@ -991,23 +997,28 @@ compile_and_run(void)
 {
     char cmdbuf[256];
     int ret;
+    const char * cc = CC;
+
+    if (cc_cmd) cc = cc_cmd;
 
     if (verbose)
-	fprintf(stderr, "Running C Code using \""CC" -shared\" and dlopen().\n");
+	fprintf(stderr,
+		"Running C Code using \"%s -shared -fPIC\" and dlopen().\n",
+		cc);
 
 #ifdef DLOPEN_ABS_PATH
     sprintf(cmdbuf, "%s -shared -fPIC -o %s %s",
-                CC, dl_name, ccode_name);
+                cc, dl_name, ccode_name);
     ret = system(cmdbuf);
 #else
-    /* Like this so that ccache has an absolute path and distinct compile. */
+    /* Like this so that ccache has a good path and distinct compile. */
     sprintf(cmdbuf, "cd %s; %s -fPIC -c -o %s %s",
-	    tmpdir, CC, BFBASE".o", BFBASE".c");
+	    tmpdir, cc, BFBASE".o", BFBASE".c");
     ret = system(cmdbuf);
 
     if (ret != -1) {
 	sprintf(cmdbuf, "cd %s; %s -shared -fPIC -o %s %s",
-		tmpdir, CC, dl_name, BFBASE".o");
+		tmpdir, cc, dl_name, BFBASE".o");
 	ret = system(cmdbuf);
     }
 #endif
