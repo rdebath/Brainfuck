@@ -41,3 +41,8 @@ the output of bf2cgmp. The nasm assembler is in ports but the programs
 produce 32bit Linux ELF executables that won't work anyway. The Makefiles
 prefer gcc, but adding 'CC=clang' works fine.
 
+The 'ports' version of GNU Lightning V2 is (of course) not auto detected
+by Tritium.  It can be pulled in using this ...
+
+$ gmake CC=clang DO_LIGHT=1 DO_LIGHT2=1 LDFLAGS=-L/usr/local/lib DEFS=-I/usr/local/include
+
