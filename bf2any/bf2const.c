@@ -115,13 +115,21 @@ flush_tape(int no_output, int keep_knowns)
 		    if (tapeoff > outoff) { outcmd('>', tapeoff-outoff); outoff=tapeoff; }
 		    if (tapeoff < outoff) { outcmd('<', outoff-tapeoff); outoff=tapeoff; }
 		    if (p->is_set) {
-			if (enable_optim) {
+			if (enable_optim && enable_be_optim) {
 			    outcmd('=', p->v);
 			} else if (p->cleaned) {
 			    if (p->v > p->cleaned_val)
 				outcmd('+', p->v-p->cleaned_val);
 			    if (p->v < p->cleaned_val)
 				outcmd('-', p->cleaned_val-p->v);
+			} else if (enable_optim && !enable_be_optim) {
+			    outcmd('[', 1);
+			    outcmd('-', 1);
+			    outcmd(']', 1);
+			    if (p->v > 0)
+				outcmd('+', p->v);
+			    if (p->v < 0)
+				outcmd('-', -p->v);
 			} else {
 			    fprintf(stderr, "Optimisation error, non-relative set generated with full optimisation disabled\n");
 			    exit(99);
@@ -242,16 +250,21 @@ void outopt(int ch, int count)
     case '=': tape->v = count; tape->is_set = 1; break;
 
     case 'B':
-	if (!tape->is_set) {
-	    flush_tape(0,1);
-	    reg_known = 0; reg_val = 0;
-	    outcmd(ch, count);
-	    return;
+	if (tape->is_set) {
+	    if (bytecell) tape->v %= 256; /* Note: preserves sign but limits range. */
+	    reg_known = 1;
+	    reg_val = tape->v;
+	    break;
 	}
-	if (bytecell) tape->v %= 256; /* Note: preserves sign but limits range. */
-	reg_known = 1;
-	reg_val = tape->v;
-	break;
+
+	flush_tape(0,1);
+	reg_known = 0; reg_val = 0;
+	if (enable_be_optim) {
+	    outcmd(ch, count);
+	} else {
+	    outcmd('[', 1);
+	}
+	return;
 
     case 'M':
     case 'N':
@@ -260,10 +273,33 @@ void outopt(int ch, int count)
     case 'm':
     case 'n':
     case 's':
+    case 'E':
 	if (!reg_known) {
 	    flush_tape(0,1);
 	    clear_cell(tape);
-	    outcmd(ch, count);
+	    if (enable_be_optim) {
+		outcmd(ch, count);
+	    } else switch(ch) {
+		case 'M': case 'm':
+		    outcmd('+', count);
+		    break;
+		case 'N': case 'n':
+		    outcmd('-', count);
+		    break;
+		case 'S': case 's':
+		    outcmd('+', 1);
+		    break;
+		case 'Q':
+		    outcmd('[', 1);
+		    outcmd('-', 1);
+		    outcmd(']', 1);
+		    if (count)
+			outcmd('+', count);
+		    break;
+		case 'E':
+		    outcmd(']', 1);
+		    break;
+	    }
 	    return;
 	}
 	switch(ch) {
@@ -289,4 +325,8 @@ void outopt(int ch, int count)
 	}
 	if (bytecell) tape->v %= 256; /* Note: preserves sign but limits range. */
     }
+
+    /* Some BE are not 32 bits, try to avoid cell size mistakes */
+    if (tape->v > 65536 || tape->v < -65536)
+	flush_tape(0,0);
 }

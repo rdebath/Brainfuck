@@ -351,9 +351,6 @@ check_arg(const char * arg)
 	lang = 0; langclass = L_TOKENS; return 1;
     } else
 
-    if (strcmp(arg, "-O") == 0 && L_BASE == L_TOKENS) {
-	return 1;
-    } else
     if (strncmp(arg, "-w", 2) == 0 && arg[2] >= '0' && arg[2] <= '9') {
 	maxcol = atol(arg+2);
 	return 1;

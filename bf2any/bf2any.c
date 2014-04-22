@@ -6,6 +6,7 @@
 
 int bytecell = 0;
 int enable_optim = 0;
+int enable_be_optim = 0;
 int enable_bf_optim = 0;
 int enable_mov_optim = 0;
 int keep_dead_code = 0;
@@ -195,14 +196,18 @@ outrun(int ch, int repcnt)
 	qcnt = 0;
 
 	/* Start new */
-	if (loopz) {
-	    /* *m = (*m != 0) */
-	    qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
-	    qcmd[qcnt] = 'Q'; qrep[qcnt] = 1; qcnt ++;
-	    inc = -1;
-	}
 	qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
-	qcmd[qcnt] = '='; qrep[qcnt] = 0; qcnt ++;
+	if (loopz) {
+	    inc = -1;
+	    if (enable_be_optim) {
+		qcmd[qcnt] = 'Q'; qrep[qcnt] = 1; qcnt ++;
+		qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
+	    }
+	}
+	if (enable_be_optim) {
+	    qcmd[qcnt] = '='; qrep[qcnt] = 0; qcnt ++;
+	}
+
 	for (i=0; i<madd_count; i++) {
 	    if (!madd_zmode[i] && madd_inc[i] == 0) continue; /* NOP */
 	    if (mov != madd_offset[i]) {
@@ -242,6 +247,14 @@ outrun(int ch, int repcnt)
 	if (mov != 0) {
 	    qcmd[qcnt] = '>'; qrep[qcnt] = 0 - mov; qcnt ++;
 	}
+	if (!enable_be_optim) {
+	    if (loopz) {
+		qcmd[qcnt] = '='; qrep[qcnt] = 0; qcnt ++;
+	    } else {
+		qcmd[qcnt] = 'N'; qrep[qcnt] = 1; qcnt ++;
+	    }
+	    qcmd[qcnt] = 'E'; qrep[qcnt] = 0; qcnt ++;
+	}
 
 	/* And forward the converted loop */
 	outrun(0, 0);
@@ -251,7 +264,7 @@ outrun(int ch, int repcnt)
 /*
  *  Decode arguments for the FE
  */
-int opt_supported = -1, byte_supported, nobyte_supported;
+int byte_supported, nobyte_supported;
 int enable_rle = 0;
 
 int
@@ -265,19 +278,19 @@ check_argv(const char * arg)
 	bytecell=0;
 
     } else if (strcmp(arg, "-m") == 0) {
-	if (opt_supported == -1)
-	    opt_supported = enable_optim = check_arg("-O");
 	check_arg(arg);
-	enable_optim=0;
+	enable_optim = 0;
+	enable_be_optim = 0;
 	keep_dead_code = 1;
-    } else if (strcmp(arg, "-O") == 0 && check_arg("-O")) {
-	opt_supported = enable_optim = check_arg(arg);
+    } else if (strcmp(arg, "-O") == 0) {
+	enable_optim = 1;
+	check_arg(arg);
     } else if (strcmp(arg, "-Obf") == 0) {
 	enable_bf_optim=1;
-	opt_supported = enable_optim = 0;
+	enable_optim = 0;
     } else if (strcmp(arg, "-Omov") == 0) {
 	enable_mov_optim=1;
-	opt_supported = enable_optim = 0;
+	enable_optim = 0;
 
     } else if (strcmp(arg, "-#") == 0 && check_arg(arg)) {
 	enable_debug++;
@@ -320,6 +333,7 @@ main(int argc, char ** argv)
     if (!byte_supported && !nobyte_supported)
 	nobyte_supported = byte_supported = 1;
     bytecell = !nobyte_supported;
+    enable_optim = enable_be_optim = check_arg("-O");
 
     for(;;) {
 	if (argc < 2 || argv[1][0] != '-' || argv[1][1] == '\0') {
@@ -362,9 +376,6 @@ main(int argc, char ** argv)
 	    argc--; argv++;
 	} else break;
     }
-
-    if (opt_supported == -1)
-	opt_supported = enable_optim = check_arg("-O");
 
     if (argc<=1 || strcmp(argv[1], "-") == 0) {
 	ifd = stdin;

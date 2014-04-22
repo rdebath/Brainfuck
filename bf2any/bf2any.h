@@ -1,6 +1,7 @@
 
 extern int bytecell;
 extern int enable_optim;
+extern int enable_be_optim;
 extern int enable_debug;
 extern int keep_dead_code;
 extern const char * current_file;
