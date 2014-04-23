@@ -8,6 +8,7 @@
 #ifndef DISABLE_DYNASM
 #include <stdint.h>
 #include <assert.h>
+#include <fcntl.h>
 #include <sys/mman.h>
 
 #include "bfi.run.h"
@@ -50,6 +51,10 @@ run_dynasm(void)
 #endif
 
 #ifdef DASM_S_OK
+#if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
+#define MAP_ANONYMOUS MAP_ANON
+#endif
+
 typedef int (*fnptr)(char* memory);
 fnptr code = 0;
 size_t codelen;
@@ -57,14 +62,27 @@ size_t codelen;
 static void
 link_and_run(dasm_State ** state)
 {
+    char   *codeptr = MAP_FAILED;
     size_t  size;
     int     dasm_status = dasm_link(state, &size);
     assert(dasm_status == DASM_S_OK);
 
-    char   *codeptr =
+#ifdef MAP_ANONYMOUS
+    codeptr =
 	(char *) mmap(NULL, size,
 		      PROT_READ | PROT_WRITE | PROT_EXEC,
-		      MAP_ANON | MAP_PRIVATE, -1, 0);
+		      MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+#else
+    /* This'll probably only work with Linux ... Oh, FreeBSD too. */
+    int fd = open("/dev/zero", O_RDWR);
+    if (fd >= 0) {
+	codeptr =
+	    (char *) mmap(NULL, size,
+			  PROT_READ | PROT_WRITE | PROT_EXEC,
+			  MAP_PRIVATE, fd, 0);
+	close(fd);
+    }
+#endif
     assert(codeptr != MAP_FAILED);
     codelen = size;
 
@@ -92,10 +110,16 @@ link_and_run(dasm_State ** state)
 	fprintf(stderr, "Compiled %d bytes of "CPUID" Dynasm code, running.\n", (int)codelen);
 
     if (isatty(STDOUT_FILENO)) setbuf(stdout, 0);
-    code = (void *) codeptr;
+
+    /* The C99 standard leaves casting from "void *" to a function
+       pointer undefined.  The assignment used below is the POSIX.1-2003
+       (Technical Corrigendum 1) workaround; see the Rationale for the
+       POSIX specification of dlsym(). */
+					     /* -- Linux man page dlsym() */
+    *(void **) (&code) = codeptr;
     code(map_hugeram());
 
-    assert(munmap(code, codelen) == 0);
+    assert(munmap(codeptr, codelen) == 0);
 }
 
 #endif

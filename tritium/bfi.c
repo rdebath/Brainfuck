@@ -155,13 +155,11 @@ double profile_hits = 0.0;
 int profile_min_cell = 0;
 int profile_max_cell = 0;
 
-/* Where's the tape memory */
+/* Where's the tape memory start */
 void * cell_array_pointer = 0;
-#ifdef USEHUGERAM
-/* Huge tape location */
+/* Location of all of the tape memory. */
 void * cell_array_low_addr = 0;
 size_t cell_array_alloc_len = 0;
-#endif
 
 /* Reading */
 void load_file(char * fname, int is_first, int is_last);
@@ -3378,7 +3376,7 @@ void
 unmap_hugeram(void)
 {
     if(cell_array_pointer==0) return;
-    free(cell_array_low_addr)
+    free(cell_array_low_addr);
     cell_array_pointer = 0;
     cell_array_low_addr = 0;
     cell_array_alloc_len = 0;
@@ -3387,9 +3385,10 @@ unmap_hugeram(void)
 
 /* -- */
 #ifdef USEHUGERAM
-#ifndef MAP_ANONYMOUS
+#if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
 #define MAP_ANONYMOUS MAP_ANON
 #endif
+
 void *
 map_hugeram(void)
 {
