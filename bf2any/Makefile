@@ -12,10 +12,10 @@
 LDLIBS=
 
 ALLEXE=\
-	bf2asmjs bf2awk bf2bas bf2bash bf2bf bf2cgmp bf2clojure bf2dc \
-	bf2gas32 bf2gas64 bf2crun bf2lua bf2neko bf2pas bf2perl bf2php \
-	bf2ps1 bf2py bf2rb bf2rc bf2run bf2sh bf2slang \
-	bf2cmd bf2elf bf2go bf2julia bf2d
+	bf2asmjs bf2awk bf2bas bf2bash bf2bf bf2cgmp bf2clojure bf2cmd \
+	bf2crun bf2d bf2dc bf2elf bf2gas32 bf2gas64 bf2go bf2julia bf2lua \
+	bf2neko bf2pas bf2perl bf2php bf2ps1 bf2py bf2rb bf2rc bf2run \
+	bf2sh bf2slang
 
 TOOLDIR=../tools
 ifneq ($(wildcard $(TOOLDIR)/dynasm/dynasm),)
@@ -51,80 +51,20 @@ MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 	 -Waggregate-return -Wcast-qual -Wswitch-enum -Wconversion \
 	 -Wunreachable-code
 
-bf2bf: bf2bf.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
+# Delete the direct to exe rule to make sure %.o files are used.
+% : %.c
 
-bf2lua:	bf2lua.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
+# Keep the .o files so we can relink.
+.PRECIOUS: %.o
 
-bf2perl: bf2perl.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
+$(ALLEXE): bf2any.o bf2const.o
 
-bf2py: bf2py.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2dc: bf2dc.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2bash: bf2bash.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2bas: bf2bas.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2awk: bf2awk.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2run: bf2run.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2gas32: bf2gas32.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2gas64: bf2gas64.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
+# Special cases.
 bf2gas32.o: bf2gas.c
 	$(CC) $(CFLAGS) -DUSE32 $(TARGET_ARCH) -c -o $@ bf2gas.c
 
 bf2gas64.o: bf2gas.c
 	$(CC) $(CFLAGS) -DUSE64 $(TARGET_ARCH) -c -o $@ bf2gas.c
-
-bf2pas: bf2pas.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2ps1: bf2ps1.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2rb: bf2rb.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2asmjs: bf2asmjs.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2cgmp: bf2cgmp.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2clojure: bf2clojure.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2php: bf2php.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2neko: bf2neko.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2sh: bf2sh.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2rc: bf2rc.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2slang: bf2slang.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2jit: bf2jit.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
 
 bf2jit.o: bf2jit.c bf2jit.amd64.h bf2jit.i686.h
 	$(CC) $(CFLAGS) -I$(TOOLDIR) $(TARGET_ARCH) -c -o $@ bf2jit.c
@@ -135,23 +75,8 @@ bf2jit.amd64.h: bf2jit.x86.dasc
 bf2jit.i686.h: bf2jit.x86.dasc
 	$(TOOLDIR)/dynasm/dynasm -c -D I386 -o bf2jit.i686.h bf2jit.x86.dasc
 
-bf2cmd: bf2cmd.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2elf: bf2elf.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2go: bf2go.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2julia: bf2julia.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
-bf2d: bf2d.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH)
-
 bf2crun: bf2crun.o bf2any.o bf2const.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(TCCLIBS) $(LIBDL)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(TCCLIBS) $(LIBDL)
 
 bf2crun.o: bf2crun.c $(TCCDEP)
 	$(CC) $(CFLAGS) $(TCCFLAG) -c -o $@ bf2crun.c $(TARGET_ARCH)

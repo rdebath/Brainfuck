@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
+#include <fcntl.h>
 #include <sys/mman.h>
 
 #include "bf2any.h"

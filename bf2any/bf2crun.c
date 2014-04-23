@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -12,8 +13,6 @@
 
 #ifndef NO_LIBTCC
 #include <libtcc.h>
-#else
-#warning "Compiling without libtcc support"
 #endif
 
 #include "bf2any.h"
@@ -284,7 +283,11 @@ print_cstring(void)
 
 /* If we're 32 bit on a 64bit or vs.versa. we need an extra option */
 #ifndef CC
-#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=2))
+#if defined(__clang__) && (__clang_major__>=3) && defined(__i386__)
+#define CC "clang -m32"
+#elif defined(__clang__) && (__clang_major__>=3) && defined(__amd64__)
+#define CC "clang -m64"
+#elif defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
 #if defined(__x86_64__)
 #if defined(__ILP32__)
 #define CC "gcc -mx32"

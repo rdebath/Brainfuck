@@ -463,6 +463,10 @@ outcmd(int ch, int count)
     }
 }
 
+#if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
+#define MAP_ANONYMOUS MAP_ANON
+#endif
+
 void
 link_and_run(dasm_State ** state)
 {
@@ -476,16 +480,29 @@ link_and_run(dasm_State ** state)
      * the segments together onto one unit of code. The size of this code
      * is returned in the 'size' argument.
      */
+    char   *codeptr = MAP_FAILED;
     size_t  size;
     int     dasm_status = dasm_link(state, &size);
     assert(dasm_status == DASM_S_OK);
 
+#ifdef MAP_ANONYMOUS
     /* I allocate this with a 'PROT_EXEC' flag set so the kernel can choose
      * to put it in the 'code area' if there is such a thing */
-    char   *codeptr =
+    codeptr =
 	(char *) mmap(NULL, size,
 		      PROT_READ | PROT_WRITE | PROT_EXEC,
-		      MAP_ANON | MAP_PRIVATE, -1, 0);
+		      MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+#else
+    /* This'll probably only work with Linux ... Oh, FreeBSD too. */
+    int fd = open("/dev/zero", O_RDWR);
+    if (fd >= 0) {
+	codeptr =
+	    (char *) mmap(NULL, size,
+			  PROT_READ | PROT_WRITE | PROT_EXEC,
+			  MAP_PRIVATE, fd, 0);
+	close(fd);
+    }
+#endif
     assert(codeptr != MAP_FAILED);
     codelen = size;
 
@@ -524,15 +541,15 @@ link_and_run(dasm_State ** state)
     /* Memory for the tape ... TODO: make it configurable, dynamic or HUGE */
     tapemem = calloc(32768, tape_step);
 
-    /* I'm not bothering with the ISO type punning for this; you can
-     * ignore the warning if your compiler produces one. I'm probably
-     * supposed to make the globals array some weird array of unions to
-     * stop that happening.
-     */
-    code = (void *) codeptr;
+    /* The C99 standard leaves casting from "void *" to a function
+       pointer undefined.  The assignment used below is the POSIX.1-2003
+       (Technical Corrigendum 1) workaround; see the Rationale for the
+       POSIX specification of dlsym(). */
+					     /* -- Linux man page dlsym() */
+    *(void **) (&code) = codeptr;
     code(tapemem + tape_step * BOFF);
 
     /* Discard code and data */
-    assert(munmap(code, codelen) == 0);
+    assert(munmap(codeptr, codelen) == 0);
     free(tapemem);
 }
