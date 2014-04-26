@@ -125,6 +125,15 @@ run_dynasm(void)
     if (cell_size == 8) tape_step = 1; else
     tape_step = sizeof(int);
 
+    if (total_nodes > 2000000) {
+	if (verbose)
+	    fprintf(stderr, "WARNING: "
+	                    "DynASM is limited to 16Mbyte of code space, "
+			    "Switching to profiling interpreter.\n");
+	run_tree();
+	return;
+    }
+
     dasm_init(Dst, 1);
     dasm_setupglobal(Dst, global_labels, GLOB__MAX);
     dasm_setup(Dst, actions);

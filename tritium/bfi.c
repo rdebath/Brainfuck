@@ -190,7 +190,6 @@ void run_tree(void);
 void print_codedump(void);
 void * map_hugeram(void);
 void unmap_hugeram(void);
-void trap_sigsegv(void);
 int getch(int oldch);
 void putch(int oldch);
 void set_cell_size(int cell_bits);
@@ -470,10 +469,6 @@ main(int argc, char ** argv)
 
 #define XX 6		/* Check BE can cope with optimisation. */
 #include "bfi.be.def"
-#endif
-
-#ifdef USEHUGERAM
-    trap_sigsegv();
 #endif
 
     for(ar = 0; ar<filecount; ar++)
@@ -1363,6 +1358,7 @@ pointer_regen(void)
 
 	case T_STOP:
 	case T_MOV:
+	case T_DUMP:
 	    break;
 
 	default:
@@ -3389,6 +3385,62 @@ unmap_hugeram(void)
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
+void
+sigsegv_report(int signo, siginfo_t * siginfo, void * ptr)
+{
+/*
+ *  A segfault handler is likely to be called from inside library functions so
+ *  I'll avoid calling the standard I/O routines.
+ *
+ *  But it's be pretty much safe once I've checked the failed access is
+ *  within the tape range so I will call exit() rather than _exit() to
+ *  flush the standard I/O buffers in that case.
+ */
+
+#define estr(x) do{ static char p[]=x; write(2, p, sizeof(p)-1);}while(0)
+    if(cell_array_pointer != 0) {
+	if (siginfo->si_addr > cell_array_pointer - MEMGUARD &&
+	    siginfo->si_addr <
+		    cell_array_pointer + cell_array_alloc_len - MEMGUARD) {
+
+	    if( siginfo->si_addr > cell_array_pointer )
+		estr("Tape pointer has moved above available space\n");
+	    else
+		estr("Tape pointer has moved below available space\n");
+	    exit(1);
+	}
+    }
+    if(siginfo->si_addr < (void*)0 + 128*1024) {
+	estr("Program fault: NULL Pointer dereference.\n");
+    } else {
+	estr("Segmentation protection violation\n");
+	abort();
+    }
+    _exit(4);
+}
+
+static struct sigaction saved_segv;
+
+void
+trap_sigsegv(void)
+{
+    struct sigaction saSegf;
+
+    saSegf.sa_sigaction = sigsegv_report;
+    sigemptyset(&saSegf.sa_mask);
+    saSegf.sa_flags = SA_SIGINFO|SA_NODEFER|SA_RESETHAND;
+
+    if(0 > sigaction(SIGSEGV, &saSegf, &saved_segv))
+	perror("Error trapping SIGSEGV, ignoring");
+}
+
+void
+restore_sigsegv(void)
+{
+    if(0 > sigaction(SIGSEGV, &saved_segv, NULL))
+	perror("Restoring SIGSEGV handler, ignoring");
+}
+
 void *
 map_hugeram(void)
 {
@@ -3443,6 +3495,8 @@ map_hugeram(void)
     if (hard_left_limit<0)
 	cell_array_pointer += MEMSKIP;
 
+    trap_sigsegv();
+
     return cell_array_pointer;
 }
 
@@ -3454,53 +3508,8 @@ unmap_hugeram(void)
 	perror("munmap tape");
     cell_array_pointer = 0;
     cell_array_low_addr = 0;
-}
 
-void
-sigsegv_report(int signo, siginfo_t * siginfo, void * ptr)
-{
-/*
- *  A segfault handler is likely to be called from inside library functions so
- *  I'll avoid calling the standard I/O routines.
- *
- *  But it's be pretty much safe once I've checked the failed access is
- *  within the tape range so I will call exit() rather than _exit() to
- *  flush the standard I/O buffers in that case.
- */
-
-#define estr(x) do{ static char p[]=x; write(2, p, sizeof(p)-1);}while(0)
-    if(cell_array_pointer != 0) {
-	if (siginfo->si_addr > cell_array_pointer - MEMGUARD &&
-	    siginfo->si_addr <
-		    cell_array_pointer + cell_array_alloc_len - MEMGUARD) {
-
-	    if( siginfo->si_addr > cell_array_pointer )
-		estr("Tape pointer has moved above available space\n");
-	    else
-		estr("Tape pointer has moved below available space\n");
-	    exit(1);
-	}
-    }
-    if(siginfo->si_addr < (void*)0 + 128*1024) {
-	estr("Program fault: NULL Pointer dereference.\n");
-    } else {
-	estr("Segmentation protection violation\n");
-	abort();
-    }
-    _exit(4);
-}
-
-void
-trap_sigsegv(void)
-{
-    struct sigaction saSegf;
-
-    saSegf.sa_sigaction = sigsegv_report;
-    sigemptyset(&saSegf.sa_mask);
-    saSegf.sa_flags = SA_SIGINFO|SA_NODEFER|SA_RESETHAND;
-
-    if(0 > sigaction(SIGSEGV, &saSegf, NULL))
-	perror("Error trapping SIGSEGV, ignoring");
+    restore_sigsegv();
 }
 #endif
 
@@ -3569,7 +3578,6 @@ convert_tree_to_runarray(void)
     last_offset = 0;
     while(n)
     {
-	n->ipos = p-progarray;
 	if (n->type != T_MOV) {
 	    *p++ = (n->offset - last_offset);
 	    last_offset = n->offset;

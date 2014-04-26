@@ -284,9 +284,9 @@ print_nasm(void)
 	     * put here without being a lot more detailed about the
 	     * instructions we use so we don't force short jumps.
 	     */
-//	    if (abs(n->ipos - n->jmp->ipos) > 120)
-//		neartok = " near";
-//	    else
+	    if (abs(n->ipos - n->jmp->ipos) > 120)
+		neartok = " near";
+	    else
 		neartok = "";
 
 	    if (n->type == T_IF || (loop_class & 2) == 2) {

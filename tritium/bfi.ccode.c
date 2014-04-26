@@ -361,7 +361,6 @@ print_ccode(FILE * ofd)
     struct bfi * n = bfprog;
     int add_mask = 0;
     int found_rail_runner;
-    int use_multifunc;	    /* Create multiple functions ... TODO */
 
     if (cell_size > 0 &&
 	cell_size != sizeof(int)*CHAR_BIT &&
@@ -371,14 +370,6 @@ print_ccode(FILE * ofd)
 
     if (verbose)
 	fprintf(stderr, "Generating C Code.\n");
-
-    /* Scan the nodes so we get an APPROXIMATE distance measure */
-    for(use_multifunc=0, n = bfprog; n; n=n->next) {
-	n->ipos = use_multifunc++;
-	if (n->type == T_PRT && n->next && n->next->type == T_PRT)
-	    use_multifunc--; /* T_PRT tokens tend to get merged */
-    }
-    use_multifunc = (use_multifunc>8192);
 
     if (!noheader) print_c_header(ofd);
 
