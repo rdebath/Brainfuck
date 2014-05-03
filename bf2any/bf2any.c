@@ -382,10 +382,11 @@ main(int argc, char ** argv)
 	    "\n\t"  "-b      Force byte cells"
 	    "\n\t"  "-#      Turn on trace code."
 	    "\n\t"  "-R      Decode rle on '+-<>', quoted strings and '='."
-	    "\n\t"  "-m      Disable optimisation (including dead loop removal)");
-	    if (check_arg("-O"))
-		fprintf(stderr, "%s\n",
-		"\t"    "-O      Enable optimisation");
+	    "\n\t"  "-m      Disable optimisation (including dead loop removal)"
+	    "\n\t"  "-O      Enable full optimisation"
+	    "\n\t"  "-Obf    Enable simple optimisation suitable for BF output"
+	    "\n\t"  "-Omov   Enable only movement optimisation"
+	    );
 
 	    check_arg(argv[1]);
 	    exit(0);
