@@ -3,6 +3,21 @@ Brainfuck
 
 This repository contains various [brainfuck](http://esolangs.org/wiki/Brainfuck) stuff.
 
+The classic description of BF is the C translation below, the opcode column is the direct translation used by my Tritium interpreter.
+
+| Opcode | Brainfuck   | C                  |
+| -------|:-----------:|--------------------|
+| T_MOV  | `>`         | ++ptr;             |
+| T_MOV  | `<`         | --ptr;             |
+| T_ADD  | `+`         | ++*ptr;            |
+| T_ADD  | `-`         | --*ptr;            |
+| T_WHL  | `[`         | while (*ptr) {     |
+| T_END  | `]`         | }                  |
+| T_PRT  | `.`         | putchar(*ptr);     |
+| T_INP  | `,`         | *ptr = getchar();  |
+
+There are several BF interpreters and tools in this repository.
+
 1. The BF program "bitwidth.b"; this is something of a torture test, if your interpreter correctly executes this anything else is likely to be dead easy. 
 
   But the official output of the Bitwidth program is a display of the cell size ie:
@@ -37,34 +52,47 @@ This repository contains various [brainfuck](http://esolangs.org/wiki/Brainfuck)
 4. BF2C.awk
 
   This awk script does a moderate amount of BF optimisation and converts the BF to a file that it feeds into the system C compiler. I hesitate to call the created language C, because, frankly it'd be a reasonable entry for the IOCCC. Even so the C compiler will compile it and this script will then invoke the created executable. This technically makes this a JIT runner.
+
+5. bf2c_v1.b
+
+  A simple BF to C converter written in BF, it's a direct translation preserving as much of the identity of BF in the final C code as possible. In effect the BF isn't translated, just tokenised.
   
-5. Brainfuck to anything. Well not exactly anything but the list includes ...
+6. bf2c_v2.b
+
+  A more complex BF to C converter in BF. This one does run lenght encoding ... in a rather unusual way.
+  
+7. Brainfuck to anything. Well not exactly anything but the list includes ...
   * run -- a direct interpreter -- blisteringly quick too for one without JIT.
   * jit -- OTOH this one uses LuaJIT's Dynasm, it's the fastest bf2any program.
-  * tcc -- Convert to C and run using LIBTCC -- Is quicker than bf2run ... just.
-  * gcc -- Convert to C and run as a shared lib; very quick with -O2.
-  * bf -- Ook, Blub, fuck fuck, "there once was a fish named Fred" and similar transliterations. Some can be compiled as C (*deoptimised*!)
+  * crun -- Convert to C and run using libtcc or libdl. TCC quicker than bf2run ... just, GCC is a lot quicker, even without GCC doing any optimisation.
+  * bf -- Ook, Blub, fuck fuck, "there once was a fish named Fred" and similar transliterations. Some can be compiled as C (*deoptimised*!) The optimiser can still run so this can be used as a BF->BF optimiser.
   * asmjs -- Convert to the "asm.js" dialect of javascript
   * awk	-- Code for (almost) any version of AWK.
-  * python
-  * lua
-  * perl
-  * php
-  * ruby
-  * basic -- A couple of very random BASIC interpreters.
   * bash -- GNU bash, uses arrays, arithimetic etc. (NO external programs or subshells used)
-  * dc -- The -r (run) option uses a special filter to allow character input. This is too complex for dc.sed.
+  * basic -- A couple of very random BASIC interpreters.
   * cgmp -- C using the Gnu MP library
+  * clojure -- Not a very nice conversion though. *no-opt*
+  * cmd -- Windows batch files ... far too slow for testing *deoptimised*
+  * dc -- The unix command, has a -r (run) option that uses a special filter to allow character input. This is too complex for dc.sed.
+  * d -- The C replacement originally by 'Digital Mars'
+  * elf -- Direct production of a 32bit Linux executable. *no-opt*
   * gas -- x64 or x86 assembler. Use gcc to assemble and link: "gcc -o bfp bfout.s" *no-opt*
-  * ps1 -- That's right MS Powershell
+  * go -- Google's modern language
+  * julia -- [An modern language using LLVM](http://julialang.org)
+  * lua
   * neko -- [Neko programming language VM](http://nekovm.org)
   * pascal -- Free pascal.
-  * clojure -- Not a very nice conversion though. *no-opt*
-  * sh -- Bourne shell without bash extensions, not Unix v7 but later should be fine. -- *deoptimised*
+  * perl
+  * php
+  * ps1 -- That's right MS Powershell
+  * python
   * rc -- The Plan9 shell rc(1) (Can't input without external programs.) -- *deoptimised*
+  * ruby
+  * sh -- Bourne shell without bash extensions, not Unix v7 but later should be fine. -- *deoptimised*
 
   Most are heavily optimised (for Brainfuck) and most work in both 8 bit and the native size of the generated code.
-  The ones marked *no-opt* are not optimised, except for run length encoding; the ones marked *deoptimised* have even the RLE reverted.
+  The ones marked *no-opt* are not optimised, except for run length encoding; the ones marked *deoptimised* have even the RLE reverted. The FE can still optimise in all cases, but without the BE optimisation only constant folding will occur.
   They have all been tested using many of the BF programs from the [Esoteric Files Archive](https://github.com/graue/esofiles/tree/master/brainfuck/src) (And of course tortured!)
 
-6. Tritium (officially Ρ‴) this BF interpreter/compiler/JIT runner makes the bf2any programs look slow. It is simply the fastest JIT BF interpreter you'll find.
+8. Tritium (officially Ρ‴) this BF interpreter/compiler/JIT runner makes the bf2any programs look slow. It is simply the fastest JIT BF interpreter you'll find.
+
