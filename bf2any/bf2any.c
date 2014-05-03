@@ -52,212 +52,247 @@ static int madd_count = 0;
 static int simple_mov_count = 0;
 
 static void
-outrun(int ch, int repcnt)
+outtxn(int ch, int repcnt)
 {
-    if (!enable_optim) {
+    /* Full normal BF optimisations, hunting for MAAD loops. */
+    int i, mov, inc, loopz;
+
+    /* Sweep everything from the buffer into outopt ? */
+    if ((ch != '>' && ch != '<' && ch != '+' && ch != '-' &&
+	 ch != '=' && ch != '[' && ch != ']') ||
+	(qcnt == 0 && ch != '[') ||
+	(qcnt >= sizeof(qcmd)/sizeof(*qcmd)-1)) {
+
+	/* If it's not a new loop add the current one too */
+	if(ch != '[') {
+	    qcmd[qcnt] = ch;
+	    qrep[qcnt] = repcnt;
+	    qcnt++;
+	    ch = 0;
+	}
+	/* For the queue ... */
+	for(i=0; i<qcnt; i++) {
+	    if (qcmd[i] > 0) {
+		/* Make sure counts are positive and post onward. */
+		int cmd = qcmd[i];
+		int rep = qrep[i];
+		if (rep < 0) switch(cmd) {
+		    case '>': cmd = '<'; rep = -rep; break;
+		    case '<': cmd = '>'; rep = -rep; break;
+		    case '+': cmd = '-'; rep = -rep; break;
+		    case '-': cmd = '+'; rep = -rep; break;
+		}
+		outopt(cmd, rep);
+	    }
+	}
+	qcnt = 0;
+	if(ch != '[') return;
+	/* We didn't add the '[' -- add it now */
+    }
+
+    /* New token */
+    qcmd[qcnt] = ch;
+    qrep[qcnt] = repcnt;
+    qcnt++;
+
+    /* Actually change '[-]' and '[+]' to a single token */
+    if (qcnt >= 3) {
+	if (qcmd[qcnt-3] == '[' && qrep[qcnt-2] == 1 && qcmd[qcnt-1] == ']'
+	    && (qcmd[qcnt-2] == '-' || qcmd[qcnt-2] == '+')) {
+	    qcnt -= 3;
+	    outtxn('=', 0);
+	    return;
+	}
+    }
+
+    /* The current loop has another one embedded and it's not [-].
+       Send the old loop start out */
+    if (qcnt > 3 && qcmd[qcnt-3] == '[') {
+	int sc[3], sr[3];
+	qcnt -= 3;
+	for(i=0; i<3; i++) {
+	    sc[i] = qcmd[qcnt+i];
+	    sr[i] = qrep[qcnt+i];
+	}
+	outtxn(0, 0);
+	for(i=0; i<3; i++) {
+	    outtxn(sc[i], sr[i]);
+	}
+	return;
+    }
+
+    /* Rest is to decode a 'simple' loop */
+    if (ch != ']') return;
+
+    loopz = inc = mov = 0;
+    madd_count = 0;
+    for(i=1; i<qcnt-1; i++) {
+	int j;
+	if (qcmd[i] == '>') { mov += qrep[i]; continue; }
+	if (qcmd[i] == '<') { mov -= qrep[i]; continue; }
+	if (qcmd[i] == '+' && mov == 0) { inc += qrep[i]; continue; }
+	if (qcmd[i] == '-' && mov == 0) { inc -= qrep[i]; continue; }
+	if (qcmd[i] == '=' && mov == 0) { loopz = 1; inc = qrep[i]; continue; }
+	for (j=0; j<madd_count; j++) {
+	    if (mov == madd_offset[j]) break;
+	}
+	if (j == madd_count) {
+	    if (j >= sizeof(madd_offset)/sizeof(*madd_offset)) {
+		/* Loop too big */
+		outtxn(0,0);
+		return;
+	    }
+	    madd_offset[madd_count] = mov;
+	    madd_inc[madd_count] = 0;
+	    madd_zmode[madd_count] = 0;
+	    madd_count ++;
+	}
+	if (qcmd[i] == '=') {
+	    madd_zmode[j] = 1;
+	    madd_inc[j] = qrep[i];
+	    continue;
+	}
+	if (qcmd[i] == '+') { madd_inc[j] += qrep[i]; continue; }
+	if (qcmd[i] == '-') { madd_inc[j] -= qrep[i]; continue; }
+
+	/* WTF! Some unknown command has made it here!? */
+	outtxn(0,0);
+	return;
+    }
+    /* Last check for not simple. */
+    if (mov
+	|| (loopz == 0 && inc != -1 && inc != 1)
+	|| (loopz != 0 && inc != 0) )
+	{ outtxn(0, 0); return; }
+
+    /* Delete old loop */
+    qcnt = 0;
+
+    /* Start new */
+    qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
+    if (loopz) {
+	inc = -1;
+	if (enable_be_optim) {
+	    qcmd[qcnt] = 'Q'; qrep[qcnt] = 1; qcnt ++;
+	    qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
+	}
+    }
+    if (enable_be_optim) {
+	qcmd[qcnt] = '='; qrep[qcnt] = 0; qcnt ++;
+    }
+
+    for (i=0; i<madd_count; i++) {
+	if (!madd_zmode[i] && madd_inc[i] == 0) continue; /* NOP */
+	if (mov != madd_offset[i]) {
+	    qcmd[qcnt] = '>'; qrep[qcnt] = madd_offset[i] - mov; qcnt ++;
+	    mov = madd_offset[i];
+	}
+	if (madd_zmode[i]) {
+	    qcmd[qcnt] = 'Q'; qrep[qcnt] = madd_inc[i]; qcnt ++;
+	} else {
+	    qcmd[qcnt] = 'M'; qrep[qcnt] = madd_inc[i] * -inc;
+	    if (qrep[qcnt] == 1) qcmd[qcnt] = 'S';
+	    if (qrep[qcnt] < 0) {
+		qcmd[qcnt] = 'N';
+		qrep[qcnt] = -qrep[qcnt];
+	    }
+
+	    /*
+	     * Note the 'BOFF' define; this is an optimisation
+	     * tweak that allows loops, that may be skipped over, to
+	     * be converted into move/add instructions even if the
+	     * references inside the loop may be converted so they
+	     * 'Add zero' to cells before the start of the tape. The
+	     * start of the tape will be shifted by this count so the
+	     * 'add zero' doesn't cause a segfault.
+	     *
+	     * Any reference that is further back than this range
+	     * cannot be proven to be after the physical start of
+	     * the tape so it must keep the 'if non-zero' condition
+	     * to avert the possible segfault.
+	     */
+
+	    if (mov < -BOFF) qcmd[qcnt] = qcmd[qcnt] - 'A' + 'a';
+	    qcnt++;
+	}
+    }
+
+    if (mov != 0) {
+	qcmd[qcnt] = '>'; qrep[qcnt] = 0 - mov; qcnt ++;
+    }
+    if (!enable_be_optim) {
+	if (loopz) {
+	    qcmd[qcnt] = '='; qrep[qcnt] = 0; qcnt ++;
+	} else {
+	    qcmd[qcnt] = 'N'; qrep[qcnt] = 1; qcnt ++;
+	}
+	qcmd[qcnt] = 'E'; qrep[qcnt] = 0; qcnt ++;
+    }
+
+    /* And forward the converted loop */
+    outtxn(0, 0);
+}
+
+/*
+    For full structual optimisation (loops to multiplies) this function
+    is skipped and the the outtxn function is called.
+
+    Otherwise there is a simple filter to find [-]+++ sequences for
+    "-Obf" optimisation, it ignores '[+]'.  The symbols are then passed
+    to the constant folding optimisations, that can now output pure BF
+    for any input.
+
+    The third option "-Omov" is a filter that just merges '<>' commands
+    and sends them directly to the BE.
+
+    The last is no transformations, just pass to the BE.
+*/
+void
+outrun(int ch, int count)
+{
+static int zstate = 0;
+    if (enable_optim) {
+	outtxn(ch, count);
+
+    } else if (enable_bf_optim) {
+	switch(zstate)
+	{
+	case 1:
+	    if (count == 1 && ch == '-') { zstate++; return; }
+	    outopt('[', 1);
+	    break;
+	case 2:
+	    if (count == 1 && ch == ']') { zstate++; return; }
+	    outopt('[', 1);
+	    outopt('-', 1);
+	    break;
+	case 3:
+	    if (ch == '+') { outopt('=', count); zstate=0; return; }
+	    if (ch == '-') { outopt('=', -count); zstate=0; return; }
+	    outopt('=', 0);
+	    break;
+	}
+	zstate=0;
+	if (count == 1 && ch == '[') { zstate++; return; }
+	outopt(ch, count);
+
+    } else if (enable_mov_optim) {
 	/* This is a very simple optimisation of pointer movements, it's
-	 * normally disabled as the full optimisation does this too.
+	 * normally not needed as it's a side effect of the other types
+	 * of optimisation.
 	 */
-	if (enable_mov_optim) {
-	    if (ch == '>') { simple_mov_count += repcnt; return; }
-	    if (ch == '<') { simple_mov_count -= repcnt; return; }
-	    if (simple_mov_count > 0) outcmd('>', simple_mov_count);
-	    if (simple_mov_count < 0) outcmd('<', -simple_mov_count);
-	    simple_mov_count = 0;
-	    outcmd(ch, repcnt);
-	    return;
-	}
-
-	/* This is just the constant folding optimisations; if the input to
-	 * that stage is pure BF the output will be too.
-	 */
-	if (enable_bf_optim) {
-	    outopt(ch, repcnt);
-	    return;
-	}
-
-	/* Disable optimisations; input codes are sent directly to BE */
-	outcmd(ch, repcnt);
+	if (ch == '>') { simple_mov_count += count; return; }
+	if (ch == '<') { simple_mov_count -= count; return; }
+	if (simple_mov_count > 0) outcmd('>', simple_mov_count);
+	if (simple_mov_count < 0) outcmd('<', -simple_mov_count);
+	simple_mov_count = 0;
+	outcmd(ch, count);
 	return;
 
     } else {
-	/* Full normal BF optimisations, hunting for MAAD loops. */
-	int i, mov, inc, loopz;
-
-	/* Sweep everything from the buffer into outopt ? */
-	if ((ch != '>' && ch != '<' && ch != '+' && ch != '-' &&
-	     ch != '=' && ch != '[' && ch != ']') ||
-	    (qcnt == 0 && ch != '[') ||
-	    (qcnt >= sizeof(qcmd)/sizeof(*qcmd)-1)) {
-
-	    /* If it's not a new loop add the current one too */
-	    if(ch != '[') {
-		qcmd[qcnt] = ch;
-		qrep[qcnt] = repcnt;
-		qcnt++;
-		ch = 0;
-	    }
-	    /* For the queue ... */
-	    for(i=0; i<qcnt; i++) {
-		if (qcmd[i] > 0) {
-		    /* Make sure counts are positive and post onward. */
-		    int cmd = qcmd[i];
-		    int rep = qrep[i];
-		    if (rep < 0) switch(cmd) {
-			case '>': cmd = '<'; rep = -rep; break;
-			case '<': cmd = '>'; rep = -rep; break;
-			case '+': cmd = '-'; rep = -rep; break;
-			case '-': cmd = '+'; rep = -rep; break;
-		    }
-		    outopt(cmd, rep);
-		}
-	    }
-	    qcnt = 0;
-	    if(ch != '[') return;
-	    /* We didn't add the '[' -- add it now */
-	}
-
-	/* New token */
-	qcmd[qcnt] = ch;
-	qrep[qcnt] = repcnt;
-	qcnt++;
-
-	/* Actually change '[-]' and '[+]' to a single token */
-	if (qcnt >= 3) {
-	    if (qcmd[qcnt-3] == '[' && qrep[qcnt-2] == 1 && qcmd[qcnt-1] == ']'
-		&& (qcmd[qcnt-2] == '-' || qcmd[qcnt-2] == '+')) {
-		qcnt -= 3;
-		outrun('=', 0);
-		return;
-	    }
-	}
-
-	/* The current loop has another one embedded and it's not [-].
-	   Send the old loop start out */
-	if (qcnt > 3 && qcmd[qcnt-3] == '[') {
-	    int sc[3], sr[3];
-	    qcnt -= 3;
-	    for(i=0; i<3; i++) {
-		sc[i] = qcmd[qcnt+i];
-		sr[i] = qrep[qcnt+i];
-	    }
-	    outrun(0, 0);
-	    for(i=0; i<3; i++) {
-		outrun(sc[i], sr[i]);
-	    }
-	    return;
-	}
-
-	/* Rest is to decode a 'simple' loop */
-	if (ch != ']') return;
-
-	loopz = inc = mov = 0;
-	madd_count = 0;
-	for(i=1; i<qcnt-1; i++) {
-	    int j;
-	    if (qcmd[i] == '>') { mov += qrep[i]; continue; }
-	    if (qcmd[i] == '<') { mov -= qrep[i]; continue; }
-	    if (qcmd[i] == '+' && mov == 0) { inc += qrep[i]; continue; }
-	    if (qcmd[i] == '-' && mov == 0) { inc -= qrep[i]; continue; }
-	    if (qcmd[i] == '=' && mov == 0) { loopz = 1; inc = qrep[i]; continue; }
-	    for (j=0; j<madd_count; j++) {
-		if (mov == madd_offset[j]) break;
-	    }
-	    if (j == madd_count) {
-		if (j >= sizeof(madd_offset)/sizeof(*madd_offset)) {
-		    /* Loop too big */
-		    outrun(0,0);
-		    return;
-		}
-		madd_offset[madd_count] = mov;
-		madd_inc[madd_count] = 0;
-		madd_zmode[madd_count] = 0;
-		madd_count ++;
-	    }
-	    if (qcmd[i] == '=') {
-		madd_zmode[j] = 1;
-		madd_inc[j] = qrep[i];
-		continue;
-	    }
-	    if (qcmd[i] == '+') { madd_inc[j] += qrep[i]; continue; }
-	    if (qcmd[i] == '-') { madd_inc[j] -= qrep[i]; continue; }
-
-	    /* WTF! Some unknown command has made it here!? */
-	    outrun(0,0);
-	    return;
-	}
-	/* Last check for not simple. */
-	if (mov
-	    || (loopz == 0 && inc != -1 && inc != 1)
-	    || (loopz != 0 && inc != 0) )
-	    { outrun(0, 0); return; }
-
-	/* Delete old loop */
-	qcnt = 0;
-
-	/* Start new */
-	qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
-	if (loopz) {
-	    inc = -1;
-	    if (enable_be_optim) {
-		qcmd[qcnt] = 'Q'; qrep[qcnt] = 1; qcnt ++;
-		qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
-	    }
-	}
-	if (enable_be_optim) {
-	    qcmd[qcnt] = '='; qrep[qcnt] = 0; qcnt ++;
-	}
-
-	for (i=0; i<madd_count; i++) {
-	    if (!madd_zmode[i] && madd_inc[i] == 0) continue; /* NOP */
-	    if (mov != madd_offset[i]) {
-		qcmd[qcnt] = '>'; qrep[qcnt] = madd_offset[i] - mov; qcnt ++;
-		mov = madd_offset[i];
-	    }
-	    if (madd_zmode[i]) {
-		qcmd[qcnt] = 'Q'; qrep[qcnt] = madd_inc[i]; qcnt ++;
-	    } else {
-		qcmd[qcnt] = 'M'; qrep[qcnt] = madd_inc[i] * -inc;
-		if (qrep[qcnt] == 1) qcmd[qcnt] = 'S';
-		if (qrep[qcnt] < 0) {
-		    qcmd[qcnt] = 'N';
-		    qrep[qcnt] = -qrep[qcnt];
-		}
-
-		/*
-		 * Note the 'BOFF' define; this is an optimisation
-		 * tweak that allows loops, that may be skipped over, to
-		 * be converted into move/add instructions even if the
-		 * references inside the loop may be converted so they
-		 * 'Add zero' to cells before the start of the tape. The
-		 * start of the tape will be shifted by this count so the
-		 * 'add zero' doesn't cause a segfault.
-		 *
-		 * Any reference that is further back than this range
-		 * cannot be proven to be after the physical start of
-		 * the tape so it must keep the 'if non-zero' condition
-		 * to avert the possible segfault.
-		 */
-
-		if (mov < -BOFF) qcmd[qcnt] = qcmd[qcnt] - 'A' + 'a';
-		qcnt++;
-	    }
-	}
-
-	if (mov != 0) {
-	    qcmd[qcnt] = '>'; qrep[qcnt] = 0 - mov; qcnt ++;
-	}
-	if (!enable_be_optim) {
-	    if (loopz) {
-		qcmd[qcnt] = '='; qrep[qcnt] = 0; qcnt ++;
-	    } else {
-		qcmd[qcnt] = 'N'; qrep[qcnt] = 1; qcnt ++;
-	    }
-	    qcmd[qcnt] = 'E'; qrep[qcnt] = 0; qcnt ++;
-	}
-
-	/* And forward the converted loop */
-	outrun(0, 0);
+	/* Disable optimisations; input codes are sent directly to BE */
+	outcmd(ch, count);
+	return;
     }
 }
 

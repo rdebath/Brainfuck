@@ -122,7 +122,7 @@ flush_tape(int no_output, int keep_knowns)
 				outcmd('+', p->v-p->cleaned_val);
 			    if (p->v < p->cleaned_val)
 				outcmd('-', p->cleaned_val-p->v);
-			} else if (enable_optim && !enable_be_optim) {
+			} else {
 			    outcmd('[', 1);
 			    outcmd('-', 1);
 			    outcmd(']', 1);
@@ -130,9 +130,6 @@ flush_tape(int no_output, int keep_knowns)
 				outcmd('+', p->v);
 			    if (p->v < 0)
 				outcmd('-', -p->v);
-			} else {
-			    fprintf(stderr, "Optimisation error, non-relative set generated with full optimisation disabled\n");
-			    exit(99);
 			}
 		    } else {
 			if (p->v > 0) outcmd('+', p->v);
