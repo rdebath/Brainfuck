@@ -137,9 +137,13 @@ print_bf(void)
 	    nocr = 0;
 	    break;
 
+	case T_DUMP:
+	    putchar('#');
+	    break;
+
 	case T_NOP:
 	    fprintf(stderr, "Warning on code generation: "
-	           "NOP node: ptr+%d, cnt=%d, @(%d,%d).\n",
+		   "NOP node: ptr+%d, cnt=%d, @(%d,%d).\n",
 		    n->offset, n->count, n->line, n->col);
 	    break;
 

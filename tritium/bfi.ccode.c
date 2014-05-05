@@ -744,10 +744,13 @@ print_ccode(FILE * ofd)
 	    break;
 
 	case T_NOP:
+	case T_DUMP:
 	    fprintf(stderr, "Warning on code generation: "
-	           "NOP node: ptr+%d, cnt=%d, @(%d,%d).\n",
+		   "%s node: ptr+%d, cnt=%d, @(%d,%d).\n",
+		    tokennames[n->type],
 		    n->offset, n->count, n->line, n->col);
 	    break;
+
 	default:
             fprintf(stderr, "Code gen error: "
                     "%s\t"
