@@ -11,12 +11,15 @@
 
 /* Choose a cell size: 0, 1, 2, 4, 127, 255, 65535, others.
  */
-#if MASK == 1
+#if MASK == 1 || !defined(MASK)
 #define icell	unsigned char
+#define M(x) x
 #ifndef ALIGNED
 #define dcell	unsigned short
 #endif
-#define M(x) x
+#ifndef MASK
+#define ENABLE_DOUBLE
+#endif
 #elif MASK == 2
 #define icell	unsigned short
 #define M(x) x
@@ -30,6 +33,7 @@
 #define icell	int
 #define M(x) ((x)%(MASK+1))
 #endif
+
 #ifndef MEMSIZE
 #define MEMSIZE 60000
 #endif
@@ -71,10 +75,11 @@ struct subst {
     { {T_SET4, T_MOV, T_MOV, T_MOV, 0},
 		"[-]>[-]>[-]>[-]" },
 
-#if MASK == 1
+#ifdef ENABLE_DOUBLE
     { {T_MOV, T_ZTEMP2, T_MOV, T_MOV, 0},
 		"[-]>>>[-]" },
 
+#ifdef BROKEN
     { {T_SET2c1,0},
 
 		"[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<"
@@ -111,6 +116,7 @@ struct subst {
 		    "[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<"
 		    "[[-]<<<+>>>]<<<"
 		    "]>" },
+#endif
 
     { {T_SET2c2,0},
         "[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<[[-]>"
@@ -303,7 +309,7 @@ int main(int argc, char **argv)
 		n = p;
 	    }
 
-#if MASK == 1
+#ifdef ENABLE_DOUBLE
 	    /* UPGRADE T_*c1 and T_*c2 tokens to T_*2 tokens */
 	    if (n->prev && (n->type == T_ADD2c1 || n->type == T_SUB2c1 ||
 	                    n->type == T_ADD2c2 || n->type == T_SUB2c2 ||
@@ -479,7 +485,7 @@ int main(int argc, char **argv)
 		}
 	    }
 
-#if MASK == 1
+#ifdef ENABLE_DOUBLE
 	    /* [->>>+>>>+<<<<<<]   Multiple move or add loop (double byte). */
 	    if (n->type == T_END2) {
 		struct bfi *v;
@@ -644,7 +650,7 @@ tcalloc(size_t nmemb, size_t size)
 
 struct mem { unsigned char val; struct mem *next, *prev; };
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
 __attribute((optimize(3),hot,aligned(64)))
 #endif
 void run(void)
@@ -694,7 +700,7 @@ void run(void)
 #error "This interpreter does not support extended codes"
 #endif
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
 __attribute((optimize(3),hot,aligned(64)))
 #endif
 void run(void)
@@ -732,7 +738,7 @@ void run(void)
  */
 
 void
-#ifdef __GNUC__
+#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
 __attribute((optimize(3),hot,aligned(64)))
 #endif
 run(void)
@@ -745,7 +751,7 @@ run(void)
     icell * m;
 #ifndef NO_XTRA
     icell a = 0;
-#if MASK == 1
+#ifdef ENABLE_DOUBLE
     int a2 = 0;
 #endif
 #endif
@@ -787,7 +793,7 @@ run(void)
 	    arraylen += 3;
 	    break;
 
-#if MASK == 1
+#ifdef ENABLE_DOUBLE
 	case T_ADD2: case T_SET2: case T_MUL2: case T_QSET2:
 	case T_WHL2c1: case T_END2c1: case T_SET2c1:
 	case T_WHL2c2: case T_END2c2: case T_SET2c2:
@@ -990,7 +996,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 
 	case T_SET4: *m = 0; m[1] = 0; m[2] = 0; m[3] = 0; p += 2; break;
 
-#if MASK == 1
+#ifdef ENABLE_DOUBLE
 	case T_SAVE2:
 	    a = *m; a2 = (m[1]<<8) + a;
 	    *m = 0; m[1] = 0;
