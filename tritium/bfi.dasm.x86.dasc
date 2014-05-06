@@ -171,7 +171,7 @@ run_dynasm(void)
 	switch(n->type)
 	{
 	case T_MOV:
-	    //? clean_acc();
+	    clean_acc();
 	    if (acc_loaded) acc_offset -= count;
 	    | add REG_P, count*tape_step
 	    break;
@@ -289,9 +289,9 @@ run_dynasm(void)
 	    dasm_growpc(Dst, maxpc);
 
 	    if (tape_step == 1) {
-                | test	REG_AL, REG_AL
+                | cmp   REG_AL, 0
 	    } else {
-		| test  REG_A, REG_A
+		| cmp   REG_A, 0
 	    }
 
 	    | jz   =>(n->jmp->count)
@@ -309,9 +309,9 @@ run_dynasm(void)
 	    }
 
 	    if (tape_step == 1) {
-                | test	REG_AL, REG_AL
+                | cmp   REG_AL, 0
 	    } else {
-		| test   REG_A, REG_A
+		| cmp   REG_A, 0
 	    }
 
 	    | jnz   =>(n->count + 1)

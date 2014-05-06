@@ -3524,6 +3524,9 @@ typedef int icell;
 #elif MASK == 0xFFFF
 #define icell	unsigned short
 #define M(x) x
+#elif MASK == -1
+#define icell	int
+#define M(x) (x)
 #elif MASK < 0xFF
 #define icell	char
 #define M(x) ((x)&MASK)
@@ -3655,6 +3658,7 @@ convert_tree_to_runarray(void)
 	    break;
 
 	case T_ENDIF:
+	    if (p[-2] == 0) p -= 2;
 	    progarray[n->count] = (p-progarray) - n->count -1;
 	    break;
 
