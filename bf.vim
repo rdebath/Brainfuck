@@ -35,7 +35,8 @@ syn sync linebreaks=25
 " Various comment marking characters, make them very visible (if not in a comment)
 syn match bfError "[{}#!]\+"
 syn match bfError "//"
-syn match bfError "^[	 ]*[;%]"
+" Only highlight these at start of line
+syn match bfError "\(^[	 ]*\)\@<=[;%]"
 
 " Mark the ! as a character of interest as some interpreters react very badly.
 syn match bfSPError "!"
