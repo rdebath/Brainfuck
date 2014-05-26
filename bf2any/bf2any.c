@@ -358,7 +358,7 @@ int
 main(int argc, char ** argv)
 {
     char * pgm = argv[0];
-    int ch, lastch=']', c=0, m, b=0, lc=0;
+    int ch, lastch=']', c=0, m, b=0, lc=0, ar;
     FILE * ifd;
     int digits = 0, number = 0, multi = 1;
     int qstring = 0;
@@ -413,72 +413,75 @@ main(int argc, char ** argv)
 	} else break;
     }
 
-    if (argc<=1 || strcmp(argv[1], "-") == 0) {
-	ifd = stdin;
-	current_file = "stdin";
-    } else if((ifd = fopen(argv[1],"r")) == 0) {
-	perror(argv[1]); exit(1);
-    } else
-	current_file = argv[1];
     outrun('!', 0);
-    while((ch = fgetc(ifd)) != EOF && (ifd!=stdin || ch != '!' || qstring)) {
-	/* Quoted strings are printed. (And set current cell) */
-	if (qstring) {
-	    if (ch == '"') {
-		qstring++;
-		if (qstring == 2) continue;
-		if (qstring == 3) qstring = 1;
-	    }
-	    if (qstring == 2) {
-		qstring = 0;
-	    } else {
-		outrun('[', 1); outrun('-', 1); outrun(']', 1);
-		outrun('+', ch); outrun('.', 1); lastch = '.';
-		continue;
-	    }
-	}
-	/* Source RLE decoding */
-	if (ch >= '0' && ch <= '9') {
-	    digits = 1;
-	    number = number*10 + ch-'0';
-	    continue;
-	}
-	if (ch == ' ' || ch == '\t') continue;
-	if (!digits) number = 1; digits=0;
-	multi = enable_rle?number:1; number = 0;
-	/* These chars are RLE */
-	m = (ch == '>' || ch == '<' || ch == '+' || ch == '-');
-	/* These ones are not */
-	if(!m && ch != '[' && ch != ']' && ch != '.' && ch != ',' &&
-	    (ch != '#' || !enable_debug) &&
-	    ((ch != '"' && ch != '=') || !enable_rle)) continue;
-	/* Check for loop comments; ie: ][ comment ] */
-	if (lc || (ch=='[' && lastch==']' && !keep_dead_code)) {
-	    lc += (ch=='[') - (ch==']'); continue;
-	}
-	if (lc) continue;
-	/* Do the RLE */
-	if (m && ch == lastch) { c+=multi; continue; }
-	/* Post the RLE token onward */
-	if (c) outrun(lastch, c);
-	if (!m) {
-	    /* Non RLE tokens here */
-	    if (ch == '"') { qstring++; continue; }
-	    if (ch == '=') {
-		outrun('[', 1); outrun('-', 1); outrun(']', 1);
-		lastch = ']';
-		continue;
-	    }
-	    if (!b && ch == ']') continue; /* Ignore too many ']' */
-	    b += (ch=='[') - (ch==']');
-	    if (lastch == '[' && ch == ']') outrun('X', 1);
-	    outrun(ch, 1);
-	    c = 0;
+    for(ar=0+(argc>1); ar<argc; ar++) {
+	if (argc<=1 || strcmp(argv[ar], "-") == 0) {
+	    ifd = stdin;
+	    current_file = "stdin";
+	} else if((ifd = fopen(argv[ar],"r")) == 0) {
+	    perror(argv[ar]); exit(1);
 	} else
-	    c = multi;
-	lastch = ch;
+	    current_file = argv[ar];
+
+	while((ch = getc(ifd)) != EOF && (ifd!=stdin || ch != '!' || qstring)) {
+	    /* Quoted strings are printed. (And set current cell) */
+	    if (qstring) {
+		if (ch == '"') {
+		    qstring++;
+		    if (qstring == 2) continue;
+		    if (qstring == 3) qstring = 1;
+		}
+		if (qstring == 2) {
+		    qstring = 0;
+		} else {
+		    outrun('[', 1); outrun('-', 1); outrun(']', 1);
+		    outrun('+', ch); outrun('.', 1); lastch = '.';
+		    continue;
+		}
+	    }
+	    /* Source RLE decoding */
+	    if (ch >= '0' && ch <= '9') {
+		digits = 1;
+		number = number*10 + ch-'0';
+		continue;
+	    }
+	    if (ch == ' ' || ch == '\t') continue;
+	    if (!digits) number = 1; digits=0;
+	    multi = enable_rle?number:1; number = 0;
+	    /* These chars are RLE */
+	    m = (ch == '>' || ch == '<' || ch == '+' || ch == '-');
+	    /* These ones are not */
+	    if(!m && ch != '[' && ch != ']' && ch != '.' && ch != ',' &&
+		(ch != '#' || !enable_debug) &&
+		((ch != '"' && ch != '=') || !enable_rle)) continue;
+	    /* Check for loop comments; ie: ][ comment ] */
+	    if (lc || (ch=='[' && lastch==']' && !keep_dead_code)) {
+		lc += (ch=='[') - (ch==']'); continue;
+	    }
+	    if (lc) continue;
+	    /* Do the RLE */
+	    if (m && ch == lastch) { c+=multi; continue; }
+	    /* Post the RLE token onward */
+	    if (c) outrun(lastch, c);
+	    if (!m) {
+		/* Non RLE tokens here */
+		if (ch == '"') { qstring++; continue; }
+		if (ch == '=') {
+		    outrun('[', 1); outrun('-', 1); outrun(']', 1);
+		    lastch = ']';
+		    continue;
+		}
+		if (!b && ch == ']') continue; /* Ignore too many ']' */
+		b += (ch=='[') - (ch==']');
+		if (lastch == '[' && ch == ']') outrun('X', 1);
+		outrun(ch, 1);
+		c = 0;
+	    } else
+		c = multi;
+	    lastch = ch;
+	}
+	if (ifd != stdin) fclose(ifd);
     }
-    if (ifd != stdin) fclose(ifd);
     if(c) outrun(lastch, c);
     while(b>0){ outrun(']', 1); b--;} /* Not enough ']', add some. */
     if (enable_debug) outrun('#', 0);
