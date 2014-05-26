@@ -9,8 +9,7 @@
 # Both bf2crun and bf2jit are multiarch aware on i386 vs amd64. (The kernel
 # must be 64bit for a 64bit application, but the userspace works both ways)
 
-LDLIBS=
-
+INSTALLDIR=/usr/local/bin
 ALLEXE=\
 	bf2asmjs bf2awk bf2bas bf2bash bf2bf bf2cgmp bf2clojure bf2cmd \
 	bf2crun bf2d bf2dc bf2elf bf2gas32 bf2gas64 bf2go bf2julia bf2lua \
@@ -18,6 +17,7 @@ ALLEXE=\
 	bf2sh bf2slang
 
 TOOLDIR=../tools
+LDLIBS=
 ifneq ($(wildcard $(TOOLDIR)/dynasm/dynasm),)
 ALLEXE+=bf2jit
 endif
@@ -42,6 +42,9 @@ clean:
 	-rm -f $(ALLEXE)
 	-rm -f libtcc.lib-off libtcc.lib-on bf2jit.amd64.h bf2jit.i686.h
 	-rm -f *.o
+
+install: all
+	install -p -s $(ALLEXE) $(INSTALLDIR)
 
 CFLAGS=-O3 -Wall -Wshadow -DBOFF=256 $(DEFS)
 
