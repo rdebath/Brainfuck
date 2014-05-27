@@ -96,3 +96,12 @@ There are several BF interpreters and tools in this repository.
 
 8. Tritium (officially Ρ‴) this BF interpreter/compiler/JIT runner makes the bf2any programs look slow. It is simply the fastest JIT BF interpreter you'll find.
 
+Copyrights
+==========
+
+The bf.vim, bf2any and Tritium programs are licensed under the GPLv2 or later versions if you prefer.
+
+The programs bf2bash.sh, bf2c.awk and all brainfuck source code, including any
+embedded in the C code are explicitly granted public domain status.
+
+The code in the tools directory has it's own licensing.
