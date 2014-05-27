@@ -18,6 +18,18 @@ static char * curfile = "brainfuck"; /* Hmmm */
 /* loop_class: condition at 1=> end, 2=>start, 3=>both */
 static int loop_class = 3;
 
+static char * oft(int i)
+{
+    static char buf[32];
+    if (i < 0)
+	sprintf(buf, "%d", i);
+    else if (i == 0)
+	*buf = 0;
+    else
+	sprintf(buf, "+%d", i);
+    return buf;
+}
+
 void
 print_nasm(void)
 {
@@ -145,7 +157,7 @@ print_nasm(void)
 		printf("\tdec ecx\n" "\tdec ecx\n");
 	    else
 
-	    if (n->count < -128)
+	    if (n->count < 0 && n->count != -128)
 		printf("\tsub ecx,%d\n", -n->count);
 	    else
 		printf("\tadd ecx,%d\n", n->count);
@@ -157,58 +169,49 @@ print_nasm(void)
 		printf("\tinc byte [ecx]\n");
 	    else if (opt_level<=0 && n->count == -1 && n->offset == 0)
 		printf("\tdec byte [ecx]\n");
-	    else if (opt_level<=0 && n->count < -128 && n->offset == 0)
-		printf("\tsub byte [ecx],%d\n", -n->count);
 	    else if (opt_level<=0 && n->count == 1)
-		printf("\tinc byte [ecx+%d]\n", n->offset);
+		printf("\tinc byte [ecx%s]\n", oft(n->offset));
 	    else if (opt_level<=0 && n->count == -1)
-		printf("\tdec byte [ecx+%d]\n", n->offset);
+		printf("\tdec byte [ecx%s]\n", oft(n->offset));
 	    else
 
-	    if (n->count < -128)
-		printf("\tsub byte [ecx+%d],%d\n", n->offset, -n->count);
+	    if (n->count < 0 && n->count > -128)
+		printf("\tsub byte [ecx%s],%d\n", oft(n->offset), -n->count);
 	    else
-		printf("\tadd byte [ecx+%d],%d\n", n->offset, SM(n->count));
+		printf("\tadd byte [ecx%s],%d\n", oft(n->offset), SM(n->count));
 	    break;
 
 	case T_SET:
-	    printf("\tmov byte [ecx+%d],%d\n", n->offset, SM(n->count));
+	    printf("\tmov byte [ecx%s],%d\n", oft(n->offset), SM(n->count));
 	    break;
 
 	case T_CALC:
-#if 0
-		printf("; CALC [ecx+%d] = %d + [ecx+%d]*%d + [ecx+%d]*%d\n",
-			n->offset, n->count,
-			n->offset2, n->count2,
-			n->offset3, n->count3);
-#endif
-
 	    if (n->count2 == 1 && n->count3 == 0) {
 		/* m[1] = m[2]*1 + m[3]*0 */
-		printf("\tmovzx eax,byte [ecx+%d]\n", n->offset2);
-		printf("\tmov byte [ecx+%d],al\n", n->offset);
+		printf("\tmovzx eax,byte [ecx%s]\n", oft(n->offset2));
+		printf("\tmov byte [ecx%s],al\n", oft(n->offset));
 	    } else if (n->count2 == 1 && n->offset2 == n->offset) {
 		/* m[1] = m[1]*1 + m[3]*n */
 		if (n->count3 == -1) {
-		    printf("\tmovzx eax,byte [ecx+%d]\n", n->offset3);
-		    printf("\tsub byte [ecx+%d],al\n", n->offset);
+		    printf("\tmovzx eax,byte [ecx%s]\n", oft(n->offset3));
+		    printf("\tsub byte [ecx%s],al\n", oft(n->offset));
 		} else if (n->count3 == 1) {
-		    printf("\tmovzx eax,byte [ecx+%d]\n", n->offset3);
-		    printf("\tadd byte [ecx+%d],al\n", n->offset);
+		    printf("\tmovzx eax,byte [ecx%s]\n", oft(n->offset3));
+		    printf("\tadd byte [ecx%s],al\n", oft(n->offset));
 		} else if (n->count3 == 2) {
-		    printf("\tmovzx eax,byte [ecx+%d]\n", n->offset3);
+		    printf("\tmovzx eax,byte [ecx%s]\n", oft(n->offset3));
 		    printf("\tadd eax,eax\n");
-		    printf("\tadd byte [ecx+%d],al\n", n->offset);
+		    printf("\tadd byte [ecx%s],al\n", oft(n->offset));
 		} else {
-		    printf("\tmovzx eax,byte [ecx+%d]\n", n->offset3);
+		    printf("\tmovzx eax,byte [ecx%s]\n", oft(n->offset3));
 		    printf("\timul eax,eax,%d\n", SM(n->count3));
-		    printf("\tadd byte [ecx+%d],al\n", n->offset);
+		    printf("\tadd byte [ecx%s],al\n", oft(n->offset));
 		}
 	    } else if (n->count2 == 1 && n->count3 == -1) {
-		printf("\tmovzx eax,byte [ecx+%d]\n", n->offset2);
-		printf("\tmovzx ebx,byte [ecx+%d]\n", n->offset3);
+		printf("\tmovzx eax,byte [ecx%s]\n", oft(n->offset2));
+		printf("\tmovzx ebx,byte [ecx%s]\n", oft(n->offset3));
 		printf("\tsub eax,ebx\n");
-		printf("\tmov byte [ecx+%d],al\n", n->offset);
+		printf("\tmov byte [ecx%s],al\n", oft(n->offset));
 	    } else {
 		printf("\t; Full T_CALC: [ecx+%d] = %d + [ecx+%d]*%d + [ecx+%d]*%d\n",
 			n->offset, n->count,
@@ -217,22 +220,22 @@ print_nasm(void)
 		if (SM(n->count2) == 0) {
 		    printf("\tmov bl,0\n");
 		} else if (n->count2 == -1 ) {
-		    printf("\tmov bl,byte [ecx+%d]\n", n->offset2);
+		    printf("\tmov bl,byte [ecx%s]\n", oft(n->offset2));
 		    printf("\tneg bl\n");
 		} else {
-		    printf("\tmov al,byte [ecx+%d]\n", n->offset2);
+		    printf("\tmov al,byte [ecx%s]\n", oft(n->offset2));
 		    printf("\timul ebx,eax,%d\n", SM(n->count2));
 		}
 		if (SM(n->count3) != 0) {
-		    printf("\tmov byte al,[ecx+%d]\n", n->offset3);
+		    printf("\tmov byte al,[ecx%s]\n", oft(n->offset3));
 		    printf("\timul eax,eax,%d\n", SM(n->count3));
 		    printf("\tadd bl,al\n");
 		}
-		printf("\tmov byte [ecx+%d],bl\n", n->offset);
+		printf("\tmov byte [ecx%s],bl\n", oft(n->offset));
 	    }
 
 	    if (SM(n->count))
-		printf("\tadd byte [ecx+%d],%d\n", n->offset, SM(n->count));
+		printf("\tadd byte [ecx%s],%d\n", oft(n->offset), SM(n->count));
 	    break;
 
 	case T_PRT:
@@ -247,10 +250,7 @@ print_nasm(void)
 		    printf("%%line %d+0 %s\n", n->line, curfile);
 		    curr_line = n->line;
 		}
-		if (n->offset == 0)
-		    printf("\tmov al,[ecx]\n");
-		else
-		    printf("\tmov al,[ecx+%d]\n", n->offset);
+		printf("\tmov al,[ecx%s]\n", oft(n->offset));
 		printf("\tcall putch\n");
 	    } else {
 		*string_buffer = n->count;
@@ -292,7 +292,7 @@ print_nasm(void)
 	    if (n->type == T_IF || (loop_class & 2) == 2) {
 		if ((loop_class & 1) == 0)
 		    printf("start_%d:\n", n->count);
-		printf("\tcmp dh,byte [ecx+%d]\n", n->offset);
+		printf("\tcmp dh,byte [ecx%s]\n", oft(n->offset));
 		printf("\tjz%s end_%d\n", neartok, n->count);
 		if ((loop_class & 1) == 1 && n->type != T_IF)
 		    printf("loop_%d:\n", n->count);
@@ -316,7 +316,7 @@ print_nasm(void)
 	    } else {
 		if ((loop_class & 2) == 0)
 		    printf("last_%d:\n", n->jmp->count);
-		printf("\tcmp dh,byte [ecx+%d]\n", n->jmp->offset);
+		printf("\tcmp dh,byte [ecx%s]\n", oft(n->jmp->offset));
 		printf("\tjnz%s loop_%d\n", neartok, n->jmp->count);
 		if ((loop_class & 2) == 2)
 		    printf("end_%d:\n", n->jmp->count);
