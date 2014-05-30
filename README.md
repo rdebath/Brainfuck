@@ -59,7 +59,7 @@ There are several BF interpreters and tools in this repository.
   
 6. bf2c_v2.b
 
-  A more complex BF to C converter in BF. This one does run lenght encoding ... in a rather unusual way.
+  A more complex BF to C converter in BF. This one does run length encoding ... in a rather unusual way.
   
 7. Brainfuck to anything. Well not exactly anything but the list includes ...
   * run -- a direct interpreter -- blisteringly quick too for one without JIT.
@@ -104,4 +104,4 @@ The bf.vim, bf2any and Tritium programs are licensed under the GPLv2 or later ve
 The programs bf2bash.sh, bf2c.awk and all brainfuck source code, including any
 embedded in the C code are explicitly granted public domain status.
 
-The code in the tools directory has it's own licensing.
+The code in the tools and the testing directories have their own licensing.
