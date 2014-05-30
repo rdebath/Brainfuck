@@ -66,8 +66,12 @@ check_arg(const char * arg)
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-d      Dump code"
+#ifndef NO_DLOPEN
 	"\n\t"  "-ldl    Use dlopen to run compiled code."
+#endif
+#ifndef NO_LIBTCC
 	"\n\t"  "-ltcc   Use libtcc to run code."
+#endif
 	"\n\t"  "-Cclang Choose a different C compiler"
 	"\n\t"  "-Ox     Pass -Ox to C compiler."
 	);
