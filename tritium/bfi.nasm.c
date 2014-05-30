@@ -146,14 +146,15 @@ print_nasm(void)
 	switch(n->type)
 	{
 	case T_MOV:
-	    /* INC & DEC modify part of the flags register, this can stall. */
-	    if (opt_level<=0 && n->count == 1)
+	    /* INC & DEC modify part of the flags register.
+	     * This can stall, but smaller seems to win. */
+	    if (n->count == 1)
 		printf("\tinc ecx\n");
-	    else if (opt_level<=0 && n->count == -1)
+	    else if (n->count == -1)
 		printf("\tdec ecx\n");
-	    else if (opt_level<=0 && n->count == 2)
+	    else if (n->count == 2)
 		printf("\tinc ecx\n" "\tinc ecx\n");
-	    else if (opt_level<=0 && n->count == -2)
+	    else if (n->count == -2)
 		printf("\tdec ecx\n" "\tdec ecx\n");
 	    else
 
@@ -164,14 +165,15 @@ print_nasm(void)
 	    break;
 
 	case T_ADD:
-	    /* INC & DEC modify part of the flags register, this can stall. */
-	    if (opt_level<=0 && n->count == 1 && n->offset == 0)
+	    /* INC & DEC modify part of the flags register.
+	     * This can stall, but smaller seems to win. */
+	    if (n->count == 1 && n->offset == 0)
 		printf("\tinc byte [ecx]\n");
-	    else if (opt_level<=0 && n->count == -1 && n->offset == 0)
+	    else if (n->count == -1 && n->offset == 0)
 		printf("\tdec byte [ecx]\n");
-	    else if (opt_level<=0 && n->count == 1)
+	    else if (n->count == 1)
 		printf("\tinc byte [ecx%s]\n", oft(n->offset));
-	    else if (opt_level<=0 && n->count == -1)
+	    else if (n->count == -1)
 		printf("\tdec byte [ecx%s]\n", oft(n->offset));
 	    else
 
