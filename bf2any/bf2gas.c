@@ -25,9 +25,8 @@ int ind = 0;
 // Callee saves: %ebp, %ebx, %esi, %edi
 // Caller saves: %eax, %ecx, and %edx
 
-#define AX	"%%eax"
-#define CX	"%%ecx"
-#define MOVZB	"movzbl"
+#define AX	"eax"
+#define BX	"ebx"
 #else
 // Call params in registers: %rdi, %rsi, %rdx, %rcx, %r8 and %r9
 // MSWindows ONLY Call params in registers: %rcx, %rdx, %r8 and %r9
@@ -36,9 +35,8 @@ int ind = 0;
 // Register vars: %ebx, %r12d, %r13d, %r14d, %r15d
 // Temps: %eax (set to zero for most FN calls)
 
-#define AX	"%%rax"
-#define CX	"%%rcx"
-#define MOVZB	"movzbq"
+#define AX	"rax"
+#define BX	"rbx"
 #endif
 
 int
@@ -53,63 +51,59 @@ outcmd(int ch, int count)
 {
     switch(ch) {
     case '!':
-	printf(".text\n");
-	printf(".globl main\n");
-	printf("main:\n");
+	/* puts(".file \"brainfuck.b\""); */
+	puts(".intel_syntax noprefix");
+	puts(".text");
+	puts(".globl main");
+	puts("main:");
 #ifdef USE32
-	printf("push %%ebp\n");
-	printf("mov %%esp, %%ebp\n");
-	printf("mov $buffer, "CX"\n");
+	puts("push ebp");
+	puts("mov ebp, esp");
 #else
-	printf("push %%rbp\n");
-	printf("mov %%rsp, %%rbp\n");
-	printf("mov $buffer, "CX"\n");
+	puts("push rbp");
+	puts("mov rbp, rsp");
 #endif
+	puts("push "BX);
+	puts("mov "BX", offset flat:buffer");
 	break;
-    case '+': printf("addb $%d,("CX")\n", count); break;
-    case '-': printf("subb $%d,("CX")\n", count); break;
-    case '<': printf("sub $%d,"CX"\n", count); break;
-    case '>': printf("add $%d,"CX"\n", count); break;
+    case '+': printf("add byte ptr ["BX"], %d\n", count); break;
+    case '-': printf("sub byte ptr ["BX"], %d\n", count); break;
+    case '<': printf("sub "BX", %d\n", count); break;
+    case '>': printf("add "BX", %d\n", count); break;
     case '[':
-	printf(MOVZB" ("CX"), "AX"\n");
-	printf("test "AX", "AX"\n");
-	printf("jz %df\n", ind*2+1);
-	printf("%d:\n", ind*2+2);
+	puts("movzx "AX", byte ptr ["BX"]");
+	puts("test "AX", "AX);
+	printf("jz %df\n", ind*2+2);
+	printf("%d:\n", ind*2+1);
 	ind++;
 	break;
     case ']':
 	ind--;
-	printf(MOVZB" ("CX"), "AX"\n");
-	printf("test "AX", "AX"\n");
-	printf("jnz %db\n", ind*2+2);
-	printf("%d:\n", ind*2+1);
+	puts("movzx "AX", byte ptr ["BX"]");
+	puts("test "AX", "AX);
+	printf("jnz %db\n", ind*2+1);
+	printf("%d:\n", ind*2+2);
 	break;
     case ',':
-	printf("push "CX"\n");
-	printf("call getchar\n");
-	printf("pop "CX"\n");
-	printf("movb %%al, ("CX")\n");
+	puts("call getchar");
+	puts("mov byte ptr ["BX"], al");
 	break;
     case '.':
-	printf(MOVZB" ("CX"), "AX"\n");
-	printf("push "CX"\n");
+	puts("movzx "AX", byte ptr ["BX"]");
 #ifdef USE32
-	printf("push "AX"\n");
-	printf("call putchar\n");
-	printf("pop "CX"\n");
+	puts("push "AX);
+	puts("call putchar");
+	puts("pop "AX);
 #else
-	printf("movq "AX", %%rdi\n");
-	printf("call putchar\n");
+	puts("mov rdi, "AX);
+	puts("call putchar");
 #endif
-	printf("pop "CX"\n");
 	break;
     case '~':
-	printf("leave\n");
-	printf("ret\n");
-	printf(".bss\n");
-	printf(".globl buffer\n");
-	printf("buffer:\n");
-	printf(".space 0x8000\n");
+	puts("pop "BX);
+	puts("leave");
+	puts("ret");
+	puts(".comm buffer,0x8000,32");
 	break;
     }
 }
