@@ -216,6 +216,14 @@ void outopt(int ch, int count)
 	    tape->cleaned = 1;
 	    tape->cleaned_val = tape->v;
 	}
+
+	/* I could save the cleaned tape state at the beginning of a loop,
+	 * then when we find the matching end loop the two tapes could be
+	 * merged to give a tape of known values after the loop ends.
+	 * This would not break the pipeline style of this code.
+	 *
+	 * This would also give states where a cell is known to have one
+	 * of two or more different values. */
 	return;
 
     case '.':
