@@ -14,7 +14,7 @@ ALLEXE=\
 	bf2asmjs bf2awk bf2bas bf2bash bf2bf bf2cgmp bf2clojure bf2cmd \
 	bf2crun bf2d bf2dc bf2elf bf2gas32 bf2gas64 bf2go bf2julia bf2lua \
 	bf2neko bf2pas bf2perl bf2php bf2ps1 bf2py bf2rb bf2rc bf2run \
-	bf2sh bf2slang
+	bf2sh bf2slang bf2nav
 
 TOOLDIR=../tools
 LDLIBS=

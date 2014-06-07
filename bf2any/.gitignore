@@ -18,6 +18,7 @@ bf2jit.amd64.h
 bf2jit.i686.h
 bf2julia
 bf2lua
+bf2nav
 bf2neko
 bf2pas
 bf2perl
