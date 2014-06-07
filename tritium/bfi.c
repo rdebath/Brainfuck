@@ -56,11 +56,13 @@ characters after your favorite comment marker in a very visible form.
 #include <string.h>
 #include <ctype.h>
 #include <sys/time.h>
+#ifndef LEGACYOS
 #include <sys/mman.h>
 #include <signal.h>
 #include <locale.h>
 #include <langinfo.h>
 #include <wchar.h>
+#endif
 
 #include "bfi.tree.h"
 
@@ -112,6 +114,7 @@ int help_flag = 0;
 int noheader = 0;
 int do_run = -1;
 
+int opt_bytedefault = 0;
 int opt_level = 3;
 int opt_runner = 0;
 int opt_no_calc = 0;
@@ -308,10 +311,10 @@ void
 UsageInt64(void)
 {
     fprintf(stderr,
-	"You cannot *specify* a cell size > %zd bits on this machine.\n"
+	"You cannot *specify* a cell size > %d bits on this machine.\n"
 	"Compiled C code can use larger cells using -DC=intmax_t, but beware the\n"
 	"optimiser may make changes that are unsafe for this code.\n",
-	sizeof(int)*CHAR_BIT);
+	(int)(sizeof(int)*CHAR_BIT));
     exit(1);
 }
 
@@ -412,9 +415,19 @@ main(int argc, char ** argv)
     int filecount = 0;
 
     program = argv[0];
-    setlocale(LC_ALL, "");
+    if ((p=strrchr(program, '/')) != 0)
+	program = p+1;
 
-    if (!strcmp("UTF-8", nl_langinfo(CODESET))) iostyle = 1;
+    opt_bytedefault = !strcmp(program, "bf");
+
+    if (opt_bytedefault)
+	iostyle = 2;
+
+#ifndef LEGACYOS
+    setlocale(LC_ALL, "");
+    if (!opt_bytedefault)
+	if (!strcmp("UTF-8", nl_langinfo(CODESET))) iostyle = 1;
+#endif
 
     filelist = calloc(argc, sizeof*filelist);
 
@@ -605,7 +618,11 @@ tcalloc(size_t nmemb, size_t size)
     m = calloc(nmemb, size);
     if (m) return m;
 
+#ifdef LEGACYOS
+    fprintf(stderr, "Memory allocation failed, ABORT\n");
+#else
     fprintf(stderr, "Allocate of %zd*%zd bytes failed, ABORT\n", nmemb, size);
+#endif
     exit(42);
 }
 
@@ -3329,8 +3346,13 @@ void
 set_cell_size(int cell_bits)
 {
     if (cell_bits >= (int)sizeof(int)*CHAR_BIT || cell_bits <= 0) {
-	cell_size = (int)sizeof(int)*CHAR_BIT;
-	cell_mask = -1;
+	if (cell_bits == -1 && opt_bytedefault) {
+	    cell_size = CHAR_BIT;
+	    cell_mask = (2 << (cell_size-1)) - 1;	/* GCC Whinge */
+	} else {
+	    cell_size = (int)sizeof(int)*CHAR_BIT;
+	    cell_mask = -1;
+	}
     } else {
 	cell_size = cell_bits;
 	cell_mask = (2 << (cell_size-1)) - 1;	/* GCC Whinge */
