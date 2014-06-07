@@ -47,6 +47,8 @@ static const int use_dlopen = 0;
 static int use_dlopen = 0;
 static int choose_runner = -1;
 static char * cc_cmd = 0;
+static char pic_opt[8] = " -fpic";
+static int in_one = 0;
 #endif
 
 #ifndef DISABLE_TCCLIB
@@ -75,6 +77,9 @@ checkarg_ccode(char * opt, char * arg)
 	choose_runner = 1;
 	return 2;
     }
+    if (!strcmp(opt, "-fPIC")) { strcpy(pic_opt, " -fPIC"); return 1; }
+    if (!strcmp(opt, "-fno-pic")) { *pic_opt = 0; return 1; }
+    if (!strcmp(opt, "-fonecall")) { in_one = 1; return 1; }
 #if defined(DISABLE_TCCLIB)
     if (!strcmp(opt, "-ltcc")) {
 	cc_cmd = "tcc";
@@ -782,7 +787,7 @@ run_ccode(void)
     if (choose_runner >= 0)
 	use_dlopen = choose_runner;
     else
-	use_dlopen = (total_nodes < 4000);
+	use_dlopen = ((total_nodes < 4000) || (opt_level > 3));
     if (use_dlopen)
 	run_gccode();
     else
@@ -962,7 +967,7 @@ run_gccode(void)
     compile_and_run();
 }
 
-/*  Needs:   gcc -shared -fPIC -o libfoo.so foo.c
+/*  Needs:   gcc -shared -fpic -o libfoo.so foo.c
     And:     -ldl
 
     NB: -fno-asynchronous-unwind-tables
@@ -988,7 +993,6 @@ run_gccode(void)
 #endif
 #else
 #define CC "cc"
-#define DLOPEN_ABS_PATH
 #endif
 #endif
 
@@ -1003,30 +1007,38 @@ compile_and_run(void)
     char cmdbuf[256];
     int ret;
     const char * cc = CC;
+    char * copt = "";
+    if (opt_level > 3)
+	copt = " -O3";
 
     if (cc_cmd) cc = cc_cmd;
 
-    if (verbose)
-	fprintf(stderr,
-		"Running C Code using \"%s -shared -fPIC\" and dlopen().\n",
-		cc);
+    if (in_one) {
+	if (verbose)
+	    fprintf(stderr,
+		"Running C Code using \"%s%s%s -shared\" and dlopen().\n",
+		cc,pic_opt,copt);
 
-#ifdef DLOPEN_ABS_PATH
-    sprintf(cmdbuf, "%s -shared -fPIC -o %s %s",
-                cc, dl_name, ccode_name);
-    ret = system(cmdbuf);
-#else
-    /* Like this so that ccache has a good path and distinct compile. */
-    sprintf(cmdbuf, "cd %s; %s -fPIC -c -o %s %s",
-	    tmpdir, cc, BFBASE".o", BFBASE".c");
-    ret = system(cmdbuf);
-
-    if (ret != -1) {
-	sprintf(cmdbuf, "cd %s; %s -shared -fPIC -o %s %s",
-		tmpdir, cc, dl_name, BFBASE".o");
+	sprintf(cmdbuf, "%s%s%s -shared -o %s %s",
+		    cc, pic_opt, copt, dl_name, ccode_name);
 	ret = system(cmdbuf);
+    } else {
+	if (verbose)
+	    fprintf(stderr,
+		"Running C Code using \"%s%s%s\", link -shared and dlopen().\n",
+		cc,pic_opt,copt);
+
+	/* Like this so that ccache has a good path and distinct compile. */
+	sprintf(cmdbuf, "cd %s; %s%s%s -c -o %s %s",
+		tmpdir, cc, pic_opt, copt, BFBASE".o", BFBASE".c");
+	ret = system(cmdbuf);
+
+	if (ret != -1) {
+	    sprintf(cmdbuf, "cd %s; %s%s -shared -o %s %s",
+		    tmpdir, cc, pic_opt, dl_name, BFBASE".o");
+	    ret = system(cmdbuf);
+	}
     }
-#endif
 
     if (ret == -1) {
 	perror("Calling C compiler failed");
