@@ -49,7 +49,6 @@
     Mac(ZFIND) Mac(MFIND) Mac(ADDWZ) \
     \
     Mac(SET2) Mac(ADD2) Mac(SUB2) Mac(WHL2) Mac(END2) Mac(ZTEMP2) \
-    Mac(SET2c1) Mac(ADD2c1) Mac(SUB2c1) Mac(WHL2c1) Mac(END2c1) \
     Mac(SET2c2) Mac(ADD2c2) Mac(SUB2c2) Mac(WHL2c2) Mac(END2c2) \
     Mac(SAVE2) Mac(MUL2) Mac(QSET2) \
     \
@@ -78,45 +77,6 @@ struct subst {
 #ifdef ENABLE_DOUBLE
     { {T_MOV, T_ZTEMP2, T_MOV, T_MOV, 0},
 		"[-]>>>[-]" },
-
-#ifdef BROKEN
-    { {T_SET2c1,0},
-
-		"[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<"
-		    "[[-]<<<+>>>]<"
-		    "[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<"
-		    "[[-]<<<+>>>]<<<"
-		    "[[-]>"
-		"[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[-"
-		    ">>-<<"
-		    "]>-"
-		"[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<"
-		    "[[-]<<<+>>>]<"
-		    "[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<"
-		    "[[-]<<<+>>>]<<<"
-		    "]>" },
-
-    { {T_ADD2c1,0},
-		"+" "[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[-"
-		    ">>+<<"
-		    "]>" },
-    { {T_SUB2c1,0},
-		"[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[-"
-		    ">>-<<"
-		    "]>-"},
-    { {T_WHL2c1,0},
-		"[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<"
-		    "[[-]<<<+>>>]<"
-		    "[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<"
-		    "[[-]<<<+>>>]<<<"
-		    "[[-]>" },
-    { {T_END2c1,0},
-		"[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<"
-		    "[[-]<<<+>>>]<"
-		    "[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<"
-		    "[[-]<<<+>>>]<<<"
-		    "]>" },
-#endif
 
     { {T_SET2c2,0},
         "[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<[[-]>"
@@ -183,8 +143,6 @@ int main(int argc, char **argv)
 	    case T_RMOV: ch = T_MOV; c= -1; break;
 	    case T_ADD:  ch = T_ADD; c=  1; break;
 	    case T_DEC:  ch = T_ADD; c= -1; break;
-	    case T_ADD2c1:  ch = T_ADD2c1; c=  1; break;
-	    case T_SUB2c1:  ch = T_SUB2c1; c= -1; break;
 	    case T_ADD2c2:  ch = T_ADD2c2; c=  1; break;
 	    case T_SUB2c2:  ch = T_SUB2c2; c= -1; break;
 	    case T_DATA: ch = T_NOP; break;
@@ -216,8 +174,8 @@ int main(int argc, char **argv)
 		n = tcalloc(1, sizeof*n);
 		if (p) { p->next = n; n->prev = p; } else pgm = n;
 		n->type = ch; p = n;
-		is_whl = (n->type == T_WHL || n->type == T_WHL2 || n->type == T_WHL2c1 || n->type == T_WHL2c2);
-		is_end = (n->type == T_END || n->type == T_END2 || n->type == T_END2c1 || n->type == T_END2c2);
+		is_whl = (n->type == T_WHL || n->type == T_WHL2 || n->type == T_WHL2c2);
+		is_end = (n->type == T_END || n->type == T_END2 || n->type == T_END2c2);
 
 		if (is_whl) { n->jmp=j; j = n; }
 		else if (is_end) {
@@ -245,7 +203,7 @@ int main(int argc, char **argv)
 	for(n=pgm; n; n=n->next) {
 	    switch(n->type)
 	    {
-		case T_WHL: case T_WHL2: case T_WHL2c1: case T_WHL2c2:
+		case T_WHL: case T_WHL2: case T_WHL2c2:
 		    n->count = ++lid; break;
 		case T_ERR: /* Unbalanced bkts */
 		    fprintf(stderr, "Warning: skipping unbalanced brackets\n");
@@ -264,7 +222,7 @@ int main(int argc, char **argv)
 	for(n=pgm; n; n=n->next) {
 	    switch(n->type)
 	    {
-		case T_WHL: case T_WHL2: case T_WHL2c1: case T_WHL2c2:
+		case T_WHL: case T_WHL2: case T_WHL2c2:
 		    n->count = ++lid; break;
 		case T_ERR: /* Unbalanced bkts */
 		    fprintf(stderr, "Warning: skipping unbalanced brackets\n");
@@ -310,8 +268,8 @@ int main(int argc, char **argv)
 	    }
 
 #ifdef ENABLE_DOUBLE
-	    /* UPGRADE T_*c1 and T_*c2 tokens to T_*2 tokens */
-	    if (n->prev && (n->type == T_ADD2c1 || n->type == T_SUB2c1 ||
+	    /* UPGRADE T_*c2 tokens to T_*2 tokens */
+	    if (n->prev && (
 	                    n->type == T_ADD2c2 || n->type == T_SUB2c2 ||
 	                    n->type == T_WHL2c2 || n->type == T_END2c2 ||
 	                    n->type == T_SET2c2 || n->type == T_ZTEMP2)) {
@@ -335,8 +293,6 @@ int main(int argc, char **argv)
 		}
 
 		if (do_up) {
-		    if (n->type == T_ADD2c1) n->type = T_ADD2;
-		    if (n->type == T_SUB2c1) n->type = T_ADD2;
 		    if (n->type == T_ADD2c2) n->type = T_ADD2;
 		    if (n->type == T_SUB2c2) n->type = T_ADD2;
 		    if (n->type == T_WHL2c2) n->type = T_WHL2;
@@ -634,101 +590,6 @@ tcalloc(size_t nmemb, size_t size)
 }
 
 
-
-
-
-
-#if 0
-/*
- * Tree interpreter with a linked list tape.
- * This is very slow!
- */
-
-#ifndef NO_XTRA
-#error "This interpreter does not support extended codes"
-#endif
-
-struct mem { unsigned char val; struct mem *next, *prev; };
-
-#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
-__attribute((optimize(3),hot,aligned(64)))
-#endif
-void run(void)
-{
-    struct bfi *n=pgm;
-    struct mem *m = tcalloc(1,sizeof*m);
-    int ch;
-
-    for(; n; n=n->next)
-	switch(n->type)
-	{
-	    case T_ADD: m->val += n->count; break;
-	    case T_SET: m->val = n->count; break;
-	    case T_WHL: if (m->val == 0) n=n->jmp; break;
-	    case T_END: if (m->val != 0) n=n->jmp; break;
-	    case T_PRT: putchar(m->val); break;
-	    case T_INP: if((ch=getchar())!=EOF) m->val=ch; break;
-	    case T_MOV:
-		if (n->count < 0) {
-		    for(ch=0; ch<-n->count; ch++)
-			if (!(m=m->prev)) {
-			    fprintf(stderr, "Error: Hit start of tape\n");
-			    exit(1);
-			}
-		} else {
-		    for(ch=0; ch<n->count; ch++) {
-			if (m->next == 0) {
-			    m->next = tcalloc(1,sizeof*m);
-			    m->next->prev = m;
-			}
-			m=m->next;
-		    }
-		}
-		break;
-	}
-}
-#endif
-
-#if 0
-/*
- * Tree interpreter with an int array tape.
- * This is rather slow.
- * Note it is, fractionally, quicker to use int cells and a mask when needed.
- */
-
-#ifndef NO_XTRA
-#error "This interpreter does not support extended codes"
-#endif
-
-#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
-__attribute((optimize(3),hot,aligned(64)))
-#endif
-void run(void)
-{
-    struct bfi *n=pgm;
-    //unsigned char * m;
-    icell * m;
-    int ch;
-    void * freep;
-    m = freep = tcalloc(MEMSIZE, sizeof*m);
-
-    for(; n; n=n->next)
-	switch(n->type)
-	{
-	    case T_ADD: *m += n->count; break;
-	    case T_SET: *m = n->count; break;
-	    case T_WHL: if (M(*m) == 0) n=n->jmp; break;
-	    case T_END: if (M(*m) != 0) n=n->jmp; break;
-	    case T_PRT: putchar(M(*m)); break;
-	    case T_INP: if((ch=getchar())!=EOF) *m=ch; break;
-	    case T_MOV: m += n->count; break;
-	}
-
-    free(freep);
-}
-#endif
-
-#if 1
 /*
  * An interpreter that uses an arry of ints to store the instructions
  * and another array for the tape. Using ints for the tape and masking
@@ -755,16 +616,10 @@ run(void)
     int a2 = 0;
 #endif
 #endif
-#ifndef USEHUGERAM
     void * freep;
-#endif
 
-#ifdef USEHUGERAM
-    m = map_hugeram();
-#else
     m = freep = tcalloc(MEMSIZE+1024, sizeof*p);
     m += 1024;
-#endif
 
     while(n)
     {
@@ -795,13 +650,11 @@ run(void)
 
 #ifdef ENABLE_DOUBLE
 	case T_ADD2: case T_SET2: case T_MUL2: case T_QSET2:
-	case T_WHL2c1: case T_END2c1: case T_SET2c1:
 	case T_WHL2c2: case T_END2c2: case T_SET2c2:
 	    arraylen += 3;
 	    break;
 
 	case T_WHL2: case T_END2:
-	case T_ADD2c1: case T_SUB2c1:
 	case T_ADD2c2: case T_SUB2c2:
 	    arraylen += 3;
 	    break;
@@ -870,9 +723,8 @@ run(void)
 	    }
 	    break;
 
-	case T_ADD2c1: case T_SUB2c1:
 	case T_ADD2c2: case T_SUB2c2:
-	case T_SET2c1: case T_SET2c2:
+	case T_SET2c2:
 
 	case T_ADD2: case T_SUB2: case T_SET2: case T_MUL2: case T_QSET2:
 	case T_SET:
@@ -882,7 +734,6 @@ run(void)
 	    *p++ = n->count;
 	    break;
 
-	case T_WHL2c1:
 	case T_WHL2c2:
 	case T_WHL2:
 	case T_WHL:
@@ -894,7 +745,6 @@ run(void)
 
 	case T_END:
 	case T_END2:
-	case T_END2c1:
 	case T_END2c2:
 	    progarray[n->count] = (p-progarray) - n->count;
 	    *p++ = -progarray[n->count];
@@ -1080,118 +930,6 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 
 /******************************************************************************/
 
-	case T_ADD2c1:
-	    if (m[-1] != 0 || m[2] != 0) {
-		++*m;
-		m[-1] += m[0];
-		m[2] += m[0];
-		m[0] = m[-1];
-		m[1] += !m[2];
-		m[1] -= !m[0];
-		--*m;
-		m[2] = 0;
-		m[-1] = 0;
-	    }
-#ifdef dcell
-	    *((dcell*)m) += p[1];
-#else
-	    {
-		unsigned int t = m[0] + (m[1]<<8);
-		t += p[1];
-		m[0] = t; m[1] = (t>>8);
-	    }
-#endif
-	    p += 3;
-	    break;
-
-	case T_SUB2c1:
-	    if (m[-1] != 0 || m[2] != 0) {
-		m[-1] += m[0];
-		m[2] += m[0];
-		m[0] = m[-1];
-		m[-1] = 1;
-		if(m[2]) {
-		    m[-1] = 0;
-		}
-		m[1] -= m[-1];
-		/* *m += 0; */
-		m[2] = m[0];
-		m[-1] = 1;
-		if(m[2]) {
-		    m[-1] = 0;
-		}
-		m[2] = 0;
-		m[1] += m[-1];
-		m[-1] = 0;
-	    }
-#ifdef dcell
-	    *((dcell*)m) += p[1];
-#else
-	    {
-		unsigned int t = m[0] + (m[1]<<8);
-		t += p[1];
-		m[0] = t; m[1] = (t>>8);
-	    }
-#endif
-	    p += 3;
-	    break;
-
-	case T_SET2c1:
-	    if (m[-1] != 0 || m[2] != 0 || m[5] != 0) {
-		m[-1] += !!m[1] + !!(m[2] + m[0]);
-		m[0] += m[5];
-		m[2] = 0;
-		m[5] = 0;
-		if(m[-1]) { m[-1] = 0; m[0] = 0; m[1] = 0; }
-	    } else
-		m[0] = m[1] = 0;
-#ifdef dcell
-	    *((dcell*)m) += p[1];
-#else
-	    {
-		unsigned int t = m[0] + (m[1]<<8);
-		t += p[1];
-		m[0] = t; m[1] = (t>>8);
-	    }
-#endif
-	    p += 3;
-	    break;
-
-	case T_WHL2c1:
-	    if (m[-1] != 0 || m[2] != 0 || m[5] != 0) {
-		icell t;
-		t = m[-1] + !!m[1] + !!(m[2] + m[0]);
-		m[0] += m[5];
-		m[5] = 0;
-		m[2] = 0;
-		m[-1] = 0;
-		if(M(t) == 0) p += p[1];
-		p += 3;
-	    } else {
-		if ((!!m[1] | !!m[0]) == 0) p += p[1];
-		p += 3;
-	    }
-	    break;
-
-	case T_END2c1:
-	    if (m[-1] != 0 || m[2] != 0 || m[5] != 0) {
-		icell t;
-		t = m[-1] + !!m[1] + !!(m[2] + m[0]);
-		m[0] += m[5];
-		m[5] = 0;
-		m[2] = 0;
-		m[-1] = 0;
-
-		if(M(t) != 0) p += p[1];
-		p += 3;
-	    } else {
-		if(M(*m) != 0 || M(m[1]) != 0) p += p[1];
-		p += 3;
-	    }
-	    break;
-
-/******************************************************************************/
-
 	case T_ADD2c2:
 	    if (m[-1] != 0 || m[2] != 0) {
 		++m[-1];
@@ -1329,11 +1067,7 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
     }
 break_break:;
     free(progarray);
-#ifndef USEHUGERAM
     free(freep);
-#endif
 #undef icell
 #undef M
 }
-
-#endif
