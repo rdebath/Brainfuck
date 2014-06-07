@@ -38,6 +38,7 @@
 #define L_RISBF         0x11    /* while (count-->0) risbf(ch); */
 #define L_HEADSECKS     0x12    /* headsecks(token, count); */
 #define L_BFRLE         0x13    /* bfrle(token, count); */
+#define L_BFXML         0x14    /* bfxml(token, count); */
 
 
 static const char bf[] = "><+-.,[]";
@@ -117,6 +118,11 @@ static const char *zero[] =
 /* Language "nyan" (may need prefix and suffix of "nyan") */
 static const char *nyan[] =
     {"anna", "nana", "nnya", "nnna", "anan", "nnay", "annn", "naaa"};
+
+/* Language XMLfuck */
+static const char * bfxml_1[] =
+    {	"<ptrinc", "<ptrdec", "<inc", "<dec",
+	"<print", "<read", "<while>", "</while>", 0 };
 
 /* BF Doubler doubles the cell size. */
 /* 12 cost, cells in LXXH order, with tmpzero */
@@ -246,6 +252,7 @@ const char ** doubler = doubler_12;
 static void risbf(int ch);
 static void headsecks(int ch, int count);
 static void bfrle(int ch, int count);
+static void bfxml(int ch, int count);
 static void bftranslate(int ch, int count);
 static void bfreprint(void);
 
@@ -360,6 +367,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-nyan") == 0) {
 	lang = nyan; langclass = L_JNWORD; return 1;
     } else
+    if (strcmp(arg, "-xml") == 0) {
+	lang = 0; langclass = L_BFXML; return 1;
+    } else
 
     if (strcmp(arg, "-risbf") == 0) {
 	lang = 0; langclass = L_RISBF; return 1;
@@ -394,6 +404,7 @@ check_arg(const char * arg)
 	"\n\t"  "-:      Dotty"
 	"\n\t"  "-lisp   Lisp Zero"
 	"\n\t"  "-risbf  RISBF"
+	"\n\t"  "-xml    XML"
 	"\n\t"  "-dump   Token dump"
 	"\n\t"  "-pog    Pogaack."
 	"\n\t"  "-chi    In chinese."
@@ -515,6 +526,7 @@ outcmd(int ch, int count)
     case L_HEADSECKS:	headsecks(ch, count); break;
     case L_BF:		bftranslate(ch, count); break;
     case L_BFRLE:	bfrle(ch, count); break;
+    case L_BFXML:	bfxml(ch, count); break;
     }
 
     if (ch == '~') {
@@ -594,6 +606,35 @@ bfrle(int ch, int count)
 	col += printf("%d%c", count, ch);
     } else while (count-- > 0)
 	pc(ch);
+}
+
+static void
+bfxml(int ch, int count)
+{
+    char * p;
+
+    if (! (p = strchr(bf,ch))) {
+	if (ch == '!') {
+	    puts("<?xml version=\"1.0\"?>");
+	    printf("<fuck bits='%d' wrap='Y'>", bytecell?8:sizeof(int)*8);
+	    if (tapelen > 1)
+		printf("<tapes><tape length='%d'/></tapes>\n", tapelen);
+	    else
+		printf("<tapes><tape/></tapes>\n");
+	}
+	else if (ch == '~') {
+	    printf("</fuck>\n");
+	}
+	return;
+    }
+
+    if ((p-bf) >= 6) {
+	printf("%s\n", bfxml_1[p-bf]);
+    } else if (count > 1) {
+	printf("%s by='%d'/>\n", bfxml_1[p-bf], count);
+    } else {
+	printf("%s/>\n", bfxml_1[p-bf]);
+    }
 }
 
 /*
