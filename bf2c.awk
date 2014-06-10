@@ -1,5 +1,4 @@
-#!/usr/bin/mawk -Wexec
-#
+#!/bin/sh -
 # BF to C converter, compiler and runner.
 #
 # This converts BF to peephole optimised C then compiles it with the system C
@@ -13,6 +12,10 @@
 #
 # The 'mawk' version is the quickest followed by "original-awk" with the big
 # fat GNU version rolling up eventually.
+#
+# Use the shell to fix the lack of -Wexec on some awks.
+true + /; exec awk -f "$0" -- "$@" ; exit; / {}
+#
 BEGIN {
     if (ARGC == 1) {
 	print "Usage: bf2c [options] files..."
@@ -27,18 +30,6 @@ BEGIN {
 	print "  -Ctcc     Use the specified C compiler rather than 'cc'."
 	print ""
 	print "Note: the -i and -# options interfere with optimisation."
-
-	print ""
-	print "This is a shell wrapper if you can't use mawk."
-	print ""
-	print "#!/bin/sh -"
-	print "PGM=$(readlink -f \"$0\")"
-	print "[ -x /usr/bin/mawk ] &&"
-	print "    exec /usr/bin/mawk -f \"$PGM\".awk -- \"$@\""
-	print "[ -x /usr/bin/original-awk ] &&"
-	print "    exec /usr/bin/original-awk -f \"$PGM\".awk -- \"$@\""
-	print "exec awk -f \"$PGM\".awk -- \"$@\""
-
 	aborting=1;
 	exit
     }
@@ -108,7 +99,7 @@ END {
     if (debug) lstr = lstr "# ";
     ll = 1;
     print_line();
-    if (icount) {
+    if (icount && !debug) {
 	print "fprintf(stderr, \"\\nCommands executed: %.0Lf\\n\", (long double)icount);" > of
     }
     print "return 0;}" > of
@@ -224,6 +215,9 @@ function print_line() {
 }
 
 function debug_mem() {
+    if (icount) {
+	print "fprintf(stderr, \"\\nCommands executed: %.0Lf\\n\", (long double)icount);" > of
+    }
     print "{ int ii, jj=0;" > of;
     print "  for(ii=" memoff "; ii<sizeof(mem)/sizeof(*mem); ii++)" > of;
     print "    if(mem[ii]) jj = ii+1;" > of;
@@ -233,14 +227,11 @@ function debug_mem() {
     print "  fprintf(stderr, \"\\n\");" > of;
     print "  if (mem-m-" memoff "<100) {" > of;
     print "    fprintf(stderr, \"         ptr:\", m-mem-" memoff ");" > of;
-    print "    for(ii=" memoff "; ii<jj || mem+ii<=m; ii++)" > of;
+    print "    for(ii=" memoff "; mem+ii<=m; ii++)" > of;
     print "      fprintf(stderr, \"   %s\", mem+ii==m?\"^\":\" \");" > of;
     print "    fprintf(stderr, \"\\n\");" > of;
     print "  }" > of;
     print "}" > of;
-    if (icount) {
-	print "fprintf(stderr, \"\\nCommands executed: %.0Lf\\n\", (long double)icount);" > of
-    }
 }
 
 function optim()
@@ -318,3 +309,4 @@ function optim()
 	str = substr(str, 1, RSTART-1) "L(" RLENGTH/2 ")" substr(str, RSTART+RLENGTH)
     }
 }
+# vim: set filetype=awk:
