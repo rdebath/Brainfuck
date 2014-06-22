@@ -358,7 +358,7 @@ int
 main(int argc, char ** argv)
 {
     char * pgm = argv[0];
-    int ch, lastch=']', c=0, m, b=0, lc=0, ar;
+    int ch, lastch=']', c=0, m, b=0, lc=0, ar, cf=0;
     FILE * ifd;
     int digits = 0, number = 0, multi = 1;
     int qstring = 0;
@@ -423,7 +423,8 @@ main(int argc, char ** argv)
 	} else
 	    current_file = argv[ar];
 
-	while((ch = getc(ifd)) != EOF && (ifd!=stdin || ch != '!' || qstring)) {
+	while((ch = getc(ifd)) != EOF && (ifd!=stdin || ch != '!' ||
+		qstring || lc || b || (c==0 && cf==0))) {
 	    /* Quoted strings are printed. (And set current cell) */
 	    if (qstring) {
 		if (ch == '"') {
@@ -459,6 +460,7 @@ main(int argc, char ** argv)
 		lc += (ch=='[') - (ch==']'); continue;
 	    }
 	    if (lc) continue;
+	    cf=1;
 	    /* Do the RLE */
 	    if (m && ch == lastch) { c+=multi; continue; }
 	    /* Post the RLE token onward */
