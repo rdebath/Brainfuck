@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh -
  # Convert BF to a bash script and run it.
  #
  # This does NOT call ANY external function or programs.
@@ -14,6 +14,10 @@
  # BUGS
  #      It's too big and too slow.
  #
+
+# The *BSD don't have package management so anything not in the base install
+# is dumped into /usr/local. This makes hardcoded paths ineffective.
+if [ ! -n "$BASH_VERSION" ];then exec bash "$0" "$@" ;else set +o posix;fi
 
 set -f +B
 
