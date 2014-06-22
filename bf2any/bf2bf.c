@@ -21,6 +21,7 @@
 #define C_HEADERS       0x100   /* Add C Header & footer */
 #define C_DEFINES       0x200   /* #defines in the header */
 #define C_RLE           0x400   /* #define for RLE in the header */
+#define GEN_HEADER      0x800   /* Generic header and footer. */
 
 #define L_BASE          (0xFF & langclass)
 
@@ -115,14 +116,21 @@ static const char *rhoprime[] =
 static const char *zero[] =
     { "0+", "0-", "0++", "0--", "0.", "0?", "0/", "/0" };
 
-/* Language "nyan" (may need prefix and suffix of "nyan") */
+/* Language "nyan" https://github.com/tommyschaefer/nyan-script */
 static const char *nyan[] =
-    {"anna", "nana", "nnya", "nnna", "anan", "nnay", "annn", "naaa"};
+    {"anna", "nana", "nnya", "nnna", "anan", "nnay", "annn", "naaa",
+     "nyan", "nyan" };
 
 /* Language XMLfuck */
 static const char * bfxml_1[] =
     {	"<ptrinc", "<ptrdec", "<inc", "<dec",
 	"<print", "<read", "<while>", "</while>", 0 };
+
+/* Language @! .. http://esolangs.org/wiki/@tention! */
+static const char *atpling[] =
+    {"@I^;", "@E^;", "@B^;", "@C^;", "$XA^<;", "&XA^>;", "XA^[", "];",
+     "D@=; T2=; Q(x{TTT*=})=; 8Q^; T{D0<}; Q,; T,; A(D!x-{D~}`)=;"
+     "X0=; I(XX1+=)=; E(XX1-=)=; B(XA^XA^1+=)=; C(XA^XA^1-=)=;", "" };
 
 /* BF Doubler doubles the cell size. */
 /* 12 cost, cells in LXXH order, with tmpzero */
@@ -365,10 +373,13 @@ check_arg(const char * arg)
 	lang = zero; langclass = L_WORDS; return 1;
     } else
     if (strcmp(arg, "-nyan") == 0) {
-	lang = nyan; langclass = L_JNWORD; return 1;
+	lang = nyan; langclass = L_JNWORD+GEN_HEADER; return 1;
     } else
     if (strcmp(arg, "-xml") == 0) {
 	lang = 0; langclass = L_BFXML; return 1;
+    } else
+    if (strcmp(arg, "-@!") == 0) {
+	lang = atpling; langclass = L_JNWORD+GEN_HEADER; return 1;
     } else
 
     if (strcmp(arg, "-risbf") == 0) {
@@ -410,6 +421,7 @@ check_arg(const char * arg)
 	"\n\t"  "-chi    In chinese."
 	"\n\t"  "-zero   'zerolang' from mescam on github"
 	"\n\t"  "-nyan   'nyan-script' from tommyschaefer on github"
+	"\n\t"  "-@!     @! from http://esolangs.org/wiki/@tention!"
 	"\n\t"  ""
 	"\n\t"  "-single BF to BF translation."
 	"\n\t"  "-double BF to BF translation, cell size doubler."
@@ -505,6 +517,23 @@ outcmd(int ch, int count)
 	    printf("int mem[%d];int main(){register int*m=mem;\n", tapelen);
     }
 
+    if (ch == '!' && (langclass & GEN_HEADER) != 0) {
+	if (L_BASE == L_JNWORD) {
+	    char * basep = strdup(lang[8]);
+	    char * s, * t = basep;
+
+	    while(s=strchr(t, ' '),s) {	/* Whinging GCC */
+		*s = 0;
+		ps(t);
+		t = s+1;
+	    }
+	    ps(t);
+
+	    free(basep);
+	} else
+	    ps(lang[8]);
+    }
+
     switch (L_BASE) {
     case L_WORDS:
     case L_JNWORD:
@@ -528,6 +557,9 @@ outcmd(int ch, int count)
     case L_BFRLE:	bfrle(ch, count); break;
     case L_BFXML:	bfxml(ch, count); break;
     }
+
+    if (ch == '~' && (langclass & GEN_HEADER) != 0)
+	ps(lang[9]);
 
     if (ch == '~') {
 	pc(0);
