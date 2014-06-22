@@ -14,7 +14,7 @@
 # fat GNU version rolling up eventually.
 #
 # Use the shell to fix the lack of -Wexec on some awks.
-true + /; exec awk -f "$0" -- "$@" ; exit; / {}
+true , /; exec awk -f "$0" -- "$@" ; exit; / {}
 #
 BEGIN {
     if (ARGC == 1) {
