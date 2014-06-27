@@ -162,7 +162,8 @@ outtxn(int ch, int repcnt)
     /* Last check for not simple. */
     if (mov
 	|| (loopz == 0 && inc != -1 && inc != 1)
-	|| (loopz != 0 && inc != 0) )
+	|| (loopz != 0 && inc != 0)
+	|| (!enable_be_optim && loopz) )
 	{ outtxn(0, 0); return; }
 
     /* Delete old loop */
@@ -172,10 +173,8 @@ outtxn(int ch, int repcnt)
     qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
     if (loopz) {
 	inc = -1;
-	if (enable_be_optim) {
-	    qcmd[qcnt] = 'Q'; qrep[qcnt] = 1; qcnt ++;
-	    qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
-	}
+	qcmd[qcnt] = 'Q'; qrep[qcnt] = 1; qcnt ++;
+	qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
     }
     if (enable_be_optim) {
 	qcmd[qcnt] = '='; qrep[qcnt] = 0; qcnt ++;
@@ -221,11 +220,7 @@ outtxn(int ch, int repcnt)
 	qcmd[qcnt] = '>'; qrep[qcnt] = 0 - mov; qcnt ++;
     }
     if (!enable_be_optim) {
-	if (loopz) {
-	    qcmd[qcnt] = '='; qrep[qcnt] = 0; qcnt ++;
-	} else {
-	    qcmd[qcnt] = 'N'; qrep[qcnt] = 1; qcnt ++;
-	}
+	qcmd[qcnt] = 'N'; qrep[qcnt] = 1; qcnt ++;
 	qcmd[qcnt] = 'E'; qrep[qcnt] = 0; qcnt ++;
     }
 

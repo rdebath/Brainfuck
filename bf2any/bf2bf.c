@@ -724,14 +724,14 @@ bftranslate(int ch, int count)
 	if ((bf_multi &= 7) == 7) {
 	    /* This generates 65536 to check for larger than 16bit cells. */
 	    pc(0); puts("// This generates 65536 to check for larger than 16bit cells");
-	    pmc("[-]>[-]++[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]+<[");
-	    pmc(">>\n\n");
+	    pmc(">[-]<[-]++[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]+>[");
+	    pmc(">\n\n");
 
 	    pc(0); puts("// This code may be replaced by the original source");
 	    lang = bfout; bfreprint();
 	    pc('\n'); puts("// to here");
 
-	    pmc("\n<<[-]]\n\n");
+	    pmc("\n<[-]]<\n\n");
 
 	    pc(0); puts("// This section is cell doubling for 16bit cells");
 	    /* This generates 256 to check for larger than byte cells. */
