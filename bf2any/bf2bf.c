@@ -221,7 +221,7 @@ static const char * doubler_esolang[] =
     0};
 
 /* Copy cell cost, cells in XLMNHX order */
-static const char * bfquad[] = {
+static const char * bfquadz[] = {
     ">>>>>", "<<<<<",
 
     "+>+[<->[->>>>+<<<<]]>>>>[-<<<<+>>>>]<<<<<[>>+[<<->>[->>>+<<<]]>>>[-<<<+"
@@ -241,6 +241,27 @@ static const char * bfquad[] = {
     "[-]>>>>>[-]<<<<<"
     };
 
+/* Copy cell cost, cells in XLMNHX order */
+static const char * bfquadnz[] = {
+    ">>>>>", "<<<<<",
+
+    "+>+[<->[->>>>+<<<<]]>>>>[-<<<<+>>>>]<<<<<[>>+[<<->>[->>>+<<<]]>>>[-<<<+"
+    ">>>]<<<<<[>>>+[<<<->>>[->>+<<]]>>[-<<+>>]<<<<<[->>>>+<<<<]]]",
+
+    "+>[<->[->>>>+<<<<]]>>>>[-<<<<+>>>>]<<<<<[>>[<<->>[->>>+<<<]]>>>[-<<<+>>>"
+    "]<<<<<[>>>[<<<->>>[->>+<<]]>>[-<<+>>]<<<<<[->>>>-<<<<]>>>-<<<]>>-<<]>-<",
+
+    ">.<", ">[-]>[-]>[-]>[-]<<<,<",
+
+    ">[<+>[->>>>+<<<<]]>>>>[-<<<<+>>>>]" "<<<[<<+>>[->>>+<<<]]>>>[-<<<+>>>]"
+    "<<[<<<+>>>[->>+<<]]>>[-<<+>>]" "<[<<<<+>>>>[->+<]]>[-<+>]" "<<<<<[[-]",
+
+    ">[<+>[->>>>+<<<<]]>>>>[-<<<<+>>>>]" "<<<[<<+>>[->>>+<<<]]>>>[-<<<+>>>]"
+    "<<[<<<+>>>[->>+<<]]>>[-<<+>>]" "<[<<<<+>>>>[->+<]]>[-<+>]" "<<<<<]",
+
+    0
+    };
+
 static int langclass = L_BF;
 static const char ** lang = bfout;
 static const char ** c = 0;
@@ -256,6 +277,7 @@ static int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
 static int bf_multi = 0, tmp_clean = 1;
 struct instruction { int ch; int count; struct instruction * next; } *pgm = 0, *last = 0;
 const char ** doubler = doubler_12;
+const char ** bfquad = bfquadnz;
 
 static void risbf(int ch);
 static void headsecks(int ch, int count);
@@ -286,7 +308,11 @@ check_arg(const char * arg)
     } else
     if (strcmp(arg, "-quad") == 0) {
 	bf_multi |= 4;
-	lang = bfquad; langclass = L_BF; return 1;
+	lang = bfquad = bfquadnz; langclass = L_BF; return 1;
+    } else
+    if (strcmp(arg, "-quadz") == 0) {
+	bf_multi |= 4;
+	lang = bfquad = bfquadz; langclass = L_BF; return 1;
     } else
     if (strcmp(arg, "-framed") == 0) {
 	bf_multi |= 8+1;
@@ -294,34 +320,42 @@ check_arg(const char * arg)
     } else
     if (strcmp(arg, "-dbl12") == 0) {
 	lang = doubler = doubler_12;
+	bf_multi |= 2;
 	langclass = L_BF; return 1;
     } else
     if (strcmp(arg, "-dbl12nz") == 0) {
 	lang = doubler = doubler_12nz;
+	bf_multi |= 2;
 	langclass = L_BF; return 1;
     } else
     if (strcmp(arg, "-dbl17a") == 0) {
 	lang = doubler = doubler_17a;
+	bf_multi |= 2;
 	langclass = L_BF; return 1;
     } else
     if (strcmp(arg, "-dbl17b") == 0) {
 	lang = doubler = doubler_17b;
+	bf_multi |= 2;
 	langclass = L_BF; return 1;
     } else
     if (strcmp(arg, "-dblcopy") == 0) {
 	lang = doubler = doubler_copy;
+	bf_multi |= 2;
 	langclass = L_BF; return 1;
     } else
     if (strcmp(arg, "-dblcpnz") == 0) {
 	lang = doubler = doubler_copynz;
+	bf_multi |= 2;
 	langclass = L_BF; return 1;
     } else
     if (strcmp(arg, "-dblcp12") == 0) {
 	lang = doubler = doubler_copy_LXXH;
+	bf_multi |= 2;
 	langclass = L_BF; return 1;
     } else
     if (strcmp(arg, "-dbleso") == 0) {
 	lang = doubler = doubler_esolang;
+	bf_multi |= 2;
 	langclass = L_BF; return 1;
     } else
     if (strcmp(arg, "-n") == 0 || strcmp(arg, "-nice") == 0) {
@@ -470,7 +504,10 @@ ps(const char * s)
 
     while (*s) {
 	putchar(*s);
-	if ((*s&0xC0) != 0x80) /* Count UTF-8 */
+	/* Count UTF-8 CHARACTERS. This is easy, but actually wrong as
+	 * we really want the display width (eg: Chinese characters are
+	 * double width, usually. */
+	if ((*s&0xC0) != 0x80)
 	    col++;
 	s++;
     }
