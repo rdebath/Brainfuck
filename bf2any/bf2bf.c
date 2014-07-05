@@ -306,7 +306,7 @@ check_arg(const char * arg)
 	bf_multi |= 2;
 	lang = doubler; langclass = L_BF; return 1;
     } else
-    if (strcmp(arg, "-quad") == 0) {
+    if (strcmp(arg, "-quadnz") == 0 || strcmp(arg, "-quad") == 0) {
 	bf_multi |= 4;
 	lang = bfquad = bfquadnz; langclass = L_BF; return 1;
     } else
@@ -461,6 +461,10 @@ check_arg(const char * arg)
 	"\n\t"  "-double BF to BF translation, cell size doubler."
 	"\n\t"  "-quad   BF to BF translation, cell size double doubler."
 	"\n\t"  "        These can be combined and will autodetect cell size."
+	"\n\t"  "-framed Put the cell size test round two simple copies."
+	"\n\t"  "        There are also several different variations ..."
+	"\n\t"  "-dbl12 -dbl12nz -dbl17a -dbl17b -dblcpnz -dblcopy -dblcp12"
+	"\n\t"  "-dbleso -quadz -quadnz"
 	);
 	return 1;
     } else
