@@ -153,6 +153,21 @@ static const char * doubler_copy_LXXH[] =
     ">[-]>[-]<<"
     };
 
+#if 0	/* Swapping the temps */
+static const char * doubler_copy_LXXH[] =
+    {
+    ">>>>",
+    "<<<<",
+    "+>+<[>-<[->>+<<]]>>[-<<+>>]<[->>+<<]<",
+    ">+<[>-<[->>+<<]]>>[-<<+>>]<[->>-<<]<-",
+    ".",
+    ">>>[-]<<<[-],",
+    "[>+<[->>+<<]]>>[-<<+>>]>[<<+>>[-<+>]]<[->+<]<[[-]<",
+    "[>+<[->>+<<]]>>[-<<+>>]>[<<+>>[-<+>]]<[->+<]<]<",
+    ">[-]>[-]<<"
+    };
+#endif
+
 /* 12 cost, cells in LXXH order */
 static const char * doubler_12nz[] =
     {">>>>", "<<<<", ">+<+[>-]>[->>+<]<<", ">+<[>-]>[->>-<]<<-",
@@ -762,7 +777,7 @@ bftranslate(int ch, int count)
 	 * The tests can be reordered and the compacted lump in the first
 	 * section can be manually replaced by the original code if wanted.
 	 */
-	if ((bf_multi &= 7) == 7) {
+	if ((bf_multi & 7) == 7) {
 	    /* This generates 65536 to check for larger than 16bit cells. */
 	    pc(0); puts("// This generates 65536 to check for larger than 16bit cells");
 	    pmc(">[-]<[-]++[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]+>[");
@@ -782,18 +797,22 @@ bftranslate(int ch, int count)
 	    /* pmc("[-]"); */
 	    pmc(">[-]++[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]+<[>-<[-]]>[");
 	    pmc(">");
+	    if (bf_multi&8) pmc("\n\n");
 
 	    lang = doubler; bfreprint();
 
+	    if (bf_multi&8) pmc("\n\n");
 	    pmc("<[-]]<");
 	    pmc("[-]]\n\n");
 
 	    pc(0); puts("// This section is cell quadrupling for 8bit cells");
 	    /* This generates 256 to check for cells upto 8 bits */
 	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]+<[>-<[-]]>[>");
+	    if (bf_multi&8) pmc("\n\n");
 
 	    lang = bfquad; bfreprint();
 
+	    if (bf_multi&8) pmc("\n\n");
 	    pmc("<[-]]<");
 	} else {
 	    /* The two cell size checks here are independent, they can be
@@ -812,10 +831,12 @@ bftranslate(int ch, int count)
 	    /* This generates 256 to check for cells upto 8 bits */
 	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]+<[>-<[-]]>[>");
 
-	    if(bf_multi >= 4) lang = bfquad;
-	    else if (bf_multi >= 2) lang = doubler;
+	    if(bf_multi&4) lang = bfquad;
+	    else if (bf_multi&2) lang = doubler;
+	    else pmc("\n\n");
 	    bfreprint();
 
+	    if ((bf_multi&6) == 0) pmc("\n\n");
 	    pmc("<[-]]<");
 	}
     }
