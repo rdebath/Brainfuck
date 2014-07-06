@@ -1193,6 +1193,14 @@ delete_tree(void)
     while(n) { p = n; n=n->next; free(p); }
 }
 
+/*
+ *  This routine relocates T_MOV instructions past other instruction types
+ *  in an effort to merge the T_MOVs together and hopefully have them cancel
+ *  out completely.
+ *
+ *  This is currently run at an early stage so it doesn't need to work for
+ *  the enhanced token types.
+ */
 void
 pointer_scan(void)
 {
@@ -1243,7 +1251,10 @@ pointer_scan(void)
 		    n = n2;
 		}
 		continue;
-	    } else if (n->next->type != T_WHL && n->next->type != T_END) {
+	    } else if ( n->next->type == T_ADD ||
+			n->next->type == T_SET ||
+			n->next->type == T_PRT ||
+			n->next->type == T_INP) {
 		if(verbose>4)
 		    fprintf(stderr, "Push past command.\n");
 		/* Put movement after a normal cmd. */
@@ -1400,6 +1411,7 @@ quick_scan(void)
 	if( n->type == T_WHL && n->next && n->next->next &&
 	    n->next->type == T_ADD &&
 	    n->next->next->type == T_END &&
+	    n->offset == n->next->offset &&
 	    ( n->next->count == 1 || n->next->count == -1 )
 	    ) {
 	    /* Change to T_SET */
@@ -1409,6 +1421,13 @@ quick_scan(void)
 	    /* Delete the loop. */
 	    n->type = T_NOP;
 	    n->next->next->type = T_NOP;
+
+	    /* If followed by a matching T_ADD merge that in too */
+	    n2 = n->next->next->next;
+	    if (n2 && n2->type == T_ADD && n2->offset == n->next->offset) {
+		n->next->count += n2->count;
+		n2->type = T_NOP;
+	    }
 
 	    if(verbose>4) {
 		fprintf(stderr, "Replaced T_WHL [-/+] with T_SET.\n");
@@ -1427,14 +1446,9 @@ quick_scan(void)
 	    n2 = add_node_after(n);
 	    n2->type = T_STOP;
 
-	    /* With the T_STOP there the 'loop' is now a T_IF */
-	    if (!opt_no_endif) {
-		n->type = T_IF;
-		n2->next->type = T_ENDIF;
-	    }
-
-	    /* Insert a T_SET for the const. */
-	    n2 = add_node_after(n2->next);
+	    /* Insert a T_SET because the T_STOP doesn't return so the T_WHL
+	     * can be converted to a T_IF later. */
+	    n2 = add_node_after(n2);
 	    n2->type = T_SET;
 	    n2->offset = n->offset;
 	    n2->count = 0;
