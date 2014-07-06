@@ -38,21 +38,29 @@ FILE * ofd;
 static void compile_and_run_libtcc(void);
 #endif
 #ifndef NO_DLOPEN
-static void compile_and_run_dll(void);
+static void compile_and_run(void);
 #endif
 static void print_cstring(void);
 
 static int imov = 0;
 static int verbose = 0;
 
+#ifndef NO_DLOPEN
+#define BFBASE "bfpgm"
 static const char * cc_cmd = 0;
-static const char * opt_flag = "-O0";
+static const char * copt = "-O0";
 static char tmpdir[] = "/tmp/bfrun.XXXXXX";
 static char ccode_name[sizeof(tmpdir)+16];
 static char dl_name[sizeof(tmpdir)+16];
+static char obj_name[sizeof(tmpdir)+16];
+static int in_one = 0;
+static char pic_opt[8] = " -fpic";
+#endif
 
+#ifndef NO_LIBTCC
 char * ccode = 0;
 size_t ccodesize = 0;
+#endif
 
 int
 check_arg(const char * arg)
@@ -66,23 +74,27 @@ check_arg(const char * arg)
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-d      Dump code"
-#ifndef NO_DLOPEN
-	"\n\t"  "-ldl    Use dlopen to run compiled code."
-#endif
 #ifndef NO_LIBTCC
 	"\n\t"  "-ltcc   Use libtcc to run code."
 #endif
+#ifndef NO_DLOPEN
+	"\n\t"  "-ldl    Use dlopen to run compiled code."
 	"\n\t"  "-Cclang Choose a different C compiler"
 	"\n\t"  "-Ox     Pass -Ox to C compiler."
+#endif
 	);
 	return 1;
     } else
+#ifndef NO_DLOPEN
     if (strncmp(arg, "-O", 2) == 0) {
-	opt_flag = arg; return 1;
+	runmode = run_dll;  /* Libtcc doesn't optimise */
+	copt = arg; return 1;
     } else
     if (strncmp(arg, "-C", 2) == 0 && arg[2]) {
+	runmode = run_dll;  /* Running the C compiler, not libtcc */
 	cc_cmd = arg + 2; return 1;
     } else
+#endif
     if (strcmp(arg, "-v") == 0) {
 	verbose++; return 1;
     } else
@@ -108,7 +120,7 @@ outcmd(int ch, int count)
     if (imov && ch != '>' && ch != '<') {
 	int mov = imov;
 
-#if 0
+#ifdef MERGEMOVE
 	imov = 0;
 
 	switch(ch) {
@@ -120,7 +132,7 @@ outcmd(int ch, int count)
 	case 'N': prv2("*(m+=%d) -= v*%d;", mov, count); return;
 	case 'S': prv("*(m+=%d) += v;", mov); return;
 	}
-#else
+#else /* else use offsets */
 	switch(ch) {
 	case '=': prv2("m[%d] = %d;", mov, count); return;
 	case 'B': prv("v= m[%d];", mov); return;
@@ -158,8 +170,9 @@ outcmd(int ch, int count)
 		perror("mkdtemp()");
 		exit(1);
 	    }
-	    strcpy(ccode_name, tmpdir); strcat(ccode_name, "/bfpgm.c");
-	    strcpy(dl_name, tmpdir); strcat(dl_name, "/bfpgm.so");
+	    strcpy(ccode_name, tmpdir); strcat(ccode_name, "/"BFBASE".c");
+	    strcpy(dl_name, tmpdir); strcat(dl_name, "/"BFBASE".so");
+	    strcpy(obj_name, tmpdir); strcat(obj_name, "/"BFBASE".o");
 	    ofd = fopen(ccode_name, "w");
 	} else
 #endif
@@ -229,7 +242,7 @@ outcmd(int ch, int count)
     else
 #endif
 #ifndef NO_DLOPEN
-	compile_and_run_dll()
+	compile_and_run()
 #endif
 	;
 }
@@ -279,7 +292,8 @@ print_cstring(void)
     }
 }
 
-/*  Needs:   gcc -shared -fPIC -o libfoo.so foo.c
+#ifndef NO_DLOPEN
+/*  Needs:   gcc -shared -fpic -o libfoo.so foo.c
     And:     -ldl
 
     NB: -fno-asynchronous-unwind-tables
@@ -310,25 +324,46 @@ print_cstring(void)
 #endif
 #endif
 
+typedef void (*voidfnp)(void);
 static int loaddll(const char *);
-static void (*runfunc)(void);
+static voidfnp runfunc;
 static void *handle;
 
 static void
-compile_and_run_dll(void)
+compile_and_run(void)
 {
     char cmdbuf[256];
     int ret;
     const char * cc = CC;
-    setbuf(stdout,0);
 
     if (cc_cmd) cc = cc_cmd;
 
-    sprintf(cmdbuf, "%s %s -w -shared -fPIC -o %s %s",
-	    cc, opt_flag, dl_name, ccode_name);
-    if (verbose)
-	fprintf(stderr, "Compiling with '%s'\n", cmdbuf);
-    ret = system(cmdbuf);
+    if (in_one) {
+	if (verbose)
+	    fprintf(stderr,
+		"Running C Code using \"%s%s %s -shared\" and dlopen().\n",
+		cc,pic_opt,copt);
+
+	sprintf(cmdbuf, "%s%s %s -shared -o %s %s",
+		    cc, pic_opt, copt, dl_name, ccode_name);
+	ret = system(cmdbuf);
+    } else {
+	if (verbose)
+	    fprintf(stderr,
+		"Running C Code using \"%s%s %s\", link -shared and dlopen().\n",
+		cc,pic_opt,copt);
+
+	/* Like this so that ccache has a good path and distinct compile. */
+	sprintf(cmdbuf, "cd %s; %s%s %s -c -o %s %s",
+		tmpdir, cc, pic_opt, copt, BFBASE".o", BFBASE".c");
+	ret = system(cmdbuf);
+
+	if (ret != -1) {
+	    sprintf(cmdbuf, "cd %s; %s%s -shared -o %s %s",
+		    tmpdir, cc, pic_opt, dl_name, BFBASE".o");
+	    ret = system(cmdbuf);
+	}
+    }
 
     if (ret == -1) {
 	perror("Calling C compiler failed");
@@ -349,12 +384,11 @@ compile_and_run_dll(void)
 	exit(1);
     }
 
-    if (verbose)
-	fprintf(stderr, "Loading with dlopen\n");
     loaddll(dl_name);
 
     unlink(ccode_name);
     unlink(dl_name);
+    unlink(obj_name);
     rmdir(tmpdir);
 
     (*runfunc)();
@@ -378,7 +412,9 @@ loaddll(const char * dlname)
     /* The C99 standard leaves casting from "void *" to a function
        pointer undefined.  The assignment used below is the POSIX.1-2003
        (Technical Corrigendum 1) workaround; see the Rationale for the
-       POSIX specification of dlsym(). */
+       POSIX specification of dlsym().
+     *						-- Linux man page dlsym()
+     */
 
     *(void **) (&runfunc) = dlsym(handle, "brainfuck");
 
@@ -388,6 +424,7 @@ loaddll(const char * dlname)
     }
     return 0;
 }
+#endif
 
 #ifndef NO_LIBTCC
 static void
