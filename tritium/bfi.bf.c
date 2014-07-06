@@ -104,15 +104,8 @@ print_bf(void)
 	    break;
 
 	case T_PRT:
-	    if (n->count == -1) {
-		putchar('.');
-		break;
-	    }
-	    fprintf(stderr, "Error on code generation:\n"
-	           "Bad print node: %s ptr+%d, cnt=%d.\n",
-		    tokennames[n->type], n->offset, n->count);
-	    fprintf(stderr, "Optimisation level too high for BF output\n");
-	    exit(1);
+	    putchar('.');
+	    break;
 
 	case T_INP:
 	    putchar(',');

@@ -364,33 +364,34 @@ run_gnulightning(void)
 
 	case T_PRT:
 	    clean_acc();
-	    if (n->count == -1) {
-		load_acc_offset(n->offset);
-		acc_loaded = 0;
+	    load_acc_offset(n->offset);
+	    acc_loaded = 0;
 
-		if (cell_mask > 0 && acc_hi_dirty) {
-		    if (cell_mask == 0xFF)
-			jit_extr_uc(REG_ACC,REG_ACC);
-		    else
-			jit_andi(REG_ACC, REG_ACC, cell_mask);
-		}
+	    if (cell_mask > 0 && acc_hi_dirty) {
+		if (cell_mask == 0xFF)
+		    jit_extr_uc(REG_ACC,REG_ACC);
+		else
+		    jit_andi(REG_ACC, REG_ACC, cell_mask);
+	    }
 
 #ifdef GNULIGHTv1
-		jit_prepare_i(1);
-		jit_pusharg_i(REG_ACC);
-		jit_finish(putch);
+	    jit_prepare_i(1);
+	    jit_pusharg_i(REG_ACC);
+	    jit_finish(putch);
 #endif
 #ifdef GNULIGHTv2
-		jit_prepare();
-		jit_pushargr(REG_ACC);
-		jit_finishi(putch);
+	    jit_prepare();
+	    jit_pushargr(REG_ACC);
+	    jit_finishi(putch);
 #endif
-		break;
-	    }
+	    break;
+
+	case T_CHR:
+	    clean_acc();
 	    acc_loaded = 0;
 
 	    if (n->count <= 0 || (n->count >= 127 && iostyle == 1) ||
-		    !n->next || n->next->type != T_PRT) {
+		    !n->next || n->next->type != T_CHR) {
 		jit_movi(REG_ACC, n->count);
 #ifdef GNULIGHTv1
 		jit_prepare_i(1);
@@ -406,7 +407,7 @@ run_gnulightning(void)
 		int i = 0, j;
 		struct bfi * v = n;
 		char *s, *p;
-		while(v->next && v->next->type == T_PRT &&
+		while(v->next && v->next->type == T_CHR &&
 			v->next->count > 0 &&
 			    (v->next->count < 127 || iostyle != 1)) {
 		    v = v->next;

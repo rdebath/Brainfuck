@@ -42,7 +42,7 @@ print_nasm(void)
     memset(charmap, 0, sizeof(charmap));
     curr_line = -1;
 
-    hello_world = (total_nodes == node_type_counts[T_PRT] && !noheader);
+    hello_world = (total_nodes == node_type_counts[T_CHR] && !noheader);
 
     if (hello_world) {
 	print_hello_world();
@@ -116,6 +116,7 @@ print_nasm(void)
 	case T_SET: i+=3; break;
 	case T_CALC: i+=6; break;
 	case T_PRT: i+=9; break;
+	case T_CHR: i+=9; break;
 	case T_INP: i+=9; break;
 	default: i+=6; break;
 	}
@@ -125,8 +126,7 @@ print_nasm(void)
     while(n)
     {
 	if (sp != string_buffer) {
-	    if ((n->type != T_SET && n->type != T_ADD && n->type != T_PRT) ||
-		(n->type == T_PRT && n->count == -1) ||
+	    if ( n->type != T_CHR ||
 		(sp >= string_buffer + sizeof(string_buffer) - 2)
 	       ) {
 		print_asm_string(charmap, string_buffer, sp-string_buffer);
@@ -135,7 +135,7 @@ print_nasm(void)
 	}
 
 	if (enable_trace) {
-	    if (n->line != 0 && n->line != curr_line && n->type != T_PRT) {
+	    if (n->line != 0 && n->line != curr_line && n->type != T_CHR) {
 		printf("%%line %d+0 %s\n", n->line, curfile);
 		curr_line = n->line;
 	    }
@@ -240,24 +240,18 @@ print_nasm(void)
 		printf("\tadd byte [ecx%s],%d\n", oft(n->offset), SM(n->count));
 	    break;
 
-	case T_PRT:
-	    if (n->count > -1) {
-		*sp++ = n->count;
-		break;
-	    }
+	case T_CHR:
+	    *sp++ = n->count;
+	    break;
 
-	    if (n->count == -1) {
-		print_asm_string(0,0,0);
-		if (enable_trace && n->line != 0 && n->line != curr_line) {
-		    printf("%%line %d+0 %s\n", n->line, curfile);
-		    curr_line = n->line;
-		}
-		printf("\tmov al,[ecx%s]\n", oft(n->offset));
-		printf("\tcall putch\n");
-	    } else {
-		*string_buffer = n->count;
-		print_asm_string(charmap, string_buffer, 1);
+	case T_PRT:
+	    print_asm_string(0,0,0);
+	    if (enable_trace && n->line != 0 && n->line != curr_line) {
+		printf("%%line %d+0 %s\n", n->line, curfile);
+		curr_line = n->line;
 	    }
+	    printf("\tmov al,[ecx%s]\n", oft(n->offset));
+	    printf("\tcall putch\n");
 	    break;
 
 	case T_INP:

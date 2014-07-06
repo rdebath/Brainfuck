@@ -132,18 +132,18 @@ print_c_header(FILE * ofd)
     if (cell_mask > 0 && cell_size < 8 && l_iostyle == 1) l_iostyle = 0;
 
     /* Hello world mode ? */
-    if (!enable_trace && !do_run && total_nodes == node_type_counts[T_PRT]) {
+    if (!enable_trace && !do_run && total_nodes == node_type_counts[T_CHR]) {
 	int okay = 1;
 	int ascii_only = 1;
 	struct bfi * n = bfprog;
 	/* Check the string; be careful. */
 	while(n && okay) {
-	    if (n->type != T_PRT || n->count > '~'
+	    if (n->type != T_CHR || n->count > '~'
 		|| (n->count < ' ' && n->count != '\n' && n->count != '\033')
 		)
 		okay = 0;
 
-	    if (n->type == T_PRT && (n->count <= 0 || n->count > 127))
+	    if (n->type == T_CHR && (n->count <= 0 || n->count > 127))
 		ascii_only = 0;
 	    if (n->type == T_INP) ascii_only = 0;
 
@@ -253,7 +253,7 @@ print_c_header(FILE * ofd)
 	    }
 	}
 
-	if (node_type_counts[T_PRT] != 0) {
+	if (node_type_counts[T_CHR] != 0 || node_type_counts[T_PRT] != 0) {
 	    switch(l_iostyle)
 	    {
 	    case 0: case 2:
@@ -544,16 +544,16 @@ print_ccode(FILE * ofd)
 
 	case T_PRT:
 	    if (!disable_indent) pt(ofd, indent,n);
-	    if (n->count == -1) {
-		if (add_mask > 0 && (add_mask < 0xFF || iostyle != 2)) {
-		    fprintf(ofd, "%s(m[%d] &= %d);\n", putname, n->offset, add_mask);
-		} else if (n->offset == 0)
-		    fprintf(ofd, "%s(*m);\n", putname);
-		else
-		    fprintf(ofd, "%s(m[%d]);\n", putname, n->offset);
-		break;
-	    }
+	    if (add_mask > 0 && (add_mask < 0xFF || iostyle != 2)) {
+		fprintf(ofd, "%s(m[%d] &= %d);\n", putname, n->offset, add_mask);
+	    } else if (n->offset == 0)
+		fprintf(ofd, "%s(*m);\n", putname);
+	    else
+		fprintf(ofd, "%s(m[%d]);\n", putname, n->offset);
+	    break;
 
+	case T_CHR:
+	    if (!disable_indent) pt(ofd, indent,n);
 	    if (!okay_for_cstr(n->count)) {
 		if (n->count == '\n')
 		    fprintf(ofd, "%s('\\n');\n", putname);
@@ -568,7 +568,7 @@ print_ccode(FILE * ofd)
 		unsigned slen = 4;	/* First char + nul + ? */
 		struct bfi * v = n;
 		char *s, *p;
-		while(v->next && v->next->type == T_PRT &&
+		while(v->next && v->next->type == T_CHR &&
 			    okay_for_cstr(v->next->count)) {
 		    v = v->next;
 		    if (v->count == '%') got_perc = 1;

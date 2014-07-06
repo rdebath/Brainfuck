@@ -15,7 +15,7 @@ extern char const * cell_type;
 
 #define TOKEN_LIST(Mac) \
     Mac(MOV) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
-    Mac(SET) Mac(CALC) \
+    Mac(SET) Mac(CALC) Mac(CHR) \
     Mac(IF) Mac(ENDIF) Mac(MULT) Mac(CMULT) Mac(FOR) \
     Mac(ZFIND) Mac(MFIND) Mac(ADDWZ) \
     Mac(CALC2) Mac(CALC3) Mac(CALC4) Mac(CALC5) \

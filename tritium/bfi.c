@@ -596,8 +596,6 @@ static int dld;
 	switch(n->type)
 	{
 	    case T_WHL: n->count = ++lid; break;
-	    case T_PRT: n->count = -1; break;
-
 	    case T_ERR: /* Unbalanced bkts */
 		fprintf(stderr,
 			"Warning: unbalanced bracket at Line %d, Col %d\n",
@@ -684,14 +682,14 @@ printtreecell(FILE * efd, int indent, struct bfi * n)
 	break;
 
     case T_PRT:
-	if (n->count == -1 )
-	    fprintf(efd, "[%d], ", n->offset);
-	else {
-	    if (n->count >= ' ' && n->count <= '~' && n->count != '"')
-		fprintf(efd, " '%c', ", n->count);
-	    else
-		fprintf(efd, " 0x%02x, ", n->count);
-	}
+	fprintf(efd, "[%d], ", n->offset);
+	break;
+
+    case T_CHR:
+	if (n->count >= ' ' && n->count <= '~' && n->count != '"')
+	    fprintf(efd, " '%c', ", n->count);
+	else
+	    fprintf(efd, " 0x%02x, ", n->count);
 	break;
 
     case T_INP: fprintf(efd, "[%d], ", n->offset); break;
@@ -820,7 +818,7 @@ process_file(void)
 	calculate_stats(); /* is in print_tree_stats() */
 
 #ifndef NO_EXT_BE
-    if (do_run && total_nodes == node_type_counts[T_PRT])
+    if (do_run && total_nodes == node_type_counts[T_CHR])
 	do_codestyle = c_default; /* Be lazy for a 'Hello World'. */
     else if (do_run && isatty(STDOUT_FILENO))
 	setbuf(stdout, 0);
@@ -830,7 +828,7 @@ process_file(void)
 
 	if (do_run) {
 	    if (verbose>2 || debug_mode || enable_trace
-		|| total_nodes == node_type_counts[T_PRT]) {
+		|| total_nodes == node_type_counts[T_CHR]) {
 
 		if (verbose)
 		    fprintf(stderr, "Starting profiling interpreter\n");
@@ -920,8 +918,7 @@ calculate_stats(void)
 		most_negative_mov = n->count;
 	    if (n->count > most_positive_mov)
 		most_positive_mov = n->count;
-	}
-	if (t != T_PRT || n->count == -1) {
+	} else if (t != T_CHR) {
 	    if (min_pointer > n->offset) min_pointer = n->offset;
 	    if (max_pointer < n->offset) max_pointer = n->offset;
 	}
@@ -1077,6 +1074,7 @@ run_tree(void)
 		break;
 
 	    case T_PRT:
+	    case T_CHR:
 	    case T_INP:
 	    if (opt_runner) {
 		if (n->type == T_INP) {
@@ -1084,18 +1082,17 @@ run_tree(void)
 		    exit(1);
 		} else {
 		    struct bfi *v = add_node_after(opt_run_end);
-		    v->type = T_PRT;
+		    v->type = T_CHR;
 		    v->line = n->line;
 		    v->col = n->col;
-		    v->count = UM(n->count == -1?p[n->offset]:n->count);
+		    v->count = UM(n->type == T_PRT?p[n->offset]:n->count);
 		    opt_run_end = v;
-		    if (opt_no_litprt || v->count == -1) {
+		    if (opt_no_litprt) {
 			v->type = T_SET;
 			v = add_node_after(opt_run_end);
 			v->type = T_PRT;
 			v->line = n->line;
 			v->col = n->col;
-			v->count = -1;
 			opt_run_end = v;
 		    }
 		}
@@ -1105,8 +1102,11 @@ run_tree(void)
 
 		switch(n->type)
 		{
+		case T_CHR:
+		    putch( UM(n->count) );
+		    break;
 		case T_PRT:
-		    putch( UM(n->count == -1?p[n->offset]:n->count) );
+		    putch( UM(p[n->offset]) );
 		    break;
 		case T_INP:
 		    p[n->offset] = getch(p[n->offset]);
@@ -1168,7 +1168,7 @@ run_tree(void)
 			n->type, n->offset, n->count);
 		exit(1);
 	}
-	if (enable_trace && n->type != T_PRT && n->type != T_ENDIF) {
+	if (enable_trace && n->type != T_PRT && n->type != T_CHR && n->type != T_ENDIF) {
 	    int off = (p+n->offset) - oldp;
 	    fflush(stdout); /* Keep in sequence if merged */
 	    fprintf(stderr, "P(%d,%d):", n->line, n->col);
@@ -1351,7 +1351,7 @@ pointer_regen(void)
     calculate_stats();
     if (!opt_force_repoint) {
 	if (node_type_counts[T_MOV] == 0) return;
-	if (min_pointer > -32 && max_pointer < 32) return;
+	if (min_pointer > -120 && max_pointer < 120) return;
     }
 
     while(n)
@@ -1374,7 +1374,7 @@ pointer_regen(void)
 	    n->offset -= current_shift;
 	    break;
 
-	case T_PRT: case T_INP: case T_ADD: case T_SET:
+	case T_PRT: case T_CHR: case T_INP: case T_ADD: case T_SET:
 	    n->offset -= current_shift;
 	    break;
 
@@ -1486,9 +1486,8 @@ invariants_scan(void)
 
 	switch(n->type) {
 	case T_PRT:
-	    if (n->count == -1)
-		node_changed = scan_one_node(n, &n);
-	    if (node_changed) {
+	    node_changed = scan_one_node(n, &n);
+	    if (node_changed && n->type == T_CHR) {
 		n2 = n;
 		n = n->next;
 		build_string_in_tree(n2);
@@ -1700,6 +1699,7 @@ find_known_value_recursion(struct bfi * n, int v_offset,
 	switch(n->type)
 	{
 	case T_NOP:
+	case T_CHR:
 	    break;
 
 	case T_SET:
@@ -1723,7 +1723,7 @@ find_known_value_recursion(struct bfi * n, int v_offset,
 	    break;
 
 	case T_PRT:
-	    if (n->count == -1 && n->offset == v_offset) {
+	    if (n->offset == v_offset) {
 		n_used = 1;
 		goto break_break;
 	    }
@@ -2090,12 +2090,11 @@ scan_one_node(struct bfi * v, struct bfi ** move_v)
 	    break;
 
 	case T_PRT: /* Print literal character. */
-	    if (v->count != -1) break;
 	    if (opt_no_litprt) break; /* BE can't cope */
 	    known_value = UM(known_value);
 	    if (known_value < 0 && (known_value&0xFF) < 0x80)
 		known_value &= 0xFF;
-	    if (known_value == -1) break;
+	    v->type = T_CHR;
 	    v->count = known_value;
 	    if (verbose>5) fprintf(stderr, "  Make literal putchar.\n");
 	    return 1;
@@ -2251,7 +2250,7 @@ search_for_update_of_offset(struct bfi *n, struct bfi *v, int n_offset)
 	    if (n->offset == n_offset)
 		return 0;
 	    break;
-	case T_PRT: case T_NOP:
+	case T_PRT: case T_CHR: case T_NOP:
 	    break;
 	default: return 0;  /* Any other type is a problem */
 	}
@@ -2841,8 +2840,8 @@ flatten_multiplier(struct bfi * v)
 }
 
 /*
- * This moves literal T_PRT nodes back up the list to join to the previous
- * group of similar T_PRT nodes. An additional pointer (prevskip) is set
+ * This moves literal T_CHR nodes back up the list to join to the previous
+ * group of similar T_CHR nodes. An additional pointer (prevskip) is set
  * so that they all point at the first in the growing 'string'.
  *
  * This allows the constant searching to disregard these nodes in one step.
@@ -2866,7 +2865,9 @@ build_string_in_tree(struct bfi * v)
 	    break;
 
 	case T_PRT:
-	    if (n->count == -1) return; /* Not a string */
+	    return; /* Not a string */
+
+	case T_CHR:
 	    found = 1;
 	    break;
 	}
@@ -2875,7 +2876,7 @@ build_string_in_tree(struct bfi * v)
     }
 
     if (verbose>5) {
-	if (n && n->type == T_PRT)
+	if (n && n->type == T_CHR)
 	    fprintf(stderr, "Found string at ");
 	else
 	    fprintf(stderr, "Found other at ");
@@ -2896,7 +2897,7 @@ build_string_in_tree(struct bfi * v)
 	/* Skipping past the whole string with prev */
 	if (n->prevskip)
 	    v->prevskip = n->prevskip;
-	else if (n->type == T_PRT)
+	else if (n->type == T_CHR)
 	    v->prevskip = n;
     } else if (v->prev) {
 	v->prev->next = v->next;
@@ -3102,11 +3103,13 @@ print_codedump(void)
 	"\n"	"#define set_tmi(o1,o2,o3,o4,o5,o6) *(p o1) = o2 + *(p o3) * o4 + *(p o5) * o6;");
 
 	/* See:  opt_no_litprt */
-	if (node_type_counts[T_PRT])
+	if (node_type_counts[T_CHR])
 	    printf("%s\n",
 		"#define outchar(x) putchar(x);"
-	"\n"	"#define outstr(x) printf(\"%s\", x);"
-	"\n"	"#define write(x) putchar(*(p x));");
+	"\n"	"#define outstr(x) printf(\"%s\", x);");
+
+	if (node_type_counts[T_PRT])
+	    puts("#define write(x) putchar(*(p x));");
 
 	if(node_type_counts[T_MULT] || node_type_counts[T_CMULT]
 	    || node_type_counts[T_FOR] || node_type_counts[T_WHL]) {
@@ -3213,20 +3216,19 @@ print_codedump(void)
                     )
 
 	case T_PRT:
-	    if (n->count == -1) {
-		printf("write(%s%.0d)\n", iv(n->offset));
-		break;
-	    }
+	    printf("write(%s%.0d)\n", iv(n->offset));
+	    break;
 
+	case T_CHR:
 	    if (!okay_for_cstr(n->count) ||
-		    !n->next || n->next->type != T_PRT) {
+		    !n->next || n->next->type != T_CHR) {
 
 		printf("outchar(%d)\n", n->count);
 	    } else {
 		unsigned i = 0, j;
 		struct bfi * v = n;
 		char *s, *p;
-		while(v->next && v->next->type == T_PRT &&
+		while(v->next && v->next->type == T_CHR &&
 			    okay_for_cstr(v->next->count)) {
 		    v = v->next;
 		    i++;
@@ -3632,10 +3634,10 @@ convert_tree_to_runarray(void)
 	*p++ = n->type;
 	switch(n->type)
 	{
-	case T_INP:
+	case T_INP: case T_PRT:
 	    break;
 
-	case T_PRT: case T_ADD: case T_SET:
+	case T_CHR: case T_ADD: case T_SET:
 	    *p++ = n->count;
 	    break;
 
@@ -3840,7 +3842,12 @@ run_progarray(int * p)
 	    break;
 
 	case T_PRT:
-	    putch( M(p[2] == -1?*m:p[2]) );
+	    putch( M(*m) );
+	    p += 2;
+	    break;
+
+	case T_CHR:
+	    putch( M(p[2]) );
 	    p += 3;
 	    break;
 

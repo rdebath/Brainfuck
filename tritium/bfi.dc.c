@@ -95,11 +95,11 @@ print_dc(void)
     int use_lmx = 0;
     ofd = stdout;
 
-    hello_world = (total_nodes == node_type_counts[T_PRT] && !noheader);
+    hello_world = (total_nodes == node_type_counts[T_CHR] && !noheader);
 
     if (hello_world) {
 	struct bfi * v = n;
-	while(v && v->type == T_PRT && okay_for_printf(v->count))
+	while(v && v->type == T_CHR && okay_for_printf(v->count))
 	    v=v->next;
 	if (v) hello_world = 0;
     }
@@ -193,17 +193,16 @@ print_dc(void)
 	    break;
 
 	case T_PRT:
-	    if (n->count == -1) {
-		fetch_cell(n->offset);
-		if (no_v7)
-		    fprintf(ofd, "aP\n");
-		else {
-		    fprintf(ofd, "lox\n");
-		    used_lox = 1;
-		}
-		break;
+	    fetch_cell(n->offset);
+	    if (no_v7)
+		fprintf(ofd, "aP\n");
+	    else {
+		fprintf(ofd, "lox\n");
+		used_lox = 1;
 	    }
+	    break;
 
+	case T_CHR:
 	    if (!okay_for_printf(n->count)) {
 		if (no_v7)
 		    prt_value("", n->count, "aP\n");
@@ -215,7 +214,7 @@ print_dc(void)
 		unsigned i = 0, j;
 		struct bfi * v = n;
 		char *s, *p;
-		while(v->next && v->next->type == T_PRT &&
+		while(v->next && v->next->type == T_CHR &&
 			    okay_for_printf(v->next->count)) {
 		    v = v->next;
 		    i++;

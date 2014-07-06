@@ -327,29 +327,30 @@ run_dynasm(void)
 
 	case T_PRT:
 	    clean_acc();
-	    if (n->count == -1) {
-		load_acc_offset(offset);
-		acc_loaded = 0;
+	    load_acc_offset(offset);
+	    acc_loaded = 0;
 
-		if (cell_mask > 0 && acc_hi_dirty) {
-		    if (cell_mask == 0xFF) {
-			| movzx REG_A, REG_AL
-		    } else {
-			| and REG_A, cell_mask
-		    }
+	    if (cell_mask > 0 && acc_hi_dirty) {
+		if (cell_mask == 0xFF) {
+		    | movzx REG_A, REG_AL
+		} else {
+		    | and REG_A, cell_mask
 		}
-
-		|.if I386
-		| push REG_A
-		| call &putch
-		| pop eax
-		|.else
-		| mov PRM_D, REG_A
-		| mov64 rax, (uint64_t)(uintptr_t) putch
-		| call  rax
-		|.endif
-		break;
 	    }
+
+	    |.if I386
+	    | push REG_A
+	    | call &putch
+	    | pop eax
+	    |.else
+	    | mov PRM_D, REG_A
+	    | mov64 rax, (uint64_t)(uintptr_t) putch
+	    | call  rax
+	    |.endif
+	    break;
+
+	case T_CHR:
+	    clean_acc();
 	    /* TODO: Strings */
 	    acc_loaded = 0;
 	    if (count >= -128 && count < 128) {
