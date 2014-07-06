@@ -991,6 +991,8 @@ run_gccode(void)
 #else
 #define CC "gcc"
 #endif
+#elif defined(__TINYC__)
+#define CC "tcc"
 #else
 #define CC "cc"
 #endif
