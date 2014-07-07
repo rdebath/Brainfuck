@@ -51,9 +51,11 @@ int main(int argc, char **argv)
 	    else if (pgm[n].cmd == ']') {
 	       pgm[n].arg = j; j = pgm[j].arg; pgm[pgm[n].arg].arg = n;
 	       if (  pgm[n].mov == 0 && pgm[n-1].mov == 0 &&
-		     pgm[n-1].cmd == '+' && pgm[n-1].arg == -1 &&
+		     pgm[n-1].cmd == '+' && (pgm[n-1].arg&1) == 1 &&
 		     pgm[n-2].cmd == '[') {
 		  n -= 2; pgm[p=n].cmd = '='; pgm[n].arg = 0;
+	       } else if (pgm[n-1].cmd == '[') {
+		  n--; pgm[p=n].cmd = '?'; pgm[n].arg = pgm[n+1].mov;
 	       }
 	    }
 	 }
@@ -80,6 +82,7 @@ static unsigned char t[USHRT_MAX+1];
 	 case '+':  t[m] += pgm[n].arg; break;
 	 case '[':  if (t[m] == 0) n=pgm[n].arg; break;
 	 case ']':  if (t[m] != 0) n=pgm[n].arg; break;
+	 case '?':  while(t[m]) m += pgm[n].arg; break;
 	 case '>':  m += pgm[n].arg; break;
 	 case '.':  putchar(t[m]); break;
 	 case ',':  if((ch=getchar())!=EOF) t[m]=ch;
