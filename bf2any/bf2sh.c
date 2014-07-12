@@ -36,7 +36,7 @@ outcmd(int ch, int count)
 
 	pr("brainfuck() {");
 	ind++;
-	pr("P=0");
+	prv("P=%d", BOFF);
 	break;
 
     case 'X': pr("echo Infinite Loop 2>&1 ; exit 1"); break;
@@ -81,7 +81,10 @@ outcmd(int ch, int count)
 	pr("    echon() { echo -n \"$1\"; }");
 	pr("    if [ .`echo -e` = .-e ]");
 	pr("    then echoe() { echo -n \"$1\"; }");
-	pr("    else echoe() { echo -n -e \"$1\"; }");
+	pr("    else if [ .`echo -e '\\070\\c'` = .8 ]");
+	pr("         then echoe() { echo -e \"$1\\c\"; }");
+	pr("         else echoe() { echo -n -e \"$1\"; }");
+	pr("         fi");
 	pr("    fi");
 	pr("fi");
 	pr("");
