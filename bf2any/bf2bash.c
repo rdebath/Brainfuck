@@ -6,6 +6,9 @@
 
 /*
  * Bash translation from BF, runs at about 340,000 instructions per second.
+ *
+ * This is specially optimised for the BASH shell, it's still slower than
+ * all the other modern shells I can find easily.
  */
 
 int do_input = 0;
@@ -65,7 +68,7 @@ outcmd(int ch, int count)
 	pr("}");
 
 	pr("");
-	pr("o(){ printf -v C '\\%%04o' $((M[P]&=255)); echo -n -e \"$C\" ; }");
+	pr("o(){ printf -v C '\\\\%%04o' $((M[P]&=255)); echo -n -e \"$C\" ; }");
 
 	if (do_input) {
 	    pr("");
