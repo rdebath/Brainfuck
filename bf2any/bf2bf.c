@@ -704,7 +704,8 @@ bfxml(int ch, int count)
     if (! (p = strchr(bf,ch))) {
 	if (ch == '!') {
 	    puts("<?xml version=\"1.0\"?>");
-	    printf("<fuck bits='%d' wrap='Y'>", bytecell?8:sizeof(int)*8);
+	    printf("<fuck bits='%d' wrap='Y'>",
+		    (int)(bytecell?8:sizeof(int)*8));
 	    if (tapelen > 1)
 		printf("<tapes><tape length='%d'/></tapes>\n", tapelen);
 	    else
