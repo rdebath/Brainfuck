@@ -116,7 +116,7 @@ flush_tape(int no_output, int keep_knowns)
 		    if (tapeoff > outoff) { outcmd('>', tapeoff-outoff); outoff=tapeoff; }
 		    if (tapeoff < outoff) { outcmd('<', outoff-tapeoff); outoff=tapeoff; }
 		    if (p->is_set) {
-			if (enable_optim && enable_be_optim) {
+			if (enable_be_optim) {
 			    outcmd('=', p->v);
 			} else if (p->cleaned && abs(p->v-p->cleaned_val) <= abs(p->v)+3) {
 			    if (p->v > p->cleaned_val)

@@ -30,5 +30,6 @@ bf2rc
 bf2run
 bf2sh
 bf2slang
+bf2tcl
 libtcc.lib-off
 libtcc.lib-on
