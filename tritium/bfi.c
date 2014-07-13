@@ -129,6 +129,7 @@ int debug_mode = 0;
 int iostyle = 0; /* 0=ASCII, 1=UTF8, 2=Binary. */
 int eofcell = 0; /* 0=>?, 1=> No Change, 2= -1, 3= 0, 4=EOF, 5=No Input. */
 char * input_string = 0;
+int libc_allows_utf8 = 0;
 
 int cell_size = 0;  /* 0 is 8,16,32 or more. 7 and up are number of bits */
 int cell_mask = -1; /* -1 is don't mask. */
@@ -252,7 +253,9 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("   -#   Use '#' as a debug symbol. Note: Selects the tree interpreter.\n");
     printf("\n");
     printf("   -a   Ascii I/O, filters CR from input%s\n", iostyle==0?" (enabled)":"");
+#ifdef __STDC_ISO_10646__
     printf("   -u   Wide character (unicode) I/O%s\n", iostyle==1?" (enabled)":"");
+#endif
     printf("   -B   Binary I/O, unmodified I/O%s\n", iostyle==2?" (enabled)":"");
     printf("\n");
     printf("   -On  'Optimisation' level.\n");
@@ -342,8 +345,14 @@ checkarg(char * opt, char * arg)
 	case 'T': enable_trace=1; break;
 
 	case 'a': iostyle=0; break;
-	case 'u': iostyle=1; break;
 	case 'B': iostyle=2; break;
+#ifdef __STDC_ISO_10646__
+	case 'u':
+	    if (!libc_allows_utf8 && verbose)
+		fprintf(stderr, "WARNING: POSIX compliant libc has 'fixed' UTF-8.\n");
+	    iostyle=1;
+	    break;
+#endif
 
 	case 'O':
 	    if (!arg_is_num) { opt_level = 1; break; }
@@ -420,13 +429,16 @@ main(int argc, char ** argv)
 
     opt_bytedefault = !strcmp(program, "bf");
 
-    if (opt_bytedefault)
-	iostyle = 2;
-
+#ifdef __STDC_ISO_10646__
 #ifndef LEGACYOS
     setlocale(LC_ALL, "");
     if (!opt_bytedefault)
-	if (!strcmp("UTF-8", nl_langinfo(CODESET))) iostyle = 1;
+	if (!strcmp("UTF-8", nl_langinfo(CODESET))) libc_allows_utf8 = 1;
+#endif
+
+    if (opt_bytedefault) iostyle = 2;
+    else if (libc_allows_utf8) iostyle = 1;
+    else iostyle = 0;
 #endif
 
     filelist = calloc(argc, sizeof*filelist);
@@ -3323,6 +3335,7 @@ getch(int oldch)
     }
     else for(;;) {
 	if (enable_trace || debug_mode) fflush(stdout);
+#ifdef __STDC_ISO_10646__
 	if (iostyle == 1) {
 	    int rv;
 	    wchar_t wch = EOF;
@@ -3334,6 +3347,7 @@ getch(int oldch)
 	    else
 		c = wch;
 	} else
+#endif
 	    c = getchar();
 
 	if (iostyle != 2 && c == '\r') continue;
@@ -3352,9 +3366,11 @@ getch(int oldch)
 void
 putch(int ch)
 {
+#ifdef __STDC_ISO_10646__
     if (ch > 127 && iostyle == 1)
 	printf("%lc", ch);
     else
+#endif
 	putchar(ch);
 }
 
