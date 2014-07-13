@@ -52,6 +52,7 @@ int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
+    if (strcmp(arg, "-intcells") == 0) return 1;
     if (strcmp(arg, "-#") == 0) return 1;
     if (strcmp(arg, "-D") == 0) {
 	checklimits = 1;

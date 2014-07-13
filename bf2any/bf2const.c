@@ -37,6 +37,8 @@ static unsigned int sav_str_maxlen = 0, sav_str_len = 0;
 
 static int deadloop = 0;
 
+static int cells_are_ints = 0;
+
 static void
 new_n(struct mem *p) {
     if (freelist) {
@@ -201,6 +203,7 @@ void outopt(int ch, int count)
     default:
 	if (ch == '!') {
 	    enable_prt = check_arg("-savestring");
+	    cells_are_ints = check_arg("-intcells");
 	    flush_tape(1,0);
 	    tape->cleaned = tape->is_set = first_run = 1;
 	} else if (ch == '~' && enable_optim)
@@ -333,6 +336,6 @@ void outopt(int ch, int count)
     }
 
     /* Some BE are not 32 bits, try to avoid cell size mistakes */
-    if (tape->v > 65536 || tape->v < -65536)
+    if (!cells_are_ints && (tape->v > 65536 || tape->v < -65536))
 	flush_tape(0,0);
 }

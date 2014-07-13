@@ -26,6 +26,7 @@ check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     if (strcmp(arg, "-savestring") == 0) return 1;
+    if (strcmp(arg, "-intcells") == 0) return 1;
     if (strncmp(arg, "-M", 2) == 0) {
 	tapelen = strtoul(arg+2, 0, 10) + BOFF;
 	return 1;
