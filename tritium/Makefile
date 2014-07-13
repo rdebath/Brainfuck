@@ -37,7 +37,7 @@ TOOLDIR=../tools
 MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 	 -Wstrict-prototypes -Wstrict-overflow=5 -Wwrite-strings \
 	 -Waggregate-return -Wcast-qual -Wswitch-enum -Wconversion \
-	 -Wunreachable-code
+	 -Wunreachable-code -fno-common
 
 bfi:	bfi.o bfi.ccode.o bfi.gnulit.o bfi.nasm.o bfi.bf.o bfi.dc.o bfi.dasm.o \
 	bfi.version.o

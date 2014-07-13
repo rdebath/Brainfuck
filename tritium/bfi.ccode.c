@@ -41,6 +41,7 @@ static const char * putname = "putch";
 static int use_direct_getchar = 0;
 static int use_dynmem = 0;
 static int memsize = 30000;
+static int leave_temps = 0;
 #if defined(DISABLE_DLOPEN)
 static const int use_dlopen = 0;
 #else
@@ -78,12 +79,15 @@ checkarg_ccode(char * opt, char * arg)
 	return 2;
     }
     if (!strcmp(opt, "-fPIC")) { strcpy(pic_opt, " -fPIC"); return 1; }
+    if (!strcmp(opt, "-fpic")) { strcpy(pic_opt, " -fpic"); return 1; }
     if (!strcmp(opt, "-fno-pic")) { *pic_opt = 0; return 1; }
     if (!strcmp(opt, "-fonecall")) { in_one = 1; return 1; }
+    if (!strcmp(opt, "-fleave-temps")) { leave_temps = 1; return 1; }
 #if defined(DISABLE_TCCLIB)
     if (!strcmp(opt, "-ltcc")) {
 	cc_cmd = "tcc";
 	choose_runner = 1;
+	in_one = 1;
 	return 1;
     }
 #endif
@@ -176,14 +180,24 @@ print_c_header(FILE * ofd)
 
     if (do_run) {
 	if (use_dlopen) {
-	    fprintf(ofd, "#define mem brainfuck_memptr\n");
-	    fprintf(ofd, "%s *mem;\n", cell_type);
-	    fprintf(ofd, "#define putch (*brainfuck_putch)\n");
-	    fprintf(ofd, "#define getch (*brainfuck_getch)\n");
-	    fprintf(ofd, "void (*brainfuck_putch)(int ch);\n");
-	    fprintf(ofd, "int (*brainfuck_getch)(int ch);\n");
-	    fprintf(ofd, "int brainfuck(void){\n");
-	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
+	    /* The structure defined in this chunk of code should be put into
+	     * a header file for compling into this program and converted into
+	     * a string so it can be included into the generated code ...
+	     * TODO: configure make to do this.
+	     */
+	    fprintf(ofd, "%s%s%s\n",
+		"typedef int (*runfnp)(void);\n"
+		"typedef int (*getfnp)(int ch);\n"
+		"typedef void (*putfnp)(int ch);\n"
+		"static int brainfuck(void);\n"
+		"struct bfinit {\n"
+		"  runfnp run; void *memptr; putfnp bf_putch; getfnp bf_getch;\n"
+		"} bf_init = {brainfuck,0,0,0};\n"
+		"#define mem (bf_init.memptr)\n"
+		"#define putch (*bf_init.bf_putch)\n"
+		"#define getch (*bf_init.bf_getch)\n"
+		"static int brainfuck(void){\n"
+		"  register ", cell_type, " * m = mem;\n");
 	} else {
 	    fprintf(ofd, "extern void putch(int ch);\n");
 	    fprintf(ofd, "extern int getch(int ch);\n");
@@ -194,15 +208,18 @@ print_c_header(FILE * ofd)
     }
     else
     {
+	if (node_type_counts[T_INP] != 0 || node_type_counts[T_PRT] != 0) {
+	    if (l_iostyle == 1) {
+		fprintf(ofd, "#include <locale.h>\n");
+		fprintf(ofd, "#include <wchar.h>\n\n");
+	    }
+	}
+
 	if (node_type_counts[T_INP] != 0)
 	{
 	    if (l_iostyle == 2 && (eofcell == 4 || (eofcell == 2 && EOF == -1))) {
 		use_direct_getchar = 1;
 	    } else {
-		if (l_iostyle == 1) {
-		    fprintf(ofd, "#include <locale.h>\n");
-		    fprintf(ofd, "#include <wchar.h>\n\n");
-		}
 		fprintf(ofd, "static int\n");
 		fprintf(ofd, "getch(int oldch)\n");
 		fprintf(ofd, "{\n");
@@ -240,11 +257,11 @@ print_c_header(FILE * ofd)
 		    fprintf(ofd, "  return 0;\n");
 		    break;
 		case 2:
-    #if EOF != -1
+		#if EOF != -1
 		    fprintf(ofd, "  if (ch != EOF) return ch;\n");
 		    fprintf(ofd, "  return -1;\n");
 		    break;
-    #endif
+		#endif
 		case 4:
 		    fprintf(ofd, "  return ch;\n");
 		    break;
@@ -260,12 +277,19 @@ print_c_header(FILE * ofd)
 		putname = "putchar";
 		break;
 	    case 1:
-		fprintf(ofd, "static void putch(int ch)\n{\n"
-			    "  if(ch>127)\n"
-			    "\tprintf(\"%%lc\",ch);\n"
-			    "  else\n"
-			    "\tputchar(ch);\n"
-			    "}\n\n");
+		fputs(
+		    "#ifdef __STDC_ISO_10646__\n"
+		    "static void putch(int ch)\n"
+		    "{\n"
+		    "  if(ch>127)\n"
+		    "\tprintf(\"%lc\",ch);\n"
+		    "  else\n"
+		    "\tputchar(ch);\n"
+		    "}\n"
+		    "#else\n"
+		    "#define putch(ch) putchar(ch)\n"
+		    "#endif\n"
+		    "\n", ofd);
 		break;
 	    }
 	}
@@ -289,14 +313,33 @@ print_c_header(FILE * ofd)
 	    if (enable_trace)
 		fprintf(ofd, "#define mem m\n");
 	} else if (!use_dynmem) {
-	    fprintf(ofd, "static %s mem[%d];\n", cell_type, memsize);
 	    fprintf(ofd, "int main(void){\n");
-
+	    /* These minor variations may change the speed of the Counter test
+	     * by 45% when compiled with GCC ... scheesh! */
+#if 0
+	    fprintf(ofd, "static %s mem[%d];\n", cell_type, memsize);
+	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
+#endif
+#if 0
+	    fprintf(ofd, "  %s * mem = calloc(sizeof(*mem),%d);\n", cell_type, memsize);
+	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
+#endif
+#if 1
+	    fprintf(ofd, "  %s mem[%d] = {0};\n", cell_type, memsize);
+	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
+#endif
+#if 0
+	    fprintf(ofd, "static %s mem[%d];\n", cell_type, memsize);
+	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
+	    fprintf(ofd, "  memset(mem, 0, sizeof(mem));\n");
+#endif
+#if 0
+	    fprintf(ofd, "static %s mem[%d];\n", cell_type, memsize);
+	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
+	    fprintf(ofd, "  setbuf(stdout,0);\n");
+#endif
 	    if (memoffset > 0)
-		fprintf(ofd, "  register %s * m = mem + %d;\n",
-			cell_type, memoffset);
-	    else
-		fprintf(ofd, "  register %s * m = mem;\n", cell_type);
+		fprintf(ofd, "  m += %d;\n", memoffset);
 	} else {
 
 	    printf("#define CELL %s\n", cell_type);
@@ -347,9 +390,9 @@ print_c_header(FILE * ofd)
 
 	if (node_type_counts[T_INP] != 0) {
 	    fprintf(ofd, "  setbuf(stdout, 0);\n");
-	    if (l_iostyle == 1)
-		fprintf(ofd, "  setlocale(LC_ALL, \"\");\n");
 	}
+	if (l_iostyle == 1)
+	    fprintf(ofd, "  setlocale(LC_ALL, \"\");\n");
     }
 
     if (enable_trace)
@@ -967,11 +1010,27 @@ run_gccode(void)
     compile_and_run();
 }
 
-/*  Needs:   gcc -shared -fpic -o libfoo.so foo.c
-    And:     -ldl
-
-    NB: -fno-asynchronous-unwind-tables
-*/
+/*  Needs:   cc -shared -fpic -o libfoo.so foo.c
+ *  And:     dlopen() (in -ldl on linux)
+ *
+ *  The above command does both a compile and a link in one, these can be
+ *  broken into two independent calls of the C compiler if wanted. This
+ *  is useful because the combined command is not acceptable to ccache.
+ *
+ *  The -fpic and -fPIC options are not REQUIRED for this to work on i686;
+ *  they instruct the compiler to create mostly position independent code
+ *  that references global tables to find the locations of the targets
+ *  of linkages between different shared objects. If the option is not
+ *  used more expensive relocations will be needed to load the file,
+ *  but it will not fail to load.
+ *
+ *  For x64 the -fpic/PIC option is required at compile time.
+ *
+ *  For some machines the implementation of -fPIC is more expensive
+ *  than the implementation of -fpic. BUT sometimes a program cannot be
+ *  compiled with -fpic because of table size limitations. For x86 they
+ *  are identical.
+ */
 
 /* If we're 32 bit on a 64bit or vs.versa. we need an extra option */
 #ifndef CC
@@ -998,9 +1057,12 @@ run_gccode(void)
 #endif
 #endif
 
-typedef void (*voidfnp)(void);
+typedef int (*runfnp)(void);
+typedef int (*getfnp)(int ch);
+typedef void (*putfnp)(int ch);
+
 static int loaddll(const char *);
-static voidfnp runfunc;
+static runfnp runfunc;
 static void *handle;
 
 static void
@@ -1063,11 +1125,15 @@ compile_and_run(void)
 
     loaddll(dl_name);
 
-    unlink(ccode_name);
-    unlink(dl_name);
-    unlink(obj_name);
-    rmdir(tmpdir);
+    if (!leave_temps) {
+	unlink(ccode_name);
+	unlink(dl_name);
+	unlink(obj_name);
+	rmdir(tmpdir);
+    }
 
+    if (verbose>1)
+	fprintf(stderr, "Calling function loaded at address %p\n", runfunc);
     (*runfunc)();
 
     dlclose(handle);
@@ -1077,42 +1143,45 @@ int
 loaddll(const char * dlname)
 {
     char *error;
-    void ** brainfuck_memptr;
-    // void ** ptr;
-    voidfnp *ptr;
+    struct bfinit {
+	runfnp run; void *memptr; putfnp bf_putch; getfnp bf_getch;
+    } *bf_init;
 
-    handle = dlopen(dlname, RTLD_LAZY);
+    if (verbose>4)
+	fprintf(stderr, "Loading DLL \"%s\"\n", dlname);
+
+    /* Normally this would use RTLD_LAZY, but here it should be v.short. */
+    handle = dlopen(dlname, RTLD_NOW | RTLD_LOCAL);
     if (!handle) {
-        fprintf(stderr, "%s\n", dlerror());
-        exit(EXIT_FAILURE);
+	fprintf(stderr, "%s\n", dlerror());
+	exit(EXIT_FAILURE);
     }
 
     dlerror();    /* Clear any existing error */
 
-    /* The C99 standard leaves casting from "void *" to a function
-       pointer undefined.  The assignment used below is the POSIX.1-2003
-       (Technical Corrigendum 1) workaround; see the Rationale for the
-       POSIX specification of dlsym().
-     *						-- Linux man page dlsym()
-     */
-
-    *(void **) (&runfunc) = dlsym(handle, "brainfuck");
-
-    /* Set the memory pointer to point to our allocated huge buffer */
-    brainfuck_memptr = dlsym(handle, "brainfuck_memptr");
-    *brainfuck_memptr = map_hugeram();
-
-    /* Set some manual fn pointers back here so we don't have to link
-     * with the -rdynamic flag */
-    ptr = dlsym(handle, "brainfuck_getch");
-    *ptr = (voidfnp) &getch;
-    ptr = dlsym(handle, "brainfuck_putch");
-    *ptr = (voidfnp) &putch;
-
+    if (verbose>4)
+	fprintf(stderr, "Finding bf_init symbol in \"%s\"\n", dlname);
+    bf_init = dlsym(handle, "bf_init");
     if ((error = dlerror()) != NULL)  {
-        fprintf(stderr, "%s\n", error);
-        exit(EXIT_FAILURE);
+	fprintf(stderr, "%s\n", error);
+	exit(EXIT_FAILURE);
     }
+
+    /* I'm using a singlton structure to pass values between us and the DLL
+     * so I don't have to mess with the even more ugly pointer casts mandated
+     * by ISO and POSIX to pass function pointers around.
+     *
+     * I get the pointer to the DLL function I want to call.
+     * Provide pointers to two of my functions (and so don't have to link
+     * with the -rdynamic flag)
+     * and set the DLL's tape pointer to our huge ram allocation.
+     */
+    bf_init->memptr = map_hugeram();
+    bf_init->bf_putch = putch;
+    bf_init->bf_getch = getch;
+    runfunc = bf_init->run;
+    if (verbose>4)
+	fprintf(stderr, "DLL loaded successfully\n");
     return 0;
 }
 
