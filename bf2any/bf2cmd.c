@@ -5,16 +5,17 @@
 #include "bf2any.h"
 
 /*
- * MS Batch translation from BF, runs at less than 1,000 instructions per second.
+ * MS Batch translation from BF, runs at about 1,000 instructions per second.
  *
  * For ANSI.SYS replacement see: https://github.com/adoxa/ansicon
  */
 
 int do_input = 0;
 int do_output = 0;
-int ind = 0;
 int loopid = 0;
 int tapelen = 1000;
+
+struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
 int
 check_arg(const char * arg)
@@ -47,6 +48,8 @@ outcmd(int ch, int count)
     case '-': printf("SET /A MEMORY%%PTR%%=MEMORY%%PTR%%-%d\r\n", count); break;
     case '<': printf("SET /A PTR=PTR-%d\r\n", count); break;
     case '>': printf("SET /A PTR=PTR+%d\r\n", count); break;
+
+#if 0	/* Neater version; but very slow */
     case '[':
 	if(bytecell) { puts("SET /A MEMORY%PTR%=MEMORY%PTR%^&255\r"); }
 	loopid++;
@@ -60,11 +63,39 @@ outcmd(int ch, int count)
 		loopid,
 		loopid,
 		loopid);
-	ind++;
 	break;
     case ']':
-	ind--; printf("GOTO :EOF\r\n)\r\n");
+	printf("GOTO :EOF\r\n)\r\n");
 	break;
+#endif
+
+    case '[':
+	{
+	    struct stkdat * n = malloc(sizeof*n);
+	    n->up = sp;
+	    sp = n;
+	    n->id = ++loopid;
+
+	    if(bytecell) { puts("SET /A MEMORY%PTR%=MEMORY%PTR%^&255\r"); }
+	    printf( "SET /A M=MEMORY%%PTR%%\r\n");
+	    printf( "IF %%M%% == 0 GOTO LOOP%dE\r\n", n->id);
+	    printf( ":LOOP%dB\r\n", n->id);
+	}
+	break;
+    case ']':
+	{
+	    struct stkdat * n = sp;
+	    sp = n->up;
+
+	    if(bytecell) { puts("SET /A MEMORY%PTR%=MEMORY%PTR%^&255\r"); }
+	    printf( "SET /A M=MEMORY%%PTR%%\r\n");
+	    printf( "IF NOT %%M%% == 0 GOTO LOOP%dB\r\n", n->id);
+	    printf( ":LOOP%dE\r\n", n->id);
+	    free(n);
+	}
+
+	break;
+
     case '.':
 	puts("CALL :put\r");
 	do_output = 1;
