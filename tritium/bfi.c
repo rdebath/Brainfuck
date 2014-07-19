@@ -477,8 +477,11 @@ main(int argc, char ** argv)
 
     if(help_flag)
 	LongUsage(stdout, 0);
-    if(filecount == 0)
-	Usage("Error: Filename or '-' must be specified");
+    if(filecount == 0) {
+	if (isatty(STDIN_FILENO))
+	    Usage("Error: Filename or '-' should be specified");
+	filelist[filecount++] = "-";
+    }
 
 #ifdef NO_EXT_BE
     if (cell_size == 0) set_cell_size(-1);
