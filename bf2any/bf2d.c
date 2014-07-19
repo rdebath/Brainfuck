@@ -47,7 +47,7 @@ outcmd(int ch, int count)
 	if (bytecell) {
 	    prv("char[] mem; mem.length = %d; mem[] = 0;", tapelen);
 	    prv("int m = %d;", BOFF);
-	    pr("register int v;");
+	    pr("int v;");
 	} else {
 	    prv("int[] mem; mem.length = %d; mem[] = 0;", tapelen);
 	    prv("int v, m = %d;", BOFF);
