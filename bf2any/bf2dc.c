@@ -247,8 +247,8 @@ outcmd(int ch, int count)
 	    }
 	}
 	pclose(ofd);
-    }
-    fprintf(ofd, "\n");
+    } else
+	fprintf(ofd, "\n");
 }
 
 static void
