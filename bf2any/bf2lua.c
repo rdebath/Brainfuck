@@ -11,6 +11,9 @@
  * There is a limit on the size of a while loop imposed by the interpreter.
  * The while loop's jump has a limited range, so if there are lots of tokens
  * in the loop I make the loop body a function.
+ *
+ * As I have to load the entire program into memory, I've added a variant that
+ * just prints "Hello world" style programs.
  */
 
 #define MAXWHILE 2048
@@ -22,20 +25,24 @@ struct instruction {
     int icount;
     struct instruction * next;
     struct instruction * loop;
+    char * cstr;
 } *pgm = 0, *last = 0, *jmpstack = 0;
 
 void loutcmd(int ch, int count, struct instruction *n);
 
-int do_input = 0;
+int do_input = 0, do_output = 0, do_tape = 0;
 int ind = 0;
 #define I printf("%*s", ind*4, "")
 static int lblcount = 0;
 static int icount = 0;
 
+static void print_cstring(char * str);
+
 int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
+    if (strcmp(arg, "-savestring") == 0) return 1;
     return 0;
 }
 
@@ -49,6 +56,10 @@ outcmd(int ch, int count)
     n->ch = ch;
     n->count = count;
     n->icount = icount;
+    if (ch == '"')
+	n->cstr = strdup(get_string());
+    else if (ch != '!' && ch != '~')
+	do_tape=1;
     if (!last) {
 	pgm = n;
     } else {
@@ -66,13 +77,15 @@ outcmd(int ch, int count)
     if (ch != '~') return;
 
     printf("#!/usr/bin/lua\n");
-    printf("local m = setmetatable({},{__index=function() return 0 end})\n");
-    printf("local p = 1\n");
-    printf("local v = 0\n");
-    /* Arrays are faster if populated from 1, negative indexes are ok.
-       Luajit likes zero. */
-    printf("for i=0,32 do m[i] = 0 end\n");
-    printf("\n");
+    if (do_tape) {
+	printf("local m = setmetatable({},{__index=function() return 0 end})\n");
+	printf("local p = 1\n");
+	printf("local v = 0\n");
+	/* Arrays are faster if populated from 1, negative indexes are ok.
+	   Luajit likes zero. */
+	printf("for i=0,32 do m[i] = 0 end\n");
+	printf("\n");
+    }
 
     if (icount < MAXWHILE) {
 	for(n=pgm; n; n=n->next)
@@ -109,6 +122,8 @@ outcmd(int ch, int count)
     while(pgm) {
 	n = pgm;
 	pgm = pgm->next;
+	if (n->cstr)
+	    free(n->cstr);
 	memset(n, '\0', sizeof*n);
 	free(n);
     }
@@ -128,8 +143,10 @@ loutcmd(int ch, int count, struct instruction *n)
 	break;
 
     case '!':
-	printf("function brainfuck()\n");
-	ind++;
+	if(do_tape) {
+	    printf("function brainfuck()\n");
+	    ind++;
+	}
 	break;
 
     case '=': I; printf("m[p] = %d\n", count); break;
@@ -151,8 +168,9 @@ loutcmd(int ch, int count, struct instruction *n)
     case '-': I; printf("m[p] = m[p]-%d\n", count); break;
     case '>': I; printf("p = p+%d\n", count); break;
     case '<': I; printf("p = p-%d\n", count); break;
-    case '.': I; printf("putch()\n"); break;
-    case ',': I; printf("getch()\n"); do_input++; break;
+    case '.': I; printf("putch()\n"); do_output=1; break;
+    case '"': print_cstring(n->cstr); break;
+    case ',': I; printf("getch()\n"); do_input=1; break;
 
     case '[':
 	if(bytecell) { I; printf("m[p] = m[p]%%256\n"); }
@@ -165,8 +183,10 @@ loutcmd(int ch, int count, struct instruction *n)
 	break;
 
     case '~':
-	ind--;
-	printf("end\n");
+	if(do_tape) {
+	    ind--;
+	    printf("end\n");
+	}
 
 	if (do_input) {
 	    printf("\n");
@@ -178,14 +198,55 @@ loutcmd(int ch, int count, struct instruction *n)
 	    printf("end\n");
 	}
 
-	printf("\n");
-	printf("function putch()\n");
-	printf("    io.write(string.char(m[p]%%256))\n");
-	printf("    io.flush()\n");
-	printf("end\n");
+	if (do_output) {
+	    printf("\n");
+	    printf("function putch()\n");
+	    printf("    io.write(string.char(m[p]%%256))\n");
+	    printf("    io.flush()\n");
+	    printf("end\n");
+	}
 
-	printf("\n");
-	printf("brainfuck()\n");
+	if(do_tape) {
+	    printf("\n");
+	    printf("brainfuck()\n");
+	}
 	break;
+    }
+}
+
+static void
+print_cstring(char * str)
+{
+    char buf[256];
+    int gotnl = 0;
+    size_t outlen = 0;
+
+    if (!str) return;
+
+    for(;; str++) {
+	if (outlen && (*str == 0 || gotnl || outlen > sizeof(buf)-8))
+	{
+	    buf[outlen] = 0;
+	    I; printf("io.write(\"%s\")\n", buf);
+	    gotnl = outlen = 0;
+	}
+	if (!*str) break;
+
+	if (*str == '\n') gotnl = 1;
+	if (*str == '"' || *str == '\\' ) {
+	    buf[outlen++] = '\\'; buf[outlen++] = *str;
+	} else if (*str >= ' ' && *str <= '~') {
+	    buf[outlen++] = *str;
+	} else if (*str == '\n') {
+	    buf[outlen++] = '\\'; buf[outlen++] = 'n';
+	} else if (*str == '\t') {
+	    buf[outlen++] = '\\'; buf[outlen++] = 't';
+	} else {
+	    char buf2[16];
+	    int n;
+	    sprintf(buf2, "\\%03o", *str & 0xFF);
+	    for(n=0; buf2[n]; n++)
+		buf[outlen++] = buf2[n];
+	}
     }
 }
