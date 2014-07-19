@@ -95,6 +95,7 @@ outcmd(int ch, int count)
 	printf("d() { eval \"A=\\$M$P\"; dec; eval \"M$P=$A\" ; }\n");
 	printf("f() { eval \"A=\\$M$P\"; [ .$A = . ] && A=0; }\n");
 
+	printf("\n");
 	printf("inc() {\n");
 	printf("case \"$A\" in\n");
 	for(i=0; i<256; i++)
@@ -103,6 +104,7 @@ outcmd(int ch, int count)
 	printf("esac\n");
 	printf("}\n");
 
+	printf("\n");
 	printf("dec() {\n");
 	printf("case \"$A\" in\n");
 	for(i=0; i<256; i++)
@@ -111,50 +113,63 @@ outcmd(int ch, int count)
 	printf("esac\n");
 	printf("}\n");
 
+	printf("\n");
 	printf("%s\n",
 
-"\n"	    "r(){"
-"\n"	    "B="
-"\n"	    "while [ ${#P} -gt 0 ]"
-"\n"	    "do"
-"\n"	    "    C=$P"
-"\n"	    "    P=${P#?}"
-"\n"	    "    case \"$C\" in"
-"\n"	    "    9* ) B=${B}0 ;;"
-"\n"	    "    1* ) B=${B}2 ; break ;;"
-"\n"	    "    2* ) B=${B}3 ; break ;;"
-"\n"	    "    3* ) B=${B}4 ; break ;;"
-"\n"	    "    4* ) B=${B}5 ; break ;;"
-"\n"	    "    5* ) B=${B}6 ; break ;;"
-"\n"	    "    6* ) B=${B}7 ; break ;;"
-"\n"	    "    7* ) B=${B}8 ; break ;;"
-"\n"	    "    8* ) B=${B}9 ; break ;;"
-"\n"	    "    * ) B=${B}1 ; break ;;"
-"\n"	    "    esac"
-"\n"	    "done"
-"\n"	    "P=$B$P"
+"\n"	    "r() {"
+"\n"	    "    C=1 ; B= ; P="
+"\n"	    "    for v in $PS"
+"\n"	    "    do"
+"\n"	    "        [ \"$C\" = 1 ] && {"
+"\n"	    "            C=0"
+"\n"	    "            case \"$v\" in"
+"\n"	    "            0) v=1;;"
+"\n"	    "            1) v=2;;"
+"\n"	    "            2) v=3;;"
+"\n"	    "            3) v=4;;"
+"\n"	    "            4) v=5;;"
+"\n"	    "            5) v=6;;"
+"\n"	    "            6) v=7;;"
+"\n"	    "            7) v=8;;"
+"\n"	    "            8) v=9;;"
+"\n"	    "            9) v=0; C=1;;"
+"\n"	    "            esac"
+"\n"	    "        }"
+"\n"	    "        B=\"$B $v\""
+"\n"	    "        P=\"$v$P\""
+"\n"	    "    done"
+"\n"	    "    [ \"$C\" = 1 ] && { B=\"$B 1\" ; P=\"1${P}\" ; }"
+"\n"	    "    PS=\"$B\""
 "\n"	    "}"
 "\n"	    ""
-"\n"	    "l(){"
-"\n"	    "B="
-"\n"	    "while [ ${#P} -gt 0 ]"
-"\n"	    "do"
-"\n"	    "    C=$P"
-"\n"	    "    P=${P#?}"
-"\n"	    "    case \"$C\" in"
-"\n"	    "    0* ) B=${B}9 ;;"
-"\n"	    "    1* ) B=${B}0 ; break ;;"
-"\n"	    "    2* ) B=${B}1 ; break ;;"
-"\n"	    "    3* ) B=${B}2 ; break ;;"
-"\n"	    "    4* ) B=${B}3 ; break ;;"
-"\n"	    "    5* ) B=${B}4 ; break ;;"
-"\n"	    "    6* ) B=${B}5 ; break ;;"
-"\n"	    "    7* ) B=${B}6 ; break ;;"
-"\n"	    "    8* ) B=${B}7 ; break ;;"
-"\n"	    "    9* ) B=${B}8 ; break ;;"
-"\n"	    "    esac"
-"\n"	    "done"
-"\n"	    "P=$B$P"
+"\n"	    "l() {"
+"\n"	    "    C=1 ; B= ; P= ; LZ= ; LZP="
+"\n"	    "    for v in $PS"
+"\n"	    "    do"
+"\n"	    "        [ \"$C\" = 1 ] && {"
+"\n"	    "            C=0"
+"\n"	    "            case \"$v\" in"
+"\n"	    "            0) v=9;C=1;;"
+"\n"	    "            1) v=0;;"
+"\n"	    "            2) v=1;;"
+"\n"	    "            3) v=2;;"
+"\n"	    "            4) v=3;;"
+"\n"	    "            5) v=4;;"
+"\n"	    "            6) v=5;;"
+"\n"	    "            7) v=6;;"
+"\n"	    "            8) v=7;;"
+"\n"	    "            9) v=8;;"
+"\n"	    "            esac"
+"\n"	    "        }"
+"\n"	    "        if [ \"$v\" = 0 ]"
+"\n"	    "        then LZ=\"$LZ $v\""
+"\n"	    "             LZP=\"$v$LZP\""
+"\n"	    "        else B=\"$B$LZ $v\""
+"\n"	    "             P=\"$v$LZP$P\""
+"\n"	    "             LZP= ; LZ="
+"\n"	    "        fi"
+"\n"	    "    done"
+"\n"	    "    PS=\"$B\""
 "\n"	    "}"
 	    );
 
@@ -165,7 +180,7 @@ outcmd(int ch, int count)
 	    printf("case \"$A\" in\n");
 	    for(i=0; i<256; i++) {
 		if (i >= ' ' && i <= '~' && i != '\'' && i != '\\')
-		    printf("%d ) echo -n '%c' ;;\n", i, i);
+		    printf("%d ) echon '%c' ;;\n", i, i);
 		else if (i == 10 )
 		    printf("%d ) echo ;;\n", i);
 		else
@@ -187,35 +202,16 @@ outcmd(int ch, int count)
 		);
 	}
 
-	if (do_input) {
-	    printf("%s\n",
-		"\n"	"i() {"
-		"\n"	"    [ \"$goteof\" = \"y\" ] && return;"
-		"\n"	"    [ \"$gotline\" != \"y\" ] && {"
-		"\n"	"        if read -r line"
-		"\n"	"        then"
-		"\n"	"            gotline=y"
-		"\n"	"        else"
-		"\n"	"            goteof=y"
-		"\n"	"            return"
-		"\n"	"        fi"
-		"\n"	"    }"
-		"\n"	"    [ \"$line\" = \"\" ] && {"
-		"\n"	"        gotline=n"
-		"\n"	"        eval \"M$P=10\""
-		"\n"	"        return"
-		"\n"	"    }"
-		"\n"	"    A=\"$line\""
-		"\n"	"    while [ ${#A} -gt 1 ] ; do A=\"${A%?}\"; done"
-		"\n"	"    line=\"${line#?}\""
-		"\n"	"# This printf command is probably not portable"
-		"\n"	"    A=`printf %d \\'\"$A\"`"
-		"\n"	"    eval \"M$P=$A\""
-		"\n"	"}"
-	    );
-	}
+	if (do_input)
+	    printf("\n%s\n%s\n%s\n%s\n%s\n",
+		"# Use other tools here, input is not needed for TC",
+		"i() {",
+		"A=`dd bs=1 count=1 2>/dev/null | od -t d1 | awk '{print $2;}'`",
+	        "eval \"M$P=$A\"",
+		"}");
 
-	printf("\nP=00000\nbf\n");
+
+	printf("\nP=\nbf\n");
 	break;
     }
 }
@@ -260,4 +256,7 @@ do  while :
 done
 
 echo $sum15_250
+// ############################################################
+
+
 #endif
