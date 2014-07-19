@@ -1,6 +1,11 @@
+#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifndef DISABLE_LIBTCL
+#include <tcl/tcl.h>
+#endif
 
 #include "bf2any.h"
 
@@ -9,8 +14,14 @@
  */
 
 int ind = 0;
-#define I printf("%*s", ind*4, "")
+#define I fprintf(ofd, "%*s", ind*4, "")
+#define oputs(str) fprintf(ofd, "%s\n", (str))
 int tapelen = 30000;
+int do_dump = 0;
+
+FILE * ofd;
+char * tclcode = 0;
+size_t tclcodesize = 0;
 
 static void print_cstring(void);
 
@@ -19,8 +30,12 @@ check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     if (strcmp(arg, "-savestring") == 0) return 1;
+    if (strcmp(arg, "-d") == 0) {
+	do_dump = 1;
+	return 1;
+    } else
     if (strncmp(arg, "-M", 2) == 0) {
-	tapelen = strtoul(arg+2, 0, 10);
+	tapelen = strtol(arg+2, 0, 10);
 	if (tapelen<1) tapelen = 30000;
 	tapelen += BOFF;
 	return 1;
@@ -33,7 +48,13 @@ outcmd(int ch, int count)
 {
     switch(ch) {
     case '!':
-	printf( "%s%d%s%d%s",
+#ifndef DISABLE_LIBTCL
+	if (!do_dump)
+	    ofd = open_memstream(&tclcode, &tclcodesize);
+	else
+#endif
+	    ofd = stdout;
+	fprintf(ofd, "%s%d%s%d%s",
 		"#!/usr/bin/tclsh\n"
 		"package require Tcl 8.5\n"
 		"fconfigure stdout -buffering none\n"
@@ -43,47 +64,59 @@ outcmd(int ch, int count)
 		"set dc ", BOFF, "\n");
 	break;
     case '~':
-	puts("}\nrun_bf");
+	oputs("}\nrun_bf");
 	break;
 
-    case '=': I; printf("lset d $dc %d\n", count); break;
+    case '=': I; fprintf(ofd, "lset d $dc %d\n", count); break;
     case 'B':
-	if(bytecell) { I; puts("lset d $dc [expr {[lindex $d $dc] % 256}]"); }
-	I; printf("set v [lindex $d $dc]\n");
+	if(bytecell) { I; oputs("lset d $dc [expr {[lindex $d $dc] % 256}]"); }
+	I; fprintf(ofd, "set v [lindex $d $dc]\n");
 	break;
 
-    case 'M': I; printf("lset d $dc [expr {[lindex $d $dc] +$v*%d}]\n", count); break;
-    case 'N': I; printf("lset d $dc [expr {[lindex $d $dc] -$v*%d}]\n", count); break;
-    case 'S': I; printf("lset d $dc [expr {[lindex $d $dc] +$v}]\n"); break;
-    case 'Q': I; printf("if {$v != 0} {lset d $dc %d}\n", count); break;
-    case 'm': I; printf("if {$v != 0} {lset d $dc [expr {[lindex $d $dc] +$v*%d}] }\n", count); break;
-    case 'n': I; printf("if {$v != 0} {lset d $dc [expr {[lindex $d $dc] -$v*%d}] }\n", count); break;
-    case 's': I; printf("if {$v != 0} {lset d $dc [expr {[lindex $d $dc] +$v}] }\n"); break;
+    case 'M': I; fprintf(ofd, "lset d $dc [expr {[lindex $d $dc] +$v*%d}]\n", count); break;
+    case 'N': I; fprintf(ofd, "lset d $dc [expr {[lindex $d $dc] -$v*%d}]\n", count); break;
+    case 'S': I; fprintf(ofd, "lset d $dc [expr {[lindex $d $dc] +$v}]\n"); break;
+    case 'Q': I; fprintf(ofd, "if {$v != 0} {lset d $dc %d}\n", count); break;
+    case 'm': I; fprintf(ofd, "if {$v != 0} {lset d $dc [expr {[lindex $d $dc] +$v*%d}] }\n", count); break;
+    case 'n': I; fprintf(ofd, "if {$v != 0} {lset d $dc [expr {[lindex $d $dc] -$v*%d}] }\n", count); break;
+    case 's': I; fprintf(ofd, "if {$v != 0} {lset d $dc [expr {[lindex $d $dc] +$v}] }\n"); break;
 
 #if 0
-    case 'X': I; printf("die(\"Abort: Infinite Loop.\\n\");\n"); break;
+    case 'X': I; fprintf(ofd, "die(\"Abort: Infinite Loop.\\n\");\n"); break;
 #endif
 
-    case '+': I; printf("lset d $dc [expr {[lindex $d $dc] + %d}]\n", count); break;
-    case '-': I; printf("lset d $dc [expr {[lindex $d $dc] - %d}]\n", count); break;
-    case '<': I; printf("incr dc %d\n", -count); break;
-    case '>': I; printf("incr dc %d\n", count); break;
+    case '+': I; fprintf(ofd, "lset d $dc [expr {[lindex $d $dc] + %d}]\n", count); break;
+    case '-': I; fprintf(ofd, "lset d $dc [expr {[lindex $d $dc] - %d}]\n", count); break;
+    case '<': I; fprintf(ofd, "incr dc %d\n", -count); break;
+    case '>': I; fprintf(ofd, "incr dc %d\n", count); break;
     case '[':
-	if(bytecell) { I; puts("lset d $dc [expr {[lindex $d $dc] % 256}]"); }
-	I; printf("while {[lindex $d $dc] != 0} {\n");
+	if(bytecell) { I; oputs("lset d $dc [expr {[lindex $d $dc] % 256}]"); }
+	I; fprintf(ofd, "while {[lindex $d $dc] != 0} {\n");
 	ind++;
 	break;
     case ']':
-	if(bytecell) { I; puts("lset d $dc [expr {[lindex $d $dc] % 256}]"); }
-	ind--; I; printf("}\n");
+	if(bytecell) { I; oputs("lset d $dc [expr {[lindex $d $dc] % 256}]"); }
+	ind--; I; fprintf(ofd, "}\n");
 	break;
-    case '.': I; puts("puts -nonewline [format \"%c\" [lindex $d $dc]]"); break;
+    case '.': I; oputs("puts -nonewline [format \"%c\" [lindex $d $dc]]"); break;
     case '"': print_cstring(); break;
     case ',':
-	I; puts("set c [scan [read stdin 1] \"%c\"]");
-	I; puts("if {$c != {}} {lset d $dc $c}");
+	I; oputs("set c [scan [read stdin 1] \"%c\"]");
+	I; oputs("if {$c != {}} {lset d $dc $c}");
 	break;
     }
+
+#ifndef DISABLE_LIBTCL
+    if (!do_dump && ch == '~') {
+	fclose(ofd);
+
+	/* The bare interpreter method. Works fine for BF code.
+	 */
+	Tcl_Interp * interp = Tcl_CreateInterp();
+	Tcl_EvalEx(interp, tclcode, -1, 0);
+	Tcl_DeleteInterp(interp);
+    }
+#endif
 }
 
 static void
@@ -102,9 +135,9 @@ print_cstring(void)
 	    buf[outlen] = 0;
 	    if (gotnl) {
 		buf[outlen-2] = 0;
-		I; printf("puts \"%s\"\n", buf);
+		I; fprintf(ofd, "puts \"%s\"\n", buf);
 	    } else {
-		I; printf("puts -nonewline \"%s\"\n", buf);
+		I; fprintf(ofd, "puts -nonewline \"%s\"\n", buf);
 	    }
 	    gotnl = 0; outlen = 0;
 	}

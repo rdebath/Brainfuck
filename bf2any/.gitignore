@@ -34,3 +34,5 @@ bf2tcl
 bf2v7sh
 libtcc.lib-off
 libtcc.lib-on
+libtcl.lib-off
+libtcl.lib-on

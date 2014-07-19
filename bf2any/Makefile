@@ -36,11 +36,23 @@ ifeq ($(findstring BSD,$(shell uname -s)),)
 LIBDL=-ldl
 endif
 
+HAVE_TCL=$(wildcard /usr/include/tcl/tcl.h)
+ifeq ($(HAVE_TCL),)
+TCLFLAG=-DDISABLE_LIBTCL
+TCLLIBS=
+TCLDEP=libtcl.lib-off
+else
+TCLFLAG=
+TCLLIBS=-ltcl
+TCLDEP=libtcl.lib-off
+endif
+
 all:	bf2any.o bf2const.o $(ALLEXE)
 
 clean:
 	-rm -f $(ALLEXE)
-	-rm -f libtcc.lib-off libtcc.lib-on bf2jit.amd64.h bf2jit.i686.h
+	-rm -f libtcc.lib-off libtcc.lib-on libtcl.lib-off libtcl.lib-on
+	-rm -f bf2jit.amd64.h bf2jit.i686.h
 	-rm -f *.o
 
 install: all
@@ -91,4 +103,18 @@ libtcc.lib-on:
 libtcc.lib-off:
 	-@rm -f libtcc.lib-on
 	@touch libtcc.lib-off
+
+bf2tcl: bf2tcl.o bf2any.o bf2const.o
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(TCLLIBS)
+
+bf2tcl.o: bf2tcl.c $(TCLDEP)
+	$(CC) $(CFLAGS) $(TCLFLAG) -c -o $@ bf2tcl.c $(TARGET_ARCH)
+
+libtcl.lib-on:
+	-@rm -f libtcl.lib-off
+	@touch libtcl.lib-on
+
+libtcl.lib-off:
+	-@rm -f libtcl.lib-on
+	@touch libtcl.lib-off
 
