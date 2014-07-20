@@ -1,8 +1,8 @@
 #!/bin/sh
 [ -n "$2" ] && cd $2
 
-MAJOR=0
-MINOR=10
+MAJOR=1
+MINOR=0
 # Set below blank for the commit to be tagged with the above version.
 SUFFIX="-post"
 BUILD=0
