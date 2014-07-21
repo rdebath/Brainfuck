@@ -7,7 +7,6 @@
 
 #ifndef DISABLE_DYNASM
 #include <stdint.h>
-#include <assert.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 
@@ -65,7 +64,10 @@ link_and_run(dasm_State ** state)
     char   *codeptr = MAP_FAILED;
     size_t  size;
     int     dasm_status = dasm_link(state, &size);
-    assert(dasm_status == DASM_S_OK);
+    if (dasm_status != DASM_S_OK) {
+	fprintf(stderr, "Process dasm_link() failed\n");
+	exit(1);
+    }
 
 #ifdef MAP_ANONYMOUS
     codeptr =
@@ -83,13 +85,19 @@ link_and_run(dasm_State ** state)
 	close(fd);
     }
 #endif
-    assert(codeptr != MAP_FAILED);
+    if (codeptr == MAP_FAILED) {
+	perror("Unable to allocate executable memory");
+	exit(1);
+    }
     codelen = size;
 
     dasm_encode(state, codeptr);
     dasm_free(state);
 
-    assert(mprotect(codeptr, size, PROT_EXEC | PROT_READ) == 0);
+     if (mprotect(codeptr, size, PROT_EXEC | PROT_READ) != 0) {
+	if (verbose)
+	    perror("mprotect read only");
+     };
 
     /* Write generated machine code to a temporary file.
     // View with:
@@ -119,7 +127,9 @@ link_and_run(dasm_State ** state)
     *(void **) (&code) = codeptr;
     code(map_hugeram());
 
-    assert(munmap(codeptr, codelen) == 0);
+    if (munmap(codeptr, codelen) != 0)
+	if (verbose)
+	    perror("munmap(code..)");
 }
 
 #endif
