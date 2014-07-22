@@ -490,7 +490,10 @@ link_and_run(dasm_State ** state)
     char   *codeptr = MAP_FAILED;
     size_t  size;
     int     dasm_status = dasm_link(state, &size);
-    assert(dasm_status == DASM_S_OK);
+    if (dasm_status != DASM_S_OK) {
+	fprintf(stderr, "Process dasm_link() failed\n");
+	exit(1);
+    }
 
 #ifdef MAP_ANONYMOUS
     /* I allocate this with a 'PROT_EXEC' flag set so the kernel can choose
@@ -510,7 +513,11 @@ link_and_run(dasm_State ** state)
 	close(fd);
     }
 #endif
-    assert(codeptr != MAP_FAILED);
+    if (codeptr == MAP_FAILED) {
+	perror("Unable to allocate executable memory");
+	exit(1);
+    }
+
     codelen = size;
 
     /* Last phase: Stream out the code fragments into proper machine
@@ -528,7 +535,9 @@ link_and_run(dasm_State ** state)
 
     /* Make it read only before we run it; also means that a context switch
      * happens so there won't be any 'bad cache' effects */
-    assert(mprotect(codeptr, size, PROT_EXEC | PROT_READ) == 0);
+    if (mprotect(codeptr, size, PROT_EXEC | PROT_READ) != 0) {
+	perror("mprotect read only");
+    };
 
 #if 0
     /* Write generated machine code to a temporary file.
@@ -557,6 +566,7 @@ link_and_run(dasm_State ** state)
     code(tapemem + tape_step * BOFF);
 
     /* Discard code and data */
-    assert(munmap(codeptr, codelen) == 0);
+    if (munmap(codeptr, codelen) != 0)
+	perror("munmap(code..)");
     free(tapemem);
 }
