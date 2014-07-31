@@ -466,6 +466,7 @@ main(int argc, char ** argv)
 		if (ch == '=') {
 		    outrun('[', 1); outrun('-', 1); outrun(']', 1);
 		    lastch = ']';
+		    c = 0;
 		    continue;
 		}
 		if (!b && ch == ']') continue; /* Ignore too many ']' */
