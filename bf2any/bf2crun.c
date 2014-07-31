@@ -28,6 +28,7 @@
 
 int ind = 0;
 int tapelen = 30000;
+int use_unistd = 0;
 enum { no_run, run_libtcc, run_dll } runmode = run_libtcc;
 FILE * ofd;
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
@@ -102,6 +103,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-d") == 0) {
 	runmode = no_run; return 1;
     } else
+    if (strcmp(arg, "-unix") == 0) {
+	use_unistd = 1; return 1;
+    } else
 #ifndef NO_DLOPEN
     if (strcmp(arg, "-ldl") == 0) {
 	runmode = run_dll; return 1;
@@ -146,7 +150,7 @@ outcmd(int ch, int count)
 	case 's': prv("if(v) m[%d] += v;", mov); return;
 	case '+': prv2("m[%d] +=%d;", mov, count); return;
 	case '-': prv2("m[%d] -=%d;", mov, count); return;
-        case '.': prv("putchar(m[%d]);", mov); return;
+	case '.': prv("PUTC(m[%d]);", mov); return;
 	}
 #endif
 
@@ -185,7 +189,27 @@ outcmd(int ch, int count)
 	/* Annoyingly most C compilers don't like this line. */
 	/* pr("#!/usr/bin/tcc -run"); */
 
-	pr("#include <stdio.h>");
+	if (use_unistd) {
+	    pr("#include <unistd.h>");
+	    if (bytecell) {
+		pr( "#define GETC(x) read(0, &(x), 1)");
+	    } else {
+		pr( "#define GETC(x) "
+		    "{ unsigned char b[1]; if(read(0, b, 1)>0) (x)=*b; }");
+	    }
+	    if (bytecell)
+		pr( "#define PUTC(x) write(1, &(x), 1);");
+	    else {
+		pr( "#define PUTC(x) "
+		    "{ char b[1]; b[0] = (x); write(1, b, 1); }");
+	    }
+	    pr( "#define PUTS(x) "
+		"{ const char s[] = x; write(1,s,sizeof(s)-1); }");
+	} else {
+	    pr("#include <stdio.h>");
+	    pr("#define GETC(x) { v=getchar(); if(v!=EOF) (x)=v; }");
+	    pr("#define PUTC(x) putchar(x)");
+	}
 	if (runmode == run_dll) {
 	    pr("int brainfuck(void){");
 	    ind++;
@@ -201,11 +225,16 @@ outcmd(int ch, int count)
 	    prv("static int mem[%d];", tapelen);
 	    prv("register int v, *m = mem + %d;", BOFF);
 	}
-	if (runmode == no_run)
+	if (runmode == no_run && !use_unistd)
 	    pr("setbuf(stdout,0);");
 	break;
 
-    case 'X': pr("fprintf(stderr, \"Infinite Loop\\n\"); exit(1);"); break;
+    case 'X':
+	if (use_unistd)
+	    pr("{char e[]=\"Infinite Loop\\n\"; write(2,e,sizeof(e)-1); return 1;}");
+	else
+	    pr("fprintf(stderr, \"Infinite Loop\\n\"); return 1;");
+	break;
 
     case '=': prv("*m = %d;", count); break;
     case 'B': pr("v = *m;"); break;
@@ -221,9 +250,9 @@ outcmd(int ch, int count)
     case '-': prv("*m -=%d;", count); break;
     case '>': imov += count; break;
     case '<': imov -= count; break;
-    case '.': pr("putchar(*m);"); break;
+    case '.': pr("PUTC(*m);"); break;
     case '"': print_cstring(); break;
-    case ',': pr("v = getchar(); if(v!=EOF) *m = v;"); break;
+    case ',': pr("GETC(*m);"); break;
 
     case '[': pr("while(*m) {"); ind++; break;
     case ']': ind--; pr("}"); break;
@@ -262,11 +291,13 @@ print_cstring(void)
 	if (outlen && (*str == 0 || gotnl || outlen > sizeof(buf)-8))
 	{
 	    buf[outlen] = 0;
-	    if (gotnl) {
+	    if (use_unistd) {
+		prv("PUTS(\"%s\")", buf);
+	    } else if (gotnl) {
 		buf[outlen-2] = 0;
 		prv("puts(\"%s\");", buf);
 	    } else if (gotperc)
-		prv("printf(\"%%s\",\"%s\");", buf);
+		prv("printf(\"%%s\", \"%s\");", buf);
 	    else
 		prv("printf(\"%s\");", buf);
 	    gotnl = gotperc = 0; outlen = 0;
@@ -281,6 +312,8 @@ print_cstring(void)
 	    buf[outlen++] = '\\'; buf[outlen++] = *str;
 	} else if (*str == '\n') {
 	    buf[outlen++] = '\\'; buf[outlen++] = 'n';
+	} else if (*str == '\r') {
+	    buf[outlen++] = '\\'; buf[outlen++] = 'r';
 	} else if (*str == '\t') {
 	    buf[outlen++] = '\\'; buf[outlen++] = 't';
 	} else {
@@ -404,8 +437,8 @@ loaddll(const char * dlname)
 
     handle = dlopen(dlname, RTLD_LAZY);
     if (!handle) {
-        fprintf(stderr, "%s\n", dlerror());
-        exit(EXIT_FAILURE);
+	fprintf(stderr, "%s\n", dlerror());
+	exit(EXIT_FAILURE);
     }
 
     dlerror();    /* Clear any existing error */
@@ -420,8 +453,8 @@ loaddll(const char * dlname)
     *(void **) (&runfunc) = dlsym(handle, "brainfuck");
 
     if ((error = dlerror()) != NULL)  {
-        fprintf(stderr, "%s\n", error);
-        exit(EXIT_FAILURE);
+	fprintf(stderr, "%s\n", error);
+	exit(EXIT_FAILURE);
     }
     return 0;
 }
