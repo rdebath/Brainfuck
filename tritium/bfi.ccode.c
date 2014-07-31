@@ -185,7 +185,7 @@ print_c_header(FILE * ofd)
 	     * a string so it can be included into the generated code ...
 	     * TODO: configure make to do this.
 	     */
-	    fprintf(ofd, "%s%s%s\n",
+	    fprintf(ofd, "%s%s%s%s%s\n",
 		"typedef int (*runfnp)(void);\n"
 		"typedef int (*getfnp)(int ch);\n"
 		"typedef void (*putfnp)(int ch);\n"
@@ -193,7 +193,7 @@ print_c_header(FILE * ofd)
 		"struct bfinit {\n"
 		"  runfnp run; void *memptr; putfnp bf_putch; getfnp bf_getch;\n"
 		"} bf_init = {brainfuck,0,0,0};\n"
-		"#define mem (bf_init.memptr)\n"
+		"#define mem ((", cell_type, "*)bf_init.memptr)\n"
 		"#define putch (*bf_init.bf_putch)\n"
 		"#define getch (*bf_init.bf_getch)\n"
 		"static int brainfuck(void){\n"
