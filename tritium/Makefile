@@ -14,8 +14,7 @@
 # It is normally a little faster that GNU Lightning.
 #
 # The JIT interpreters will normally get disabled if their requirements don't
-# exist but as the tests are very simple they can be confused. Especially the
-# Dynasm which needs either luajit or a normal lua with the 'bitops' package.
+# exist but as the tests are very simple they can be confused.
 #
 # To manually disable a 'JITter' add one or more of the options below to the
 # make command line.
@@ -33,11 +32,19 @@ CFLAGS=-O3 -Wall -Wshadow -idirafter $(TOOLDIR) $(DEFS) $(CONF)
 LDFLAGS=
 TOOLDIR=../tools
 
+ifeq ($(NO_STATIC),)
+# These are used to link specified libaries statically.
+# Other libraries (eg: libc) remain normally dynamic.
+GNUSTK=-Wl,-Bstatic
+GNUDYN=-Wl,-Bdynamic
+endif
+
 # for: make DEFS='$(MOREDEFS)'
 MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 	 -Wstrict-prototypes -Wstrict-overflow=5 -Wwrite-strings \
 	 -Waggregate-return -Wcast-qual -Wswitch-enum -Wconversion \
-	 -Wunreachable-code -fno-common
+	 -Wunreachable-code -fno-common -Wpadded \
+	 -Wlarger-than=512 -Wstack-usage=512
 
 bfi:	bfi.o bfi.ccode.o bfi.gnulit.o bfi.nasm.o bfi.bf.o bfi.dc.o bfi.dasm.o \
 	bfi.version.o
@@ -120,4 +127,4 @@ bfi.dasm.o: bfi.dasm.amd64.h bfi.dasm.i686.h
 endif
 
 CONF=$(CONF_DYNASM) $(CONF_LIGHTNING) $(CONF_TCCLIB) $(CONF_LIBDL)
-LDLIBS=$(LIBS_LIGHTNING) $(LIBS_TCCLIB) $(LIBS_LIBDL)
+LDLIBS=$(GNUSTK) $(LIBS_LIGHTNING) $(LIBS_TCCLIB) $(GNUDYN) $(LIBS_LIBDL)
