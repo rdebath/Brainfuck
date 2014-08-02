@@ -1,7 +1,7 @@
 " Vim syntax file
 " Language:     Brainfuck
 " Maintainer:   rdebath c/o github.com
-" Version:      1.0.20131129
+" Version:      1.0.20140719
 
 " This file highlights the eight BF command characters in four (reasonable)
 " classes. This is the simple part.
@@ -31,6 +31,7 @@ syn sync clear
 syn sync minlines=150
 syn sync maxlines=150
 syn sync linebreaks=25
+set synmaxcol=1024
 
 " Various comment marking characters, make them very visible (if not in a comment)
 syn match bfError "[{}#!]\+"
@@ -94,9 +95,13 @@ if version >= 508 || !exists("did_brainfuck_syn_inits")
     " Initially I did this; but I find it too much of a highlight.
     HiLink bfSPError	Error
   else
-    " This looks a lot better to me (with a dark background)
-    highlight Warn ctermbg=22 guibg=Blue
-    HiLink bfSPError	Warn
+    if &bg=="dark"
+	" This looks a lot better to me
+	highlight Warn ctermbg=22 guibg=Blue
+	HiLink bfSPError	Warn
+    else
+	" HiLink bfSPError	Error
+    endif
   endif
 
   delcommand HiLink
