@@ -606,6 +606,9 @@ static int dld;
     /* I could make this close the loops, Better? */
     while (jst) { n = jst; jst = jst->jmp; n->type = T_ERR; n->jmp = 0; }
 
+    if (dld)
+	fprintf(stderr, "Warning: Unterminated comment loop at end of file.\n");
+
     loaded_nodes = 0;
     for(n=bfprog; n; n=n->next) {
 	switch(n->type)
