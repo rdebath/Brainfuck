@@ -22,6 +22,7 @@ Currently 'smoke' tested on
     Sparc running Debian etch
     x86_64 running NetBSD
     i686 running Debian lenny
+    Windows i386 and amd64.
 
 Testing notes
 -------------
@@ -34,6 +35,7 @@ will be compiled and used. If this does not compile remove or rename
 the tools/dynasm directory to disable DynASM completely.
 
 FreeBSD x86_64
+--------------
 Use the ports functionality to install gmake or compile manually as the
 BSD 'pmake' make version's extensions are incompatible with the gmake
 extensions. Ports will also be needed for the gmp library to compile
@@ -46,3 +48,15 @@ by Tritium.  It can be pulled in using this ...
 
 $ gmake CC=clang DO_LIGHT=1 DO_LIGHT2=1 LDFLAGS=-L/usr/local/lib DEFS=-I/usr/local/include
 
+Windows
+-------
+Cross compile of Tritium from Debian Wheezy (stable) Linux using:
+    make CC=i686-w64-mingw32-gcc DO_LIBDL=
+or
+    make CC=x86_64-w64-mingw32-gcc DO_LIBDL=
+
+The Dynasm JIT works so it's nice and quick. (cmd.exe, however, is slow!)
+
+The majority of the bf2any cross compile to Windows happily as they're
+plain C, but most of the special ones haven't been altered to run on
+non-Posix operating systems.

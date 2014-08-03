@@ -2,6 +2,10 @@
  *  twice, once for i386 and once for amd64
  *
  *  The C compiler then includes one to match the current compile.
+ *
+ *  Just to clarify, it is still possibly to use #if commands, but the
+ *  assembler (pass1) will see ALL the lines of assembly irrespective of
+ *  these directives; therefor no '.define' commands within a '#ifdef'.
  */
 
 |.if I386
@@ -36,6 +40,8 @@
 |.define REG_BL, dl
 |.define REG_C, ecx
 |.define REG_Z, ebx
+/* Windows is, of course, different.
+ * This time it may not even be Microsoft's fault!?!? */
 |.define PRM, rdi
 |.define PRM_D, edi
 |.endif
@@ -159,7 +165,11 @@ run_dynasm(void)
     | mov  rbp, rsp
     | sub  rsp, 64 // Some shadow space for Windows (if this is ever ported).
     |
+#ifndef _WIN32
     | mov  REG_P, PRM
+#else
+    | mov  REG_P, rcx
+#endif
     |.endif
     | xor  REG_Z, REG_Z
 
@@ -343,7 +353,11 @@ run_dynasm(void)
 	    | call &putch
 	    | pop eax
 	    |.else
+#ifndef _WIN32
 	    | mov PRM_D, REG_A
+#else
+	    | mov REG_C, REG_A
+#endif
 	    | mov64 rax, (uint64_t)(uintptr_t) putch
 	    | call  rax
 	    |.endif
@@ -363,7 +377,11 @@ run_dynasm(void)
 	    | call &putch
 	    | pop eax
 	    |.else
+#ifndef _WIN32
 	    | mov PRM_D, REG_A
+#else
+	    | mov REG_C, REG_A
+#endif
 	    | mov64 rax, (uint64_t)(uintptr_t) putch
 	    | call  rax
 	    |.endif
@@ -378,7 +396,11 @@ run_dynasm(void)
 	    | call &getch
 	    | pop REG_B
 	    |.else
+#ifndef _WIN32
 	    | mov PRM_D, REG_A
+#else
+	    | mov REG_C, REG_A
+#endif
 	    | mov64 rax, (uint64_t)(uintptr_t) getch
 	    | call  rax
 	    |.endif
