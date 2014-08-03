@@ -32,8 +32,14 @@ TCCFLAG=
 TCCLIBS=-ltcc
 TCCDEP=libtcc.lib-on
 endif
+HAVE_DL=yes
+ifeq ($(HAVE_DL),)
+LIBDL=
+LIBDLFLAG=-DNO_DLOPEN
+else
 ifeq ($(findstring BSD,$(shell uname -s)),)
 LIBDL=-ldl
+endif
 endif
 
 HAVE_TCL=$(wildcard /usr/include/tcl/tcl.h)
@@ -94,7 +100,7 @@ bf2crun: bf2crun.o bf2any.o bf2const.o
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(TCCLIBS) $(LIBDL)
 
 bf2crun.o: bf2crun.c $(TCCDEP)
-	$(CC) $(CFLAGS) $(TCCFLAG) -c -o $@ bf2crun.c $(TARGET_ARCH)
+	$(CC) $(CFLAGS) $(TCCFLAG) $(LIBDLFLAG) -c -o $@ bf2crun.c $(TARGET_ARCH)
 
 libtcc.lib-on:
 	-@rm -f libtcc.lib-off
