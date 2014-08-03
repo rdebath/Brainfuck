@@ -10,6 +10,7 @@
 # must be 64bit for a 64bit application, but the userspace works both ways)
 
 INSTALLDIR=/usr/local/bin
+INSTALLEXT=
 ALLEXE=\
 	bf2asmjs bf2awk bf2bas bf2bash bf2bf bf2cgmp bf2clojure \
 	bf2cmd bf2crun bf2d bf2dc bf2elf bf2gas32 bf2gas64 bf2go \
@@ -61,8 +62,12 @@ clean:
 	-rm -f bf2jit.amd64.h bf2jit.i686.h
 	-rm -f *.o
 
-install: all
-	install -p -s $(ALLEXE) $(INSTALLDIR)
+install:
+	-@$(MAKE) -k all
+	-@echo Installing: $(ALLEXE) to $(INSTALLDIR)
+	-@for i in $(ALLEXE) ; do \
+	install -p -s $$i $(INSTALLDIR)/$$i$(INSTALLEXT) ; \
+	done
 
 CFLAGS=-O3 -Wall -Wshadow -DBOFF=256 $(DEFS)
 
