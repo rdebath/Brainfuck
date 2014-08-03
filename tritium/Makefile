@@ -27,6 +27,7 @@ VERSTRING := $(shell sh version.sh bfi.version.h)
 all: bfi
 
 INSTALLDIR=/usr/local/bin
+INSTALLEXT=
 CC=gcc
 CFLAGS=-O3 -Wall -Wshadow -idirafter $(TOOLDIR) $(DEFS) $(CONF)
 LDFLAGS=
@@ -57,7 +58,7 @@ clean:
 	-rm -f *.o bfi.dasm.amd64.h bfi.dasm.i686.h bfi.version.h
 
 install: bfi
-	install -p -s bfi $(INSTALLDIR)
+	install -p -s bfi $(INSTALLDIR)/bfi$(INSTALLEXT)
 
 bfi.gnulit.o:	bfi.gnulit.c bfi.tree.h bfi.gnulit.h bfi.run.h
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ -fno-strict-aliasing -Wno-unused-value bfi.gnulit.c
