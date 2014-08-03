@@ -48,8 +48,10 @@ check_arg(const char * arg)
 #endif
     if (strcmp(arg, "-d") == 0) {
 	inputmode=0; return 1;
+#ifndef _WIN32
     } else if (strcmp(arg, "-r") == 0) {
 	inputmode=1; return 1;
+#endif
     } else if (strcmp(arg, "-dump") == 0) {
 	inputmode=2; return 1;
     } else if (strcmp(arg, "-t") == 0) {
@@ -61,7 +63,9 @@ check_arg(const char * arg)
 	fprintf(stderr, "%s\n",
 	"\t"    "-d      Dump code (',' command input will be requested)"
 	"\n\t"  "-dump   Dump code (',' command ignored; default)"
+#ifndef _WIN32
 	"\n\t"  "-r      Run program (standard input will be translated)"
+#endif
 	"\n\t"  "-t      Traditional dc mode"
 	"\n\t"  "-g      General modern dc mode (default is to autodetect)");
 	return 1;
@@ -69,8 +73,10 @@ check_arg(const char * arg)
 	return 0;
 }
 
+#ifndef _WIN32
 /* Note: calling exit() isn't posix */
 void endprog(int s) { exit(s != SIGCHLD); }
+#endif
 
 static char *
 dc_ltoa(long val)
@@ -86,7 +92,10 @@ outcmd(int ch, int count)
 {
     switch(ch) {
     case '!':
-	if (inputmode == 1) ofd = popen("dc", "w"); else ofd = stdout;
+#ifndef _WIN32
+	if (inputmode == 1) ofd = popen("dc", "w"); else
+#endif
+	    ofd = stdout;
 	if (outputmode == 2)
 	    pr("#!/usr/bin/dc");
 	prv("[%dsp", BOFF);
@@ -202,9 +211,10 @@ outcmd(int ch, int count)
 	}
     }
 
-    if (inputmode == 1)
-	pr("[?lp:a]si");
-    else if (do_input) {
+#ifndef _WIN32
+    if (inputmode == 1) pr("[?lp:a]si"); else
+#endif
+    if (do_input) {
 	int flg = 0;
 	pr("0si");
 	fprintf(stderr, "Please enter the input data for the program: ");
@@ -228,14 +238,16 @@ outcmd(int ch, int count)
     if (bytecell)
 	fprintf(ofd, "[256+]sM [256 %% d0>M]sm\n");
     fprintf(ofd, "[aP]sO [daP]so\n");
-    if (inputmode == 1)
-	fprintf(ofd, "[d!=.?]si\n");
-    else if (do_input)
+#ifndef _WIN32
+    if (inputmode == 1) fprintf(ofd, "[d!=.?]si\n"); else
+#endif
+    if (do_input)
 	fprintf(ofd, "[]si\n");
     fprintf(ofd, "0\n");
 #endif
 
     fprintf(ofd, "LFx ");
+#ifndef _WIN32
     if (inputmode == 1) {
 
 	if (do_input) {
@@ -248,6 +260,7 @@ outcmd(int ch, int count)
 	}
 	pclose(ofd);
     } else
+#endif
 	fprintf(ofd, "\n");
 }
 

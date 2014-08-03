@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <stdint.h>
 
 #include "bf2any.h"
 
@@ -200,17 +201,23 @@ outcmd(int ch, int count)
 	insertobj(sizeof(elfheader) + sizeof(start) + prolog_meminit_offset, p);
 
 	{
+#ifndef _WIN32
 	    mode_t umsk = umask(S_IRWXG + S_IRWXO);
+#endif
 	    if ((ofd = fopen(filename, "w")) == NULL) {
 		perror(filename);
 		exit(1);
 	    } else {
 		fwrite(textbuf, 1, pos, ofd);
 		fclose(ofd);
+#ifndef _WIN32
 		if (chmod(filename, (S_IRWXU + S_IRWXG + S_IRWXO) & ~umsk) < 0)
 		    perror(filename);
+#endif
 	    }
+#ifndef _WIN32
 	    umask(umsk);
+#endif
 	}
 	break;
     }
