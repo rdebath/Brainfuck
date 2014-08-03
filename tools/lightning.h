@@ -36,9 +36,9 @@
 extern "C" {
 #endif
 
-#include <lightning/asm-common.h>
-
 #ifndef LIGHTNING_DETECT
+
+#include <lightning/asm-common.h>
 
 #ifndef LIGHTNING_DEBUG
 #include <lightning/asm.h>
@@ -57,7 +57,14 @@ extern "C" {
 
 #else
 
+/* jit_flush_code only defined for GCC in lightning V1 */
+#if defined(__GNUC__) || defined(__GNUG__)
+/* jit_flush_code only defined for __linux__ */
+#ifdef __linux__
+
 #if defined(__i386__) || defined(__i386) || defined(_M_IX86)
+#include <lightning/asm-common.h>
+
 #ifndef LIGHTNING_DEBUG
 #include <lightning/i386/asm.h>
 #endif
@@ -70,7 +77,11 @@ extern "C" {
 #include <lightning/fp-common.h>
 #endif
 
+#endif
+
 #if defined(__powerpc__) || defined(__PPC__)
+#include <lightning/asm-common.h>
+
 #ifndef LIGHTNING_DEBUG
 #include <lightning/ppc/asm.h>
 #endif
@@ -84,6 +95,8 @@ extern "C" {
 #endif
 
 #if defined(__sparc__)
+#include <lightning/asm-common.h>
+
 #ifndef LIGHTNING_DEBUG
 #include <lightning/sparc/asm.h>
 #endif
@@ -96,6 +109,7 @@ extern "C" {
 #include <lightning/fp-common.h>
 #endif
 
+#endif /* __GNUC__ */
 #endif
 
 #ifdef __cplusplus
