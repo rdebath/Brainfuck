@@ -56,7 +56,7 @@ characters after your favorite comment marker in a very visible form.
 #include <string.h>
 #include <ctype.h>
 #include <sys/time.h>
-#ifndef LEGACYOS
+#if !defined(LEGACYOS) && !defined(_WIN32)
 #include <sys/mman.h>
 #include <signal.h>
 #include <locale.h>
@@ -70,6 +70,10 @@ characters after your favorite comment marker in a very visible form.
 #include "bfi.run.h"
 #define XX 0
 #include "bfi.be.def"
+#endif
+
+#ifndef __STDC_ISO_10646__
+#warning System is not __STDC_ISO_10646__ unicode I/O disabled.
 #endif
 
 #ifdef MAP_NORESERVE
@@ -430,7 +434,7 @@ main(int argc, char ** argv)
     opt_bytedefault = !strcmp(program, "bf");
 
 #ifdef __STDC_ISO_10646__
-#ifndef LEGACYOS
+#if !defined(LEGACYOS) && !defined(_WIN32)
     setlocale(LC_ALL, "");
     if (!opt_bytedefault)
 	if (!strcmp("UTF-8", nl_langinfo(CODESET))) libc_allows_utf8 = 1;
@@ -634,10 +638,10 @@ tcalloc(size_t nmemb, size_t size)
     m = calloc(nmemb, size);
     if (m) return m;
 
-#ifdef LEGACYOS
-    fprintf(stderr, "Memory allocation failed, ABORT\n");
-#else
+#if !defined(LEGACYOS) && !defined(_WIN32)
     fprintf(stderr, "Allocate of %zd*%zd bytes failed, ABORT\n", nmemb, size);
+#else
+    fprintf(stderr, "Memory allocation failed, ABORT\n");
 #endif
     exit(42);
 }
@@ -836,10 +840,17 @@ process_file(void)
 	calculate_stats(); /* is in print_tree_stats() */
 
 #ifndef NO_EXT_BE
-    if (do_run && total_nodes == node_type_counts[T_CHR])
-	do_codestyle = c_default; /* Be lazy for a 'Hello World'. */
-    else if (do_run && isatty(STDOUT_FILENO))
-	setbuf(stdout, 0);
+    if (do_run) {
+	if (total_nodes == node_type_counts[T_CHR])
+	    do_codestyle = c_default; /* Be lazy for a 'Hello World'. */
+#ifndef _WIN32 /* cmd.exe is ****ing slow */
+	else if (isatty(STDOUT_FILENO))
+	    setbuf(stdout, 0);
+#else
+	static char obuf[16384];
+	setvbuf(stdout, obuf, _IOLBF, sizeof(obuf));
+#endif
+    }
 
     if (do_codestyle == c_default) {
 #endif
@@ -3341,6 +3352,9 @@ getch(int oldch)
     }
     else for(;;) {
 	if (enable_trace || debug_mode) fflush(stdout);
+#ifdef _WIN32
+	fflush(stdout);
+#endif
 #ifdef __STDC_ISO_10646__
 	if (iostyle == 1) {
 	    int rv;
