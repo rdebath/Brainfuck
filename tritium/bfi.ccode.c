@@ -41,7 +41,6 @@ static const char * putname = "putch";
 static int use_direct_getchar = 0;
 static int use_dynmem = 0;
 static int memsize = 30000;
-static int leave_temps = 0;
 #if defined(DISABLE_DLOPEN)
 static const int use_dlopen = 0;
 #else
@@ -50,6 +49,7 @@ static int choose_runner = -1;
 static char * cc_cmd = 0;
 static char pic_opt[8] = " -fpic";
 static int in_one = 0;
+static int leave_temps = 0;
 #endif
 
 #ifndef DISABLE_TCCLIB
