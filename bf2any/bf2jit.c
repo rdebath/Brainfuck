@@ -4,7 +4,11 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#ifndef _WIN32
 #include <sys/mman.h>
+#else
+# include <windows.h>
+#endif
 
 #include "bf2any.h"
 

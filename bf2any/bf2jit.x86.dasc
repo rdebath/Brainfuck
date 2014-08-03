@@ -15,6 +15,12 @@
  *  You can have multiple code sections, eg: for library routines. But in
  *  general you probably won't need to as you can probably run over your
  *  parse tree in the 'right' order.
+ *
+ *  Note, it is possibly to use #if commands to break up pieces of
+ *  code, but the assembler (pass1) will see ALL the lines of assembly
+ *  irrespective of these directives; therefor all '.define' commands
+ *  within a '#ifdef' will be active.
+ *
  */
 
 |.if I386
@@ -47,6 +53,8 @@
 |.define REG_B, ebx
 |.define REG_BL, bl
 |.define REG_C, ecx
+/* Windows, of course, uses different registers for the parameters.
+ * This time it may not even be Microsoft's fault!?!? */
 |.define PRM, rdi
 |.endif
 
@@ -216,7 +224,11 @@ outcmd(int ch, int count)
 	| mov  rbp, rsp
 	| sub  rsp, 64 // Some shadow space for Windows.
 	|
+#ifndef _WIN32
 	| mov  REG_P, PRM
+#else
+	| mov  REG_P, rcx
+#endif
 	|.endif
 	break;
 
@@ -439,7 +451,11 @@ outcmd(int ch, int count)
 	| call &putchar
 	| pop eax
 	|.else
+#ifndef _WIN32
 	| movzx PRM, byte [REG_P]
+#else
+	| movzx rcx, byte [REG_P]
+#endif
 	| mov64 rax, (uintptr_t) putchar
 	| call  rax
 	|.endif
@@ -487,7 +503,7 @@ link_and_run(dasm_State ** state)
      * the segments together onto one unit of code. The size of this code
      * is returned in the 'size' argument.
      */
-    char   *codeptr = MAP_FAILED;
+    char   *codeptr;
     size_t  size;
     int     dasm_status = dasm_link(state, &size);
     if (dasm_status != DASM_S_OK) {
@@ -495,6 +511,7 @@ link_and_run(dasm_State ** state)
 	exit(1);
     }
 
+#ifndef _WIN32
 #ifdef MAP_ANONYMOUS
     /* I allocate this with a 'PROT_EXEC' flag set so the kernel can choose
      * to put it in the 'code area' if there is such a thing */
@@ -517,6 +534,13 @@ link_and_run(dasm_State ** state)
 	perror("Unable to allocate executable memory");
 	exit(1);
     }
+#else /*_WIN32*/
+    codeptr = (char*) VirtualAlloc(0, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    if (!codeptr) {
+	perror("Unable to allocate executable memory");
+	exit(1);
+    }
+#endif
 
     codelen = size;
 
@@ -535,9 +559,16 @@ link_and_run(dasm_State ** state)
 
     /* Make it read only before we run it; also means that a context switch
      * happens so there won't be any 'bad cache' effects */
+#ifndef __WIN32
     if (mprotect(codeptr, size, PROT_EXEC | PROT_READ) != 0) {
 	perror("mprotect read only");
     };
+#else
+    DWORD oldProt = 0;
+    if (!VirtualProtect(codeptr, size, PAGE_EXECUTE_READ, &oldProt)) {
+	perror("VirtualProtect read only failed");
+    }
+#endif
 
 #if 0
     /* Write generated machine code to a temporary file.
@@ -566,7 +597,11 @@ link_and_run(dasm_State ** state)
     code(tapemem + tape_step * BOFF);
 
     /* Discard code and data */
+#ifndef _WIN32
     if (munmap(codeptr, codelen) != 0)
 	perror("munmap(code..)");
+#else
+    (void)VirtualFree(codeptr, 0, MEM_RELEASE);
+#endif
     free(tapemem);
 }
