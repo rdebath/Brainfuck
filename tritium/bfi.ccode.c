@@ -928,7 +928,9 @@ run_tccode(void)
 	tcc_delete(s);
 	free(ccode);
 
+	start_runclock();
 	func();
+	finish_runclock();
 	free(image);
     }
 #endif
@@ -959,7 +961,9 @@ run_tccode(void)
 	    fprintf(stderr, "Could not find compiled code entry point\n");
 	    exit(1);
 	}
+	start_runclock();
 	func();
+	finish_runclock();
 
 	tcc_delete(s);
 	free(ccode);
@@ -971,7 +975,7 @@ run_tccode(void)
 #define TCCDONE
 static char * args[] = {"tcclib", 0};
     if (verbose)
-	fprintf(stderr, "Running C Code using libtcc tcc_run().\n");
+	fprintf(stderr, "Running C Code using libtcc tcc_run() to compile & run.\n");
 
     rv = tcc_run(s, 1, args);
     if (verbose && rv)
@@ -1134,7 +1138,10 @@ compile_and_run(void)
 
     if (verbose>1)
 	fprintf(stderr, "Calling function loaded at address %p\n", runfunc);
+
+    start_runclock();
     (*runfunc)();
+    finish_runclock();
 
     dlclose(handle);
 }

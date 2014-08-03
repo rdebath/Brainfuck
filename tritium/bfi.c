@@ -162,6 +162,7 @@ int most_neg_maad_loop = 0;
 double profile_hits = 0.0;
 int profile_min_cell = 0;
 int profile_max_cell = 0;
+struct timeval run_start, run_pause;
 
 /* Where's the tape memory start */
 void * cell_array_pointer = 0;
@@ -198,6 +199,10 @@ void run_tree(void);
 void print_codedump(void);
 void * map_hugeram(void);
 void unmap_hugeram(void);
+void start_runclock(void);
+void finish_runclock(void);
+void pause_runclock(void);
+void unpause_runclock(void);
 int getch(int oldch);
 void putch(int oldch);
 void set_cell_size(int cell_bits);
@@ -1012,10 +1017,9 @@ run_tree(void)
 {
     int *p, *oldp;
     struct bfi * n = bfprog;
-    struct timeval tv_start, tv_end, tv_pause;
 
     oldp = p = map_hugeram();
-    gettimeofday(&tv_start, 0);
+    start_runclock();
 
     while(n){
 	{
@@ -1127,8 +1131,6 @@ run_tree(void)
 		}
 		break;
 	    } else {
-		gettimeofday(&tv_pause, 0); /* Stop the clock. */
-
 		switch(n->type)
 		{
 		case T_CHR:
@@ -1140,17 +1142,6 @@ run_tree(void)
 		case T_INP:
 		    p[n->offset] = getch(p[n->offset]);
 		    break;
-		}
-
-		/* Restart the clock */
-		gettimeofday(&tv_end, 0);
-		tv_start.tv_usec = tv_start.tv_usec +
-				(tv_end.tv_usec - tv_pause.tv_usec);
-		tv_start.tv_sec = tv_start.tv_sec +
-				(tv_end.tv_sec - tv_pause.tv_sec);
-		while (tv_start.tv_usec < 0) {
-		    tv_start.tv_usec += 1000000;
-		    tv_start.tv_sec -= 1;
 		}
 		break;
 	    }
@@ -1207,11 +1198,7 @@ run_tree(void)
     }
 
 break_break:;
-    gettimeofday(&tv_end, 0);
-    run_time = (tv_end.tv_sec + tv_end.tv_usec/1000000.0);
-    run_time = run_time - (tv_start.tv_sec + tv_start.tv_usec/1000000.0);
-    if (verbose)
-	fprintf(stderr, "Run time (excluding inputs) %.4fs\n", run_time);
+    finish_runclock();
 }
 
 void
@@ -3351,6 +3338,7 @@ getch(int oldch)
      *
      * But it does give me somewhere to stick the EOF rubbish.
      */
+    pause_runclock();
     if (input_string) {
 	char * p = 0;
 	c = (unsigned char)*input_string;
@@ -3383,6 +3371,8 @@ getch(int oldch)
 	if (iostyle != 2 && c == '\r') continue;
 	break;
     }
+    unpause_runclock();
+
     if (c != EOF) return c;
     switch(eofcell)
     {
@@ -3396,13 +3386,58 @@ getch(int oldch)
 void
 putch(int ch)
 {
+    pause_runclock();
 #ifdef __STDC_ISO_10646__
     if (ch > 127 && iostyle == 1)
 	printf("%lc", ch);
     else
 #endif
 	putchar(ch);
+    unpause_runclock();
 }
+
+void
+start_runclock(void)
+{
+    gettimeofday(&run_start, 0);
+}
+
+void
+finish_runclock(void)
+{
+    struct timeval run_end;
+    gettimeofday(&run_end, 0);
+    run_time = (run_end.tv_sec + run_end.tv_usec/1000000.0);
+    run_time = run_time - (run_start.tv_sec + run_start.tv_usec/1000000.0);
+    if (verbose) {
+	fflush(stdout);
+	fprintf(stderr, "Run time (excluding I/O) %.4fs\n", run_time);
+    }
+}
+
+void
+pause_runclock(void)
+{
+    /* Stop the clock. */
+    gettimeofday(&run_pause, 0);
+}
+
+void
+unpause_runclock(void)
+{
+    struct timeval run_end;
+    /* Restart the clock */
+    gettimeofday(&run_end, 0);
+    run_start.tv_usec = run_start.tv_usec +
+		    (run_end.tv_usec - run_pause.tv_usec);
+    run_start.tv_sec = run_start.tv_sec +
+		    (run_end.tv_sec - run_pause.tv_sec);
+    while (run_start.tv_usec < 0) {
+	run_start.tv_usec += 1000000;
+	run_start.tv_sec -= 1;
+    }
+}
+
 
 void
 set_cell_size(int cell_bits)
@@ -3797,7 +3832,9 @@ convert_tree_to_runarray(void)
     *p++ = T_STOP;
 
     delete_tree();
+    start_runclock();
     run_progarray(progarray);
+    finish_runclock();
     free(progarray);
 }
 

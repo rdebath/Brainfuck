@@ -516,7 +516,9 @@ run_gnulightning(void)
 	fprintf(stderr, "Generated %d bytes of machine code, running\n",
 		(int)(jit_get_ip().ptr - (char*)startptr));
 
+    start_runclock();
     codeptr();
+    finish_runclock();
 #endif
 
 #ifdef GNULIGHTv2
@@ -531,7 +533,9 @@ run_gnulightning(void)
     jit_clear_state();
     // jit_disassemble();
 
+    start_runclock();
     codeptr();
+    finish_runclock();
 #endif
 
 #if 0
