@@ -145,7 +145,9 @@ link_and_run(dasm_State ** state)
        POSIX specification of dlsym(). */
 					     /* -- Linux man page dlsym() */
     *(void **) (&code) = codeptr;
+    start_runclock();
     code(map_hugeram());
+    finish_runclock();
 
     if (verbose>1)
 	fprintf(stderr, "Run complete\n");
