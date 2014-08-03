@@ -3090,19 +3090,25 @@ update_opt_runner(struct bfi * n, int * mem, int offset)
  *
  * The default header generates some C code.
  */
-
-#define iv(V)	(V>0?"+":""),V
-
 void
 print_codedump(void)
 {
     struct bfi * n = bfprog;
     int memsz = 32768;
+    int disable_c_header = 0;
 
-    if (!noheader) {
+    if (cell_size != sizeof(int)*CHAR_BIT &&
+	cell_size != sizeof(short)*CHAR_BIT &&
+	cell_size != sizeof(char)*CHAR_BIT) {
+	disable_c_header = 1;
+	if (verbose)
+	    fprintf(stderr, "Code dump C header only works for C types\n");
+    }
+
+    if (!noheader && !disable_c_header) {
 	printf("%s%s%s%s%s\n",
 	"#ifndef bf_start"
-"\n"	"#include <stdio.h>"
+"\n"	"#include <unistd.h>"
 "\n"	"#define bf_start(msz,moff) ",cell_type," mem[msz];"
 	"int main(void){register ",cell_type,"*p=mem+moff;"
 "\n"	"#define bf_end() return 0;}");
@@ -3115,63 +3121,73 @@ print_codedump(void)
 	    puts("#define ptradd(x) p += x;");
 
 	if (node_type_counts[T_ADD])
-	    puts("#define add_i(x,y) *(p x) += y;");
+	    puts("#define add_i(x,y) p[x] += y;");
 
 	if (node_type_counts[T_SET])
-	    puts("#define set_i(x,y) *(p x) = y;");
+	    puts("#define set_i(x,y) p[x] = y;");
 
 	/* See:  opt_no_calc */
 	if (node_type_counts[T_CALC])
 	    printf("%s\n",
-		"#define add_c(x,y) *(p x) += *(p y);"
-	"\n"	"#define add_cm(x,y,z) *(p x) += *(p y) * z;"
-	"\n"	"#define set_c(x,y) *(p x) = *(p y);"
-	"\n"	"#define set_cm(x,y,z) *(p x) = *(p y) * z;"
-	"\n"	"#define add_cmi(o1,o2,o3,o4) *(p o1) += *(p o2) * o3 + o4;"
-	"\n"	"#define set_cmi(o1,o2,o3,o4) *(p o1) = *(p o2) * o3 + o4;"
-	"\n"	"#define set_tmi(o1,o2,o3,o4,o5,o6) *(p o1) = o2 + *(p o3) * o4 + *(p o5) * o6;");
-
-	/* See:  opt_no_litprt */
-	if (node_type_counts[T_CHR])
-	    printf("%s\n",
-		"#define outchar(x) putchar(x);"
-	"\n"	"#define outstr(x) printf(\"%s\", x);");
-
-	if (node_type_counts[T_PRT])
-	    puts("#define write(x) putchar(*(p x));");
+		"#define add_c(x,y) p[x] += p[y];"
+	"\n"	"#define add_cm(x,y,z) p[x] += p[y] * z;"
+	"\n"	"#define set_c(x,y) p[x] = p[y];"
+	"\n"	"#define set_cm(x,y,z) p[x] = p[y] * z;"
+	"\n"	"#define add_cmi(o1,o2,o3,o4) p[o1] += p[o2] * o3 + o4;"
+	"\n"	"#define set_cmi(o1,o2,o3,o4) p[o1] = p[o2] * o3 + o4;"
+	"\n"	"#define set_tmi(o1,o2,o3,o4,o5,o6) p[o1] = o2 + p[o3] * o4 + p[o5] * o6;");
 
 	if(node_type_counts[T_MULT] || node_type_counts[T_CMULT]
 	    || node_type_counts[T_FOR] || node_type_counts[T_WHL]) {
-	    puts("#define lp_start(x,y,z,c) while(*(p x)) { /* if(*(p x)==0) goto y; z: */");
-	    puts("#define lp_end(x,y,z) } /* if(*(p x)) goto y; z: */");
+	    puts("#define lp_start(x,y,z,c) while(p[x]) { /* if(p[x]==0) goto y; z: */");
+	    puts("#define lp_end(x,y,z) } /* if(p[x]) goto y; z: */");
 	}
 
 	/* See:  opt_no_endif */
 	if (node_type_counts[T_IF]) {
-	    puts("#define if_start(x,y) if(*(p x)) { /* if(*(p x)==0) goto y; */");
+	    puts("#define if_start(x,y) if(p[x]) { /* if(p[x]==0) goto y; */");
 	    puts("#define if_end(x) } /* x: */");
 	}
 
 	if (node_type_counts[T_STOP])
 	    puts("#define bf_err() exit(1);");
 
-	if (node_type_counts[T_INP])
+	/* See:  opt_no_litprt */
+	if (node_type_counts[T_CHR])
+	    printf("%s\n",
+		"#define outchar(x) {char s= x; write(1,&s,1);}"
+	"\n"	"#define outstr(x) {static const char s[]= x; write(1,s,sizeof(s)-1);}");
+
+	if (node_type_counts[T_PRT])
+	    puts("#define outcell(x) {char s=p[x]; write(1,&s,1);}");
+
+	if (node_type_counts[T_INP]) {
 	    switch(eofcell)
 	    {
 	    case 0:
 	    case 1:
-		puts("#define inpchar(x) {int a=getchar();if(a!=EOF)*(p x)=a;}");
-		break;
-	    case 2:
-		puts("#define inpchar(x) {int a=getchar();if(a!=EOF)*(p x)=a;else *(p x)= -1;}");
-		break;
-	    case 3:
-		puts("#define inpchar(x) {int a=getchar();if(a!=EOF)*(p x)=a;else *(p x)=0;}");
+		puts("#define inpchar(x) "
+		     "{unsigned char a[1]; if(read(0,a,1)>0) p[x]=*a;}");
 		break;
 	    case 4:
-		puts("#define inpchar(x) *(p x)=getchar();");
+#if EOF != -1
+		printf("#define inpchar(x) "
+		     "{unsigned char a[1]; if(read(0,a,1)>0) p[x]=*a;"
+		     "else p[x]= %d;}", EOF);
+		break;
+#endif
+	    case 2:
+		puts("#define inpchar(x) "
+		     "{unsigned char a[1]; if(read(0,a,1)>0) p[x]=*a;"
+		     "else p[x]= -1;}");
+		break;
+	    case 3:
+		puts("#define inpchar(x) "
+		     "{unsigned char a[1]; if(read(0,a,1)>0) p[x]=*a;"
+		     "else p[x]= 0;}");
 		break;
 	    }
+	}
 
 	puts("#endif");
     }
@@ -3190,52 +3206,47 @@ print_codedump(void)
 
 	case T_ADD:
 	    if (n->count)
-		printf("add_i(%s%.0d,%d)\n", iv(n->offset), n->count);
+		printf("add_i(%d,%d)\n", n->offset, n->count);
 	    break;
 
 	case T_SET:
-	    printf("set_i(%s%.0d,%d)\n", iv(n->offset), n->count);
+	    printf("set_i(%d,%d)\n", n->offset, n->count);
 	    break;
 
 	case T_CALC:
 	    if (n->count == 0) {
 		if (n->offset == n->offset2 && n->count2 == 1 && n->count3 == 1) {
-		    printf("add_c(%s%.0d,%s%.0d)\n",
-			iv(n->offset), iv(n->offset3));
+		    printf("add_c(%d,%d)\n", n->offset, n->offset3);
 		    break;
 		}
 
 		if (n->offset == n->offset2 && n->count2 == 1) {
-		    printf("add_cm(%s%.0d,%s%.0d,%d)\n",
-			iv(n->offset), iv(n->offset3), n->count3);
+		    printf("add_cm(%d,%d,%d)\n", n->offset, n->offset3, n->count3);
 		    break;
 		}
 
 		if (n->count3 == 0) {
 		    if (n->count2 == 1)
-			printf("set_c(%s%.0d,%s%.0d)\n",
-			    iv(n->offset), iv(n->offset2));
+			printf("set_c(%d,%d)\n", n->offset, n->offset2);
 		    else
-			printf("set_cm(%s%.0d,%s%.0d,%d)\n",
-			    iv(n->offset), iv(n->offset2), n->count2);
+			printf("set_cm(%d,%d,%d)\n", n->offset, n->offset2, n->count2);
 		    break;
 		}
 	    }
 
 	    if (n->offset == n->offset2 && n->count2 == 1) {
-		printf("add_cmi(%s%.0d,%s%.0d,%d,%d)\n",
-			iv(n->offset), iv(n->offset3), n->count3, n->count);
+		printf("add_cmi(%d,%d,%d,%d)\n",
+			n->offset, n->offset3, n->count3, n->count);
 		break;
 	    }
 
 	    if (n->count3 == 0) {
-		printf("set_cmi(%s%.0d,%s%.0d,%d,%d)\n",
-		    iv(n->offset), iv(n->offset2), n->count2, n->count);
+		printf("set_cmi(%d,%d,%d,%d)\n",
+		    n->offset, n->offset2, n->count2, n->count);
 	    } else {
-		printf("set_tmi(%s%.0d,%d,%s%.0d,%d,%s%.0d,%d)\n",
-		    iv(n->offset), n->count,
-		    iv(n->offset2), n->count2,
-		    iv(n->offset3), n->count3);
+		printf("set_tmi(%d,%d,%d,%d,%d,%d)\n",
+		    n->offset, n->count, n->offset2, n->count2,
+		    n->offset3, n->count3);
 	    }
 	    break;
 
@@ -3245,7 +3256,7 @@ print_codedump(void)
                     )
 
 	case T_PRT:
-	    printf("write(%s%.0d)\n", iv(n->offset));
+	    printf("outcell(%d)\n", n->offset);
 	    break;
 
 	case T_CHR:
@@ -3278,11 +3289,11 @@ print_codedump(void)
 #undef okay_for_cstr
 
 	case T_INP:
-	    printf("inpchar(%s%.0d)\n", iv(n->offset));
+	    printf("inpchar(%d)\n", n->offset);
 	    break;
 
 	case T_IF:
-	    printf("if_start(%s%.0d,lbl_%d)\n", iv(n->offset), n->count);
+	    printf("if_start(%d,lbl_%d)\n", n->offset, n->count);
 	    break;
 
 	case T_ENDIF:
@@ -3291,13 +3302,13 @@ print_codedump(void)
 
 	case T_MULT: case T_CMULT: case T_FOR:
 	case T_WHL:
-	    printf("lp_start(%s%.0d,lbl_%d,loop_%d,%s)\n",
-		    iv(n->offset), n->count, n->count, tokennames[n->type]);
+	    printf("lp_start(%d,lbl_%d,loop_%d,%s)\n",
+		    n->offset, n->count, n->count, tokennames[n->type]);
 	    break;
 
 	case T_END:
-	    printf("lp_end(%s%.0d,loop_%d,lbl_%d)\n",
-		    iv(n->jmp->offset), n->jmp->count, n->jmp->count);
+	    printf("lp_end(%d,loop_%d,lbl_%d)\n",
+		    n->jmp->offset, n->jmp->count, n->jmp->count);
 	    break;
 
 	case T_STOP:
@@ -3327,7 +3338,6 @@ print_codedump(void)
     }
     printf("bf_end()\n");
 }
-#undef iv
 
 int
 getch(int oldch)
