@@ -16,7 +16,7 @@
  * just prints "Hello world" style programs.
  */
 
-#define MAXWHILE 2048
+#define MAXWHILE 4096
 
 struct instruction {
     int ch;
@@ -35,6 +35,7 @@ int ind = 0;
 #define I printf("%*s", ind*4, "")
 static int lblcount = 0;
 static int icount = 0;
+static int maxwhile = MAXWHILE;
 
 static void print_cstring(char * str);
 
@@ -43,6 +44,10 @@ check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     if (strcmp(arg, "-savestring") == 0) return 1;
+    if (strncmp(arg, "-w", 2) == 0) {
+	maxwhile = strtol(arg+2, 0, 10);
+	return 1;
+    }
     return 0;
 }
 
@@ -87,16 +92,16 @@ outcmd(int ch, int count)
 	printf("\n");
     }
 
-    if (icount < MAXWHILE) {
+    if (icount < maxwhile) {
 	for(n=pgm; n; n=n->next)
 	    loutcmd(n->ch, n->count, n);
     } else {
 	for(n=pgm; n; n=n->next) {
 	    if (n->ch != ']') continue;
-	    if (n->icount-n->loop->icount <= MAXWHILE) continue;
+	    if (n->icount-n->loop->icount <= maxwhile) continue;
 	    loutcmd(1000, 1, n->loop);
 	    for(n2 = n->loop->next; n != n2; n2=n2->next) {
-		if (n2->ch == '[' && n2->loop->icount-n2->icount > MAXWHILE) {
+		if (n2->ch == '[' && n2->loop->icount-n2->icount > maxwhile) {
 		    loutcmd(n2->ch, n2->count, n);
 		    I; printf("bf%d()\n", n2->ino);
 		    n2 = n2->loop;
@@ -108,7 +113,7 @@ outcmd(int ch, int count)
 	}
 
 	for(n=pgm; n; n=n->next) {
-	    if (n->ch != '[' || n->loop->icount-n->icount <= MAXWHILE)
+	    if (n->ch != '[' || n->loop->icount-n->icount <= maxwhile)
 		loutcmd(n->ch, n->count, n);
 	    else {
 		loutcmd(n->ch, n->count, n);
