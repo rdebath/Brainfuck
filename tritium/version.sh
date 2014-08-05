@@ -3,27 +3,29 @@
 
 MAJOR=1
 MINOR=0
-# Set below blank for the commit to be tagged with the above version.
-SUFFIX="-post"
-BUILD=0
+SUFFIX="# Unknown @ `date --rfc-3339=seconds`"
+BUILD=
 
 git_describe() {
-    # More detail than git describe --tagso
-    TAG=`git tag -l v$MAJOR.$MINOR`
+    # Get more detail than just git describe --tags
+    TAG=`git describe --tags --match='v[0-9]*.[0-9]*' --abbrev=0`
+    MAJOR=`echo $TAG | sed "s/^v\([0-9]*\).*/\1/"`
+    MINOR=`echo $TAG | sed "s/^v[0-9]*\.\([0-9]*\)/\1/"`
+
     if [ `git rev-list origin -n 1 2>/dev/null | wc -l` -eq 0 ]
     then ORIGIN=HEAD
     else ORIGIN=origin
     fi
 
     SUFFIX=
-    VER=`git rev-list HEAD ${TAG:+^$TAG} | wc -l`
-    OVER=`git rev-list $ORIGIN ${TAG:+^$TAG} | wc -l`
-    DIFF=`git rev-list $ORIGIN..HEAD | wc -l`
-    NDIFF=`git rev-list HEAD..$ORIGIN | wc -l`
+    VER=`git rev-list HEAD ${TAG:+^$TAG} . | wc -l`
+    OVER=`git rev-list $ORIGIN ${TAG:+^$TAG} . | wc -l`
+    DIFF=`git rev-list $ORIGIN..HEAD . | wc -l`
+    NDIFF=`git rev-list HEAD..$ORIGIN . | wc -l`
 
-    MOD=`git status --porc | grep "^ M" | wc -l`
+    MOD=`git status --porc . | grep "^ M" | wc -l`
 
-    HDR=`( git rev-list HEAD -n 1 ; git rev-list $ORIGIN -n 1 ) 2>/dev/null | uniq | wc -l`
+    HDR=`( git rev-list HEAD -n 1 . ; git rev-list $ORIGIN -n 1 . ) 2>/dev/null | uniq | wc -l`
 
     [ "$DIFF" -eq "0" -a "$NDIFF" -eq 0 -a "$HDR" -eq 2 ] && {
 	echo WARNING: YOUR VERSION IS FORKED 1>&2
@@ -42,7 +44,7 @@ git_describe() {
 
     [ "$TAG" = "" ] && SUFFIX="$SUFFIX-pre"
 
-    SUFFIX="$SUFFIX `git rev-list HEAD -n 1 | cut -c 1-7`"
+    SUFFIX="$SUFFIX `git rev-list HEAD -n 1 . | cut -c 1-7`"
     BUILD="$VER"
 }
 
