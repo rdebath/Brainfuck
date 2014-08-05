@@ -3139,6 +3139,7 @@ print_codedump(void)
 	if (node_type_counts[T_STOP])
 	    puts("#define bf_err() exit(1);");
 
+#if 0
 	/* See:  opt_no_litprt */
 	if (node_type_counts[T_CHR])
 	    printf("%s\n",
@@ -3147,6 +3148,19 @@ print_codedump(void)
 
 	if (node_type_counts[T_PRT])
 	    puts("#define outcell(x) {char s=p[x]; write(1,&s,1);}");
+#endif
+	if (node_type_counts[T_CHR] || node_type_counts[T_PRT]) {
+	    puts("void putch(int c) {char s=c; write(1,&s,1);}");
+	}
+	if (node_type_counts[T_CHR]) {
+	    printf("%s\n",
+		"#define outchar(x) putch(x);"
+	"\n"	"void putstr(char *s) {char *p=s; while(*p)p++; write(1,s,p-s);}"
+	"\n"	"#define outstr(x) putstr(x);");
+	}
+	if (node_type_counts[T_PRT]) {
+	    puts("#define outcell(x) putch(p[x]);");
+	}
 
 	if (node_type_counts[T_INP]) {
 	    switch(eofcell)
@@ -3154,23 +3168,23 @@ print_codedump(void)
 	    case 0:
 	    case 1:
 		puts("#define inpchar(x) "
-		     "{unsigned char a[1]; if(read(0,a,1)>0) p[x]=*a;}");
+		     "{unsigned char a[1]; if(read(0,a,1)>0) p[x]= *a;}");
 		break;
 	    case 4:
 #if EOF != -1
 		printf("#define inpchar(x) "
-		     "{unsigned char a[1]; if(read(0,a,1)>0) p[x]=*a;"
+		     "{unsigned char a[1]; if(read(0,a,1)>0) p[x]= *a;"
 		     "else p[x]= %d;}", EOF);
 		break;
 #endif
 	    case 2:
 		puts("#define inpchar(x) "
-		     "{unsigned char a[1]; if(read(0,a,1)>0) p[x]=*a;"
+		     "{unsigned char a[1]; if(read(0,a,1)>0) p[x]= *a;"
 		     "else p[x]= -1;}");
 		break;
 	    case 3:
 		puts("#define inpchar(x) "
-		     "{unsigned char a[1]; if(read(0,a,1)>0) p[x]=*a;"
+		     "{unsigned char a[1]; if(read(0,a,1)>0) p[x]= *a;"
 		     "else p[x]= 0;}");
 		break;
 	    }
