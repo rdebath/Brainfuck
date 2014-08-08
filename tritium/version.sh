@@ -3,7 +3,7 @@
 
 MAJOR=1
 MINOR=0
-SUFFIX="# Unknown @ `date --rfc-3339=seconds`"
+SUFFIX="# Unknown @ `date -R`"
 BUILD=
 
 git_describe() {

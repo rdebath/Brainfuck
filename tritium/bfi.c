@@ -1169,7 +1169,7 @@ run_tree(void)
 			fprintf(stderr, "%s%s%d",
 					i?", ":"",
 					doff+i==off?">":"",
-					oldp[doff+i]);
+					UM(oldp[doff+i]));
 		    }
 		    fprintf(stderr, "\n");
 		}

@@ -33,7 +33,7 @@ TCCFLAG=
 TCCLIBS=-ltcc
 TCCDEP=libtcc.lib-on
 endif
-HAVE_DL=yes
+HAVE_DL=$(wildcard /usr/include/dlfcn.h)
 ifeq ($(HAVE_DL),)
 LIBDL=
 LIBDLFLAG=-DNO_DLOPEN
