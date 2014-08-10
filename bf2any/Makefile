@@ -23,37 +23,6 @@ ifneq ($(wildcard $(TOOLDIR)/dynasm/dynasm),)
 ALLEXE+=bf2jit
 endif
 
-HAVE_TCC=$(wildcard /usr/include/libtcc.h)
-ifeq ($(HAVE_TCC),)
-TCCFLAG=-DNO_LIBTCC
-TCCLIBS=
-TCCDEP=libtcc.lib-off
-else
-TCCFLAG=
-TCCLIBS=-ltcc
-TCCDEP=libtcc.lib-on
-endif
-HAVE_DL=$(wildcard /usr/include/dlfcn.h)
-ifeq ($(HAVE_DL),)
-LIBDL=
-LIBDLFLAG=-DNO_DLOPEN
-else
-ifeq ($(findstring BSD,$(shell uname -s)),)
-LIBDL=-ldl
-endif
-endif
-
-HAVE_TCL=$(wildcard /usr/include/tcl/tcl.h)
-ifeq ($(HAVE_TCL),)
-TCLFLAG=-DDISABLE_LIBTCL
-TCLLIBS=
-TCLDEP=libtcl.lib-off
-else
-TCLFLAG=
-TCLLIBS=-ltcl
-TCLDEP=libtcl.lib-off
-endif
-
 all:	bf2any.o bf2const.o $(ALLEXE)
 
 clean:
@@ -62,6 +31,7 @@ clean:
 	-rm -f bf2jit.amd64.h bf2jit.i686.h
 	-rm -f *.o
 
+# Install all we can make, but don't fail if some can't be built.
 install:
 	-@$(MAKE) -k all
 	-@echo Installing: $(ALLEXE) to $(INSTALLDIR)
@@ -85,13 +55,16 @@ MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 
 $(ALLEXE): bf2any.o bf2const.o
 
+#-------------------------------------------------------------------------------
 # Special cases.
+#-------------------------------------------------------------------------------
 bf2gas32.o: bf2gas.c
 	$(CC) $(CFLAGS) -DUSE32 $(TARGET_ARCH) -c -o $@ bf2gas.c
 
 bf2gas64.o: bf2gas.c
 	$(CC) $(CFLAGS) -DUSE64 $(TARGET_ARCH) -c -o $@ bf2gas.c
 
+#------------------------------------------------------------------------------- 
 bf2jit.o: bf2jit.c bf2jit.amd64.h bf2jit.i686.h
 	$(CC) $(CFLAGS) -I$(TOOLDIR) $(TARGET_ARCH) -c -o $@ bf2jit.c
 
@@ -100,6 +73,28 @@ bf2jit.amd64.h: bf2jit.x86.dasc
 
 bf2jit.i686.h: bf2jit.x86.dasc
 	$(TOOLDIR)/dynasm/dynasm -c -D I386 -o bf2jit.i686.h bf2jit.x86.dasc
+
+#-------------------------------------------------------------------------------
+HAVE_DL=$(wildcard /usr/include/dlfcn.h)
+ifeq ($(HAVE_DL),)
+LIBDL=
+LIBDLFLAG=-DNO_DLOPEN
+else
+ifeq ($(findstring BSD,$(shell uname -s)),)
+LIBDL=-ldl
+endif
+endif
+
+HAVE_TCC=$(wildcard /usr/include/libtcc.h)
+ifeq ($(HAVE_TCC),)
+TCCFLAG=-DNO_LIBTCC
+TCCLIBS=
+TCCDEP=libtcc.lib-off
+else
+TCCFLAG=
+TCCLIBS=-ltcc
+TCCDEP=libtcc.lib-on
+endif
 
 bf2crun: bf2crun.o bf2any.o bf2const.o
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(TCCLIBS) $(LIBDL)
@@ -115,6 +110,18 @@ libtcc.lib-off:
 	-@rm -f libtcc.lib-on
 	@touch libtcc.lib-off
 
+#-------------------------------------------------------------------------------
+HAVE_TCL=$(wildcard /usr/include/tcl/tcl.h)
+ifeq ($(HAVE_TCL),)
+TCLFLAG=-DDISABLE_LIBTCL
+TCLLIBS=
+TCLDEP=libtcl.lib-off
+else
+TCLFLAG=
+TCLLIBS=-ltcl
+TCLDEP=libtcl.lib-on
+endif
+
 bf2tcl: bf2tcl.o bf2any.o bf2const.o
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(TCLLIBS)
 
@@ -128,4 +135,31 @@ libtcl.lib-on:
 libtcl.lib-off:
 	-@rm -f libtcl.lib-on
 	@touch libtcl.lib-off
+
+#-------------------------------------------------------------------------------
+PYVER=2.7
+HAVE_PYLIB=$(wildcard /usr/include/python$(PYVER)/Python.h)
+ifeq ($(HAVE_PYLIB),)
+PYLIBFLAG=
+PYLIBLIBS=
+PYLIBDEP=libpy.lib-off
+else
+PYLIBFLAG=-DENABLE_LIBPY -I/usr/include/python$(PYVER)
+PYLIBLIBS=-lpython$(PYVER)$(PYLIBEX)
+PYLIBDEP=libpy.lib-on
+endif
+
+bf2py: bf2py.o bf2any.o bf2const.o
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(PYLIBLIBS)
+
+bf2py.o: bf2py.c $(PYLIBDEP)
+	$(CC) $(CFLAGS) $(PYLIBFLAG) -c -o $@ bf2py.c $(TARGET_ARCH)
+
+libpy.lib-on:
+	-@rm -f libpy.lib-off
+	@touch libpy.lib-on
+
+libpy.lib-off:
+	-@rm -f libpy.lib-on
+	@touch libpy.lib-off
 

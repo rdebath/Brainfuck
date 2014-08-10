@@ -34,6 +34,12 @@ check_arg(const char * arg)
 	do_dump = 1;
 	return 1;
     } else
+#ifndef DISABLE_LIBTCL
+    if (strcmp(arg, "-r") == 0) {
+	do_dump = 0;
+	return 1;
+    } else
+#endif
     if (strncmp(arg, "-M", 2) == 0) {
 	tapelen = strtol(arg+2, 0, 10);
 	if (tapelen<1) tapelen = 30000;
