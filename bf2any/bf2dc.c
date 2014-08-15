@@ -21,9 +21,6 @@
  *  2)  I could use a pair of variables and use divmod to move bytes from
  *      one to the other. This means we can't have bignum cells but
  *      run length encoding is possible. (divmod by 256^N)
- *
- *  NB: "USE_STACK" is incomplete (Only works with recent DC, no optimisation
- *	and no EOF).
  */
 
 int do_input = 0;
@@ -36,16 +33,14 @@ int ind = 0;
 static void print_dcstring(void);
 
 FILE * ofd;
-int outputmode = 3;
+int outputmode = 2;
 int inputmode = 2;
 
 int
 check_arg(const char * arg)
 {
-#ifndef USE_STACK
     if (strcmp(arg, "-savestring") == 0) return 1;
     if (strcmp(arg, "-O") == 0) return 1;
-#endif
     if (strcmp(arg, "-d") == 0) {
 	inputmode=0; return 1;
 #ifndef _WIN32
@@ -58,6 +53,10 @@ check_arg(const char * arg)
 	outputmode=1; return 1;
     } else if (strcmp(arg, "-g") == 0) {
 	outputmode=2; return 1;
+    } else if (strcmp(arg, "-a") == 0) {
+	outputmode=3; return 1;
+    } else if (strcmp(arg, "-sed") == 0) {
+	outputmode=5; return 1;
     } else
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
@@ -66,8 +65,10 @@ check_arg(const char * arg)
 #ifndef _WIN32
 	"\n\t"  "-r      Run program (standard input will be translated)"
 #endif
-	"\n\t"  "-t      Traditional dc mode"
-	"\n\t"  "-g      General modern dc mode (default is to autodetect)");
+	"\n\t"  "-t      Traditional dc mode; works with V7 unix dc."
+	"\n\t"  "-g      General modern dc mode. (BSD or GNU)"
+	"\n\t"  "-a      Autodetect dc type V7 or modern."
+	"\n\t"  "-sed    For dc.sed.");
 	return 1;
     } else
 	return 0;
@@ -101,7 +102,6 @@ outcmd(int ch, int count)
 	prv("[%dsp", BOFF);
 	break;
 
-#ifndef USE_STACK
     case '=': prv("%slp:a", dc_ltoa(count)); break;
     case 'B':
 	if(bytecell)
@@ -128,24 +128,9 @@ outcmd(int ch, int count)
 	else
 	    pr("lp;a0!=b]Sblp;a0!=bLbc");
 	break;
-#endif
-
-#ifdef USE_STACK
-    case '>': while(count-->0) pr("SL z [0]sq 0=q"); break;
-    case '<': while(count-->0) pr("LL"); break;
-    case '+': prv("%d+", count); break;
-    case '-': prv("%d-", count); break;
-    case '[': pr("["); break;
-    case ']':
-	if (bytecell)
-	    pr("lmx d0!=b]Sb lmx d0!=b 0sbLbd!=.");
-	else
-	    pr("d0!=b]Sbd0!=b 0sbLbd!=.");
-	break;
-#endif
 
     case ',': if (inputmode != 2) { pr("lix"); do_input=1; } break;
-    case '.': pr("lox"); do_output=1; break;
+    case '.': if (outputmode == 2) pr("lp;aaP"); else pr("lox"); do_output=1; break;
     case '"': print_dcstring(); break;
     }
 
@@ -153,8 +138,7 @@ outcmd(int ch, int count)
 
     pr("q]SF");
 
-#ifndef USE_STACK
-    if (do_output || bytecell)
+    if ((do_output && outputmode != 2) || bytecell)
 	fprintf(ofd, "[256+]sM [lp;a 256 %% d0>M]sm\n");
 
     if (do_output)
@@ -169,7 +153,7 @@ outcmd(int ch, int count)
 		} else
 		if ( i >= ' ' && i <= '~' && i != '[' && i != ']'
 		    && i != '\\' /* bsd dc */
-		    && (outputmode != 1 || (i != '|' && i != '~')) /* dc.sed */
+		    && (outputmode != 5 || (i != '|' && i != '~')) /* dc.sed */
 		    ) {
 		    fprintf(ofd, "[[%c]P]%d:C", i, i);
 		} else
@@ -188,15 +172,11 @@ outcmd(int ch, int count)
 
 	switch(outputmode)
 	{
-	case 1:
+	case 1: case 5:
 	    fprintf(ofd, "[;Cx]sO [lmx;Cx]so\n");
 	    break;
 
-	case 2:
-	    fprintf(ofd, "[lmxaP]so\n");
-	    break;
-
-	default:
+	case 3:
 	    /*  Note: dc.sed works in traditional mode, but as it takes
 		minutes just to print "Hello World!" without optimisation
 		there's not much point doing an auto detection. However,
@@ -232,19 +212,6 @@ outcmd(int ch, int count)
 	pr("0li:I0sn");
 	pr("[lnd1+sn;Ilp:a]si");
     }
-#endif
-
-#ifdef USE_STACK
-    if (bytecell)
-	fprintf(ofd, "[256+]sM [256 %% d0>M]sm\n");
-    fprintf(ofd, "[aP]sO [daP]so\n");
-#ifndef _WIN32
-    if (inputmode == 1) fprintf(ofd, "[d!=.?]si\n"); else
-#endif
-    if (do_input)
-	fprintf(ofd, "[]si\n");
-    fprintf(ofd, "0\n");
-#endif
 
     fprintf(ofd, "LFx ");
 #ifndef _WIN32

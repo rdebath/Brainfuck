@@ -22,6 +22,9 @@
 #define C_DEFINES       0x200   /* #defines in the header */
 #define C_RLE           0x400   /* #define for RLE in the header */
 #define GEN_HEADER      0x800   /* Generic header and footer. */
+#define C_NUMRLE        0x3000  /* RLE using %d in <>+- */
+#define C_ADDRLE        0x2000  /* RLE using %d in +- */
+#define C_MOVRLE        0x1000  /* RLE using %d in <> */
 
 #define L_BASE          (0xFF & langclass)
 
@@ -100,6 +103,10 @@ static const char * dotty[] =
 static const char * lisp2[] =
     { "((", "))", "()(", "())", ")())", ")(((", ")()(", ")(()" };
 
+static const char * bewbs[] =
+    { "(.)(.)", "(.){.}", "(.)[.]", "[.](.)",
+      "[.][.]", "{.}{.}", "{.}[.]", "[.]{.}" };
+
 /* Language COW: Not quite as simple as some commands aren't direct replacements. */
 static const char * moo[] = {"moO", "mOo", "MoO", "MOo",
 		"MMMMOOMooOOOmooMMM", "OOOMoo", "MOOmoOmOo", "MoOMOomoo"};
@@ -115,6 +122,22 @@ static const char *rhoprime[] =
 /* https://github.com/mescam/zerolang */
 static const char *zero[] =
     { "0+", "0-", "0++", "0--", "0.", "0?", "0/", "/0" };
+
+/* dc(1) using an array and a point in another variable */
+static const char *dc1[] =
+{   "lp%d+sp", "lp%d-sp", "lp;a%d+lp:a", "lp;a%d-lp:a",
+    "lp;aaP", "", "[lp;a0=q", "lbx]dSbxLbs.",
+    "0sp[q]sq", "" };
+
+/* dc(1) using an array and a pointer on the main stack */
+static const char *dc2[] =
+{ "%d+", "%d-", "dd;a%d+r:a", "dd;a%d-r:a", "d;aaP", "", "[d;a0=q", "lbx]dSbxLbs.",
+  "0[q]sq", "" };
+
+/* dc(1) using the main stack and the stack 'L' as the tape */
+static const char *dc3[] =
+{   "SLz0=z", "LL", "%d+", "%d-", "daP", "", "[lmxd0=q", "lbx]dSbxLbs.",
+    "[256+]sM[256%d0>M]sm [q]sq[0]szz", "" };
 
 /* Language "nyan" https://github.com/tommyschaefer/nyan-script */
 static const char *nyan[] =
@@ -391,6 +414,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-lisp") == 0) {
 	lang = lisp2; langclass = L_CHARS; return 1;
     } else
+    if (strcmp(arg, "-bewbs") == 0) {
+	lang = bewbs; langclass = L_JNWORD; return 1;
+    } else
     if (strcmp(arg, "-chi") == 0 || strcmp(arg, "-chinese") == 0) {
 	lang = chinese; langclass = L_JNWORD; return 1;
     } else
@@ -414,6 +440,15 @@ check_arg(const char * arg)
     } else
     if (strcmp(arg, "-@!") == 0) {
 	lang = atpling; langclass = L_JNWORD+GEN_HEADER; return 1;
+    } else
+    if (strcmp(arg, "-dc1") == 0 || strcmp(arg, "-dc") == 0) {
+	lang = dc1; langclass = L_JNWORD+GEN_HEADER+C_NUMRLE; return 1;
+    } else
+    if (strcmp(arg, "-dc2") == 0) {
+	lang = dc2; langclass = L_JNWORD+GEN_HEADER+C_NUMRLE; return 1;
+    } else
+    if (strcmp(arg, "-dc3") == 0) {
+	lang = dc3; langclass = L_JNWORD+GEN_HEADER+C_ADDRLE; return 1;
     } else
 
     if (strcmp(arg, "-risbf") == 0) {
@@ -448,6 +483,7 @@ check_arg(const char * arg)
 	"\n\t"  "-bfrle  Convert to BF RLE as used by -R."
 	"\n\t"  "-:      Dotty"
 	"\n\t"  "-lisp   Lisp Zero"
+	"\n\t"  "-bewbs  BEWBS"
 	"\n\t"  "-risbf  RISBF"
 	"\n\t"  "-xml    XML"
 	"\n\t"  "-dump   Token dump"
@@ -456,6 +492,7 @@ check_arg(const char * arg)
 	"\n\t"  "-zero   'zerolang' from mescam on github"
 	"\n\t"  "-nyan   'nyan-script' from tommyschaefer on github"
 	"\n\t"  "-@!     @! from http://esolangs.org/wiki/@tention!"
+	"\n\t"  "-dc -dc1 -dc2 -dc3 Various conversions to dc(1)"
 	"\n\t"  ""
 	"\n\t"  "-single BF to BF translation."
 	"\n\t"  "-double BF to BF translation, cell size doubler."
@@ -578,11 +615,22 @@ outcmd(int ch, int count)
     switch (L_BASE) {
     case L_WORDS:
     case L_JNWORD:
-	if (!(p = strchr(bf,ch))) break;
-	while(count-->0){
-	    ps(lang[p-bf]);
-	    if (langclass & C_RLE)
-		while(count-->0) ps(lang[8]);
+	{
+	    int v;
+	    if (!(p = strchr(bf,ch))) break;
+	    v = p-bf;
+	    if ((v>=0 && v<2 && (langclass & C_MOVRLE)) ||
+	        (v>=2 && v<4 && (langclass & C_ADDRLE))) {
+		char sbuf[256];
+		snprintf(sbuf, sizeof(sbuf), lang[v], count);
+		ps(sbuf);
+		break;
+	    }
+	    while(count-->0){
+		ps(lang[v]);
+		if (langclass & C_RLE)
+		    while(count-->0) ps(lang[8]);
+	    }
 	}
 	break;
 
