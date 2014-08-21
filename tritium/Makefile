@@ -20,6 +20,9 @@
 # make command line.
 #
 # make DO_TCC= DO_LIGHT= DO_LIBDL= DO_DYNASM=
+#
+# The internal GNU lightning and Dynasm can also be removed by deleting the
+# relevent parts of the tools directory.
 
 # Always run the version check script.
 VERSTRING := $(shell sh version.sh bfi.version.h)
@@ -48,7 +51,7 @@ MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 	 -Wlarger-than=512 -Wstack-usage=512
 
 bfi:	bfi.o bfi.ccode.o bfi.gnulit.o bfi.nasm.o bfi.bf.o bfi.dc.o bfi.dasm.o \
-	bfi.version.o
+	clock.o bfi.version.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o bfi $^ $(LDLIBS) $(TARGET_ARCH)
 
 pristine: clean
@@ -65,7 +68,7 @@ bfi.gnulit.o:	bfi.gnulit.c bfi.tree.h bfi.gnulit.h bfi.run.h
 
 bfi.o: \
     bfi.c bfi.tree.h bfi.run.h bfi.be.def bfi.ccode.h bfi.gnulit.h \
-    bfi.nasm.h bfi.bf.h bfi.dc.h
+    bfi.nasm.h bfi.bf.h bfi.dc.h clock.h
 bfi.version.o: bfi.version.h
 bfi.bf.o: bfi.bf.c bfi.tree.h
 bfi.ccode.o: bfi.ccode.c bfi.tree.h bfi.run.h bfi.ccode.h
@@ -73,6 +76,8 @@ bfi.dc.o: bfi.dc.c bfi.tree.h bfi.run.h
 bfi.nasm.o: bfi.nasm.c bfi.tree.h bfi.nasm.h
 
 bfi.dasm.o: bfi.dasm.h bfi.tree.h bfi.run.h
+
+clock.o: clock.h
 
 bfi.dasm.amd64.h: bfi.dasm.x86.dasc
 	$(TOOLDIR)/dynasm/dynasm -c -o bfi.dasm.amd64.h bfi.dasm.x86.dasc

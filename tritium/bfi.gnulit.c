@@ -24,6 +24,7 @@
 #endif
 
 #include "bfi.run.h"
+#include "clock.h"
 
 #if defined(GNULIGHTv1) || defined(GNULIGHTv2)
 
@@ -518,7 +519,7 @@ run_gnulightning(void)
 
     start_runclock();
     codeptr();
-    finish_runclock();
+    finish_runclock(&run_time, &io_time);
 #endif
 
 #ifdef GNULIGHTv2
@@ -535,7 +536,7 @@ run_gnulightning(void)
 
     start_runclock();
     codeptr();
-    finish_runclock();
+    finish_runclock(&run_time, &io_time);
 #endif
 
 #if 0

@@ -15,6 +15,7 @@
 #endif
 
 #include "bfi.run.h"
+#include "clock.h"
 
 #include "dynasm/dasm_proto.h"
 
@@ -147,7 +148,7 @@ link_and_run(dasm_State ** state)
     *(void **) (&code) = codeptr;
     start_runclock();
     code(map_hugeram());
-    finish_runclock();
+    finish_runclock(&run_time, &io_time);
 
     if (verbose>1)
 	fprintf(stderr, "Run complete\n");

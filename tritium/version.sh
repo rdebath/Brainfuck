@@ -3,7 +3,7 @@
 
 MAJOR=1
 MINOR=0
-SUFFIX="# Unknown @ `date -R`"
+SUFFIX="# Unknown @ `date -R 2>/dev/null || date`"
 BUILD=
 
 git_describe() {

@@ -35,6 +35,7 @@
 
 #include "bfi.tree.h"
 #include "bfi.run.h"
+#include "clock.h"
 #include "bfi.ccode.h"
 
 static const char * putname = "putch";
@@ -930,7 +931,7 @@ run_tccode(void)
 
 	start_runclock();
 	func();
-	finish_runclock();
+	finish_runclock(&run_time, &io_time);
 	free(image);
     }
 #endif
@@ -963,7 +964,7 @@ run_tccode(void)
 	}
 	start_runclock();
 	func();
-	finish_runclock();
+	finish_runclock(&run_time, &io_time);
 
 	tcc_delete(s);
 	free(ccode);
@@ -1141,7 +1142,7 @@ compile_and_run(void)
 
     start_runclock();
     (*runfunc)();
-    finish_runclock();
+    finish_runclock(&run_time, &io_time);
 
     dlclose(handle);
 }

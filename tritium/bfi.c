@@ -101,6 +101,8 @@ characters after your favorite comment marker in a very visible form.
 #endif
 
 #ifndef NO_EXT_BE
+#include "clock.h"
+
 enum codestyle { c_default,
 #define XX 1
 #include "bfi.be.def"
@@ -110,6 +112,11 @@ const char * codestylename[] = { "std"
 #define XX 8
 #include "bfi.be.def"
 };
+#else
+#define start_runclock(x)
+#define finish_runclock(x,y)
+#define pause_runclock(x)
+#define unpause_runclock(x)
 #endif
 
 char const * program = "C";
@@ -151,7 +158,7 @@ struct bfi *bfprog = 0;
 struct bfi *opt_run_start, *opt_run_end;
 
 /* Stats */
-double run_time = 0;
+double run_time = 0, io_time = 0;
 int loaded_nodes = 0;
 int total_nodes = 0;
 int node_type_counts[TCOUNT+1];
@@ -162,7 +169,6 @@ int most_neg_maad_loop = 0;
 double profile_hits = 0.0;
 int profile_min_cell = 0;
 int profile_max_cell = 0;
-struct timeval run_start, run_pause;
 
 /* Where's the tape memory start */
 void * cell_array_pointer = 0;
@@ -199,10 +205,6 @@ void run_tree(void);
 void print_codedump(void);
 void * map_hugeram(void);
 void unmap_hugeram(void);
-void start_runclock(void);
-void finish_runclock(void);
-void pause_runclock(void);
-void unpause_runclock(void);
 int getch(int oldch);
 void putch(int oldch);
 void set_cell_size(int cell_bits);
@@ -789,16 +791,13 @@ printtree(void)
 void
 process_file(void)
 {
-#define tickstart() do{ if (verbose>2) gettimeofday(&tv_step, 0); } while(0)
+#define tickstart() start_runclock()
 #define tickend(str) do{ \
-	    if (verbose>2) {					    \
-		gettimeofday(&tv_end, 0);			    \
-		fprintf(stderr, str " %.3f\n",			    \
-		(tv_end.tv_sec - tv_step.tv_sec) +		    \
-		(tv_end.tv_usec - tv_step.tv_usec)/1000000.0);	    \
+	    if (verbose>2) {					\
+		double rt = 0;					\
+		finish_runclock(&rt,0);				\
+		if(rt) fprintf(stderr, str " %.3fs\n",rt);	\
 	    } } while(0)
-
-    struct timeval tv_end, tv_step;
 
     if (verbose>5) printtree();
     if (opt_level>=1) {
@@ -848,13 +847,8 @@ process_file(void)
     if (do_run) {
 	if (total_nodes == node_type_counts[T_CHR])
 	    do_codestyle = c_default; /* Be lazy for a 'Hello World'. */
-#ifndef _WIN32 /* cmd.exe is ****ing slow */
 	else if (isatty(STDOUT_FILENO))
 	    setbuf(stdout, 0);
-#else
-	static char obuf[16384];
-	setvbuf(stdout, obuf, _IOLBF, sizeof(obuf));
-#endif
     }
 
     if (do_codestyle == c_default) {
@@ -919,6 +913,11 @@ process_file(void)
     }
 #endif
 
+    if (do_run && verbose && verbose < 3 && run_time>0) {
+	fflush(stdout);
+	fprintf(stderr, "Run time %.6fs, I/O time %.6fs\n", run_time, io_time);
+    }
+
 #undef tickstart
 #undef tickend
 }
@@ -976,8 +975,8 @@ print_tree_stats(void)
     if (total_nodes) {
 	fprintf(stderr, "Offset range %d..%d", min_pointer, max_pointer);
 	fprintf(stderr, ", Minimum MAAD offset %d\n", most_neg_maad_loop);
-	if (profile_hits > 0)
-	    fprintf(stderr, "Run time %.4fs, cycles %.0f, %.3fns/cycle\n",
+	if (profile_hits > 0 && run_time>0)
+	    fprintf(stderr, "Run time %.6fs, cycles %.0f, %.3fns/cycle\n",
 		run_time, profile_hits, 1000000000.0*run_time/profile_hits);
 
 	fprintf(stderr, "Tokens: ");
@@ -1198,7 +1197,7 @@ run_tree(void)
     }
 
 break_break:;
-    finish_runclock();
+    finish_runclock(&run_time, &io_time);
 }
 
 void
@@ -3411,49 +3410,6 @@ putch(int ch)
 }
 
 void
-start_runclock(void)
-{
-    gettimeofday(&run_start, 0);
-}
-
-void
-finish_runclock(void)
-{
-    struct timeval run_end;
-    gettimeofday(&run_end, 0);
-    run_time = (run_end.tv_sec + run_end.tv_usec/1000000.0);
-    run_time = run_time - (run_start.tv_sec + run_start.tv_usec/1000000.0);
-    if (verbose) {
-	fflush(stdout);
-	fprintf(stderr, "Run time (excluding I/O) %.4fs\n", run_time);
-    }
-}
-
-void
-pause_runclock(void)
-{
-    /* Stop the clock. */
-    gettimeofday(&run_pause, 0);
-}
-
-void
-unpause_runclock(void)
-{
-    struct timeval run_end;
-    /* Restart the clock */
-    gettimeofday(&run_end, 0);
-    run_start.tv_usec = run_start.tv_usec +
-		    (run_end.tv_usec - run_pause.tv_usec);
-    run_start.tv_sec = run_start.tv_sec +
-		    (run_end.tv_sec - run_pause.tv_sec);
-    while (run_start.tv_usec < 0) {
-	run_start.tv_usec += 1000000;
-	run_start.tv_sec -= 1;
-    }
-}
-
-
-void
 set_cell_size(int cell_bits)
 {
     if (cell_bits >= (int)sizeof(int)*CHAR_BIT || cell_bits <= 0) {
@@ -3848,7 +3804,7 @@ convert_tree_to_runarray(void)
     delete_tree();
     start_runclock();
     run_progarray(progarray);
-    finish_runclock();
+    finish_runclock(&run_time, &io_time);
     free(progarray);
 }
 
