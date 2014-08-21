@@ -878,8 +878,8 @@ bftranslate(int ch, int count)
 static void
 bfreprint(void)
 {
-    tmp_clean = 0;
     struct instruction * n = pgm;
+    tmp_clean = 0;
     for(; n; n=n->next) {
 	int ch = n->ch;
 	int count = n->count;

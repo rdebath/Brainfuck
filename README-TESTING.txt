@@ -11,8 +11,8 @@ Full testing (home environment)
     x86_64 running Debian wheezy
 
 Full testing
-    i686 running Debian jessy
-    x86_64 running Debian jessy
+    i686 running Debian jessie
+    x86_64 running Debian jessie
     x86_64 running FreeBSD
 
 Currently 'smoke' tested on
@@ -22,6 +22,8 @@ Currently 'smoke' tested on
     Sparc running Debian etch
     x86_64 running NetBSD
     i686 running Debian lenny
+    i686 running Debian etch
+    i686 running Debian woody (GNU lightning fails)
     Windows i386 and amd64.
 
 Testing notes
