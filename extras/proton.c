@@ -244,27 +244,8 @@ runprog(void)
 		break;
 	    }
 #else
-static char prtconv[] = "\nABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^?"
-			" !\"#$%&'()*+,-./0123456789:;<=>\033";
-
-	case T_PRT: putchar(prtconv[M(*tp)]); p+=2; break;
-	case T_INP:
-	    {
-		int a;
-		if((a=getchar()) != EOF) {
-		    char * c;
-		    if (a >= 'a' && a <= 'z') a = a - 'a' + 'A';
-		    c = strchr(prtconv, a);
-		    if (c)
-			*tp = c-prtconv;
-		    else
-			*tp = 0xFF;
-		}
-		else if (on_eof != 1) *tp = on_eof;
-		p+=2;
-		break;
-	    }
-	    break;
+	case T_PRT: printf("%d\n", M(*tp)); p+=2; break;
+	case T_INP: p+=2; break;
 #endif
 	}
     }
