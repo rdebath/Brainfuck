@@ -299,8 +299,9 @@ static int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
 
 static int bf_multi = 0, tmp_clean = 1;
 struct instruction { int ch; int count; struct instruction * next; } *pgm = 0, *last = 0;
-const char ** doubler = doubler_12;
-const char ** bfquad = bfquadnz;
+/* Default double and quad to the easiest to prove algorithms. */
+const char ** doubler = doubler_copy;
+const char ** bfquad = bfquadz;
 
 static void risbf(int ch);
 static void headsecks(int ch, int count);
@@ -321,6 +322,7 @@ check_arg(const char * arg)
     if (strcmp(arg, "-c") == 0) {
 	lang = cbyte; langclass = L_CWORDS; return 1;
     } else
+
     if (strcmp(arg, "-single") == 0) {
 	bf_multi |= 1;
 	lang = bfout; langclass = L_BF; return 1;
@@ -329,6 +331,10 @@ check_arg(const char * arg)
 	bf_multi |= 2;
 	lang = doubler; langclass = L_BF; return 1;
     } else
+    if (strcmp(arg, "-quad") == 0) {
+	bf_multi |= 4;
+	lang = bfquad; langclass = L_BF; return 1;
+    } else
     if (strcmp(arg, "-quadnz") == 0 || strcmp(arg, "-quad") == 0) {
 	bf_multi |= 4;
 	lang = bfquad = bfquadnz; langclass = L_BF; return 1;
@@ -336,10 +342,6 @@ check_arg(const char * arg)
     if (strcmp(arg, "-quadz") == 0) {
 	bf_multi |= 4;
 	lang = bfquad = bfquadz; langclass = L_BF; return 1;
-    } else
-    if (strcmp(arg, "-framed") == 0) {
-	bf_multi |= 8+1;
-	return 1;
     } else
     if (strcmp(arg, "-dbl12") == 0) {
 	lang = doubler = doubler_12;
@@ -381,6 +383,7 @@ check_arg(const char * arg)
 	bf_multi |= 2;
 	langclass = L_BF; return 1;
     } else
+
     if (strcmp(arg, "-n") == 0 || strcmp(arg, "-nice") == 0) {
 	lang = nice; langclass = L_CDWORDS; return 1;
     } else
@@ -830,22 +833,22 @@ bftranslate(int ch, int count)
 	    /* This generates 65536 to check for cells upto 16 bits */
 	    pmc("[-]>[-]++[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]+<[>-<[-]]>[");
 	    pmc(">");
-	    if (bf_multi&8) pmc("\n\n");
+	    pmc("\n\n");
 
 	    lang = doubler; bfreprint();
 
-	    if (bf_multi&8) pmc("\n\n");
+	    pmc("\n\n");
 	    pmc("<[-]]<");
 	    pmc("[-]]\n\n");
 
 	    pc(0); puts("// This section is cell quadrupling for 8bit cells");
 	    /* This generates 256 to check for cells upto 8 bits */
 	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]+<[>-<[-]]>[>");
-	    if (bf_multi&8) pmc("\n\n");
+	    pmc("\n\n");
 
 	    lang = bfquad; bfreprint();
 
-	    if (bf_multi&8) pmc("\n\n");
+	    pmc("\n\n");
 	    pmc("<[-]]<");
 	} else {
 	    /* The two cell size checks here are independent, they can be
@@ -853,8 +856,8 @@ bftranslate(int ch, int count)
 	     */
 
 	    /* This generates 256 to check for larger than byte cells. */
-	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]<[");
-	    pmc(">>\n\n");
+	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]");
+	    pmc("<[" ">>\n\n");
 
 	    if ((bf_multi&1) == 0) lang = doubler; else lang = bfout;
 	    bfreprint();
@@ -862,14 +865,16 @@ bftranslate(int ch, int count)
 	    pmc("\n\n<<[-]]\n\n");
 
 	    /* This generates 256 to check for cells upto 8 bits */
-	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]+<[>-<[-]]>[>");
+	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]");
+	    pmc("+<[>-<[-]]>[>");
+
+	    pmc("\n\n");
 
 	    if(bf_multi&4) lang = bfquad;
 	    else if (bf_multi&2) lang = doubler;
-	    else pmc("\n\n");
 	    bfreprint();
 
-	    if ((bf_multi&6) == 0) pmc("\n\n");
+	    pmc("\n\n");
 	    pmc("<[-]]<");
 	}
     }

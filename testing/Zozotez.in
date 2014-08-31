@@ -1,0 +1,22 @@
+((\
+  (set quote lambda cons car cdr if eq atom flambda print read eval au-revoir
+  REPL list setq and)
+    (print '(Bonjour to Zozotez REPL classic |LISP1.| (au-revoir) to |exit.|) NIL)
+    (REPL))
+ : " \ c a d ? = s ~ p r e ; builtins
+ (\ () 'au-revoir) ; exit-function
+ (\ () ; REPL
+      (print 'Zozotez-moi~>())
+      (if (eq (print(eval(read))) 'au-revoir) () (REPL)))
+ (\ q q) ; list
+ (~ ($s $o) (list set (list quote $s) $o)) ; setq
+ (~ ($s . $o) (if $o (list if $s (cons and $o)) $s)))
+((\ (fibonacci + - 0 1 num)
+  (fibonacci num 0 1))
+  (\ (n a1 a2) (? n (fibonacci (- n 1) a2 (+ a1 a2)) a1))
+  (\ (x y) (? x (c (a x) (+ (d x) y)) y))
+  (\ (x y) (? y (- (d x) (d y)) x))
+  () '(1) '(1 2 3 4 5 6 7 8))
+;
+(au-revoir)
+
