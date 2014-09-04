@@ -33,6 +33,7 @@ int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-b") == 0) return 1;
+    if (strcmp(arg, "-no-default-opt") == 0) return 1;
     return 0;
 }
 

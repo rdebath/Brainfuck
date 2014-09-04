@@ -363,7 +363,8 @@ main(int argc, char ** argv)
     if (!byte_supported && !nobyte_supported)
 	nobyte_supported = byte_supported = 1;
     bytecell = !nobyte_supported;
-    enable_optim = enable_be_optim = check_arg("-O");
+    enable_be_optim = check_arg("-O");
+    enable_optim = !check_arg("-no-default-opt");
 
     for(;;) {
 	if (argc < 2 || argv[1][0] != '-' || argv[1][1] == '\0') {

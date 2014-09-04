@@ -314,6 +314,7 @@ int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-#") == 0) return 1;
+    if (strcmp(arg, "-no-default-opt") == 0) return 1;
 
     if (strncmp(arg, "-M", 2) == 0) {
 	tapelen = strtoul(arg+2, 0, 10);
