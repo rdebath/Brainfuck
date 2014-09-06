@@ -9,18 +9,53 @@
  */
 
 int do_input = 0;
+int do_batfile = 0, do_unbuffered = 0;
 int ind = 0;
 int tapelen = 30000;
 #define I printf("%*s", ind*4, "")
 
+static void print_string(char*s);
+
+#ifdef FULLPREFIX
+static char cmdprefix[] =
+	"@@echo off"
+"\n"	"@@set POWERSHELL_BAT_ARGS=%*"
+"\n"	"@@if defined POWERSHELL_BAT_ARGS set "
+	"POWERSHELL_BAT_ARGS=%POWERSHELL_BAT_ARGS:\"=\\\"%"
+"\n"	"@@PowerShell -ExecutionPolicy Bypass -Command Invoke-Expression "
+	"$('$args=@(^&{$args} %POWERSHELL_BAT_ARGS%);'+"
+	"[String]::Join([Environment]::NewLine,$((Get-Content '%~f0') "
+	"-notmatch '^^@@^|^^:'))) & goto :EOF"
+"\n"	"{" ;
+
+static char cmdsuffix[] = "\n"	"}.Invoke($args)";
+#else
+
+static char cmdprefix[] =
+    "@PowerShell -ExecutionPolicy Bypass -Command Invoke-Expression "
+    "$([String]::Join([Environment]::NewLine,$((Get-Content '%~f0') "
+    "-notmatch '^^@Po'))) & goto :EOF";
+
+static char cmdsuffix[] =
+"\n"	"# If running in the console, wait for input before closing."
+"\n"	"if ($Host.Name -eq \"ConsoleHost\")"
+"\n"	"{ "
+"\n"	"    Write-Host \"Press any key to continue...\" -nonewline"
+"\n"	"    $Host.UI.RawUI.ReadKey(\"NoEcho,IncludeKeyUp\") > $null"
+"\n"	"}" ;
+#endif
+
 int
 check_arg(const char * arg)
 {
+    if (strcmp(arg, "-savestring") == 0) return 1;
     if (strcmp(arg, "-O") == 0) return 1;
     if (strncmp(arg, "-M", 2) == 0) {
 	tapelen = strtoul(arg+2, 0, 10) + BOFF;
 	return 1;
     }
+    if (strcmp(arg, "-bat") == 0) { do_batfile = 1; return 1; }
+    if (strcmp(arg, "-nb") == 0) { do_unbuffered = 1; return 1; }
     return 0;
 }
 
@@ -29,6 +64,8 @@ outcmd(int ch, int count)
 {
     switch(ch) {
     case '!':
+	if (do_batfile)
+	    printf("%s\n", cmdprefix);
 	I; printf("function brainfuck() {\n");
 	ind ++;
 	I; printf("$m = @([int]0) * %d\n", tapelen);
@@ -62,7 +99,14 @@ outcmd(int ch, int count)
 	if(bytecell) { I; printf("$m[$p]=$m[$p] -band 255;\n"); }
 	ind--; I; printf("}\n");
 	break;
-    case '.': I; printf("[Console]::Write([string][char]$m[$p]);\n"); break;
+    case '.':
+	if (do_unbuffered) {
+	    I; printf("Write-Host $([char]$m[$p]) -nonewline\n");
+	} else {
+	    I; printf("outchar $m[$p]\n");
+	}
+	break;
+    case '"': print_string(get_string()); break;
     case ',':
 	I; printf("inchar\n");
 	do_input = 1;
@@ -80,9 +124,21 @@ outcmd(int ch, int count)
 	    printf("function inchar() {\n");
 	    printf("    if ($script:goteof -eq $true) { return; }\n");
 	    printf("    if ($script:gotline -eq $false) {\n");
-	    printf("        $script:line = Read-Host "";\n");
-	    printf("        $script:gotline = $true;\n");
-	    printf("        $script:goteof = $false; # Well crap.\n");
+	    if (!do_unbuffered) {
+		printf("        # The prompt string is corrupted by powershell.\n");
+		printf("        Write-Host $script:obuf -nonewline\n");
+		printf("        $script:obuf = \"\"\n");
+	    }
+	    printf("        $script:line = Read-Host\n");
+	    printf("        $script:gotline = $true\n");
+	    printf("        $script:goteof = $false\n");
+	    printf("        # Well crap -- no EOF, I'll fake it.\n");
+	    printf("        if ( $script:line.Length -eq 1 -And "
+		"26 -eq [int]($script:line.Substring(0,1).ToCharArray()[0])"
+		") {\n");
+	    printf("            $script:goteof = $true\n");
+	    printf("            return\n");
+	    printf("        }\n");
 	    printf("    }\n");
 	    printf("    if ($script:line -eq \"\") {\n");
 	    printf("        $script:gotline = $false;\n");
@@ -97,7 +153,82 @@ outcmd(int ch, int count)
 	    printf("$script:gotline = $false\n");
 	    printf("\n");
 	}
+	if (!do_unbuffered) {
+	    printf("function outchar() {\n");
+	    printf("  if ($args[0] -ne 10) {\n");
+	    printf("    $script:obuf=\"$script:obuf$([char]$args[0])\"\n");
+	    printf("    return;\n");
+	    printf("  }\n");
+	    printf("  # Using Write-Output here mostly works but not well.\n");
+	    printf("  Write-Host $script:obuf\n");
+	    printf("  $script:obuf=\"\"\n");
+	    printf("}\n");
+	    printf("\n");
+	}
 	I; printf("brainfuck\n");
+
+	if (do_batfile)
+	    printf("%s\n", cmdsuffix);
 	break;
+    }
+}
+
+static void
+print_string(char * str)
+{
+    char buf[256];
+    int gotnl = 0, badchar = 0;
+    size_t outlen = 0;
+
+    if (!str) return;
+
+    for(;; str++) {
+	if (outlen && (*str == 0 || gotnl || badchar || outlen > sizeof(buf)-8))
+	{
+	    buf[outlen] = 0;
+	    if (do_unbuffered) {
+		if (gotnl) {
+		    buf[outlen-2] = 0;
+		    I; printf("Write-Host \"%s\"\n", buf);
+		} else {
+		    I; printf("Write-Host \"%s\" -nonewline\n", buf);
+		}
+	    } else {
+		if (gotnl)
+		    buf[outlen-=2] = 0;
+		if (outlen == 1) {
+		    I; printf("outchar %d\n", *buf);
+		} else if (outlen>0) {
+		    I; printf("$script:obuf=$script:obuf + \"%s\"\n", buf);
+		}
+
+		if (gotnl) {
+		    I; printf("outchar 10\n");
+		}
+	    }
+	    gotnl = 0; outlen = 0;
+	}
+	if (badchar) {
+	    if (do_unbuffered) {
+		I; printf("Write-Host $([char]%d) -nonewline\n", badchar);
+	    } else {
+		I; printf("outchar %d\n", badchar);
+	    }
+	    badchar = 0;
+	}
+	if (!*str) break;
+
+	if (*str == '\n') gotnl = 1;
+	if (*str == '"' || *str == '`') {
+	    buf[outlen++] = '`'; buf[outlen++] = *str;
+	} else if (*str >= ' ' && *str <= '~') {
+	    buf[outlen++] = *str;
+	} else if (*str == '\n') {
+	    buf[outlen++] = '`'; buf[outlen++] = 'n';
+	} else if (*str == '\t') {
+	    buf[outlen++] = '`'; buf[outlen++] = 't';
+	} else {
+	    badchar = *(unsigned char *)str;
+	}
     }
 }
