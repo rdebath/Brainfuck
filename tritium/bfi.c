@@ -2473,6 +2473,15 @@ find_known_calc_state(struct bfi * v)
 	 * node wipes it. */
 	/* This is a BF standard form. */
 
+	int cnt1 = v->count2 * n2->count2;
+	double cnt2 = (double)v->count2 * (double)n2->count2;
+	if ((double)cnt1 != cnt2) {
+	    if (verbose>5)
+		fprintf(stderr, "T_CALC merge Mult overflow %d != %.0f @(%d,%d)\n",
+				cnt1, cnt2, v->line, v->col);
+	    return rv;
+	}
+
 	v->offset2 = n2->offset2;
 	v->count2 = v->count2 * n2->count2;
 
