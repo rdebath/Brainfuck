@@ -123,7 +123,7 @@ static const char *rhoprime[] =
 static const char *zero[] =
     { "0+", "0-", "0++", "0--", "0.", "0?", "0/", "/0" };
 
-/* dc(1) using an array and a point in another variable */
+/* dc(1) using an array and a pointer in another variable */
 static const char *dc1[] =
 {   "lp%d+sp", "lp%d-sp", "lp;a%d+lp:a", "lp;a%d-lp:a",
     "lp;aaP", "", "[lp;a0=q", "lbx]dSbxLbs.",
@@ -138,6 +138,12 @@ static const char *dc2[] =
 static const char *dc3[] =
 {   "SLz0=z", "LL", "%d+", "%d-", "daP", "", "[lmxd0=q", "lbx]dSbxLbs.",
     "[256+]sM[256%d0>M]sm [q]sq[0]szz", "" };
+
+/* dc(1) using two unbounded variables. */
+static const char *dc4[] =
+{   "lr256*+sr lld256/sl lmx", "ll256*+sl lrd256/sr lmx",
+    "%d+ lmx", "%d- lmx", "daP", "", "[lmxd0=q", "lbx]dSbxLbs.",
+    "[256+]sM[256%d0>M]sm [q]sq 0dsldsr", "" };
 
 /* Language "nyan" https://github.com/tommyschaefer/nyan-script */
 static const char *nyan[] =
@@ -454,6 +460,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-dc3") == 0) {
 	lang = dc3; langclass = L_JNWORD+GEN_HEADER+C_ADDRLE; return 1;
     } else
+    if (strcmp(arg, "-dc4") == 0) {
+	lang = dc4; langclass = L_JNWORD+GEN_HEADER+C_ADDRLE; return 1;
+    } else
 
     if (strcmp(arg, "-risbf") == 0) {
 	lang = 0; langclass = L_RISBF; return 1;
@@ -496,13 +505,16 @@ check_arg(const char * arg)
 	"\n\t"  "-zero   'zerolang' from mescam on github"
 	"\n\t"  "-nyan   'nyan-script' from tommyschaefer on github"
 	"\n\t"  "-@!     @! from http://esolangs.org/wiki/@tention!"
-	"\n\t"  "-dc -dc1 -dc2 -dc3 Various conversions to dc(1)"
+	"\n\t"  "-dc     Convert to dc(1) using the first of below."
+	"\n\t"  "-dc1      Use an array and a pointer variable."
+	"\n\t"  "-dc2      Use an array with the pointer on the stack (not V7)."
+	"\n\t"  "-dc3      Store the tape in the main stack and a second one."
+	"\n\t"  "-dc4      Use two unbounded variables to store the tape."
 	"\n\t"  ""
 	"\n\t"  "-single BF to BF translation."
 	"\n\t"  "-double BF to BF translation, cell size doubler."
 	"\n\t"  "-quad   BF to BF translation, cell size double doubler."
 	"\n\t"  "        These can be combined and will autodetect cell size."
-	"\n\t"  "-framed Put the cell size test round two simple copies."
 	"\n\t"  "        There are also several different variations ..."
 	"\n\t"  "-dbl12 -dbl12nz -dbl17a -dbl17b -dblcpnz -dblcopy -dblcp12"
 	"\n\t"  "-dbleso -quadz -quadnz"
