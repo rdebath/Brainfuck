@@ -20,16 +20,17 @@ BEGIN {
     if (ARGC == 1) {
 	print "Usage: bf2c [options] files..."
 	print " Options:"
-	print "  -c        Don't run the program, send it to stdout."
-	print "  -O -O3    Pass this option to 'cc'."
-	print "  -O0       Disable peephole optimisations."
-	print "  -#        Dump final memory and when a # is seen."
-	print "  -i        Enable counting of BF instructions."
-	print "  -M65536   Specify amount of memory to allocate."
-	print "  -Tint     Type for the tape cells."
-	print "  -Ctcc     Use the specified C compiler rather than 'cc'."
+	print "  -c         Don't run the program, send it to stdout."
+	print "  -O -O3     Pass this option to 'cc'."
+	print "  -O0        Disable peephole optimisations."
+	print "  -#         Dump final memory and when a # is seen."
+	print "  -i         Enable counting of BF instructions."
+	print "  -M65536    Specify amount of memory to allocate."
+	print "  -Tunsigned Type for the tape cells."
+	print "  -Ctcc      Use the specified C compiler rather than 'cc'."
 	print ""
 	print "Note: the -i and -# options interfere with optimisation."
+	print "      For the -i to count correctly -T must not be signed."
 	aborting=1;
 	exit
     }
@@ -100,7 +101,7 @@ END {
     ll = 1;
     print_line();
     if (icount && !debug) {
-	print "fprintf(stderr, \"\\nCommands executed: %.0Lf\\n\", (long double)icount);" > of
+	print "fprintf(stderr, \"\\nCommands executed: %\"PRIuMAX\"\\n\", icount);" > of
     }
     print "return 0;}" > of
 
@@ -125,9 +126,18 @@ function header() {
 
     if (cell != "") tcell=cell; else tcell="unsigned char";
 
-    print "#include <stdlib.h>" > of
-    print "#include <unistd.h>" > of
-    print "#include <stdio.h>"  > of
+    if (!norun)
+	print "#include <string.h>" > of
+
+    if (cell != "" || icount || debug)
+	print "#include <stdio.h>"  > of
+    if (cell == "" || !norun)
+	print "#include <unistd.h>" > of
+    if (icount)
+	print "#include <inttypes.h>" > of
+    else if (tcell ~ /_/)
+	print "#include <stdint.h>" > of
+	
     print "#define r m+=1;" > of
     print "#define l m-=1;" > of
     print "#define u *m+=1;"    > of
@@ -159,11 +169,7 @@ function header() {
     if (icount) {
 	print "#define t icount++;" > of
 	print "#define T(x) icount += (x);" > of
-	print "#ifdef __x86_64" > of
-	print "__int128 icount = 0;" > of
-	print "#else" > of
-	print "long long icount = 0;" > of
-	print "#endif" > of
+	print "uintmax_t icount = 0;" > of
     }
 
     if (cell != "") {
@@ -216,17 +222,17 @@ function print_line() {
 
 function debug_mem() {
     if (icount) {
-	print "fprintf(stderr, \"\\nCommands executed: %.0Lf\\n\", (long double)icount);" > of
+	print "fprintf(stderr, \"\\nCommands executed: %\"PRIuMAX\"\\n\", icount);" > of
     }
-    print "{ int ii, jj=0;" > of;
+    print "{ unsigned ii, jj=0;" > of;
     print "  for(ii=" memoff "; ii<sizeof(mem)/sizeof(*mem); ii++)" > of;
     print "    if(mem[ii]) jj = ii+1;" > of;
     print "  fprintf(stderr, \"Ptr: %2d: mem:\", m-mem-" memoff ");" > of;
     print "  for(ii=" memoff "; ii<jj || mem+ii<=m; ii++)" > of;
-    print "    fprintf(stderr, \" %3d\", mem[ii]);" > of;
+    print "    fprintf(stderr, \" %3.0f\", (double)mem[ii]);" > of;
     print "  fprintf(stderr, \"\\n\");" > of;
     print "  if (mem-m-" memoff "<100) {" > of;
-    print "    fprintf(stderr, \"         ptr:\", m-mem-" memoff ");" > of;
+    print "    fprintf(stderr, \"         ptr:\");" > of;
     print "    for(ii=" memoff "; mem+ii<=m; ii++)" > of;
     print "      fprintf(stderr, \"   %s\", mem+ii==m?\"^\":\" \");" > of;
     print "    fprintf(stderr, \"\\n\");" > of;
