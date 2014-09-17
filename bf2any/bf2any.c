@@ -483,7 +483,7 @@ main(int argc, char ** argv)
     }
     if(c) outrun(lastch, c);
     while(b>0){ outrun(']', 1); b--;} /* Not enough ']', add some. */
-    if (enable_debug) outrun('#', 0);
+    if (enable_debug && lastch != '#') outrun('#', 0);
     outrun('~', 0);
     return 0;
 }

@@ -161,6 +161,9 @@ static const char *atpling[] =
      "D@=; T2=; Q(x{TTT*=})=; 8Q^; T{D0<}; Q,; T,; A(D!x-{D~}`)=;"
      "X0=; I(XX1+=)=; E(XX1-=)=; B(XA^XA^1+=)=; C(XA^XA^1-=)=;", "" };
 
+/* Language Cupid */
+static const char * cupid[] = { "->", "<-", "><", "<>", "<<", ">>", "-<", ">-", 0 };
+
 /* BF Doubler doubles the cell size. */
 /* 12 cost, cells in LXXH order, with tmpzero */
 static const char * doubler_12[] =
@@ -451,6 +454,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-@!") == 0) {
 	lang = atpling; langclass = L_JNWORD+GEN_HEADER; return 1;
     } else
+    if (strcmp(arg, "-cp") == 0 || strcmp(arg, "-cupid") == 0) {
+	lang = cupid; langclass = L_JNWORD; return 1;
+    } else
     if (strcmp(arg, "-dc1") == 0 || strcmp(arg, "-dc") == 0) {
 	lang = dc1; langclass = L_JNWORD+GEN_HEADER+C_NUMRLE; return 1;
     } else
@@ -505,6 +511,7 @@ check_arg(const char * arg)
 	"\n\t"  "-zero   'zerolang' from mescam on github"
 	"\n\t"  "-nyan   'nyan-script' from tommyschaefer on github"
 	"\n\t"  "-@!     @! from http://esolangs.org/wiki/@tention!"
+	"\n\t"  "-cupid  Cupid from http://esolangs.org/wiki/Cupid"
 	"\n\t"  "-dc     Convert to dc(1) using the first of below."
 	"\n\t"  "-dc1      Use an array and a pointer variable."
 	"\n\t"  "-dc2      Use an array with the pointer on the stack (not V7)."
@@ -561,7 +568,7 @@ ps(const char * s)
 
     while (*s) {
 	putchar(*s);
-	/* Count UTF-8 CHARACTERS. This is easy, but actually wrong as
+	/* Count UTF-8 codepoints. This is easy, but actually wrong as
 	 * we really want the display width (eg: Chinese characters are
 	 * double width, usually. */
 	if ((*s&0xC0) != 0x80)
@@ -806,10 +813,12 @@ bftranslate(int ch, int count)
 	    else if (!tmp_clean && lang[8]) {
 		pmc(lang[8]); tmp_clean = 1;
 	    }
+	    if (ch == '#') pc('\n');
 	    if (p)
 		while(count-->0) pmc(lang[p-bf]);
 	    else
 		pc(ch);
+	    if (ch == '#') pc('\n');
 	}
 	return;
     }
@@ -909,7 +918,10 @@ bfreprint(void)
 		pmc(lang[8]); tmp_clean = 1;
 	    }
 	    while(count-->0) pmc(lang[p-bf]);
-	} else
+	} else {
+	    if (ch == '#') pc('\n');
 	    pc(ch);
+	    if (ch == '#') pc('\n');
+	}
     }
 }
