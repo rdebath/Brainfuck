@@ -345,7 +345,7 @@ check_arg(const char * arg)
 	bf_multi |= 4;
 	lang = bfquad; langclass = L_BF; return 1;
     } else
-    if (strcmp(arg, "-quadnz") == 0 || strcmp(arg, "-quad") == 0) {
+    if (strcmp(arg, "-quadnz") == 0) {
 	bf_multi |= 4;
 	lang = bfquad = bfquadnz; langclass = L_BF; return 1;
     } else
@@ -872,7 +872,7 @@ bftranslate(int ch, int count)
 
 	    pmc("\n\n");
 	    pmc("<[-]]<");
-	} else {
+	} else if ((bf_multi & 7) != 5) {
 	    /* The two cell size checks here are independent, they can be
 	     * reordered or used on their own.
 	     */
@@ -894,6 +894,28 @@ bftranslate(int ch, int count)
 
 	    if(bf_multi&4) lang = bfquad;
 	    else if (bf_multi&2) lang = doubler;
+	    bfreprint();
+
+	    pmc("\n\n");
+	    pmc("<[-]]<");
+	} else {
+	    /* Eight bit and thirty two bit. */
+	    /* This condition is a bit more difficult to optimise and a bit
+	     * smaller than the simple multiply list above.
+	     * It checks for binary cells of 16bits or less. */
+	    pmc("++>>+++++[-<<[->++++++++<]>[-<+>]>]<");
+	    pmc("+<[[-]>>");
+	    pmc("\n\n");
+
+	    lang = bfout;
+	    bfreprint();
+
+	    /* This is an "else" condition, the code cannot be resequenced */
+	    pmc("\n\n");
+	    pmc("<[-]<[-]]>[>");
+	    pmc("\n\n");
+
+	    lang = bfquad;
 	    bfreprint();
 
 	    pmc("\n\n");

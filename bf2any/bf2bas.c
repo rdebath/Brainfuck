@@ -250,6 +250,7 @@ outcmd(int ch, int count)
 		break;
 	    case loop_wend:
 		I; printf("WHILE M(P)<>0\n");
+		break;
 	    case loop_while:
 		I; printf("While M(P)<>0\n");
 		break;
