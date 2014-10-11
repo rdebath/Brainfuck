@@ -78,7 +78,7 @@ There are several BF interpreters and tools in this repository.
   * elf -- Direct production of a 32bit Linux executable. *no-opt*
   * gas -- x64 or x86 assembler. Use gcc to assemble and link: "gcc -o bfp bfout.s" *no-opt*
   * go -- Google's modern language
-  * julia -- [An modern language using LLVM](http://julialang.org)
+  * julia -- [A modern language using LLVM](http://julialang.org)
   * lua
   * neko -- [Neko programming language VM](http://nekovm.org)
   * navision -- Now called Microsoft DynamicsNAV
@@ -91,7 +91,7 @@ There are several BF interpreters and tools in this repository.
   * ruby
   * tcl
   * s-lang
-  * sh -- Bourne shell without bash extensions, not Unix v7 but later should be fine. -- *deoptimised*
+  * sh -- Bourne shell without bash extensions, not Unix v7 but later should be fine.
   * v7sh -- Bourne shell from Unix v7. -- *deoptimised*
 
   Most are heavily optimised (for Brainfuck) and most work in both 8 bit and the native size of the generated code.
