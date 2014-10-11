@@ -2944,6 +2944,15 @@ build_string_in_tree(struct bfi * v)
  *
  * TODO: If there are NO T_INP instructions we could use a fast runner and
  *      just intercept the output.
+ *
+ *	I could continue running until we actually hit the T_INP instruction,
+ *	I would need to save the current tape state so that it can be rolled
+ *	back to the beginning of the loop.
+ *
+ *	This method could also be used in the middle of the program, just stop
+ *	when you find a calculation based on an unknown.
+ *
+ *	A simple counter would stop this hanging on an infinite loop.
  */
 void
 try_opt_runner(void)
