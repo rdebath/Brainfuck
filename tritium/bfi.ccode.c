@@ -1043,6 +1043,8 @@ run_gccode(void)
 #define CC "clang -m32"
 #elif defined(__clang__) && (__clang_major__>=3) && defined(__amd64__)
 #define CC "clang -m64"
+#elif defined(__PCC__)
+#define CC "pcc"
 #elif defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
 #if defined(__x86_64__)
 #if defined(__ILP32__)
