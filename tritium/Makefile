@@ -51,7 +51,7 @@ MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 	 -Wlarger-than=512 -Wstack-usage=512
 
 bfi:	bfi.o bfi.ccode.o bfi.gnulit.o bfi.nasm.o bfi.bf.o bfi.dc.o bfi.dasm.o \
-	clock.o bfi.version.o
+	clock.o taperam.o bfi.version.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o bfi $^ $(LDLIBS) $(TARGET_ARCH)
 
 pristine: clean
@@ -76,6 +76,7 @@ bfi.dc.o: bfi.dc.c bfi.tree.h bfi.run.h
 bfi.nasm.o: bfi.nasm.c bfi.tree.h bfi.nasm.h
 
 bfi.dasm.o: bfi.dasm.h bfi.tree.h bfi.run.h
+taperam.o: bfi.tree.h bfi.run.h
 
 clock.o: clock.h
 
