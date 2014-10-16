@@ -14,6 +14,7 @@
 # include <windows.h>
 #endif
 
+#include "bfi.dasm.h"
 #include "bfi.run.h"
 #include "clock.h"
 
@@ -24,7 +25,7 @@ static int tape_step = sizeof(int);
 static int dump_code = 0;
 
 int
-checkarg_dynasm(char * opt, char * arg)
+checkarg_dynasm(char * opt, char * arg UNUSED)
 {
     if (!strcmp(opt, "-dump")) {
 	dump_code = 1;
@@ -82,13 +83,16 @@ link_and_run(dasm_State ** state)
 		      MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 #else
     /* This'll probably only work with Linux ... Oh, FreeBSD too. */
-    int fd = open("/dev/zero", O_RDWR);
-    if (fd >= 0) {
-	codeptr =
-	    (char *) mmap(NULL, size,
-			  PROT_READ | PROT_WRITE | PROT_EXEC,
-			  MAP_PRIVATE, fd, 0);
-	close(fd);
+    {
+	int fd = open("/dev/zero", O_RDWR);
+	if (fd >= 0) {
+	    codeptr =
+		(char *) mmap(NULL, size,
+			      PROT_READ | PROT_WRITE | PROT_EXEC,
+			      MAP_PRIVATE, fd, 0);
+	    close(fd);
+	} else
+	    codeptr = MAP_FAILED;
     }
 #endif
     if (codeptr == MAP_FAILED) {

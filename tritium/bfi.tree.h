@@ -1,4 +1,11 @@
 
+#ifndef __GNUC__
+#define __attribute__(__ignored__)
+#define UNUSED
+#else
+#define UNUSED __attribute__ ((__unused__))
+#endif
+
 extern int curr_line, curr_col;
 extern int noheader, enable_trace, hard_left_limit, most_neg_maad_loop;
 extern int min_pointer, max_pointer;

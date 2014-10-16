@@ -241,7 +241,7 @@ print_nasm(void)
 	    break;
 
 	case T_CHR:
-	    *sp++ = n->count;
+	    *sp++ = (char) /*GCC -Wconversion*/ n->count;
 	    break;
 
 	case T_PRT:

@@ -43,7 +43,7 @@ characters after your favorite comment marker in a very visible form.
 #ifdef __STRICT_ANSI__
 #define _POSIX_C_SOURCE 200809UL
 #if __STDC_VERSION__ < 199901L
-#error This program needs at least the C99 standard.
+#warning This program needs at least the C99 standard.
 #endif
 #else
 #define _GNU_SOURCE
@@ -168,6 +168,15 @@ int flatten_multiplier(struct bfi * v);
 void build_string_in_tree(struct bfi * v);
 void * tcalloc(size_t nmemb, size_t size);
 struct bfi * add_node_after(struct bfi * p);
+void find_known_value_recursion(struct bfi * n, int v_offset,
+		struct bfi ** n_found,
+		int * const_found_p, int * known_value_p, int * unsafe_p,
+		int allow_recursion,
+		struct bfi * n_stop,
+		int * hit_stop_node_p,
+		int * n_used_p,
+		int * unknown_found_p);
+int search_for_update_of_offset(struct bfi *n, struct bfi *v, int n_offset);
 
 /* Printing and running */
 void run_tree(void);
@@ -181,6 +190,13 @@ void run_progarray(int * progarray);
 /* Trial run. */
 void try_opt_runner(void);
 int update_opt_runner(struct bfi * n, int * mem, int offset);
+
+/* Other functions. */
+void LongUsage(FILE * fd, const char * errormsg) __attribute__ ((__noreturn__));
+void Usage(const char * why) __attribute__ ((__noreturn__));
+void UsageOptError(char * why) __attribute__ ((__noreturn__));
+void UsageInt64(void) __attribute__ ((__noreturn__));
+int checkarg(char * opt, char * arg);
 
 void LongUsage(FILE * fd, const char * errormsg)
 {
@@ -1937,7 +1953,7 @@ find_known_value(struct bfi * n, int v_offset,
 }
 
 int
-scan_one_node(struct bfi * v, struct bfi ** move_v)
+scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 {
     struct bfi *n = 0;
     int const_found = 0, known_value = 0, non_zero_unsafe = 0;
@@ -2966,7 +2982,7 @@ update_opt_runner(struct bfi * n, int * mem, int offset)
     int i;
 
     if (n && n->orgtype == T_WHL && UM(mem[offset + n->offset]) == 0) {
-	// Move the T_SUSP
+	/* Move the T_SUSP */
 	int lp = 1;
 	if (verbose>3)
 	    fprintf(stderr, "Trial run optimise triggered on dead loop.\n");
@@ -3261,10 +3277,10 @@ print_codedump(void)
 		p = s = malloc(i+2);
 
 		for(j=0; j<i; j++) {
-		    *p++ = n->count;
+		    *p++ = (char) /*GCC -Wconversion*/ n->count;
 		    n = n->next;
 		}
-		*p++ = n->count;
+		*p++ = (char) /*GCC -Wconversion*/ n->count;
 		*p++ = 0;
 
 		printf("outstr(\"%s\")\n", s);

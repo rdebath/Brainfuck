@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "bfi.tree.h"
+#include "bfi.gnulit.h"
 
 #ifndef DISABLE_GNULIGHTNING
 #define LIGHTNING_DETECT
@@ -29,14 +30,15 @@
 #if defined(GNULIGHTv1) || defined(GNULIGHTv2)
 
 /* GNU lightning's macros upset GCC a little ... */
-#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=3))
+#if (defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=3))) || defined(__clang__)
 #pragma GCC diagnostic ignored "-Wunused-value"
+#pragma GCC diagnostic ignored "-Wcast-align"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wpointer-to-int-cast"
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#ifdef __clang__
+#pragma GCC diagnostic ignored "-Wused-but-marked-unused"
 #endif
-#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
-#pragma GCC optimize("no-strict-aliasing")
-#pragma GCC optimize(1)
 #endif
 
 #ifdef GNULIGHTv1
@@ -143,6 +145,7 @@ load_acc_offset(int offset)
 
 static void puts_without_nl(char * s) { fputs(s, stdout); }
 
+static void failout(void) __attribute__ ((__noreturn__));
 static void failout(void) { fprintf(stderr, "STOP Command executed.\n"); exit(1); }
 
 struct freecell { struct freecell * next; void * memp; } * saved_pointers = 0;
@@ -177,6 +180,7 @@ run_gnulightning(void)
 #ifdef GNULIGHTv1
     jit_insn** loopstack = 0;
     jit_insn *codeBuffer;
+    void * startptr;
 #endif
 #ifdef GNULIGHTv2
     jit_node_t    *start, *end;	    /* For size of code */
@@ -202,7 +206,7 @@ run_gnulightning(void)
     save_ptr_for_free(codeBuffer);
 
     codeptr = jit_set_ip(codeBuffer).vptr;
-    void * startptr = jit_get_ip().ptr;
+    startptr = jit_get_ip().ptr;
     /* Function call prolog */
     jit_prolog(0);
     /* Get the data area pointer */
@@ -418,10 +422,10 @@ run_gnulightning(void)
 		save_ptr_for_free(s);
 
 		for(j=0; j<i; j++) {
-		    *p++ = n->count;
+		    *p++ = (char) /*GCC -Wconversion*/ n->count;
 		    n = n->next;
 		}
-		*p++ = n->count;
+		*p++ = (char) /*GCC -Wconversion*/ n->count;
 		*p++ = 0;
 
 #ifdef GNULIGHTv1

@@ -1,7 +1,7 @@
 #ifdef __STRICT_ANSI__
 #define _POSIX_C_SOURCE 200809UL
 #if __STDC_VERSION__ < 199901L
-#error This program needs at least the C99 standard.
+#warning This program needs at least the C99 standard.
 #endif
 
 #ifndef DISABLE_TCCLIB
@@ -59,6 +59,9 @@ void run_tccode(void);
 #ifndef DISABLE_DLOPEN
 void run_gccode(void);
 #endif
+
+static void pt(FILE* ofd, int indent, struct bfi * n);
+static void print_c_header(FILE * ofd);
 
 int
 checkarg_ccode(char * opt, char * arg)
@@ -632,7 +635,7 @@ print_ccode(FILE * ofd)
 		    if (n->count == '\n') { *p++ = '\\'; *p++ = 'n'; } else
 		    if (n->count == '\\') { *p++ = '\\'; *p++ = '\\'; } else
 		    if (n->count == '"') { *p++ = '\\'; *p++ = '"'; } else
-			*p++ = n->count;
+			*p++ = (char) /*GCC -Wconversion*/ n->count;
 		    if (j!=i)
 			n = n->next;
 		}
@@ -892,7 +895,7 @@ run_tccode(void)
     tcc_add_symbol(s, "getch", &getch);
     tcc_add_symbol(s, "putch", &putch);
 
-#if __TCCLIB_VERSION == 0x000925
+#if defined(__TCCLIB_VERSION) && __TCCLIB_VERSION == 0x000925
 #define TCCDONE
     {
 	int (*func)(void);
@@ -936,7 +939,7 @@ run_tccode(void)
     }
 #endif
 
-#if __TCCLIB_VERSION == 0x000926
+#if defined(__TCCLIB_VERSION) && __TCCLIB_VERSION == 0x000926
 #define TCCDONE
     {
 	int (*func)(void);
@@ -973,16 +976,17 @@ run_tccode(void)
 #endif
 
 #if !defined(TCCDONE)
-#define TCCDONE
-static char * args[] = {"tcclib", 0};
-    if (verbose)
-	fprintf(stderr, "Running C Code using libtcc tcc_run() to compile & run.\n");
+    {
+    static char * args[] = {"tcclib", 0};
+	if (verbose)
+	    fprintf(stderr, "Running C Code using libtcc tcc_run() to compile & run.\n");
 
-    rv = tcc_run(s, 1, args);
-    if (verbose && rv)
-	fprintf(stderr, "tcc_run returned %d\n", rv);
-    tcc_delete(s);
-    free(ccode);
+	rv = tcc_run(s, 1, args);
+	if (verbose && rv)
+	    fprintf(stderr, "tcc_run returned %d\n", rv);
+	tcc_delete(s);
+	free(ccode);
+    }
 #endif
 }
 #endif
@@ -1139,8 +1143,10 @@ compile_and_run(void)
 	rmdir(tmpdir);
     }
 
+#ifndef __STRICT_ANSI__
     if (verbose>1)
-	fprintf(stderr, "Calling function loaded at address %p\n", runfunc);
+	fprintf(stderr, "Calling function loaded at address %p\n", (void*) runfunc);
+#endif
 
     start_runclock();
     (*runfunc)();

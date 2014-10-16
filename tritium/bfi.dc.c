@@ -10,6 +10,7 @@
 
 #include "bfi.tree.h"
 #include "bfi.run.h"
+#include "bfi.dc.h"
 
 static FILE * ofd;
 static int no_v7 = 0;
@@ -69,7 +70,7 @@ prt_value(const char * prefix, int count, const char * suffix)
 }
 
 int
-checkarg_dc(char * opt, char * arg)
+checkarg_dc(char * opt, char * arg UNUSED)
 {
     if (!strcmp(opt, "-nov7")) {
 	no_v7 = 1;
@@ -222,10 +223,10 @@ print_dc(void)
 		p = s = malloc(i+2);
 
 		for(j=0; j<i; j++) {
-		    *p++ = n->count;
+		    *p++ = (char) /*GCC -Wconversion*/ n->count;
 		    n = n->next;
 		}
-		*p++ = n->count;
+		*p++ = (char) /*GCC -Wconversion*/ n->count;
 		*p++ = 0;
 
 		fprintf(ofd, "[%s]P\n", s);
@@ -330,8 +331,9 @@ print_dc(void)
 	    fprintf(ofd, "[1G [sB_1]SA [bAla]SB 0=A Bx 0sALAaBLB+ ]si\n");
 
 	    */
-	    /* Input integers, -1 on EOF */
+	    /* Input integers, -1 on EOF
 	    // fprintf(ofd, "[? z [_1]SA 0=A 0sALA+ ]si\n");
+	    */
 	}
     }
 

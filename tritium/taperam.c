@@ -11,9 +11,9 @@
 #include "bfi.run.h"
 
 /* Where's the tape memory start */
-void * cell_array_pointer = 0;
+char * cell_array_pointer = 0;
 /* Location of all of the tape memory. */
-void * cell_array_low_addr = 0;
+char * cell_array_low_addr = 0;
 size_t cell_array_alloc_len = 0;
 
 #ifdef MAP_NORESERVE
@@ -52,7 +52,7 @@ map_hugeram(void)
     if(cell_array_pointer==0) {
 	if (hard_left_limit<0) {
 	    cell_array_low_addr = tcalloc(MEMSIZE-hard_left_limit, sizeof(int));
-	    cell_array_pointer = (char *)cell_array_low_addr - hard_left_limit*sizeof(int);
+	    cell_array_pointer = cell_array_low_addr - hard_left_limit*sizeof(int);
 	} else {
 	    cell_array_low_addr = tcalloc(MEMSIZE, sizeof(int));
 	    cell_array_pointer = cell_array_low_addr;
@@ -74,9 +74,10 @@ unmap_hugeram(void)
 
 /* -- */
 #ifdef USEHUGERAM
+static void sigsegv_report(int signo, siginfo_t * siginfo, void * ptr) __attribute__((__noreturn__));
 
 static void
-sigsegv_report(int signo, siginfo_t * siginfo, void * ptr)
+sigsegv_report(int signo UNUSED, siginfo_t * siginfo, void * ptr UNUSED)
 {
 /*
  *  A segfault handler is likely to be called from inside library functions so
@@ -89,18 +90,18 @@ sigsegv_report(int signo, siginfo_t * siginfo, void * ptr)
 
 #define estr(x) do{ static char p[]=x; write(2, p, sizeof(p)-1);}while(0)
     if(cell_array_pointer != 0) {
-	if (siginfo->si_addr > cell_array_pointer - MEMGUARD &&
-	    siginfo->si_addr <
+	if ((char*)siginfo->si_addr > cell_array_pointer - MEMGUARD &&
+	    (char*)siginfo->si_addr <
 		    cell_array_pointer + cell_array_alloc_len - MEMGUARD) {
 
-	    if( siginfo->si_addr > cell_array_pointer )
+	    if( (char*)siginfo->si_addr > cell_array_pointer )
 		estr("Tape pointer has moved above available space\n");
 	    else
 		estr("Tape pointer has moved below available space\n");
 	    exit(1);
 	}
     }
-    if(siginfo->si_addr < (void*)0 + 128*1024) {
+    if((char*)siginfo->si_addr < (char*)0 + 128*1024) {
 	estr("Program fault: NULL Pointer dereference.\n");
     } else {
 	estr("Segmentation protection violation\n");
@@ -134,7 +135,7 @@ restore_sigsegv(void)
 void *
 map_hugeram(void)
 {
-    void * mp;
+    char * mp;
     if (cell_array_pointer != 0)
 	return cell_array_pointer;
 

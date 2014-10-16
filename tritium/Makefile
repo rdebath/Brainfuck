@@ -32,11 +32,29 @@ all: bfi
 INSTALLDIR=/usr/local/bin
 INSTALLEXT=
 CC=gcc
-CFLAGS=-O3 -Wall -Wshadow -idirafter $(TOOLDIR) $(DEFS) $(CONF)
+CFLAGS=-O -Wall -Wshadow $(UNSAFE) $(INCLTOOLS) $(DEFS) $(CONF)
 LDFLAGS=
 TOOLDIR=../tools
 
-ifeq ($(NO_STATIC),)
+ifneq ($(CC),tcc)
+ifneq ($(TOOLDIR),)
+INCLTOOLS=-idirafter $(TOOLDIR)
+endif
+else
+INCLTOOLS=-I $(TOOLDIR)
+endif
+
+# Current GCC policy seems to be to do any unsafe optimisation they can think
+# of and let everyone else pick up the pieces. In addition v4.7 of GCC does
+# it wrong, doing it's 'optimisation' on calculations that are defined by the
+# C standard.
+ifeq ($(CC),gcc)
+UNSAFE=-fno-delete-null-pointer-checks -fno-strict-overflow
+# -fwrapv -fno-strict-aliasing -fno-aggressive-loop-optimizations
+# -funsafe-loop-optimizations
+endif
+
+ifneq ($(STATIC_TOOLS),)
 # These are used to link specified libaries statically.
 # Other libraries (eg: libc) remain normally dynamic.
 GNUSTK=-Wl,-Bstatic
@@ -48,7 +66,7 @@ MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 	 -Wstrict-prototypes -Wstrict-overflow=5 -Wwrite-strings \
 	 -Waggregate-return -Wcast-qual -Wswitch-enum -Wconversion \
 	 -Wunreachable-code -fno-common -Wpadded \
-	 -Wlarger-than=512 -Wstack-usage=512
+	 -Wlarger-than=512 -Wstack-usage=512 -Wunsafe-loop-optimizations
 
 bfi:	bfi.o bfi.ccode.o bfi.gnulit.o bfi.nasm.o bfi.bf.o bfi.dc.o bfi.dasm.o \
 	clock.o taperam.o bfi.version.o
@@ -91,8 +109,10 @@ bfi.dasm.i686.h: bfi.dasm.x86.dasc
 DO_TCC=$(wildcard /usr/include/libtcc.h)
 DO_LIBDL=$(wildcard /usr/include/dlfcn.h)
 DO_DYNASM=$(wildcard $(TOOLDIR)/dynasm/dynasm)
-DO_MYLIGHT=$(wildcard $(TOOLDIR)/lightning.h)
 DO_LIGHT=$(wildcard /usr/include/lightning.h)
+ifneq ($(CC),tcc)
+DO_MYLIGHT=$(wildcard $(TOOLDIR)/lightning.h)
+endif
 
 ifeq ($(DO_LIBDL),)
 CONF_LIBDL=-DDISABLE_DLOPEN

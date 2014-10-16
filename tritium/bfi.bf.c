@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "bfi.tree.h"
+#include "bfi.bf.h"
 
 static void
 pint(int v)
@@ -116,8 +117,6 @@ print_bf(void)
 	    nocr = 1;
 	case T_WHL:
 	    putchar('[');
-	    // BFBasic
-	    // if (n->offset == 2) printf("\n> [-]>[-]>[-]>[-]>[-]>[-]>[-]><<<<<<< <");
 	    break;
 
 	case T_END:
