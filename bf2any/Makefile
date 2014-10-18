@@ -163,3 +163,31 @@ libpy.lib-off:
 	-@rm -f libpy.lib-on
 	@touch libpy.lib-off
 
+#-------------------------------------------------------------------------------
+LUAVER=5.1
+LJITVER=2.1
+HAVE_LUALIB=$(wildcard /usr/include/luajit-$(LJITVER)/lua.h)
+ifeq ($(HAVE_LUALIB),)
+LUALIBFLAG=
+LUALIBLIBS=
+LUALIBDEP=liblua.lib-off
+else
+LUALIBFLAG=-DENABLE_LIBLUA -I/usr/include/luajit-$(LJITVER)
+LUALIBLIBS=-lluajit-$(LUAVER)
+LUALIBDEP=liblua.lib-on
+endif
+
+bf2lua: bf2lua.o bf2any.o bf2const.o
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(LUALIBLIBS)
+
+bf2lua.o: bf2lua.c $(LUALIBDEP)
+	$(CC) $(CFLAGS) $(LUALIBFLAG) -c -o $@ bf2lua.c $(TARGET_ARCH)
+
+liblua.lib-on:
+	-@rm -f liblua.lib-off
+	@touch liblua.lib-on
+
+liblua.lib-off:
+	-@rm -f liblua.lib-on
+	@touch liblua.lib-off
+

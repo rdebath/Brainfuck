@@ -32,6 +32,8 @@ bf2sh
 bf2slang
 bf2tcl
 bf2v7sh
+liblua.lib-off
+liblua.lib-on
 libpy.lib-off
 libpy.lib-on
 libtcc.lib-off

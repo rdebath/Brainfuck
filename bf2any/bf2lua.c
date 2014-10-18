@@ -2,6 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef ENABLE_LIBLUA
+#include <lua.h>
+#include <lualib.h>
+#include <lauxlib.h>
+#endif
+
 #include "bf2any.h"
 
 /*
@@ -32,17 +38,35 @@ void loutcmd(int ch, int count, struct instruction *n);
 
 int do_input = 0, do_output = 0, do_tape = 0;
 int ind = 0;
-#define I printf("%*s", ind*4, "")
+#define I fprintf(ofd, "%*s", ind*4, "")
+
 static int lblcount = 0;
 static int icount = 0;
 static int maxwhile = MAXWHILE;
 
 static void print_cstring(char * str);
 
+static int do_dump;
+static FILE * ofd;
+#ifdef ENABLE_LIBLUA
+static char * luacode = 0;
+static size_t luacodesize = 0;
+#endif
+
 int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
+    if (strcmp(arg, "-d") == 0) {
+        do_dump = 1;
+        return 1;
+    } else
+#ifdef ENABLE_LIBLUA
+    if (strcmp(arg, "-r") == 0) {
+        do_dump = 0;
+        return 1;
+    } else
+#endif
     if (strcmp(arg, "-savestring") == 0) return 1;
     if (strncmp(arg, "-w", 2) == 0) {
 	maxwhile = strtol(arg+2, 0, 10);
@@ -80,16 +104,22 @@ outcmd(int ch, int count)
     }
 
     if (ch != '~') return;
+#ifdef ENABLE_LIBLUA
+    if (!do_dump)
+	ofd = open_memstream(&luacode, &luacodesize);
+    else
+#endif
+	ofd = stdout;
 
-    printf("#!/usr/bin/lua\n");
+    fprintf(ofd, "#!/usr/bin/lua\n");
     if (do_tape) {
-	printf("local m = setmetatable({},{__index=function() return 0 end})\n");
-	printf("local p = 1\n");
-	printf("local v = 0\n");
+	fprintf(ofd, "local m = setmetatable({},{__index=function() return 0 end})\n");
+	fprintf(ofd, "local p = 1\n");
+	fprintf(ofd, "local v = 0\n");
 	/* Arrays are faster if populated from 1, negative indexes are ok.
 	   Luajit likes zero. */
-	printf("for i=0,32 do m[i] = 0 end\n");
-	printf("\n");
+	fprintf(ofd, "for i=0,32 do m[i] = 0 end\n");
+	fprintf(ofd, "\n");
     }
 
     if (icount < maxwhile) {
@@ -103,7 +133,7 @@ outcmd(int ch, int count)
 	    for(n2 = n->loop->next; n != n2; n2=n2->next) {
 		if (n2->ch == '[' && n2->loop->icount-n2->icount > maxwhile) {
 		    loutcmd(n2->ch, n2->count, n);
-		    I; printf("bf%d()\n", n2->ino);
+		    I; fprintf(ofd, "bf%d()\n", n2->ino);
 		    n2 = n2->loop;
 		    loutcmd(n2->ch, n2->count, n);
 		} else
@@ -117,7 +147,7 @@ outcmd(int ch, int count)
 		loutcmd(n->ch, n->count, n);
 	    else {
 		loutcmd(n->ch, n->count, n);
-		I; printf("bf%d()\n", n->ino);
+		I; fprintf(ofd, "bf%d()\n", n->ino);
 		n=n->loop;
 		loutcmd(n->ch, n->count, n);
 	    }
@@ -132,6 +162,30 @@ outcmd(int ch, int count)
 	memset(n, '\0', sizeof*n);
 	free(n);
     }
+
+#ifdef ENABLE_LIBLUA
+    if (!do_dump && ch == '~') {
+	int status, result;
+	lua_State *L;
+        fclose(ofd);
+
+	L = luaL_newstate();
+	luaL_openlibs(L); /* Load Lua libraries */
+	status = luaL_loadstring(L, luacode);
+	if (status) {
+	    /* If something went wrong, error message is at the top of */
+	    /* the stack */
+	    fprintf(stderr, "Couldn't load file: %s\n", lua_tostring(L, -1));
+	    exit(1);
+	}
+	result = lua_pcall(L, 0, LUA_MULTRET, 0);
+	if (result) {
+	    fprintf(stderr, "Failed to run script: %s\n", lua_tostring(L, -1));
+	    exit(1);
+	}
+	lua_close(L);   /* Bye, Lua */
+    }
+#endif
 }
 
 void
@@ -139,81 +193,81 @@ loutcmd(int ch, int count, struct instruction *n)
 {
     switch(ch) {
     case 1000:
-	printf("function bf%d()\n", n->ino);
+	fprintf(ofd, "function bf%d()\n", n->ino);
 	ind++;
 	break;
     case 1001:
 	ind--;
-	printf("end\n\n");
+	fprintf(ofd, "end\n\n");
 	break;
 
     case '!':
 	if(do_tape) {
-	    printf("function brainfuck()\n");
+	    fprintf(ofd, "function brainfuck()\n");
 	    ind++;
 	}
 	break;
 
-    case '=': I; printf("m[p] = %d\n", count); break;
+    case '=': I; fprintf(ofd, "m[p] = %d\n", count); break;
     case 'B':
-	if(bytecell) { I; printf("m[p] = m[p]%%256\n"); }
-	I; printf("v = m[p]\n");
+	if(bytecell) { I; fprintf(ofd, "m[p] = m[p]%%256\n"); }
+	I; fprintf(ofd, "v = m[p]\n");
 	break;
-    case 'M': I; printf("m[p] = m[p]+v*%d\n", count); break;
-    case 'N': I; printf("m[p] = m[p]-v*%d\n", count); break;
-    case 'S': I; printf("m[p] = m[p]+v\n"); break;
-    case 'Q': I; printf("if v ~= 0 then m[p] = %d end\n", count); break;
-    case 'm': I; printf("if v ~= 0 then m[p] = m[p]+v*%d end\n", count); break;
-    case 'n': I; printf("if v ~= 0 then m[p] = m[p]-v*%d end\n", count); break;
-    case 's': I; printf("if v ~= 0 then m[p] = m[p]+v end\n"); break;
+    case 'M': I; fprintf(ofd, "m[p] = m[p]+v*%d\n", count); break;
+    case 'N': I; fprintf(ofd, "m[p] = m[p]-v*%d\n", count); break;
+    case 'S': I; fprintf(ofd, "m[p] = m[p]+v\n"); break;
+    case 'Q': I; fprintf(ofd, "if v ~= 0 then m[p] = %d end\n", count); break;
+    case 'm': I; fprintf(ofd, "if v ~= 0 then m[p] = m[p]+v*%d end\n", count); break;
+    case 'n': I; fprintf(ofd, "if v ~= 0 then m[p] = m[p]-v*%d end\n", count); break;
+    case 's': I; fprintf(ofd, "if v ~= 0 then m[p] = m[p]+v end\n"); break;
 
-    case 'X': I; printf("error('Aborting Infinite Loop')\n"); break;
+    case 'X': I; fprintf(ofd, "error('Aborting Infinite Loop')\n"); break;
 
-    case '+': I; printf("m[p] = m[p]+%d\n", count); break;
-    case '-': I; printf("m[p] = m[p]-%d\n", count); break;
-    case '>': I; printf("p = p+%d\n", count); break;
-    case '<': I; printf("p = p-%d\n", count); break;
-    case '.': I; printf("putch()\n"); do_output=1; break;
+    case '+': I; fprintf(ofd, "m[p] = m[p]+%d\n", count); break;
+    case '-': I; fprintf(ofd, "m[p] = m[p]-%d\n", count); break;
+    case '>': I; fprintf(ofd, "p = p+%d\n", count); break;
+    case '<': I; fprintf(ofd, "p = p-%d\n", count); break;
+    case '.': I; fprintf(ofd, "putch()\n"); do_output=1; break;
     case '"': print_cstring(n->cstr); break;
-    case ',': I; printf("getch()\n"); do_input=1; break;
+    case ',': I; fprintf(ofd, "getch()\n"); do_input=1; break;
 
     case '[':
-	if(bytecell) { I; printf("m[p] = m[p]%%256\n"); }
-	I; printf("while m[p]~=0 do\n");
+	if(bytecell) { I; fprintf(ofd, "m[p] = m[p]%%256\n"); }
+	I; fprintf(ofd, "while m[p]~=0 do\n");
 	ind++;
 	break;
     case ']':
-	if(bytecell) { I; printf("m[p] = m[p]%%256\n"); }
-	ind--; I; printf("end\n");
+	if(bytecell) { I; fprintf(ofd, "m[p] = m[p]%%256\n"); }
+	ind--; I; fprintf(ofd, "end\n");
 	break;
 
     case '~':
 	if(do_tape) {
 	    ind--;
-	    printf("end\n");
+	    fprintf(ofd, "end\n");
 	}
 
 	if (do_input) {
-	    printf("\n");
-	    printf("function getch()\n");
-	    printf("    local Char = io.read(1)\n");
-	    printf("    if Char then\n");
-	    printf("        m[p] = string.byte(Char)\n");
-	    printf("    end\n");
-	    printf("end\n");
+	    fprintf(ofd, "\n");
+	    fprintf(ofd, "function getch()\n");
+	    fprintf(ofd, "    local Char = io.read(1)\n");
+	    fprintf(ofd, "    if Char then\n");
+	    fprintf(ofd, "        m[p] = string.byte(Char)\n");
+	    fprintf(ofd, "    end\n");
+	    fprintf(ofd, "end\n");
 	}
 
 	if (do_output) {
-	    printf("\n");
-	    printf("function putch()\n");
-	    printf("    io.write(string.char(m[p]%%256))\n");
-	    printf("    io.flush()\n");
-	    printf("end\n");
+	    fprintf(ofd, "\n");
+	    fprintf(ofd, "function putch()\n");
+	    fprintf(ofd, "    io.write(string.char(m[p]%%256))\n");
+	    fprintf(ofd, "    io.flush()\n");
+	    fprintf(ofd, "end\n");
 	}
 
 	if(do_tape) {
-	    printf("\n");
-	    printf("brainfuck()\n");
+	    fprintf(ofd, "\n");
+	    fprintf(ofd, "brainfuck()\n");
 	}
 	break;
     }
@@ -232,7 +286,7 @@ print_cstring(char * str)
 	if (outlen && (*str == 0 || gotnl || outlen > sizeof(buf)-8))
 	{
 	    buf[outlen] = 0;
-	    I; printf("io.write(\"%s\")\n", buf);
+	    I; fprintf(ofd, "io.write(\"%s\")\n", buf);
 	    gotnl = outlen = 0;
 	}
 	if (!*str) break;
