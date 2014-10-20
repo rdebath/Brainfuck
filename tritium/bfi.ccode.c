@@ -320,6 +320,11 @@ print_c_header(FILE * ofd)
 	    fprintf(ofd, "int main(void){\n");
 	    /* These minor variations may change the speed of the Counter test
 	     * by 45% when compiled with GCC ... scheesh! */
+#if 1
+	    fprintf(ofd, "  %s mem[%d];\n", cell_type, memsize);
+	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
+	    fprintf(ofd, "  memset(mem, 0, sizeof(mem));\n");
+#endif
 #if 0
 	    fprintf(ofd, "static %s mem[%d];\n", cell_type, memsize);
 	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
@@ -328,7 +333,7 @@ print_c_header(FILE * ofd)
 	    fprintf(ofd, "  %s * mem = calloc(sizeof(*mem),%d);\n", cell_type, memsize);
 	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
 #endif
-#if 1
+#if 0
 	    fprintf(ofd, "  %s mem[%d] = {0};\n", cell_type, memsize);
 	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
 #endif
