@@ -19,7 +19,7 @@
 
 int ind = 0;
 #define I fprintf(ofd, "%*s", ind*4, "")
-#define oputs(str) fprintf(ofd, "%s\n", (str))
+
 int tapelen = 0;
 int do_dump = 0;
 
