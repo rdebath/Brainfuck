@@ -2,7 +2,7 @@
 [ -n "$2" ] && cd $2
 
 MAJOR=1
-MINOR=0
+MINOR=1
 SUFFIX="# Unknown @ `date -R 2>/dev/null || date`"
 BUILD=
 

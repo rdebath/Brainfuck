@@ -6,7 +6,17 @@
 #define VS_Q(x) #x
 #define VS_S(x) VS_Q(x)
 #define VS(x) VS_S(VERSION_ ## x)
+#ifdef GITHASH
+#ifdef GITTAG
+#define VERSION VS(MAJOR) "." VS(MINOR) " " \
+		VS_S(GITHASH) " " VS_S(GITTAG) " " VS_S(GITTIME)
+#else
+#define VERSION VS(MAJOR) "." VS(MINOR) "." VS(BUILD) "? " \
+		VS_S(GITHASH) " " VS_S(GITTIME)
+#endif
+#else
 #define VERSION VS(MAJOR) "." VS(MINOR) "." VS(BUILD) VERSION_SUFFIX
+#endif
 
 #if defined(__x86_64__) || defined(__amd64__) || defined(_M_AMD64)
 #define PROCESSOR	" x64"

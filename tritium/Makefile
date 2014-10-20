@@ -26,6 +26,10 @@
 
 # Always run the version check script.
 VERSTRING := $(shell sh version.sh bfi.version.h)
+GITARCHVERSION=$Format:%nGITHASH=-DGITHASH=%h%nGITTIME=-DGITTIME="%cd"%nGITDECO="%d"$
+ifneq ($(GITDECO),)
+GITTAG=-DGITTAG=$(GITDECO)
+endif
 
 all: bfi
 
@@ -84,10 +88,12 @@ install: bfi
 bfi.gnulit.o:	bfi.gnulit.c bfi.tree.h bfi.gnulit.h bfi.run.h
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ -fno-strict-aliasing -Wno-unused-value bfi.gnulit.c
 
+bfi.version.o: bfi.version.h
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ $(GITHASH) $(GITTIME) $(GITTAG) bfi.version.c
+
 bfi.o: \
     bfi.c bfi.tree.h bfi.run.h bfi.be.def bfi.ccode.h bfi.gnulit.h \
     bfi.nasm.h bfi.bf.h bfi.dc.h clock.h
-bfi.version.o: bfi.version.h
 bfi.bf.o: bfi.bf.c bfi.tree.h
 bfi.ccode.o: bfi.ccode.c bfi.tree.h bfi.run.h bfi.ccode.h
 bfi.dc.o: bfi.dc.c bfi.tree.h bfi.run.h
