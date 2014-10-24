@@ -3649,7 +3649,7 @@ convert_tree_to_runarray(void)
 }
 
 #if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
-__attribute((optimize(3),hot,aligned(64)))
+__attribute__((optimize(3),hot,aligned(64)))
 #endif
 void
 run_progarray(int * p)
