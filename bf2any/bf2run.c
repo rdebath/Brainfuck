@@ -234,7 +234,7 @@ debugprog(register int * p, register icell *mp)
 #else
 #if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
 /* Tell GNU C to think really hard about this function! */
-__attribute((optimize(3),hot,aligned(64)))
+__attribute__((optimize(3),hot,aligned(64)))
 #endif
 void
 runprog(register int * p, register icell *mp)

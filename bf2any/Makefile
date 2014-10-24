@@ -8,6 +8,8 @@
 #
 # Both bf2crun and bf2jit are multiarch aware on i386 vs amd64. (The kernel
 # must be 64bit for a 64bit application, but the userspace works both ways)
+#
+# Note: pkg-config doesn't cope with multiarch -- I suggest using schroot.
 
 INSTALLDIR=/usr/local/bin
 INSTALLEXT=
@@ -58,13 +60,17 @@ $(ALLEXE): bf2any.o bf2const.o
 #-------------------------------------------------------------------------------
 # Special cases.
 #-------------------------------------------------------------------------------
+PKGCONF=pkg-config$(TARGET_ARCH)
+#-------------------------------------------------------------------------------
+# Clone the two plain assembly variants.
 bf2gas32.o: bf2gas.c
 	$(CC) $(CFLAGS) -DUSE32 $(TARGET_ARCH) -c -o $@ bf2gas.c
 
 bf2gas64.o: bf2gas.c
 	$(CC) $(CFLAGS) -DUSE64 $(TARGET_ARCH) -c -o $@ bf2gas.c
 
-#------------------------------------------------------------------------------- 
+#-------------------------------------------------------------------------------
+# Assemble the dynasm machine code.
 bf2jit.o: bf2jit.c bf2jit.amd64.h bf2jit.i686.h
 	$(CC) $(CFLAGS) -I$(TOOLDIR) $(TARGET_ARCH) -c -o $@ bf2jit.c
 
@@ -75,10 +81,11 @@ bf2jit.i686.h: bf2jit.x86.dasc
 	$(TOOLDIR)/dynasm/dynasm -c -D I386 -o bf2jit.i686.h bf2jit.x86.dasc
 
 #-------------------------------------------------------------------------------
+# Libraries for running C code in process.
 HAVE_DL=$(wildcard /usr/include/dlfcn.h)
 ifeq ($(HAVE_DL),)
 LIBDL=
-LIBDLFLAG=-DNO_DLOPEN
+LIBDLFLAG=-DDISABLE_DLOPEN
 else
 ifeq ($(findstring BSD,$(shell uname -s)),)
 LIBDL=-ldl
@@ -87,7 +94,7 @@ endif
 
 HAVE_TCC=$(wildcard /usr/include/libtcc.h)
 ifeq ($(HAVE_TCC),)
-TCCFLAG=-DNO_LIBTCC
+TCCFLAG=-DDISABLE_LIBTCC
 TCCLIBS=
 TCCDEP=libtcc.lib-off
 else
@@ -111,6 +118,7 @@ libtcc.lib-off:
 	@touch libtcc.lib-off
 
 #-------------------------------------------------------------------------------
+# TCL doesn't use pkg-config and so is usually installed sanely.
 HAVE_TCL=$(wildcard /usr/include/tcl/tcl.h)
 ifeq ($(HAVE_TCL),)
 TCLFLAG=-DDISABLE_LIBTCL
@@ -137,15 +145,17 @@ libtcl.lib-off:
 	@touch libtcl.lib-off
 
 #-------------------------------------------------------------------------------
-PYVER=2.7
-HAVE_PYLIB=$(wildcard /usr/include/python$(PYVER)/Python.h)
+# This uses 'pkg-config' to lookup the weird flags your version
+# of libpython-dev needs. If either is not available the interface
+# is disabled.
+HAVE_PYLIB=$(shell $(PKGCONF) --list-all 2>/dev/null | sed -n 's/^\(python-[^ ]*\).*/\1/p' | tail -1)
 ifeq ($(HAVE_PYLIB),)
-PYLIBFLAG=
+PYLIBFLAG=-DDISABLE_LIBPY
 PYLIBLIBS=
 PYLIBDEP=libpy.lib-off
 else
-PYLIBFLAG=-DENABLE_LIBPY -I/usr/include/python$(PYVER)
-PYLIBLIBS=-lpython$(PYVER)$(PYLIBEX)
+PYLIBFLAG=$(shell $(PKGCONF) --cflags $(HAVE_PYLIB))
+PYLIBLIBS=$(shell $(PKGCONF) --libs $(HAVE_PYLIB))
 PYLIBDEP=libpy.lib-on
 endif
 
@@ -164,16 +174,17 @@ libpy.lib-off:
 	@touch libpy.lib-off
 
 #-------------------------------------------------------------------------------
-LUAVER=5.1
-LJITVER=2.1
-HAVE_LUALIB=$(wildcard /usr/include/luajit-$(LJITVER)/lua.h)
+# This uses 'pkg-config' to lookup the weird flags your version
+# of the lua library needs. If either is not available the interface
+# is disabled.
+HAVE_LUALIB=$(shell $(PKGCONF) --list-all 2>/dev/null | sed -n -e 's/^\(luajit\) .*/\1/p' -e 's/^\(lua5\..\) .*/\1/p' | tail -1)
 ifeq ($(HAVE_LUALIB),)
-LUALIBFLAG=
+LUALIBFLAG=-DDISABLE_LIBLUA
 LUALIBLIBS=
 LUALIBDEP=liblua.lib-off
 else
-LUALIBFLAG=-DENABLE_LIBLUA -I/usr/include/luajit-$(LJITVER)
-LUALIBLIBS=-lluajit-$(LUAVER)
+LUALIBFLAG=$(shell $(PKGCONF) --cflags $(HAVE_LUALIB))
+LUALIBLIBS=$(shell $(PKGCONF) --libs $(HAVE_LUALIB))
 LUALIBDEP=liblua.lib-on
 endif
 
@@ -191,3 +202,4 @@ liblua.lib-off:
 	-@rm -f liblua.lib-on
 	@touch liblua.lib-off
 
+#-------------------------------------------------------------------------------

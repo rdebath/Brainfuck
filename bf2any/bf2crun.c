@@ -4,14 +4,14 @@
 #include <unistd.h>
 #include <string.h>
 
-#ifndef NO_DLOPEN
+#ifndef DISABLE_DLOPEN
 #include <dlfcn.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <signal.h>
 #endif
 
-#ifndef NO_LIBTCC
+#ifndef DISABLE_LIBTCC
 #include <libtcc.h>
 #endif
 
@@ -35,10 +35,10 @@ FILE * ofd;
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
 #define prv2(s,v,v2)    fprintf(ofd, "%*s" s "\n", ind*4, "", (v), (v2))
 
-#ifndef NO_LIBTCC
+#ifndef DISABLE_LIBTCC
 static void compile_and_run_libtcc(void);
 #endif
-#ifndef NO_DLOPEN
+#ifndef DISABLE_DLOPEN
 static void compile_and_run(void);
 #endif
 static void print_cstring(void);
@@ -46,7 +46,7 @@ static void print_cstring(void);
 static int imov = 0;
 static int verbose = 0;
 
-#ifndef NO_DLOPEN
+#ifndef DISABLE_DLOPEN
 #define BFBASE "bfpgm"
 static const char * cc_cmd = 0;
 static const char * copt = "-O0";
@@ -58,7 +58,7 @@ static int in_one = 0;
 static char pic_opt[8] = " -fpic";
 #endif
 
-#ifndef NO_LIBTCC
+#ifndef DISABLE_LIBTCC
 char * ccode = 0;
 size_t ccodesize = 0;
 #endif
@@ -76,10 +76,10 @@ check_arg(const char * arg)
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-d      Dump code"
-#ifndef NO_LIBTCC
+#ifndef DISABLE_LIBTCC
 	"\n\t"  "-ltcc   Use libtcc to run code."
 #endif
-#ifndef NO_DLOPEN
+#ifndef DISABLE_DLOPEN
 	"\n\t"  "-ldl    Use dlopen to run compiled code."
 	"\n\t"  "-Cclang Choose a different C compiler"
 	"\n\t"  "-Ox     Pass -Ox to C compiler."
@@ -87,7 +87,7 @@ check_arg(const char * arg)
 	);
 	return 1;
     } else
-#ifndef NO_DLOPEN
+#ifndef DISABLE_DLOPEN
     if (strncmp(arg, "-O", 2) == 0) {
 	runmode = run_dll;  /* Libtcc doesn't optimise */
 	copt = arg; return 1;
@@ -106,12 +106,12 @@ check_arg(const char * arg)
     if (strcmp(arg, "-unix") == 0) {
 	use_unistd = 1; return 1;
     } else
-#ifndef NO_DLOPEN
+#ifndef DISABLE_DLOPEN
     if (strcmp(arg, "-ldl") == 0) {
 	runmode = run_dll; return 1;
     } else
 #endif
-#ifndef NO_LIBTCC
+#ifndef DISABLE_LIBTCC
     if (strcmp(arg, "-ltcc") == 0) {
 	runmode = run_libtcc; return 1;
     } else
@@ -163,12 +163,12 @@ outcmd(int ch, int count)
 
     switch(ch) {
     case '!':
-#ifndef NO_LIBTCC
+#ifndef DISABLE_LIBTCC
 	if (runmode == run_libtcc) {
 	    ofd = open_memstream(&ccode, &ccodesize);
 	} else
 #endif
-#ifndef NO_DLOPEN
+#ifndef DISABLE_DLOPEN
 	if (runmode != no_run) {
 	    runmode = run_dll;
 	    if( mkdtemp(tmpdir) == 0 ) {
@@ -266,12 +266,12 @@ outcmd(int ch, int count)
     fclose(ofd);
     setbuf(stdout,0);
 
-#ifndef NO_LIBTCC
+#ifndef DISABLE_LIBTCC
     if (runmode == run_libtcc)
 	compile_and_run_libtcc();
     else
 #endif
-#ifndef NO_DLOPEN
+#ifndef DISABLE_DLOPEN
 	compile_and_run()
 #endif
 	;
@@ -326,7 +326,7 @@ print_cstring(void)
     }
 }
 
-#ifndef NO_DLOPEN
+#ifndef DISABLE_DLOPEN
 /*  Needs:   gcc -shared -fpic -o libfoo.so foo.c
     And:     -ldl
 
@@ -460,7 +460,7 @@ loaddll(const char * dlname)
 }
 #endif
 
-#ifndef NO_LIBTCC
+#ifndef DISABLE_LIBTCC
 static void
 compile_and_run_libtcc(void)
 {

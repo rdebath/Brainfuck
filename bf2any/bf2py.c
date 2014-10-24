@@ -1,4 +1,4 @@
-#ifdef ENABLE_LIBPY
+#ifndef DISABLE_LIBPY
 /* This must be first; hopefully nothing else must be first too */
 #include <Python.h>
 #endif
@@ -35,7 +35,7 @@ check_arg(const char * arg)
 	do_dump = 1;
 	return 1;
     } else
-#ifdef ENABLE_LIBPY
+#ifndef DISABLE_LIBPY
     if (strcmp(arg, "-r") == 0) {
 	do_dump = 0;
 	return 1;
@@ -53,7 +53,7 @@ outcmd(int ch, int count)
 {
     switch(ch) {
     case '!':
-#ifdef ENABLE_LIBPY
+#ifndef DISABLE_LIBPY
         if (!do_dump)
 	    ofd = open_memstream(&pycode, &pycodesize);
 	else
@@ -124,7 +124,7 @@ outcmd(int ch, int count)
 #endif
     }
 
-#ifdef ENABLE_LIBPY
+#ifndef DISABLE_LIBPY
     if (!do_dump && ch == '~') {
 	fclose(ofd);
 

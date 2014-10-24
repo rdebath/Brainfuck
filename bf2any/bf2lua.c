@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef ENABLE_LIBLUA
+#ifndef DISABLE_LIBLUA
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
@@ -48,7 +48,7 @@ static void print_cstring(char * str);
 
 static int do_dump;
 static FILE * ofd;
-#ifdef ENABLE_LIBLUA
+#ifndef DISABLE_LIBLUA
 static char * luacode = 0;
 static size_t luacodesize = 0;
 #endif
@@ -61,7 +61,7 @@ check_arg(const char * arg)
         do_dump = 1;
         return 1;
     } else
-#ifdef ENABLE_LIBLUA
+#ifndef DISABLE_LIBLUA
     if (strcmp(arg, "-r") == 0) {
         do_dump = 0;
         return 1;
@@ -104,14 +104,16 @@ outcmd(int ch, int count)
     }
 
     if (ch != '~') return;
-#ifdef ENABLE_LIBLUA
+#ifndef DISABLE_LIBLUA
     if (!do_dump)
 	ofd = open_memstream(&luacode, &luacodesize);
     else
 #endif
+    {
 	ofd = stdout;
+	fprintf(ofd, "#!/usr/bin/lua\n");   /* liblua doesn't like this */
+    }
 
-    fprintf(ofd, "#!/usr/bin/lua\n");
     if (do_tape) {
 	fprintf(ofd, "local m = setmetatable({},{__index=function() return 0 end})\n");
 	fprintf(ofd, "local p = 1\n");
@@ -163,7 +165,7 @@ outcmd(int ch, int count)
 	free(n);
     }
 
-#ifdef ENABLE_LIBLUA
+#ifndef DISABLE_LIBLUA
     if (!do_dump && ch == '~') {
 	int status, result;
 	lua_State *L;
