@@ -88,7 +88,7 @@ outcmd(int ch, int count)
 	pr("    fi");
 	pr("fi");
 	pr("");
-	pr("o(){ echoe \"`printf '\\\\\\\\%%04o' $((M$P&=255))`\" ; }");
+	pr("o(){ echoe \"`printf '\\\\\\\\%%04o' $((M$P&255))`\" ; }");
 
 	if (do_input) {
 	    pr("");
