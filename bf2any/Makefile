@@ -9,8 +9,9 @@
 # Both bf2crun and bf2jit are multiarch aware on i386 vs amd64. (The kernel
 # must be 64bit for a 64bit application, but the userspace works both ways)
 #
-# Beware: pkg-config doesn't cope with multiarch -- I suggest using schroot.
+# Beware: pkg-config doesn't cope with multiarch.
 
+CC=$(shell ( which gcc clang pcc ; echo cc ) | head -1 | sed 's:.*/::')
 INSTALL=install -p -s
 INSTALLDIR=/usr/local/bin
 INSTALLEXT=
@@ -42,7 +43,11 @@ install:
 	$(INSTALL) $$i $(INSTALLDIR)/$$i$(INSTALLEXT) ; \
 	done
 
+ifneq ($(CC),cc)
 CFLAGS=-O3 -Wall -Wshadow -DBOFF=256 $(DEFS)
+else
+CFLAGS=-O -DBOFF=256 $(DEFS)
+endif
 
 # for: make DEFS='$(MOREDEFS)'
 MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
