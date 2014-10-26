@@ -51,7 +51,7 @@ it to the list and fill in it's entry.
 /****************************************************************************/
 #ifndef DISABLE_DYNASM
 X(dynasm,DYNASM,
-    printf("   -q   Run using the Dynasm interpreter/compiler.\n");    ,
+    printf("   -q   Run using the Dynasm interpreter/assembler.\n");    ,
     case 'q': do_codestyle = c_dynasm; break;                ,
     /* Cannot do print_dynasm() */                                     ,
     case c_dynasm: run_dynasm(); break;                               )
@@ -73,7 +73,7 @@ X(dynasm,DYNASM,
 /****************************************************************************/
 #ifndef DISABLE_GNULIGHTNING
 X(gnulightning,GNULIGHTNING,
-    printf("   -j   Run using the GNU lightning interpreter/compiler.\n");    ,
+    printf("   -j   Run using the GNU lightning interpreter/assembler.\n");    ,
     case 'j': do_codestyle = c_gnulightning; break;                ,
     /* Cannot do print_gnulightning() */                                     ,
     case c_gnulightning: run_gnulightning(); break;                               )
@@ -128,18 +128,30 @@ X(nasm,NASM,
 	    exit(255);
 	}
 	set_cell_size(8);
+	if (!default_io && iostyle != 2) {
+	    fprintf(stderr, "The -s option only supports binary I/O.\n");
+	    exit(255);
+	}
+	iostyle = 2;
     }
 #endif
 
 /****************************************************************************/
 X(bf,BF,
-    printf("   -F   Attempt to regenerate BF code.\n");             ,
+    printf("   -F   Attempt to regenerate BF code. (This disables a lot of optimisations.)\n");,
     case 'F': do_codestyle = c_bf; hard_left_limit = 0; break;      ,
     case c_bf: print_bf(); break;                                   ,
     /* No direct run */						    )
 #if XX == 6
     if (do_codestyle == c_bf)
 	opt_no_calc = opt_no_endif = opt_no_litprt = opt_no_repoint = 1;
+#endif
+#if XX == 4
+    if (do_codestyle == c_bf)
+	if (!default_io) {
+	    fprintf(stderr, "The -F option only supports default I/O.\n");
+	    exit(255);
+	}
 #endif
 
 /****************************************************************************/
@@ -150,8 +162,15 @@ X(dc,DC,
     case c_dc: print_dc(); break;                                   ,
     /* No direct run */						    )
 #if XX == 4
-    if (eofcell == 0 && do_codestyle == c_dc && input_string == 0)
-	eofcell = 6;
+    if (do_codestyle == c_dc) {
+	if (eofcell == 0 && do_codestyle == c_dc && input_string == 0)
+	    eofcell = 6;
+	if (!default_io && iostyle != 2) {
+	    fprintf(stderr, "The -D option only supports binary I/O.\n");
+	    exit(255);
+	}
+	iostyle = 2;
+    }
 #endif
 #if XX == 9
     {	int f = checkarg_dc(opt, arg);

@@ -137,6 +137,11 @@ print_c_header(FILE * ofd)
     int memoffset = 0;
     int l_iostyle = iostyle;
 
+    if (!do_run && node_type_counts[T_INP] != 0 && l_iostyle == 3) {
+	fprintf(stderr, "Standalone C code for integer input not implemented.\n");
+	exit(1);
+    }
+
     if (cell_mask > 0 && cell_size < 8 && l_iostyle == 1) l_iostyle = 0;
 
     /* Hello world mode ? */
@@ -170,8 +175,8 @@ print_c_header(FILE * ofd)
 
     fprintf(ofd, "#include <stdio.h>\n");
     fprintf(ofd, "#include <stdlib.h>\n");
-    if( cell_size == CHAR_BIT || use_dynmem )
-	fprintf(ofd, "#include <string.h>\n");
+    /* if( cell_size == CHAR_BIT || use_dynmem ) */
+    fprintf(ofd, "#include <string.h>\n");
     fprintf(ofd, "\n");
 
     if (cell_size == 0) {
@@ -293,6 +298,14 @@ print_c_header(FILE * ofd)
 		    "#else\n"
 		    "#define putch(ch) putchar(ch)\n"
 		    "#endif\n"
+		    "\n", ofd);
+		break;
+	    case 3:
+		fputs(
+		    "static void putch(int ch)\n"
+		    "{\n"
+		    "  printf(\"%d\\n\", ch);\n"
+		    "}\n"
 		    "\n", ofd);
 		break;
 	    }

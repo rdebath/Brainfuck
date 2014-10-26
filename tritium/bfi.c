@@ -112,10 +112,11 @@ int opt_force_repoint = 0;
 int hard_left_limit = -1024;
 int enable_trace = 0;
 int debug_mode = 0;
-int iostyle = 0; /* 0=ASCII, 1=UTF8, 2=Binary. */
+int iostyle = 0; /* 0=ASCII, 1=UTF8, 2=Binary, 3=Integer. */
 int eofcell = 0; /* 0=>?, 1=> No Change, 2= -1, 3= 0, 4=EOF, 5=No Input. */
 char * input_string = 0;
 int libc_allows_utf8 = 0;
+int default_io = 1;
 
 int cell_size = 0;  /* 0 is 8,16,32 or more. 7 and up are number of bits */
 int cell_mask = -1; /* -1 is don't mask. */
@@ -217,17 +218,22 @@ void LongUsage(FILE * fd, const char * errormsg)
 	exit(1);
     }
 
-    printf("        If the file is '-' this will read from the standard input and use\n"
-	   "        the character '!' to end the BF program and begin the input to it.\n"
-	   "        Note: ! is still ignored inside any BF loop and before the first\n"
-	   "        BF instruction has been entered.\n");
+    printf("    If the file is '-' this will read from the standard input and use\n"
+	   "    the character '!' to end the BF program and begin the input to it.\n"
+	   "    Note: ! is still ignored inside any BF loop and before the first\n"
+	   "    BF instruction has been entered. If the standard input is not a\n"
+	   "    terminal the '-' is optional.\n"
+	   "\n"
+	   "    The default action is to run the code using the fastest option available.\n"
+	   );
     printf("\n");
     printf("   -h   This message.\n");
     printf("   -v   Verbose, repeat for more.\n");
     printf("\n");
     printf("   -r   Run in interpreter.\n");
-    printf("        There are two normal interpreters a tree based one and a faster\n");
-    printf("        array based one. The array based one will be used unless:\n");
+    printf("        There are two normal interpreters a tree based one with full profiling\n");
+    printf("        and tracing support and a faster array based one.\n");
+    printf("        The array based one will be used unless:\n");
     printf("            * The -# option is used.\n");
     printf("            * The -T option is used.\n");
     printf("            * Three or more -v options are used.\n");
@@ -264,12 +270,14 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("   -b8  Use 8 bit cells.\n");
     printf("   -b16 Use 16 bit cells.\n");
     printf("   -b32 Use 32 bit cells.\n");
-    printf("        Default for running now is %dbits.\n",
+    printf("        Default for running now (-r) is %dbits.\n",
 			(int)sizeof(int)*CHAR_BIT);
-    printf("        Default for C code is 'unknown', NASM can only be 8bit.\n");
     printf("        Other bitwidths also work (including 7..32)\n");
     printf("        Full Unicode characters need 21 bits.\n");
-    printf("        The optimiser may be less effective if this is not specified.\n");
+    printf("        Default for C code is 'unknown', this is set when the C code is\n");
+    printf("        compiled (and can be larger than an int eg: -DC=__int128 ).\n");
+    printf("        NASM can only be 8bit.\n");
+    printf("        The optimiser will be less effective if this is not specified.\n");
     printf("\n");
     printf("   -E   End of file processing.\n");
     printf("   -E1      End of file gives no change for ',' command.\n");
@@ -279,13 +287,52 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("   -E5      Disable ',' command, ie: treat it as a comment character.\n");
     printf("   -E6      Treat running the ',' command as an error and Stop.\n");
     printf("\n");
+    printf("General extras\n");
+    printf("   -fintio\n");
+    printf("        Use decimal I/O instead of character I/O.\n");
+    printf("   -fno-negtape\n");
+    printf("        Limit optimiser to no negative tape positions.\n");
+    printf("   -fno-calctok\n");
+    printf("        Disable the T_CALC token.\n");
+    printf("   -fno-litprt\n");
+    printf("        Disable the T_CHR token and printf() strings.\n");
+    printf("   -fno-repoint\n");
+    printf("        Do not recreate pointer movements between loops as last stage.\n");
+    printf("   -frepoint\n");
+    printf("        Recreate pointer movements between loops as last stage.\n");
+    printf("\n");
+    printf("C generation extras\n");
+    printf("   -dynmem\n");
+    printf("        Use relloc() to extend tape in generated C code.\n");
+    printf("   -mem 60000\n");
+    printf("        Define array size for generated code.\n");
+    printf("   Note: the above two options do not apply to '-r'.\n");
+    printf("\n");
+#if !defined(DISABLE_DLOPEN)
+    printf("   -cc clang\n");
+    printf("        Choose C compiler to compile C for '-r' option.\n");
+    printf("   -ldl\n");
+    printf("        Use dlopen() shared libraries to run C code.\n");
+    printf("   -fonecall\n");
+    printf("        Call C compiler once to both compile and link.\n");
+    printf("        (Normally it done in two parts to support ccache).\n");
+    printf("   -fPIC -fpic -fno-pic\n");
+    printf("        Control usage of position independed code flag.\n");
+    printf("   -fleave-temps\n");
+    printf("        Do not delete C code and library file when done.\n");
+#endif
+#if !defined(DISABLE_TCCLIB)
+    printf("   -ltcc\n");
+    printf("        Use the TCCLIB library to run C code.\n");
+#endif
+    printf("\n");
     printf("\tNOTE: Some of the code generators are quite limited and do\n");
     printf("\tnot support all these options. NASM is 8 bits only. The BF\n");
     printf("\tgenerator does not include the ability to generate most of\n");
     printf("\tthe optimisation facilities.  The dc(1) generator defaults\n");
     printf("\tto -E6 as standard dc(1) has no character input routines.\n");
     printf("\tMany (including dc(1)) don't support -E2,-E3 and -E4.\n");
-    printf("\tMost generators do not support unicode.\n");
+    printf("\tMost code generators only support binary I/O.\n");
 
     exit(1);
 }
@@ -338,13 +385,14 @@ checkarg(char * opt, char * arg)
 	case 'm': opt_level=0; break;
 	case 'T': enable_trace=1; break;
 
-	case 'a': iostyle=0; break;
-	case 'B': iostyle=2; break;
+	case 'a': iostyle=0; default_io=0; break;
+	case 'B': iostyle=2; default_io=0; break;
 #ifdef __STDC_ISO_10646__
 	case 'u':
 	    if (!libc_allows_utf8 && verbose)
 		fprintf(stderr, "WARNING: POSIX compliant libc has 'fixed' UTF-8.\n");
 	    iostyle=1;
+	    default_io=0;
 	    break;
 #endif
 
@@ -398,6 +446,7 @@ checkarg(char * opt, char * arg)
     } else if (!strcmp(opt, "-fno-litprt")) { opt_no_litprt = 1; return 1;
     } else if (!strcmp(opt, "-fno-repoint")) { opt_no_repoint = 1; return 1;
     } else if (!strcmp(opt, "-frepoint")) { opt_force_repoint = 1; return 1;
+    } else if (!strcmp(opt, "-fintio")) { iostyle = 3; opt_no_litprt = 1; default_io=0; return 1;
     } else if (!strcmp(opt, "-help")) { help_flag++; return 1;
     }
 
@@ -3367,6 +3416,14 @@ getch(int oldch)
 #ifdef _WIN32
 	fflush(stdout);
 #endif
+	if (iostyle == 3) {
+	    int rv;
+	    rv = scanf("%d", &c);
+	    if (rv == EOF || rv == 0)
+		c = EOF;
+	    else
+		c = UM(c);
+	} else
 #ifdef __STDC_ISO_10646__
 	if (iostyle == 1) {
 	    int rv;
@@ -3401,6 +3458,9 @@ void
 putch(int ch)
 {
     pause_runclock();
+    if (iostyle == 3) {
+	printf("%d\n", UM(ch));
+    } else
 #ifdef __STDC_ISO_10646__
     if (ch > 127 && iostyle == 1)
 	printf("%lc", ch);
@@ -3431,7 +3491,7 @@ set_cell_size(int cell_bits)
 		cell_size, cell_mask);
     }
 
-    if (cell_size >= 0 && cell_size < 7) {
+    if (cell_size >= 0 && cell_size < 7 && iostyle != 3) {
 	fprintf(stderr, "A minimum cell size of 7 bits is needed for ASCII.\n");
 	exit(1);
     } else if (cell_size <= CHAR_BIT)
