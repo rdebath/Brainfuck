@@ -11,6 +11,7 @@
 #
 # Beware: pkg-config doesn't cope with multiarch -- I suggest using schroot.
 
+INSTALL=install -p -s
 INSTALLDIR=/usr/local/bin
 INSTALLEXT=
 ALLEXE=\
@@ -38,7 +39,7 @@ install:
 	-@$(MAKE) -k all
 	-@echo Installing: $(ALLEXE) to $(INSTALLDIR)
 	-@for i in $(ALLEXE) ; do \
-	install -p -s $$i $(INSTALLDIR)/$$i$(INSTALLEXT) ; \
+	$(INSTALL) $$i $(INSTALLDIR)/$$i$(INSTALLEXT) ; \
 	done
 
 CFLAGS=-O3 -Wall -Wshadow -DBOFF=256 $(DEFS)
@@ -156,7 +157,9 @@ libtcl.lib-off:
 # This uses 'pkg-config' to lookup the weird flags your version
 # of libpython-dev needs. If either is not available the interface
 # is disabled.
-HAVE_PYLIB=$(shell $(PKGCONF) --list-all 2>/dev/null | sed -n 's/^\(python-[^ ]*\).*/\1/p' | tail -1)
+HAVE_PYLIB=$(shell $(PKGCONF) --list-all 2>/dev/null | \
+	sed -n 's/^\(python-[^ ]*\).*/\1/p' | \
+	sort -r | head -1)
 ifeq ($(HAVE_PYLIB),)
 PYLIBFLAG=-DDISABLE_LIBPY
 PYLIBLIBS=
@@ -185,7 +188,9 @@ libpy.lib-off:
 # This uses 'pkg-config' to lookup the weird flags your version
 # of the lua library needs. If either is not available the interface
 # is disabled.
-HAVE_LUALIB=$(shell $(PKGCONF) --list-all 2>/dev/null | sed -n -e 's/^\(luajit\) .*/\1/p' -e 's/^\(lua5\..\) .*/\1/p' | tail -1)
+HAVE_LUALIB=$(shell $(PKGCONF) --list-all 2>/dev/null | \
+	sed -n -e 's/^\(luajit\) .*/\1/p' -e 's/^\(lua5\..\) .*/\1/p' | \
+	sort -r | head -1)
 ifeq ($(HAVE_LUALIB),)
 LUALIBFLAG=-DDISABLE_LIBLUA
 LUALIBLIBS=
