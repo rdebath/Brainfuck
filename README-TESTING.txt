@@ -23,7 +23,7 @@ Currently 'smoke' tested on
     x86_64 running NetBSD
     i686 running Debian lenny
     i686 running Debian etch
-    i686 running Debian woody (GNU lightning fails)
+    i686 running Debian woody (Use make CC=cc)
     Windows i386 and amd64.
 
 Testing notes
