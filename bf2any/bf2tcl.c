@@ -4,7 +4,7 @@
 #include <string.h>
 
 #ifndef DISABLE_LIBTCL
-#include <tcl/tcl.h>
+#include <tcl.h>
 #endif
 
 #include "bf2any.h"

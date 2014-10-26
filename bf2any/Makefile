@@ -9,7 +9,7 @@
 # Both bf2crun and bf2jit are multiarch aware on i386 vs amd64. (The kernel
 # must be 64bit for a 64bit application, but the userspace works both ways)
 #
-# Note: pkg-config doesn't cope with multiarch -- I suggest using schroot.
+# Beware: pkg-config doesn't cope with multiarch -- I suggest using schroot.
 
 INSTALLDIR=/usr/local/bin
 INSTALLEXT=
@@ -118,16 +118,24 @@ libtcc.lib-off:
 	@touch libtcc.lib-off
 
 #-------------------------------------------------------------------------------
-# TCL doesn't use pkg-config and so is usually installed sanely.
-HAVE_TCL=$(wildcard /usr/include/tcl/tcl.h)
-ifeq ($(HAVE_TCL),)
+# TCL doesn't use pkg-config and so is usually installed sanely, but this may
+# change as pkgconf (the svelte version) is available.
+HAVE_TCL=$(shell $(PKGCONF) --cflags --libs tcl >/dev/null 2>&1 && echo tcl)
+ifneq ($(HAVE_TCL),)
+TCLFLAG=$(shell $(PKGCONF) --cflags $(HAVE_TCL))
+TCLLIBS=$(shell $(PKGCONF) --libs $(HAVE_TCL))
+TCLDEP=libtcl.lib-on
+else
+HAVE_TCL_H=$(wildcard /usr/include/tcl/tcl.h)
+ifeq ($(HAVE_TCL_H),)
 TCLFLAG=-DDISABLE_LIBTCL
 TCLLIBS=
 TCLDEP=libtcl.lib-off
 else
-TCLFLAG=
+TCLFLAG=-I/usr/include/tcl
 TCLLIBS=-ltcl
 TCLDEP=libtcl.lib-on
+endif
 endif
 
 bf2tcl: bf2tcl.o bf2any.o bf2const.o
