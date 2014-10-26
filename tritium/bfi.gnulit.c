@@ -19,9 +19,19 @@
 #include <lightning.h>
 
 #ifdef jit_set_ip
+#ifndef GNULIGHTv1
 #define GNULIGHTv1
+#endif
 #elif defined(JIT_R0)
+#ifdef GNULIGHTv1
+#warning GNU Lightning V2 disabled, library will not be linked.
+#undef GNULIGHTv1
+#else
 #define GNULIGHTv2
+#endif
+#elif defined(GNULIGHTv1)
+#undef GNULIGHTv1
+#warning GNU Lightning V1 disabled, Header file did not configure.
 #endif
 
 #include "bfi.run.h"

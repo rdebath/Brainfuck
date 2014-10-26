@@ -33,19 +33,25 @@ endif
 
 all: bfi
 
+INSTALL=install -p -s
 INSTALLDIR=/usr/local/bin
 INSTALLEXT=
-CC=gcc
-CFLAGS=-O -Wall -Wshadow $(UNSAFE) $(INCLTOOLS) $(DEFS) $(CONF)
-LDFLAGS=
 TOOLDIR=../tools
 
-ifneq ($(CC),tcc)
-ifneq ($(TOOLDIR),)
-INCLTOOLS=-idirafter $(TOOLDIR)
+CC=$(shell ( which gcc clang pcc ; echo cc ) | head -1 | sed 's:.*/::')
+ifneq ($(CC),cc)
+CFLAGS=-O -Wall -Wshadow $(UNSAFE) $(INCLTOOLS) $(DEFS) $(CONF)
+else
+CFLAGS=-O $(INCLTOOLS) $(DEFS) $(CONF)
 endif
+LDFLAGS=
+
+ifneq ($(TOOLDIR),)
+ifeq ($(filter cc tcc,$(CC)),)
+INCLTOOLS=-idirafter $(TOOLDIR)
 else
 INCLTOOLS=-I $(TOOLDIR)
+endif
 endif
 
 # Current GCC policy seems to be to do any unsafe optimisation they can think
@@ -56,6 +62,7 @@ ifeq ($(CC),gcc)
 UNSAFE=-fno-delete-null-pointer-checks -fno-strict-overflow
 # -fwrapv -fno-strict-aliasing -fno-aggressive-loop-optimizations
 # -funsafe-loop-optimizations
+GNULGT=-fno-strict-aliasing -Wno-unused-value
 endif
 
 ifneq ($(STATIC_TOOLS),)
@@ -83,10 +90,10 @@ clean:
 	-rm -f *.o bfi.dasm.amd64.h bfi.dasm.i686.h bfi.version.h
 
 install: bfi
-	install -p -s bfi $(INSTALLDIR)/bfi$(INSTALLEXT)
+	$(INSTALL) bfi $(INSTALLDIR)/bfi$(INSTALLEXT)
 
 bfi.gnulit.o:	bfi.gnulit.c bfi.tree.h bfi.gnulit.h bfi.run.h
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ -fno-strict-aliasing -Wno-unused-value bfi.gnulit.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ $(GNULGT) bfi.gnulit.c
 
 bfi.version.o: bfi.version.h
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ $(GITHASH) $(GITTIME) $(GITTAG) bfi.version.c
@@ -140,16 +147,17 @@ LIBS_TCCLIB=-ltcc
 endif
 endif
 
-ifeq ($(DO_LIGHT),)
-ifeq ($(DO_MYLIGHT),)
+ifeq ($(DO_LIGHT)$(DO_MYLIGHT),)
 CONF_LIGHTNING=-DDISABLE_GNULIGHTNING
 LIBS_LIGHTNING=
-endif
 else
 DO_LIGHT2=$(wildcard /usr/include/lightning/jit_*.h)
 ifneq ($(DO_LIGHT2),)
 CONF_LIGHTNING=
 LIBS_LIGHTNING=-llightning
+else
+CONF_LIGHTNING=-DGNULIGHTv1
+LIBS_LIGHTNING=
 endif
 endif
 
