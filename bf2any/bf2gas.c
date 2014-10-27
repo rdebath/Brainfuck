@@ -27,6 +27,10 @@ int ind = 0;
 
 #define AX	"eax"
 #define BX	"ebx"
+#define CX	"ecx"
+#define DX	"edx"
+#define BP	"ebp"
+#define SP	"esp"
 #else
 // Call params in registers: %rdi, %rsi, %rdx, %rcx, %r8 and %r9
 // MSWindows ONLY Call params in registers: %rcx, %rdx, %r8 and %r9
@@ -37,6 +41,10 @@ int ind = 0;
 
 #define AX	"rax"
 #define BX	"rbx"
+#define CX	"rcx"
+#define DX	"rdx"
+#define BP	"rbp"
+#define SP	"rsp"
 #endif
 
 int
@@ -56,13 +64,8 @@ outcmd(int ch, int count)
 	puts(".text");
 	puts(".globl main");
 	puts("main:");
-#ifdef USE32
-	puts("push ebp");
-	puts("mov ebp, esp");
-#else
-	puts("push rbp");
-	puts("mov rbp, rsp");
-#endif
+	puts("push "BP);
+	puts("mov "BP", "SP);
 	puts("push "BX);
 	puts("mov "BX", offset flat:buffer");
 	break;
