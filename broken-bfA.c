@@ -20,12 +20,12 @@ main(int argc, char **argv){
 	case '<': m--; break;
 	case '.': putchar(mem[m]); break;
 	case ',': {int a=getchar(); if(a!=EOF) mem[m]=a;} break;
+	case '[':
+	    loopat = p;
+	    break;
 	case ']':
 	    if (loopat == -1) exit(1);
-	    if (mem[m]) p = loopat; else loopat = -1;
-	    break;
-	case '[':
-	    if(mem[m]==0)while(pgm[p]!=']')p++; else loopat = p;
+	    if (mem[m]) p = loopat;
 	    break;
 	}
     }

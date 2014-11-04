@@ -20,7 +20,7 @@ main(int argc, char **argv){
 	case '<': m--; break;
 	case '.': putchar(mem[m]); break;
 	case ',': {int a=getchar(); if(a!=EOF) mem[m]=a;} break;
-	case ']': if(sp) { sp--; p=jmpstk[sp]-1; } else p = -1; break;
+	case ']': if (mem[m]) { if(sp) { sp--; p=jmpstk[sp]-1; } else p = -1; } break;
 	case '[': jmpstk[sp++] = p; break;
 	}
     }
