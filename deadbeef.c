@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 
 void run(void)
 {
-static unsigned char t[USHRT_MAX+1];
+static unsigned char t[(sizeof(int)>sizeof(short))+USHRT_MAX];
    unsigned short m = 0;
    int n, ch;
    for(n=0; ; n++) {
