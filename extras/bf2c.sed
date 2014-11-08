@@ -7,20 +7,11 @@
 #define z *m=0\
 #define o write(1,m,1)\
 #define i read(0,m,1)\
-#define b while(*m)\
-#define _ return 0;}\
-char mem[30000];int main(){register char*m=mem;\
-
+#define b while(*m){\
+char mem[30000];int main(){register char*m=mem;
+$a\
+return 0;}
 s/[^]<>+,-.[]//g
 s/\[-]/z;/g
-s/+/u;/g
-s/-/d;/g
-s/\./o;/g
-s/,/i;/g
-s/\[/b{/g
-s/\]/}/g
-s/>/r;/g
-s/</l;/g
-   
-$a\
-_
+s/\(.\)/\1;/g
+y/]<>+,-.[/}lruidob/
