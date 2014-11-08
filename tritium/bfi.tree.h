@@ -13,6 +13,7 @@ extern int min_pointer, max_pointer;
 extern int opt_level;
 extern int iostyle, eofcell;
 extern char * input_string;
+extern int opt_repoint;
 
 extern int cell_size;
 extern int cell_mask;

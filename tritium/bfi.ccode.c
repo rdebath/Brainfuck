@@ -42,6 +42,7 @@ static const char * putname = "putch";
 static int use_direct_getchar = 0;
 static int use_dynmem = 0;
 static int memsize = 30000;
+static int libtcc_specials = 0;
 #if defined(DISABLE_DLOPEN)
 static const int use_dlopen = 0;
 #else
@@ -69,6 +70,7 @@ checkarg_ccode(char * opt, char * arg)
 #if !defined(DISABLE_TCCLIB)
     if (!strcmp(opt, "-ltcc")) {
 	choose_runner = 0;
+	libtcc_specials = 1;
 	return 1;
     }
 #endif
@@ -91,6 +93,7 @@ checkarg_ccode(char * opt, char * arg)
     if (!strcmp(opt, "-ltcc")) {
 	cc_cmd = "tcc";
 	choose_runner = 1;
+	libtcc_specials = 1;
 	in_one = 1;
 	return 1;
     }
@@ -98,6 +101,7 @@ checkarg_ccode(char * opt, char * arg)
 #endif
     if (!strcmp(opt, "-dynmem")) {
 	use_dynmem = 1;
+	if (opt_repoint == -1) opt_repoint = 0;
 	return 1;
     }
     if (!strcmp(opt, "-mem")) {
@@ -175,7 +179,6 @@ print_c_header(FILE * ofd)
 
     fprintf(ofd, "#include <stdio.h>\n");
     fprintf(ofd, "#include <stdlib.h>\n");
-    /* if( cell_size == CHAR_BIT || use_dynmem ) */
     fprintf(ofd, "#include <string.h>\n");
     fprintf(ofd, "\n");
 
@@ -708,6 +711,16 @@ print_ccode(FILE * ofd)
 		found_rail_runner = 1;
 	    }
 
+	    if (found_rail_runner && !do_run && use_dynmem && n->next->count>0) {
+		pt(ofd, indent,n);
+		fprintf(ofd, "while(m[%d]) m += %d;\n",
+		    n->offset, n->next->count);
+		pt(ofd, indent,n);
+		fprintf(ofd, "m = move_ptr(m,0);\n");
+		n=n->jmp;
+		break;
+	    }
+
 #if !defined(DISABLE_TCCLIB) && defined(__i386__)
 	    /* TCCLIB generates a slow while() with two jumps in the loop,
 	     * and several memory accesses. This is the assembler we would
@@ -716,7 +729,7 @@ print_ccode(FILE * ofd)
 	     * These prints are really ugly; I need a 'print gas in C'
 	     * function if we have much more.
 	     */
-	    if (found_rail_runner && cell_size == 32) {
+	    if (found_rail_runner && cell_size == 32 && libtcc_specials) {
 		fprintf(ofd, "#if !defined(__i386__) || !defined(__TINYC__)\n");
 		pt(ofd, indent,n);
                 if (n->next->count == 1) {
@@ -757,7 +770,7 @@ print_ccode(FILE * ofd)
 	    /* TCCLIB generates a slow 'strlen', libc is better, but the
 	     * function call overhead is horrible.
 	     */
-	    if (found_rail_runner && cell_size == CHAR_BIT &&
+	    if (found_rail_runner && cell_size == CHAR_BIT && libtcc_specials &&
 		add_mask <= 0 && n->next->count == 1) {
 		pt(ofd, indent,n);
 		fprintf(ofd, "if(m[%d]) {\n", n->offset);
@@ -877,6 +890,8 @@ run_tccode(void)
 #ifdef __STRICT_ANSI__
     void * iso_workaround;
 #endif
+
+    libtcc_specials = 1;
 
     ofd = open_memstream(&ccode, &ccodelen);
     if (ofd == NULL) { perror("open_memstream"); exit(7); }

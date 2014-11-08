@@ -143,8 +143,10 @@ X(bf,BF,
     case c_bf: print_bf(); break;                                   ,
     /* No direct run */						    )
 #if XX == 6
-    if (do_codestyle == c_bf)
-	opt_no_calc = opt_no_endif = opt_no_litprt = opt_no_repoint = 1;
+    if (do_codestyle == c_bf) {
+	opt_no_calc = opt_no_endif = opt_no_litprt = 1;
+	opt_repoint = 0;
+    }
 #endif
 #if XX == 4
     if (do_codestyle == c_bf)

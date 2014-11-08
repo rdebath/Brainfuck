@@ -106,8 +106,7 @@ int opt_runner = 0;
 int opt_no_calc = 0;
 int opt_no_litprt = 0;
 int opt_no_endif = 0;
-int opt_no_repoint = 0;
-int opt_force_repoint = 0;
+int opt_repoint = -1;
 
 int hard_left_limit = -1024;
 int enable_trace = 0;
@@ -444,8 +443,8 @@ checkarg(char * opt, char * arg)
     } else if (!strcmp(opt, "-fno-negtape")) { hard_left_limit = 0; return 1;
     } else if (!strcmp(opt, "-fno-calctok")) { opt_no_calc = 1; return 1;
     } else if (!strcmp(opt, "-fno-litprt")) { opt_no_litprt = 1; return 1;
-    } else if (!strcmp(opt, "-fno-repoint")) { opt_no_repoint = 1; return 1;
-    } else if (!strcmp(opt, "-frepoint")) { opt_force_repoint = 1; return 1;
+    } else if (!strcmp(opt, "-fno-repoint")) { opt_repoint = 0; return 1;
+    } else if (!strcmp(opt, "-frepoint")) { opt_repoint = 1; return 1;
     } else if (!strcmp(opt, "-fintio")) { iostyle = 3; opt_no_litprt = 1; default_io=0; return 1;
     } else if (!strcmp(opt, "-help")) { help_flag++; return 1;
     }
@@ -859,7 +858,7 @@ process_file(void)
 
 	if (opt_runner) try_opt_runner();
 
-	if (!opt_no_repoint)
+	if (opt_repoint != 0)
 	    pointer_regen();
 
 	if (verbose>2)
@@ -1396,7 +1395,7 @@ pointer_regen(void)
     int current_shift = 0;
 
     calculate_stats();
-    if (!opt_force_repoint) {
+    if (opt_repoint != 1) {
 	if (node_type_counts[T_MOV] == 0) return;
 	if (min_pointer > -120 && max_pointer < 120) return;
     }
@@ -3152,7 +3151,7 @@ print_codedump(void)
 	if (enable_trace)
 	    puts("#define posn(l,c) /* Line l Column c */");
 
-	/* See:  opt_no_repoint */
+	/* See:  opt_repoint */
 	if (node_type_counts[T_MOV])
 	    puts("#define ptradd(x) p += x;");
 
@@ -3188,16 +3187,9 @@ print_codedump(void)
 	if (node_type_counts[T_STOP])
 	    puts("#define bf_err() exit(1);");
 
-#if 0
-	/* See:  opt_no_litprt */
-	if (node_type_counts[T_CHR])
-	    printf("%s\n",
-		"#define outchar(x) {char s= x; write(1,&s,1);}"
-	"\n"	"#define outstr(x) {static const char s[]= x; write(1,s,sizeof(s)-1);}");
+	if (node_type_counts[T_DUMP])
+	    puts("#define bf_dump(l,c) /* Hmmm */");
 
-	if (node_type_counts[T_PRT])
-	    puts("#define outcell(x) {char s=p[x]; write(1,&s,1);}");
-#endif
 	if (node_type_counts[T_CHR] || node_type_counts[T_PRT]) {
 	    puts("void putch(int c) {char s=c; write(1,&s,1);}");
 	}
@@ -3365,8 +3357,11 @@ print_codedump(void)
 	    printf("bf_err()\n");
 	    break;
 
-	case T_NOP:
 	case T_DUMP:
+	    printf("bf_dump(%d,%d)\n", n->line, n->col);
+	    break;
+
+	case T_NOP:
 	    fprintf(stderr, "Warning on code generation: "
 	           "%s node: ptr+%d, cnt=%d, @(%d,%d).\n",
 		    tokennames[n->type],
