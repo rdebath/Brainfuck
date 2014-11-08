@@ -147,9 +147,9 @@ check_arg(const char * arg)
 void
 outcmd(int ch, int count)
 {
-    int32_t p;		// BEWARE: Assuming this is a good int.
+    int32_t p;		/* BEWARE: Assuming this is a good int. */
     FILE * ofd;
-    signed char arg;	// Another assembler type: one byte signed.
+    signed char arg;	/* Another assembler type: one byte signed. */
 
     /* limit count to the range of a signed char */
     while (count>127) { outcmd(ch, 127); count -= 127; }

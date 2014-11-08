@@ -159,10 +159,8 @@ loutcmd(int ch, int count, struct instruction *n)
 	    pr("END;");
 	    prv("%d: BEGIN", n->iloop);
 	    ind ++;
-	    // ind++;
 	    break;
 	case ']':
-	    // ind--;
 	    pr("if m[p] <> 0 THEN ");
 	    ind++; prv("j := %d", n->loop->iloop); ind--;
 	    pr("ELSE");

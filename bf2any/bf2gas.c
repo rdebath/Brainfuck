@@ -21,9 +21,10 @@ int ind = 0;
 #endif
 
 #ifdef USE32
-// Call params on stack
-// Callee saves: %ebp, %ebx, %esi, %edi
-// Caller saves: %eax, %ecx, and %edx
+/* Call params on stack
+ * Callee saves: %ebp, %ebx, %esi, %edi
+ * Caller saves: %eax, %ecx, and %edx
+ */
 
 #define AX	"eax"
 #define BX	"ebx"
@@ -32,12 +33,13 @@ int ind = 0;
 #define BP	"ebp"
 #define SP	"esp"
 #else
-// Call params in registers: %rdi, %rsi, %rdx, %rcx, %r8 and %r9
-// MSWindows ONLY Call params in registers: %rcx, %rdx, %r8 and %r9
-// Callee saves: %rbp, %rbx and %r12 through %r15
-// Caller saves: %rax, %rcx, %rdx and the rest
-// Register vars: %ebx, %r12d, %r13d, %r14d, %r15d
-// Temps: %eax (set to zero for most FN calls)
+/* Call params in registers: %rdi, %rsi, %rdx, %rcx, %r8 and %r9
+ * MSWindows ONLY Call params in registers: %rcx, %rdx, %r8 and %r9
+ * Callee saves: %rbp, %rbx and %r12 through %r15
+ * Caller saves: %rax, %rcx, %rdx and the rest
+ * Register vars: %ebx, %r12d, %r13d, %r14d, %r15d
+ * Temps: %eax (set to zero for most FN calls)
+ */
 
 #define AX	"rax"
 #define BX	"rbx"

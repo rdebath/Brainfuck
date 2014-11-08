@@ -393,7 +393,7 @@ main(int argc, char ** argv)
 	    break;
 	} else if (argv[1][0] == '-') {
 	    char * ap = argv[1]+1;
-	    char buf[4] = "-X";
+	    static char buf[4] = "-X";
 	    while(*ap) {
 		buf[1] = *ap;
 		if (!check_argv(buf))
