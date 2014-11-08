@@ -43,6 +43,7 @@
 #define L_HEADSECKS     0x12    /* headsecks(token, count); */
 #define L_BFRLE         0x13    /* bfrle(token, count); */
 #define L_BFXML         0x14    /* bfxml(token, count); */
+#define L_UGLYBF        0x15    /* bfugly(token, count); */
 
 
 static const char bf[] = "><+-.,[]";
@@ -316,6 +317,7 @@ static void risbf(int ch);
 static void headsecks(int ch, int count);
 static void bfrle(int ch, int count);
 static void bfxml(int ch, int count);
+static void bfugly(int ch, int count);
 static void bftranslate(int ch, int count);
 static void bfreprint(void);
 
@@ -451,6 +453,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-xml") == 0) {
 	lang = 0; langclass = L_BFXML; return 1;
     } else
+    if (strcmp(arg, "-ugly") == 0) {
+	lang = 0; langclass = L_UGLYBF; return 1;
+    } else
     if (strcmp(arg, "-@!") == 0) {
 	lang = atpling; langclass = L_JNWORD+GEN_HEADER; return 1;
     } else
@@ -505,6 +510,7 @@ check_arg(const char * arg)
 	"\n\t"  "-bewbs  BEWBS"
 	"\n\t"  "-risbf  RISBF"
 	"\n\t"  "-xml    XML"
+	"\n\t"  "-uglybf Ugly BF"
 	"\n\t"  "-dump   Token dump"
 	"\n\t"  "-pog    Pogaack."
 	"\n\t"  "-chi    In chinese."
@@ -668,6 +674,7 @@ outcmd(int ch, int count)
     case L_BF:		bftranslate(ch, count); break;
     case L_BFRLE:	bfrle(ch, count); break;
     case L_BFXML:	bfxml(ch, count); break;
+    case L_UGLYBF:	bfugly(ch, count); break;
     }
 
     if (ch == '~' && (langclass & GEN_HEADER) != 0)
@@ -779,6 +786,38 @@ bfxml(int ch, int count)
 	printf("%s by='%d'/>\n", bfxml_1[p-bf], count);
     } else {
 	printf("%s/>\n", bfxml_1[p-bf]);
+    }
+}
+
+static void
+bfugly(int ch, int count)
+{
+    char * p;
+    int usebs = 0;
+    int stars = 0;
+    char och = ch;
+
+    if (! (p = strchr(bf,ch))) return;
+    switch(ch)
+    {
+    case ']': och = '['; usebs = 1; break;
+    case '-': och = '+'; usebs = 1; break;
+    case '<': och = '>'; usebs = 1; break;
+    case ',': och = '.'; usebs = 1; break;
+    }
+
+    while(count) {
+	if (count & 1) {
+	    int i;
+	    if (usebs) pc('\\');
+	    if (!usebs && stars == 1)
+		pc(och);
+	    else for(i=0; i<stars; i++)
+		pc('*');
+	    pc(och);
+	}
+	count >>= 1;
+	stars++;
     }
 }
 

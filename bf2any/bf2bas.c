@@ -7,6 +7,7 @@
 /*
  * VB.NET translation from BF, runs at about 2,000,000,000 instructions per second.
  *
+ * Brandy basic translation from BF, runs at about 15,000,000 instructions per second.
  * bwbasic (-bw) translation from BF, runs at about 100,000 instructions per second.
  * bas-2.3 (-ansi) translation from BF, runs at about 1,500,000 instructions per second.
  * MOLE-Basic-0.7 (-goto|sort) translation from BF, runs at about 400,000 instructions per second.
@@ -20,13 +21,21 @@
 int ind = 0;
 int lineno = 0;
 int lineinc = 1;
-int open_doloop = 0; /* So we don't get an "unused variable" warning */
-int tapelen = 30000;
 
-enum { loop_wend, loop_while, loop_do, loop_goto } loop_style = loop_do;
+int enable_linenos = 0;
+int open_doloop = 0; /* So we don't get an "unused variable" warning in VB. */
+int do_input = 0;
+
+int tapelen = 30000;
+char tapecell[16]="M(P)";
+char tapeptr[16]="P";
+char tempcell[16]="V";
+char tapename[16]="M";
+
+enum { loop_wend, loop_endw, loop_while, loop_do, loop_goto } loop_style = loop_do;
 enum { init_none, init_dim, init_global, init_main } init_style = init_dim;
 enum { end_none, end_end, end_system, end_vb } end_style = end_end;
-enum { io_basic, io_vb } io_style = io_basic;
+enum { io_basic, io_bbc, io_vb } io_style = io_basic;
 
 struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
@@ -36,7 +45,7 @@ line_no_indent(void)
 {
     int i = 0;
     lineno += lineinc;
-    if (loop_style == loop_goto)
+    if (enable_linenos)
 	i = -4 + printf("%-3d ", lineno);
     printf("%*s", ind*4-i, "");
 }
@@ -48,6 +57,24 @@ check_arg(const char * arg)
     else
     if (strncmp(arg, "-M", 2) == 0) {
 	tapelen = strtoul(arg+2, 0, 10) + BOFF;
+	return 1;
+    } else
+    if (strcmp("-bbc", arg) ==0) {
+	init_style = init_dim;
+	loop_style = loop_endw;
+	end_style = end_end;
+	io_style = io_bbc;
+	strcpy(tapecell, "M%(P%)");
+	strcpy(tapeptr, "P%");
+	strcpy(tempcell, "V%");
+	strcpy(tapename, "M%");
+	return 1;
+    } else
+    if (strcmp("-%", arg) ==0) {
+	strcpy(tapecell, "M%(P%)");
+	strcpy(tapeptr, "P%");
+	strcpy(tempcell, "V%");
+	strcpy(tapename, "M%");
 	return 1;
     } else
     if (strcmp("-wend", arg) ==0) {
@@ -76,6 +103,7 @@ check_arg(const char * arg)
 	loop_style = loop_goto;
 	end_style = end_end;
 	io_style = io_basic;
+	enable_linenos = 1;
 	return 1;
     } else
     if (strcmp("-bac", arg) ==0) {
@@ -97,6 +125,7 @@ check_arg(const char * arg)
 	fprintf(stderr, "%s\n",
 	"\t"    "default is ansi"
 	"\n\t"  "-ansi   ANSI basic (do while style loop)"
+	"\n\t"  "-bbc    BBC Basic"
 	"\n\t"  "-wend   Like ansi but use While ... Wend"
 	"\n\t"  "-goto   Basic using GOTOs and line numbers (may need 'sort -n')"
 	"\n\t"  "-vb     Microsoft VB.NET"
@@ -117,12 +146,12 @@ outcmd(int ch, int count)
 	    case init_none:
 		break;
 	    case init_dim:
-		I; printf("DIM M(%d)\n", tapelen);
-		I; printf("P = %d\n", BOFF);
+		I; printf("DIM %s(%d)\n", tapename, tapelen);
+		I; printf("%s = %d\n", tapeptr, BOFF);
 		break;
 	    case init_global:
-		I; printf("GLOBAL M TYPE int ARRAY %d\n", tapelen);
-		I; printf("P = %d\n", BOFF);
+		I; printf("GLOBAL %s TYPE int ARRAY %d\n", tapename, tapelen);
+		I; printf("%s = %d\n", tapeptr, BOFF);
 		break;
 	    case init_main:
 		I; printf("Public Module MM\n");
@@ -132,10 +161,9 @@ outcmd(int ch, int count)
 		/* Using "Dim M(32700) As Byte" means we have to fix overflows
 		 * rather than having an automatic wrap.
 		 */
-		I; printf("Dim M(%d) As Integer\n", tapelen);
-		I; printf("Dim P As Integer\n");
-		// I; printf("Dim V As Integer ' Sigh, yes I know, sometimes unused.\n");
-		I; printf("P = %d\n", BOFF);
+		I; printf("Dim %s(%d) As Integer\n", tapename, tapelen);
+		I; printf("Dim %s As Integer\n", tapeptr);
+		I; printf("%s = %d\n", tapeptr, BOFF);
 		break;
 	}
 	break;
@@ -161,43 +189,76 @@ outcmd(int ch, int count)
 		I; printf("End Module\n");
 		break;
 	}
+	if (io_style == io_bbc) {
+	    I; printf("DEF PROCPRT(C%%)\n");
+	    I; printf("IF C%%=10 THEN PRINT ELSE PRINT CHR$(C%%);\n");
+	    I; printf("ENDPROC\n");
+	}
+	if (do_input && io_style == io_bbc) {
+	    I; printf("DEF PROCINP\n");
+	    I; printf("IF I%% = 0 THEN\n");
+	    ind ++;
+	    I; printf("INPUT \"\" A$\n");
+	    I; printf("I%% = 1\n");
+	    ind --;
+	    I; printf("ENDIF\n");
+
+	    I; printf("IF A$ = \"\" THEN\n");
+	    ind ++;
+	    I; printf("%s = 10\n", tapecell);
+	    I; printf("I%% = 0\n");
+	    ind --;
+	    I; printf("ELSE\n");
+	    ind ++;
+	    I; printf("%s = ASC(A$)\n", tapecell);
+	    I; printf("A$ = MID$(A$,2)\n");
+	    ind --;
+	    I; printf("ENDIF\n");
+	    I; printf("ENDPROC\n");
+	}
 	break;
 
     case 'X':
 	I; printf("print \"Infinite Loop\"\n");
 	I; printf("GOTO 200\n");
 	break;
-    case '=': I; printf("M(P)=%d\n", count); break;
+    case '=': I; printf("%s=%d\n", tapecell, count); break;
     case 'B':
 	if (end_style == end_vb && !open_doloop) {
 	    I; printf("Do\n");
 	    ind++;
-	    I; printf("Dim V As Integer\n");
+	    I; printf("Dim %s As Integer\n", tempcell);
 	    open_doloop = 1;
 	}
 
-	if(bytecell) { I; printf("M(P)=M(P) MOD 256\n"); }
-	I; printf("V=M(P)\n");
+	if(bytecell) { I; printf("%s=%s MOD 256\n", tapecell, tapecell); }
+	I; printf("%s=%s\n", tempcell, tapecell);
 	break;
-    case 'M': I; printf("M(P)=M(P)+V*%d\n", count); break;
-    case 'N': I; printf("M(P)=M(P)-V*%d\n", count); break;
-    case 'S': I; printf("M(P)=M(P)+V\n"); break;
-    case 'Q': I; printf("IF V<>0 THEN M(P) = %d\n", count); break;
+    case 'M': I; printf("%s=%s+%s*%d\n", tapecell, tapecell, tempcell, count); break;
+    case 'N': I; printf("%s=%s-%s*%d\n", tapecell, tapecell, tempcell, count); break;
+    case 'S': I; printf("%s=%s+%s\n", tapecell, tapecell, tempcell); break;
+    case 'Q': I; printf("IF %s<>0 THEN %s = %d\n", tempcell, tapecell, count); break;
 
-    case 'm': I; printf("IF V<>0 THEN M(P)=M(P)+V*%d\n", count); break;
-    case 'n': I; printf("IF V<>0 THEN M(P)=M(P)-V*%d\n", count); break;
-    case 's': I; printf("IF V<>0 THEN M(P)=M(P)+V\n"); break;
+    case 'm': I; printf("IF %s<>0 THEN %s=%s+%s*%d\n", tempcell, tapecell, tapecell, tempcell, count); break;
+    case 'n': I; printf("IF %s<>0 THEN %s=%s-%s*%d\n", tempcell, tapecell, tapecell, tempcell, count); break;
+    case 's': I; printf("IF %s<>0 THEN %s=%s+%s\n", tempcell, tapecell, tapecell, tempcell); break;
 
-    case '+': I; printf("M(P)=M(P)+%d\n", count); break;
-    case '-': I; printf("M(P)=M(P)-%d\n", count); break;
-    case '<': I; printf("P=P-%d\n", count); break;
-    case '>': I; printf("P=P+%d\n", count); break;
+    case '+': I; printf("%s=%s+%d\n", tapecell, tapecell, count); break;
+    case '-': I; printf("%s=%s-%d\n", tapecell, tapecell, count); break;
+    case '<': I; printf("%s=%s-%d\n", tapeptr, tapeptr, count); break;
+    case '>': I; printf("%s=%s+%d\n", tapeptr, tapeptr, count); break;
     case '.':
 	switch(io_style) {
 	case io_basic:
-	    I; printf("PRINT CHR$(M(P));\n"); break;
+	    I; printf("IF %s<>10 THEN PRINT CHR$(%s);\n", tapecell, tapecell);
+	    I; printf("IF %s=10 THEN PRINT\n", tapecell);
+	    break;
 	case io_vb:
-	    I; printf("Console.Write(Chr(M(P)))\n"); break;
+	    I; printf("Console.Write(Chr(%s))\n", tapecell);
+	    break;
+	case io_bbc:
+	    I; printf("PROCPRT(%s)\n", tapecell);
+	    break;
 	}
 	break;
     case ',':
@@ -209,7 +270,7 @@ outcmd(int ch, int count)
 	    I; printf("A$ = A$ + CHR$(10)\n");
 	    ind --;
 	    I; printf("END IF\n");
-	    I; printf("M(P) = ASC(A$)\n");
+	    I; printf("%s = ASC(A$)\n", tapecell);
 	    I; printf("A$ = MID$(A$,2)\n");
 	    break;
 	case io_vb:
@@ -221,9 +282,13 @@ outcmd(int ch, int count)
 	    I; printf("C = Console.Read()\n");
 	    ind --;
 	    I; printf("Loop While C = 13\n");
-	    I; printf("IF C <> -1 THEN M(P)=C\n");
+	    I; printf("IF C <> -1 THEN %s=C\n", tapecell);
 	    ind --;
 	    I; printf("Loop While False\n");
+	    break;
+	case io_bbc:
+	    I; printf("PROCINP\n");
+	    do_input = 1;
 	    break;
 	}
 	break;
@@ -234,7 +299,7 @@ outcmd(int ch, int count)
 	    open_doloop = 0;
 	}
 
-	if(bytecell) { I; printf("M(P)=M(P) MOD 256\n"); }
+	if(bytecell) { I; printf("%s=%s MOD 256\n", tapecell, tapecell); }
 	switch(loop_style) {
 	    case loop_goto:
 		{
@@ -246,13 +311,16 @@ outcmd(int ch, int count)
 		}
 		break;
 	    case loop_do:
-		I; printf("DO WHILE M(P)<>0\n");
+		I; printf("DO WHILE %s<>0\n", tapecell);
 		break;
 	    case loop_wend:
-		I; printf("WHILE M(P)<>0\n");
+		I; printf("WHILE %s<>0\n", tapecell);
 		break;
 	    case loop_while:
-		I; printf("While M(P)<>0\n");
+		I; printf("While %s<>0\n", tapecell);
+		break;
+	    case loop_endw:
+		I; printf("WHILE %s<>0\n", tapecell);
 		break;
 	}
 	ind++;
@@ -264,7 +332,7 @@ outcmd(int ch, int count)
 	    open_doloop = 0;
 	}
 
-	if(bytecell) { I; printf("M(P)=M(P) MOD 256\n"); }
+	if(bytecell) { I; printf("%s=%s MOD 256\n", tapecell, tapecell); }
 	ind--;
 	switch(loop_style) {
 	    case loop_goto:
@@ -275,9 +343,9 @@ outcmd(int ch, int count)
 
 		    saveline = lineno;
 		    lineno = n->id;
-		    I; printf("IF M(P)=0 THEN GOTO %d\n", saveline+lineinc*2);
+		    I; printf("IF %s=0 THEN GOTO %d\n", tapecell, saveline+lineinc*2);
 		    lineno = saveline;
-		    I; printf("IF M(P)<>0 THEN GOTO %d\n", n->id+lineinc*2);
+		    I; printf("IF %s<>0 THEN GOTO %d\n", tapecell, n->id+lineinc*2);
 		    free(n);
 		}
 		break;
@@ -289,6 +357,9 @@ outcmd(int ch, int count)
 		break;
 	    case loop_while:
 		I; printf("End While\n");
+		break;
+	    case loop_endw:
+		I; printf("ENDWHILE\n");
 		break;
 	}
 	break;
