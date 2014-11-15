@@ -7,6 +7,15 @@
 #include "bfi.tree.h"
 #include "bfi.bf.h"
 
+int BFBasic = 0;
+
+int
+checkarg_bf(char * opt, char * arg)
+{
+    if (!strcmp(opt, "-fbfbasic")) { BFBasic = 1; return 1; }
+    return 0;
+}
+
 static void
 pint(int v)
 {
@@ -117,6 +126,14 @@ print_bf(void)
 	    nocr = 1;
 	case T_WHL:
 	    putchar('[');
+	    /* This is something that's always true for BF Basic generated
+	     * code. The 'while-switch' loop takes the first few cells and
+	     * next seven are temps that will always be left at zero. This
+	     * fragment explicitly zeros those cells so the optimiser can
+	     * easily see this is true. */
+	    if (BFBasic)
+		if (n->offset == 2)
+		    printf("\n> [-]>[-]>[-]>[-]>[-]>[-]>[-]><<<<<<< <");
 	    break;
 
 	case T_END:
