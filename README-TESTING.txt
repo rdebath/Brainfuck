@@ -38,12 +38,13 @@ the tools/dynasm directory to disable DynASM completely.
 
 FreeBSD x86_64
 --------------
-Use the ports functionality to install gmake or compile manually as the
-BSD 'pmake' make version's extensions are incompatible with the gmake
-extensions. Ports will also be needed for the gmp library to compile
-the output of bf2cgmp. The nasm assembler is in ports but the programs
-produce 32bit Linux ELF executables that won't work anyway. The Makefiles
-prefer gcc, but adding 'CC=clang' works fine.
+Use the ports functionality to install gmake or compile manually as
+the BSD 'pmake' make version's extensions are incompatible with the
+gmake extensions. Ports will also be needed for the gmp library to
+compile the output of bf2cgmp.  The the nasm assembler output in link
+mode compiles and runs successfully when linked to libc by clang. The
+'gas' assembler output does not. The Makefiles prefer gcc, but adding
+'CC=clang' works fine.
 
 The 'ports' version of GNU Lightning V2 is (of course) not auto detected
 by Tritium.  It can be pulled in using this ...
@@ -58,7 +59,8 @@ or
     make CC=x86_64-w64-mingw32-gcc DO_LIBDL=
 
 The Dynasm JIT works so it's nice and quick. (cmd.exe, however, is slow!)
+The nasm/gas output cross compiles and runs with the -fwin32 option.
 
 The majority of the bf2any cross compile to Windows happily as they're
-plain C, but most of the special ones haven't been altered to run on
-non-Posix operating systems.
+plain C, but the special features, embedded interpreters etc don't work
+on non-Posix operating systems.

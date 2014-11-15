@@ -17,6 +17,7 @@ static int link_main = 0;
 #else
 static int link_main = 1;
 #endif
+static int ulines = 0;
 
 static int hello_world = 0;
 
@@ -36,6 +37,7 @@ checkarg_nasm(char * opt, char * arg)
     if (!strcmp(opt, "-fgas")) { intel_gas = link_main = 1; return 1; }
     if (!strcmp(opt, "-fnasm")) { intel_gas = 0; return 1; }
     if (!strcmp(opt, "-flinux")) { intel_gas = 0; link_main = 0; return 1; }
+    if (!strcmp(opt, "-fwin32")) { intel_gas = 1; link_main = 1; ulines = 1; return 1; }
     return 0;
 }
 
@@ -533,9 +535,9 @@ print_gas_header(void)
 	printf("mem:\n");
 	printf("\tresb %d\n", memsize);
 	printf("\tsection\t.text\n");
-	printf("\textern read\n");
-	printf("\textern write\n");
-	printf("\tglobal main\n");
+	printf("\textern %sread\n", ulines?"_":"");
+	printf("\textern %swrite\n", ulines?"_":"");
+	printf("\tglobal %smain\n", ulines?"_":"");
 	printf("\n");
     }
 
@@ -544,7 +546,7 @@ print_gas_header(void)
     printf("\tmov dword ptr [esp+8], 1\n");
     printf("\tmov dword ptr [esp+4], ecx\n");
     printf("\tmov dword ptr [esp], 0\n");
-    printf("\tcall read\n");
+    printf("\tcall %sread\n", ulines?"_":"");
     printf("\tadd esp, 12\n");
     printf("\txor edx,edx\n");
     printf("\tret\n");
@@ -557,7 +559,7 @@ print_gas_header(void)
     printf("\tlea eax, [esp+12]\n");
     printf("\tmov dword ptr [esp+4], eax\n");
     printf("\tmov dword ptr [esp], 1\n");
-    printf("\tcall write\n");
+    printf("\tcall %swrite\n", ulines?"_":"");
     printf("\tmov ecx, dword ptr [esp+16]\n");
     printf("\tadd esp, 20\n");
     printf("\txor edx,edx\n");
@@ -569,16 +571,16 @@ print_gas_header(void)
     printf("\tmov dword ptr [esp+8], edx\n");
     printf("\tmov dword ptr [esp+4], eax\n");
     printf("\tmov dword ptr [esp], 1\n");
-    printf("\tcall write\n");
+    printf("\tcall %swrite\n", ulines?"_":"");
     printf("\tmov ecx, dword ptr [esp+12]\n");
     printf("\tadd esp, 16\n");
     printf("\txor edx,edx\n");
     printf("\tret\n");
 
     if (intel_gas)
-	printf(".globl main\n");
+	printf(".globl %smain\n", ulines?"_":"");
 
-    printf("main:\n");
+    printf("%smain:\n", ulines?"_":"");
     printf("\tpush ebp\n");
     printf("\tmov ebp, esp\n");
     printf("\tpush ebx\n");
