@@ -587,8 +587,8 @@ link_and_run(dasm_State ** state)
     /* Remove the stdout output buffer */
     if (isatty(STDOUT_FILENO)) setbuf(stdout, 0);
 
-    /* Memory for the tape ... TODO: make it configurable, dynamic or HUGE */
-    tapemem = calloc(32768, tape_step);
+    /* Memory for the tape. */
+    tapemem = calloc(tapesz, tape_step);
 
     /* The C99 standard leaves casting from "void *" to a function
        pointer undefined.  The assignment used below is the POSIX.1-2003
@@ -596,7 +596,7 @@ link_and_run(dasm_State ** state)
        POSIX specification of dlsym(). */
 					     /* -- Linux man page dlsym() */
     *(void **) (&code) = codeptr;
-    code(tapemem + tape_step * BOFF);
+    code(tapemem + tape_step * tapeinit);
 
     /* Discard code and data */
 #ifndef _WIN32

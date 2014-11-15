@@ -26,7 +26,7 @@ outcmd(int ch, int count)
 	printf( "%s%d%s",
 		"#!/usr/bin/perl\n"
 		"$|++;\n" "$^W = 0;\n"
-		"$p = ", BOFF, ";\n");
+		"$p = ", tapeinit, ";\n");
 	break;
 
     case '=': I; printf("$m[$p] = %d;\n", count); break;

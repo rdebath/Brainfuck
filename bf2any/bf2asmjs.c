@@ -38,8 +38,6 @@ struct instruction {
 
 void loutcmd(int ch, int count, struct instruction *n);
 
-#define MEMSIZE 65536
-
 static int do_input = 0;
 static int ind = 2;
 static int lblcount = 0;
@@ -206,7 +204,7 @@ loutcmd(int ch, int count, struct instruction *n)
 		"    var m = new stdlib.Int32Array(heap);\n"
 		);
 	printf("%s%d%s",
-		"    var p = ", BOFF * (bytecell?1:4), ";\n"
+		"    var p = ", tapeinit * (bytecell?1:4), ";\n"
 		"    var v = 0;\n"
 		"    var o = ffi.put;\n"
 		"    var get = ffi.get;\n"
@@ -265,7 +263,7 @@ loutcmd(int ch, int count, struct instruction *n)
 		"    function reset() {\n"
 		"        var i = 0;\n"
 		"        while ((i|0) < (%d|0)) {\n",
-		MEMSIZE * (bytecell?1:4)
+		tapesz * (bytecell?1:4)
 		);
 	if (bytecell)
 	    printf(
@@ -303,7 +301,7 @@ loutcmd(int ch, int count, struct instruction *n)
 		"                   return c;\n"
 		"               }\n"
 		"    }, new ArrayBuffer(%d));\n"
-		"})(this)\n", MEMSIZE * (bytecell?1:4));
+		"})(this)\n", tapesz * (bytecell?1:4));
 	break;
 
     }

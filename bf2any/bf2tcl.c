@@ -16,7 +16,6 @@
 int ind = 0;
 #define I fprintf(ofd, "%*s", ind*4, "")
 #define oputs(str) fprintf(ofd, "%s\n", (str))
-int tapelen = 30000;
 int do_dump = 0;
 
 FILE * ofd;
@@ -40,12 +39,6 @@ check_arg(const char * arg)
 	return 1;
     } else
 #endif
-    if (strncmp(arg, "-M", 2) == 0) {
-	tapelen = strtol(arg+2, 0, 10);
-	if (tapelen<1) tapelen = 30000;
-	tapelen += BOFF;
-	return 1;
-    }
     return 0;
 }
 
@@ -66,8 +59,8 @@ outcmd(int ch, int count)
 		"fconfigure stdout -buffering none\n"
 		"fconfigure stdin -buffering none\n"
 		"proc run_bf {} {\n"
-		"set d [lrepeat ",tapelen," 0]\n"
-		"set dc ", BOFF, "\n");
+		"set d [lrepeat ",tapesz," 0]\n"
+		"set dc ", tapeinit, "\n");
 	break;
     case '~':
 	oputs("}\nrun_bf");

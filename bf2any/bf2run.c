@@ -18,15 +18,11 @@ int do_dump = 0;
 typedef int icell;
 #endif
 
-#ifndef MEMSIZE
-#define MEMSIZE 65536
-#endif
-
 static int *mem = 0, *mptr = 0;
 static size_t memlen = 0;
 static icell * tape = 0;
 
-static size_t tapelen = MEMSIZE+BOFF;
+static size_t tapealloc;
 
 #define TOKEN_LIST(Mac) \
     Mac(STOP) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
@@ -66,14 +62,9 @@ check_arg(const char * arg)
 	do_dump = 0;
 	return 1;
     } else
-    if (strncmp(arg, "-M", 2) == 0) {
-	tapelen = strtoul(arg+2, 0, 10) + BOFF;
-	return 1;
-    } else
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-d      Dump code"
-	"\n\t"  "-MNNN   Memory to allocate for tape"
 	"\n\t"  "-r      Run program");
 	return 1;
     } else
@@ -125,13 +116,14 @@ outcmd(int ch, int count)
     case '#': *mptr++ = t = T_DUMP; break;
     case '~':
 	*mptr++ = t = T_STOP;
+	tapealloc = tapelen + BOFF;
 	if (do_dump) {
 	    dumpprog(mem, mptr);
 	    return;
 	}
 	setbuf(stdout, 0);
 
-	tape = calloc(tapelen, sizeof(icell));
+	tape = calloc(tapealloc, sizeof(icell));
 
 	if(!enable_debug && !checklimits)
 	    runprog(mem, tape+BOFF);
@@ -188,7 +180,7 @@ dumpmem(int *mp)
 {
     size_t i, j = 0;
     const icell msk = (bytecell)?0xFF:-1;
-    for (i = 0; i < tapelen; i++) if (tape[i]&msk) j = i + 1;
+    for (i = 0; i < tapealloc; i++) if (tape[i]&msk) j = i + 1;
     fprintf(stderr, "Ptr: %3d, mem:", (int)(mp-tape-BOFF));
     for (i = BOFF; i < j; i++)
 	fprintf(stderr, "%s%d", tape + i == mp ? ">" : " ", tape[i]&msk);
@@ -245,7 +237,7 @@ runprog(register int * p, register icell *mp)
     for(;;){
 	mp += p[0];
 #ifdef PART2
-	if (mp>=tape+tapelen || (mp<tape+BOFF && (a || mp<tape)))
+	if (mp>=tape+tapealloc || (mp<tape+BOFF && (a || mp<tape)))
 	{
 	    fprintf(stderr,
 		    "Error: Tape pointer has moved to position %d\n",

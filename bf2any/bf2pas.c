@@ -25,7 +25,6 @@ void loutcmd(int ch, int count, struct instruction *n);
 
 int do_input = 0;
 int ind = 0;
-int tapelen = 30000;
 
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
@@ -37,10 +36,6 @@ int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
-    if (strncmp(arg, "-M", 2) == 0) {
-	tapelen = strtoul(arg+2, 0, 10) + BOFF;
-	return 1;
-    }
     return 0;
 }
 
@@ -131,9 +126,9 @@ loutcmd(int ch, int count, struct instruction *n)
 	pr("var");
 	ind++;
 	if (bytecell)
-	    prv("tape : packed array [0..%d] of byte;", tapelen);
+	    prv("tape : packed array [0..%d] of byte;", tapesz);
 	else
-	    prv("tape : packed array [0..%d] of longint;", tapelen);
+	    prv("tape : packed array [0..%d] of longint;", tapesz);
 	pr("tapepos : longint;");
 	pr("v : longint;");
 	pr("inch : char;");
@@ -144,7 +139,7 @@ loutcmd(int ch, int count, struct instruction *n)
     case '!':
 	pr("begin");
 	ind ++;
-	prv("tapepos := %d;", BOFF);
+	prv("tapepos := %d;", tapeinit);
 	break;
 
     case '=': prv("tape[tapepos] := %d;", count); break;

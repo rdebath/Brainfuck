@@ -99,7 +99,7 @@ outcmd(int ch, int count)
 	    ofd = stdout;
 	if (outputmode == 2)
 	    pr("#!/usr/bin/dc");
-	prv("[%dsp", BOFF);
+	prv("[%dsp", tapeinit);
 	break;
 
     case '=': prv("%slp:a", dc_ltoa(count)); break;

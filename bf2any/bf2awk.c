@@ -39,7 +39,7 @@ outcmd(int ch, int count)
     case '!':
 	printf("#!/usr/bin/awk -f\n");
 	printf("BEGIN {\n"); ind++;
-	I; printf("p=%d\n",BOFF); break;
+	I; printf("p=%d\n",tapeinit); break;
 	break;
 
     case '=': I; printf("m[p] = %d\n", count); break;

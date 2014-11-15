@@ -303,7 +303,6 @@ static int col = 0;
 static int maxcol = 72;
 static int state = 0;
 static int bf_mov = 0;
-static int tapelen = 30000;
 
 static int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
 
@@ -327,10 +326,6 @@ check_arg(const char * arg)
     if (strcmp(arg, "-#") == 0) return 1;
     if (strcmp(arg, "-no-default-opt") == 0) return 1;
 
-    if (strncmp(arg, "-M", 2) == 0) {
-	tapelen = strtoul(arg+2, 0, 10);
-	return 1;
-    } else
     if (strcmp(arg, "-c") == 0) {
 	lang = cbyte; langclass = L_CWORDS; return 1;
     } else
@@ -619,9 +614,11 @@ outcmd(int ch, int count)
 		printf("#define _ return 0;}\n");
 	}
 	if (bytecell)
-	    printf("char mem[%d];int main(){register char*m=mem;\n", tapelen);
+	    printf("char mem[%d];int main(){register char*m=mem;\n", tapesz);
 	else
-	    printf("int mem[%d];int main(){register int*m=mem;\n", tapelen);
+	    printf("int mem[%d];int main(){register int*m=mem;\n", tapesz);
+	if (tapeinit)
+	    printf("m += %d;\n", tapeinit);
     }
 
     if (ch == '!' && (langclass & GEN_HEADER) != 0) {
@@ -769,7 +766,7 @@ bfxml(int ch, int count)
 	    puts("<?xml version=\"1.0\"?>");
 	    printf("<fuck bits='%d' wrap='Y'>",
 		    (int)(bytecell?8:sizeof(int)*8));
-	    if (tapelen > 1)
+	    if (tapelen > 0)
 		printf("<tapes><tape length='%d'/></tapes>\n", tapelen);
 	    else
 		printf("<tapes><tape/></tapes>\n");

@@ -23,7 +23,6 @@
  */
 
 int ind = 0;
-int tapelen = 30000;
 
 /*
  * The bits of machine language that, together, make up a compiled
@@ -133,10 +132,6 @@ int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-b") == 0) return 1;
-    if (strncmp(arg, "-M", 2) == 0) {
-	tapelen = strtoul(arg+2, 0, 10);
-	return 1;
-    } else
     if (strncmp(arg, "-o", 2) == 0 && arg[2]) {
 	filename = arg+2;
 	return 1;
@@ -194,10 +189,10 @@ outcmd(int ch, int count)
 	p = pos;
 	insertobj(p_filesz, p);
 
-	p = pos + tapelen;
+	p = pos + tapesz;
 	insertobj(p_memsz, p);
 
-	p = pos + base_address;
+	p = pos + base_address + tapeinit;
 	insertobj(sizeof(elfheader) + sizeof(start) + prolog_meminit_offset, p);
 
 	{

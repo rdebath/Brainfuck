@@ -33,7 +33,6 @@ struct instruction {
 void loutcmd(int ch, int count, struct instruction *n);
 
 int ind = 0;
-static int tapelen = 30000;
 #define I printf("%*s", ind*4, "")
 static int lblcount = 0;
 static int icount = 0;
@@ -46,10 +45,6 @@ check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     if (strcmp(arg, "-savestring") == 0) return 1;
-    if (strncmp(arg, "-M", 2) == 0) {
-	tapelen = strtoul(arg+2, 0, 10) + BOFF;
-	return 1;
-    }
     if (strcmp(arg, "-nofunc") == 0) {
 	no_function = 1;
 	return 1;
@@ -150,12 +145,12 @@ loutcmd(int ch, int count, struct instruction *n)
     case 999:
 	if (bytecell)
 	    printf( "%s%d%s%d%s",
-		    "m = zeros(Uint8, ",tapelen,")\n"
-		    "p = ", BOFF, "\n");
+		    "m = zeros(Uint8, ",tapesz,")\n"
+		    "p = ", tapeinit, "\n");
 	else
 	    printf( "%s%d%s%d%s",
-		    "m = zeros(typeof(0), ",tapelen,")\n"
-		    "p = ", BOFF, "\n");
+		    "m = zeros(typeof(0), ",tapesz,")\n"
+		    "p = ", tapeinit, "\n");
 	break;
     case 1000:
 	printf("function bf%d(m,p)\n", n->ino);

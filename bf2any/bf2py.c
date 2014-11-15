@@ -20,7 +20,6 @@
 int ind = 0;
 #define I fprintf(ofd, "%*s", ind*4, "")
 
-int tapelen = 0;
 int do_dump = 0;
 
 FILE * ofd;
@@ -31,6 +30,10 @@ int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
+    if (strcmp(arg, "-M") == 0) {
+	tapelen = 0;
+	return 1;
+    }
     if (strcmp(arg, "-d") == 0) {
 	do_dump = 1;
 	return 1;
@@ -41,10 +44,6 @@ check_arg(const char * arg)
 	return 1;
     } else
 #endif
-    if (strncmp(arg, "-M", 2) == 0) {
-	tapelen = strtoul(arg+2, 0, 10) + BOFF;
-	return 1;
-    }
     return 0;
 }
 
@@ -66,14 +65,14 @@ outcmd(int ch, int count)
 #else
 	fprintf(ofd, "import os\n");
 #endif
-	if (tapelen>0) {
-	    fprintf(ofd, "m = [0] * %d\n", tapelen);
+	if (tapelen > 0) {
+	    fprintf(ofd, "m = [0] * %d\n", tapesz);
 	} else {
 	    /* Dynamic arrays are 20% slower! */
 	    fprintf(ofd, "from collections import defaultdict\n");
 	    fprintf(ofd, "m = defaultdict(int)\n");
 	}
-	fprintf(ofd, "p = %d\n", BOFF);
+	fprintf(ofd, "p = %d\n", tapeinit);
 	break;
 
     case '=': I; fprintf(ofd, "m[p] = %d\n", count); break;

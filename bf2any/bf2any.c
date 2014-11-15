@@ -5,6 +5,7 @@
 #include "bf2any.h"
 
 int bytecell = 0;
+int tapelen = 30000;
 int enable_optim = 0;
 int enable_be_optim = 0;
 int enable_bf_optim = 0;
@@ -329,6 +330,10 @@ check_argv(const char * arg)
 
     } else if (strcmp(arg, "-h") == 0) {
 	return 0;
+    } else if (strncmp(arg, "-M", 2) == 0 && arg[2] != 0) {
+	tapelen = strtoul(arg+2, 0, 10);
+	if (tapelen < 1) tapelen = 30000;
+	return 1;
     } else if (check_arg(arg)) {
 	;
     }
@@ -382,6 +387,7 @@ main(int argc, char ** argv)
 	    "\n\t"  "-O      Enable full optimisation"
 	    "\n\t"  "-Obf    Enable simple optimisation suitable for BF output"
 	    "\n\t"  "-Omov   Enable only movement optimisation"
+	    "\n\t"  "-M30000 Set length of tape, -M for dynamic if available."
 	    );
 
 	    check_arg(argv[1]);

@@ -1,5 +1,6 @@
 
 extern int bytecell;
+extern int tapelen;
 extern int enable_optim;
 extern int enable_be_optim;
 extern int enable_debug;
@@ -12,3 +13,5 @@ int check_arg(const char * arg);
 
 char * get_string(void);
 
+#define tapeinit (enable_optim?BOFF:0)
+#define tapesz   (tapelen+tapeinit)

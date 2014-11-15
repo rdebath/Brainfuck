@@ -36,7 +36,7 @@ outcmd(int ch, int count)
 
 	pr("brainfuck() {");
 	ind++;
-	prv("P=%d", BOFF);
+	prv("P=%d", tapeinit);
 	break;
 
     case 'X': pr("echo Infinite Loop 2>&1 ; exit 1"); break;

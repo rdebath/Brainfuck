@@ -26,7 +26,6 @@ int enable_linenos = 0;
 int open_doloop = 0; /* So we don't get an "unused variable" warning in VB. */
 int do_input = 0;
 
-int tapelen = 30000;
 char tapecell[16]="M(P)";
 char tapeptr[16]="P";
 char tempcell[16]="V";
@@ -55,10 +54,6 @@ check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     else
-    if (strncmp(arg, "-M", 2) == 0) {
-	tapelen = strtoul(arg+2, 0, 10) + BOFF;
-	return 1;
-    } else
     if (strcmp("-bbc", arg) ==0) {
 	init_style = init_dim;
 	loop_style = loop_endw;
@@ -146,12 +141,12 @@ outcmd(int ch, int count)
 	    case init_none:
 		break;
 	    case init_dim:
-		I; printf("DIM %s(%d)\n", tapename, tapelen);
-		I; printf("%s = %d\n", tapeptr, BOFF);
+		I; printf("DIM %s(%d)\n", tapename, tapesz);
+		I; printf("%s = %d\n", tapeptr, tapeinit);
 		break;
 	    case init_global:
-		I; printf("GLOBAL %s TYPE int ARRAY %d\n", tapename, tapelen);
-		I; printf("%s = %d\n", tapeptr, BOFF);
+		I; printf("GLOBAL %s TYPE int ARRAY %d\n", tapename, tapesz);
+		I; printf("%s = %d\n", tapeptr, tapeinit);
 		break;
 	    case init_main:
 		I; printf("Public Module MM\n");
@@ -161,9 +156,9 @@ outcmd(int ch, int count)
 		/* Using "Dim M(32700) As Byte" means we have to fix overflows
 		 * rather than having an automatic wrap.
 		 */
-		I; printf("Dim %s(%d) As Integer\n", tapename, tapelen);
+		I; printf("Dim %s(%d) As Integer\n", tapename, tapesz);
 		I; printf("Dim %s As Integer\n", tapeptr);
-		I; printf("%s = %d\n", tapeptr, BOFF);
+		I; printf("%s = %d\n", tapeptr, tapeinit);
 		break;
 	}
 	break;

@@ -10,7 +10,6 @@
 
 int do_input = 0;
 int ind = 0;
-int tapelen = 30000;
 #define I printf("%*s", ind*4, "")
 
 static void print_cstring(void);
@@ -19,10 +18,6 @@ int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
-    if (strncmp(arg, "-M", 2) == 0) {
-	tapelen = strtoul(arg+2, 0, 10) + BOFF;
-	return 1;
-    }
     if (strcmp(arg, "-savestring") == 0) return 1;
     return 0;
 }
@@ -33,13 +28,13 @@ outcmd(int ch, int count)
     switch(ch) {
     case '!':
 	printf("#!/usr/bin/env slsh\n");
-	I; printf("variable p=%d;\n",BOFF);
+	I; printf("variable p=%d;\n",tapeinit);
 	I; printf("variable v;\n");
 	I;
 	if (bytecell)
-	    printf("variable m = UChar_Type [%d];\n", tapelen);
+	    printf("variable m = UChar_Type [%d];\n", tapesz);
 	else
-	    printf("variable m = Integer_Type [%d];\n", tapelen);
+	    printf("variable m = Integer_Type [%d];\n", tapesz);
 	I; printf("variable goteof = 0, gotline = 0, line = \"\", c;\n");
 	break;
 

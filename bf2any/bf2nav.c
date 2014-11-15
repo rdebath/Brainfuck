@@ -20,8 +20,6 @@ struct instruction {
 
 void loutcmd(int ch, int count, struct instruction *n);
 
-#define MEMSIZE 65536
-
 static int do_input = 0;
 static int ind = 2;
 static int lblcount = 0;
@@ -180,7 +178,7 @@ loutcmd(int ch, int count, struct instruction *n)
         pr("PROCEDURE ResetProg@1000000003();");
         pr("BEGIN");
 	pr("  j := 0;");
-	prv("  p := %d;", BOFF+1);
+	prv("  p := %d;", tapeinit+1);
 	pr("  InputLine := '';");
 	pr("END;\n");
 
@@ -268,7 +266,7 @@ static char * boilerplate =
 "\n"	"      InputLine@1000000007 : Text[1024];"
 "\n"	"      j@1000000002 : Integer;"
 "\n"	"      p@1000000003 : Integer;"
-"\n"	"      m@1000000004 : ARRAY [60000] OF Char;"
+"\n"	"      m@1000000004 : ARRAY [60000] OF Char;"	    /* TODO: tapesz */
 "\n"	"      v@1000000005 : Integer;"
 "\n"	"      moreinp@1000000006 : Integer;"
 "\n"	""
