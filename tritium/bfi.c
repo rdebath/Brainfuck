@@ -237,8 +237,8 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("            * The -T option is used.\n");
     printf("            * Three or more -v options are used.\n");
     printf("\n");
-    printf("   -A   Generate output to be compiled or assembled. "
-		    "(opposite of -r)\n");
+    printf("   -A   Generate output to be compiled or assembled.\n");
+    printf("        (opposite of -r, use -b32 to add C header to default.)\n");
     printf("\n");
 #ifndef NO_EXT_BE
 #define XX 2
@@ -534,19 +534,19 @@ main(int argc, char ** argv)
 	filelist[filecount++] = "-";
     }
 
-#ifdef NO_EXT_BE
-    if (cell_size == 0) set_cell_size(-1);
-
-#else
+#ifndef NO_EXT_BE
 #define XX 4
 #include "bfi.be.def"
 
     if (do_run == -1) do_run = (do_codestyle == c_default);
+#endif
+
     if (do_run) opt_runner = 0; /* Run it in one go */
-    if (cell_size == 0 && (do_codestyle == c_default || do_run || opt_runner))
+    if (cell_size == 0 && (do_run || opt_runner))
 	set_cell_size(-1);
 
-#define XX 6		/* Check BE can cope with optimisation. */
+#ifndef NO_EXT_BE
+#define XX 6
 #include "bfi.be.def"
 #endif
 

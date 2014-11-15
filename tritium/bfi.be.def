@@ -33,7 +33,7 @@ it to the list and fill in it's entry.
 /* Print code */
 #define X(a,b,c,d,e,f) e
 #elif XX == 6
-/* Opt Limits */
+/* Last Option Limits */
 #define X(a,b,c,d,e,f)
 #elif XX == 7
 /* Run directly */
@@ -46,6 +46,13 @@ it to the list and fill in it's entry.
 #define X(a,b,c,d,e,f)
 #else
 #define X(a,b,c,d,e,f)
+#endif
+
+#if XX == 6
+    /* Generators normally generate code with a fixed cell size. */
+    if (cell_size == 0 && do_codestyle != c_ccode &&
+	do_codestyle != c_default && do_codestyle != c_bf)
+	set_cell_size(-1);
 #endif
 
 /****************************************************************************/
@@ -142,18 +149,16 @@ X(bf,BF,
     case 'F': do_codestyle = c_bf; hard_left_limit = 0; break;      ,
     case c_bf: print_bf(); break;                                   ,
     /* No direct run */						    )
-#if XX == 6
+#if XX == 4
     if (do_codestyle == c_bf) {
 	opt_no_calc = opt_no_endif = opt_no_litprt = 1;
 	opt_repoint = 0;
-    }
-#endif
-#if XX == 4
-    if (do_codestyle == c_bf)
+
 	if (!default_io) {
 	    fprintf(stderr, "The -F option only supports default I/O.\n");
 	    exit(255);
 	}
+    }
 #endif
 
 /****************************************************************************/
