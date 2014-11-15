@@ -9,6 +9,7 @@
 
 static void print_asm_string(char * charmap, char * strbuf, int strsize);
 static void print_asm_header(void);
+static void print_nasm_header(void);
 static void print_hello_world(void);
 
 static int hello_world = 0;
@@ -17,6 +18,19 @@ static char * curfile = "brainfuck"; /* Hmmm */
 
 /* loop_class: condition at 1=> end, 2=>start, 3=>both */
 static int loop_class = 3;
+
+/* Intel GAS translation */
+static int intel_gas = 0;
+static void print_gas_header(void);
+static void print_gas_footer(void);
+
+int
+checkarg_nasm(char * opt, char * arg)
+{
+    if (!strcmp(opt, "-fgas")) { intel_gas = 1; return 1; }
+    if (!strcmp(opt, "-fnasm")) { intel_gas = 0; return 1; }
+    return 0;
+}
 
 static char * oft(int i)
 {
@@ -42,7 +56,8 @@ print_nasm(void)
     memset(charmap, 0, sizeof(charmap));
     curr_line = -1;
 
-    hello_world = (total_nodes == node_type_counts[T_CHR] && !noheader);
+    hello_world = (total_nodes == node_type_counts[T_CHR] &&
+		    !noheader && !intel_gas);
 
     if (hello_world) {
 	print_hello_world();
@@ -135,12 +150,14 @@ print_nasm(void)
 	}
 
 	if (enable_trace) {
-	    if (n->line != 0 && n->line != curr_line && n->type != T_CHR) {
+	    if (n->line != 0 && n->line != curr_line &&
+		n->type != T_CHR && !intel_gas) {
 		printf("%%line %d+0 %s\n", n->line, curfile);
 		curr_line = n->line;
 	    }
 
-	    printf("; "); printtreecell(stdout, 0, n); printf("\n");
+	    printf("%c ", intel_gas?'#':';');
+	    printtreecell(stdout, 0, n); printf("\n");
 	}
 
 	switch(n->type)
@@ -168,76 +185,77 @@ print_nasm(void)
 	    /* INC & DEC modify part of the flags register.
 	     * This can stall, but smaller seems to win. */
 	    if (n->count == 1 && n->offset == 0)
-		printf("\tinc byte [ecx]\n");
+		printf("\tinc byte ptr [ecx]\n");
 	    else if (n->count == -1 && n->offset == 0)
-		printf("\tdec byte [ecx]\n");
+		printf("\tdec byte ptr [ecx]\n");
 	    else if (n->count == 1)
-		printf("\tinc byte [ecx%s]\n", oft(n->offset));
+		printf("\tinc byte ptr [ecx%s]\n", oft(n->offset));
 	    else if (n->count == -1)
-		printf("\tdec byte [ecx%s]\n", oft(n->offset));
+		printf("\tdec byte ptr [ecx%s]\n", oft(n->offset));
 	    else
 
 	    if (n->count < 0 && n->count > -128)
-		printf("\tsub byte [ecx%s],%d\n", oft(n->offset), -n->count);
+		printf("\tsub byte ptr [ecx%s],%d\n", oft(n->offset), -n->count);
 	    else
-		printf("\tadd byte [ecx%s],%d\n", oft(n->offset), SM(n->count));
+		printf("\tadd byte ptr [ecx%s],%d\n", oft(n->offset), SM(n->count));
 	    break;
 
 	case T_SET:
-	    printf("\tmov byte [ecx%s],%d\n", oft(n->offset), SM(n->count));
+	    printf("\tmov byte ptr [ecx%s],%d\n", oft(n->offset), SM(n->count));
 	    break;
 
 	case T_CALC:
 	    if (n->count2 == 1 && n->count3 == 0) {
 		/* m[1] = m[2]*1 + m[3]*0 */
-		printf("\tmovzx eax,byte [ecx%s]\n", oft(n->offset2));
-		printf("\tmov byte [ecx%s],al\n", oft(n->offset));
+		printf("\tmovzx eax,byte ptr [ecx%s]\n", oft(n->offset2));
+		printf("\tmov byte ptr [ecx%s],al\n", oft(n->offset));
 	    } else if (n->count2 == 1 && n->offset2 == n->offset) {
 		/* m[1] = m[1]*1 + m[3]*n */
 		if (n->count3 == -1) {
-		    printf("\tmovzx eax,byte [ecx%s]\n", oft(n->offset3));
-		    printf("\tsub byte [ecx%s],al\n", oft(n->offset));
+		    printf("\tmovzx eax,byte ptr [ecx%s]\n", oft(n->offset3));
+		    printf("\tsub byte ptr [ecx%s],al\n", oft(n->offset));
 		} else if (n->count3 == 1) {
-		    printf("\tmovzx eax,byte [ecx%s]\n", oft(n->offset3));
-		    printf("\tadd byte [ecx%s],al\n", oft(n->offset));
+		    printf("\tmovzx eax,byte ptr [ecx%s]\n", oft(n->offset3));
+		    printf("\tadd byte ptr [ecx%s],al\n", oft(n->offset));
 		} else if (n->count3 == 2) {
-		    printf("\tmovzx eax,byte [ecx%s]\n", oft(n->offset3));
+		    printf("\tmovzx eax,byte ptr [ecx%s]\n", oft(n->offset3));
 		    printf("\tadd eax,eax\n");
-		    printf("\tadd byte [ecx%s],al\n", oft(n->offset));
+		    printf("\tadd byte ptr [ecx%s],al\n", oft(n->offset));
 		} else {
-		    printf("\tmovzx eax,byte [ecx%s]\n", oft(n->offset3));
+		    printf("\tmovzx eax,byte ptr [ecx%s]\n", oft(n->offset3));
 		    printf("\timul eax,eax,%d\n", SM(n->count3));
-		    printf("\tadd byte [ecx%s],al\n", oft(n->offset));
+		    printf("\tadd byte ptr [ecx%s],al\n", oft(n->offset));
 		}
 	    } else if (n->count2 == 1 && n->count3 == -1) {
-		printf("\tmovzx eax,byte [ecx%s]\n", oft(n->offset2));
-		printf("\tmovzx ebx,byte [ecx%s]\n", oft(n->offset3));
+		printf("\tmovzx eax,byte ptr [ecx%s]\n", oft(n->offset2));
+		printf("\tmovzx ebx,byte ptr [ecx%s]\n", oft(n->offset3));
 		printf("\tsub eax,ebx\n");
-		printf("\tmov byte [ecx%s],al\n", oft(n->offset));
+		printf("\tmov byte ptr [ecx%s],al\n", oft(n->offset));
 	    } else {
-		printf("\t; Full T_CALC: [ecx+%d] = %d + [ecx+%d]*%d + [ecx+%d]*%d\n",
+		printf("\t%c Full T_CALC: [ecx+%d] = %d + [ecx+%d]*%d + [ecx+%d]*%d\n",
+			intel_gas?'#':';',
 			n->offset, n->count,
 			n->offset2, n->count2,
 			n->offset3, n->count3);
 		if (SM(n->count2) == 0) {
 		    printf("\tmov bl,0\n");
 		} else if (n->count2 == -1 ) {
-		    printf("\tmov bl,byte [ecx%s]\n", oft(n->offset2));
+		    printf("\tmov bl,byte ptr [ecx%s]\n", oft(n->offset2));
 		    printf("\tneg bl\n");
 		} else {
-		    printf("\tmov al,byte [ecx%s]\n", oft(n->offset2));
+		    printf("\tmov al,byte ptr [ecx%s]\n", oft(n->offset2));
 		    printf("\timul ebx,eax,%d\n", SM(n->count2));
 		}
 		if (SM(n->count3) != 0) {
-		    printf("\tmov byte al,[ecx%s]\n", oft(n->offset3));
+		    printf("\tmov al,byte ptr [ecx%s]\n", oft(n->offset3));
 		    printf("\timul eax,eax,%d\n", SM(n->count3));
 		    printf("\tadd bl,al\n");
 		}
-		printf("\tmov byte [ecx%s],bl\n", oft(n->offset));
+		printf("\tmov byte ptr [ecx%s],bl\n", oft(n->offset));
 	    }
 
 	    if (SM(n->count))
-		printf("\tadd byte [ecx%s],%d\n", oft(n->offset), SM(n->count));
+		printf("\tadd byte ptr [ecx%s],%d\n", oft(n->offset), SM(n->count));
 	    break;
 
 	case T_CHR:
@@ -246,7 +264,7 @@ print_nasm(void)
 
 	case T_PRT:
 	    print_asm_string(0,0,0);
-	    if (enable_trace && n->line != 0 && n->line != curr_line) {
+	    if (enable_trace && !intel_gas && n->line != 0 && n->line != curr_line) {
 		printf("%%line %d+0 %s\n", n->line, curfile);
 		curr_line = n->line;
 	    }
@@ -256,19 +274,22 @@ print_nasm(void)
 
 	case T_INP:
 
-	    if (n->offset != 0) {
+	    if (n->offset != 0 || intel_gas) {
 		printf("\tpush ecx\n");
 		printf("\tadd ecx,%d\n", n->offset);
 	    }
-	    printf("\txor eax,eax\n");
-	    printf("\tmov ebx,eax\n");
-	    printf("\tcdq\n");
-	    printf("\tinc edx\n");
-	    printf("\tmov al, 3\n");
-	    printf("\tint 0x80\t; read(ebx, ecx, edx);\n");
-	    if (n->offset != 0) {
-		printf("\tpop ecx\n");
+	    if (!intel_gas) {
+		printf("\txor eax,eax\n");
+		printf("\tmov ebx,eax\n");
+		printf("\tcdq\n");
+		printf("\tinc edx\n");
+		printf("\tmov al, 3\n");
+		printf("\tint 0x80\t; read(ebx, ecx, edx);\n");
+	    } else {
+		printf("\tcall getch\n");
 	    }
+	    if (n->offset != 0 || intel_gas)
+		printf("\tpop ecx\n");
 	    break;
 
 	case T_MULT: case T_CMULT: case T_IF: case T_FOR:
@@ -280,7 +301,7 @@ print_nasm(void)
 	     * put here without being a lot more detailed about the
 	     * instructions we use so we don't force short jumps.
 	     */
-	    if (abs(n->ipos - n->jmp->ipos) > 120)
+	    if (abs(n->ipos - n->jmp->ipos) > 120 && !intel_gas)
 		neartok = " near";
 	    else
 		neartok = "";
@@ -288,7 +309,7 @@ print_nasm(void)
 	    if (n->type == T_IF || (loop_class & 2) == 2) {
 		if ((loop_class & 1) == 0)
 		    printf("start_%d:\n", n->count);
-		printf("\tcmp dh,byte [ecx%s]\n", oft(n->offset));
+		printf("\tcmp dh,byte ptr [ecx%s]\n", oft(n->offset));
 		printf("\tjz%s end_%d\n", neartok, n->count);
 		if ((loop_class & 1) == 1 && n->type != T_IF)
 		    printf("loop_%d:\n", n->count);
@@ -299,7 +320,7 @@ print_nasm(void)
 	    break;
 
 	case T_END:
-	    if (abs(n->ipos - n->jmp->ipos) > 120)
+	    if (abs(n->ipos - n->jmp->ipos) > 120 && !intel_gas)
 		neartok = " near";
 	    else
 		neartok = "";
@@ -312,7 +333,7 @@ print_nasm(void)
 	    } else {
 		if ((loop_class & 2) == 0)
 		    printf("last_%d:\n", n->jmp->count);
-		printf("\tcmp dh,byte [ecx%s]\n", oft(n->jmp->offset));
+		printf("\tcmp dh,byte ptr [ecx%s]\n", oft(n->jmp->offset));
 		printf("\tjnz%s loop_%d\n", neartok, n->jmp->count);
 		if ((loop_class & 2) == 2)
 		    printf("end_%d:\n", n->jmp->count);
@@ -355,10 +376,22 @@ print_nasm(void)
     if(sp != string_buffer) {
 	print_asm_string(charmap, string_buffer, sp-string_buffer);
     }
+
+    if (intel_gas)
+	print_gas_footer();
 }
 
 static void
 print_asm_header(void)
+{
+    if (intel_gas)
+	print_gas_header();
+    else
+	print_nasm_header();
+}
+
+static void
+print_nasm_header(void)
 {
     char const *np =0, *ep;
     if (curfile && *curfile) {
@@ -462,6 +495,78 @@ print_asm_header(void)
     printf("\tinc\tedx\t\t; EDX = 1 ;ARG4 for system calls\n");
     printf("\tmov\tecx,mem\n");
     printf("\n");
+    printf("%%define ptr\t\t; I'm putting these in for dumber assemblers.\n");
+    printf("%%define .byte\tdb\t; Sigh\n");
+    printf("\n");
+}
+
+static void
+print_gas_header(void)
+{
+    printf("# This is for gcc's 'gas' assembler running in 'intel' mode\n");
+    printf("# The code is 32bit so you may need a -m32\n");
+    printf("# Assembler and link with libc using \"gcc -m32 -s -o bfpgm bfpgm.s\"\n");
+    printf("# Works on Linux, NetBSD and probably any other x86 OS with GCC.\n");
+    printf("#\n");
+    printf(".intel_syntax noprefix\n");
+    printf(".text\n");
+
+    printf("getch:\n");
+    printf("\tsub esp, 12\n");
+    printf("\tmov dword ptr [esp+8], 1\n");
+    printf("\tmov dword ptr [esp+4], ecx\n");
+    printf("\tmov dword ptr [esp], 0\n");
+    printf("\tcall read\n");
+    printf("\tadd esp, 12\n");
+    printf("\txor edx,edx\n");
+    printf("\tret\n");
+
+    printf("putch:\n");
+    printf("\tsub esp, 20\n");
+    printf("\tmov dword ptr [esp+16], ecx\n");
+    printf("\tmov byte ptr [esp+12], al\n");
+    printf("\tmov dword ptr [esp+8], 1\n");
+    printf("\tlea eax, [esp+12]\n");
+    printf("\tmov dword ptr [esp+4], eax\n");
+    printf("\tmov dword ptr [esp], 1\n");
+    printf("\tcall write\n");
+    printf("\tmov ecx, dword ptr [esp+16]\n");
+    printf("\tadd esp, 20\n");
+    printf("\txor edx,edx\n");
+    printf("\tret\n");
+
+    printf("prttext:\n");
+    printf("\tsub esp, 16\n");
+    printf("\tmov dword ptr [esp+12], ecx\n");
+    printf("\tmov dword ptr [esp+8], edx\n");
+    printf("\tmov dword ptr [esp+4], eax\n");
+    printf("\tmov dword ptr [esp], 1\n");
+    printf("\tcall write\n");
+    printf("\tmov ecx, dword ptr [esp+12]\n");
+    printf("\tadd esp, 16\n");
+    printf("\txor edx,edx\n");
+    printf("\tret\n");
+
+    printf(".globl main\n");
+
+    printf("main:\n");
+    printf("\tpush ebp\n");
+    printf("\tmov ebp, esp\n");
+    printf("\tpush ebx\n");
+    printf("\tmov ecx, offset flat:buffer\n");
+    printf("\txor edx,edx\n");
+    if ( most_neg_maad_loop != 0)
+	printf("\tadd ecx, %d\n", -most_neg_maad_loop);
+
+    printf("\t.comm buffer,%d,32\n", 0x8000 - most_neg_maad_loop);
+}
+
+static void
+print_gas_footer(void)
+{
+    printf("\tpop ebx\n");
+    printf("\tleave\n");
+    printf("\tret\n");
 }
 
 static void
@@ -469,10 +574,13 @@ print_asm_string(char * charmap, char * strbuf, int strsize)
 {
 static int textno = -1;
     int saved_line = curr_line;
+
+    if (textno == -1 && intel_gas)
+	textno ++;
     if (textno == -1) {
 	textno++;
 
-	if (enable_trace)
+	if (enable_trace && !intel_gas)
 	    printf("%%line 1 lib_string.s\n");
 	curr_line = -1;
 	printf("section .data\n");
@@ -503,7 +611,7 @@ static int textno = -1;
     }
 
     if (strsize <= 0) return;
-    if (strsize == 1) {
+    if (strsize == 1 && !intel_gas) {
 	int ch = *strbuf & 0xFF;
 	if (charmap[ch] == 0) {
 	    charmap[ch] = 1;
@@ -513,33 +621,55 @@ static int textno = -1;
 	    printf("litprt_%02x:\n", ch);
 	    printf("\tmov al,0x%02x\n", ch);
 	    printf("\tjmp putch\n");
-	    printf("section .bftext\n");
+	    if (intel_gas)
+		printf(".text\n");
+	    else
+		printf("section .bftext\n");
 	    if (enable_trace && saved_line > 0)
 		printf("%%line %d+0 %s\n", saved_line, curfile);
 	    curr_line = saved_line;
 	}
 	printf("\tcall litprt_%02x\n", ch);
+    } else if (strsize == 1 && intel_gas) {
+	int ch = *strbuf & 0xFF;
+	if (charmap[ch] == 0) {
+	    charmap[ch] = 1;
+	    printf(".section .rodata\n");
+	    printf("text_x%02x:\n", ch);
+	    printf("\t.byte 0x%02x\n", ch);
+	    printf(".text\n");
+	}
+	printf("\tmov eax, offset flat:text_x%02x\n", ch);
+	printf("\tmov edx,%d\n", strsize);
+	printf("\tcall prttext\n");
     } else {
 	int i;
 	textno++;
-	if (saved_line != curr_line) {
-	    if (enable_trace && saved_line > 0)
-		printf("%%line %d+0 %s\n", saved_line, curfile);
-	    curr_line = saved_line;
+	if (intel_gas)
+	    printf(".section .rodata\n");
+	else {
+	    if (saved_line != curr_line) {
+		if (enable_trace && saved_line > 0)
+		    printf("%%line %d+0 %s\n", saved_line, curfile);
+		curr_line = saved_line;
+	    }
+	    printf("section .rodata\n");
 	}
-	printf("section .rodata\n");
 	printf("text_%d:\n", textno);
 	for(i=0; i<strsize; i++) {
 	    if (i%8 == 0) {
 		if (i) printf("\n");
-		printf("\tdb ");
+		printf("\t.byte ");
 	    } else
 		printf(", ");
 	    printf("0x%02x", (strbuf[i] & 0xFF));
 	}
 	printf("\n");
-	printf("section .bftext\n");
-	printf("\tmov eax,text_%d\n", textno);
+	if (intel_gas)
+	    printf(".text\n");
+	else
+	    printf("section .bftext\n");
+	printf("\tmov eax,%stext_%d\n", intel_gas?"offset flat:":"", textno);
 	printf("\tmov edx,%d\n", strsize);
 	printf("\tcall prttext\n");
     }

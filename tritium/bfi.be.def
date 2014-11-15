@@ -142,6 +142,11 @@ X(nasm,NASM,
 	iostyle = 2;
     }
 #endif
+#if XX == 9
+    {	int f = checkarg_nasm(opt, arg);
+	if (f) return f;
+    }
+#endif
 
 /****************************************************************************/
 X(bf,BF,
