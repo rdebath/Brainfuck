@@ -37,13 +37,10 @@ size_t cell_array_alloc_len = 0;
 /* This is the fallback; it doesn't trap "end of tape". */
 #ifndef USEHUGERAM
 
-#ifndef MEMSIZE
 #ifdef __STRICT_ANSI__
-#pragma message "WARNING: Using small memory, define MEMSIZE to increase."
+#pragma message "WARNING: Using small memory, use -mem option."
 #else
-#warning Using small memory, define MEMSIZE to increase.
-#endif
-#define MEMSIZE	    1024*1024
+#warning Using small memory, use -mem option.
 #endif
 
 void *
@@ -51,10 +48,10 @@ map_hugeram(void)
 {
     if(cell_array_pointer==0) {
 	if (hard_left_limit<0) {
-	    cell_array_low_addr = tcalloc(MEMSIZE-hard_left_limit, sizeof(int));
+	    cell_array_low_addr = tcalloc(memsize-hard_left_limit, sizeof(int));
 	    cell_array_pointer = cell_array_low_addr - hard_left_limit*sizeof(int);
 	} else {
-	    cell_array_low_addr = tcalloc(MEMSIZE, sizeof(int));
+	    cell_array_low_addr = tcalloc(memsize, sizeof(int));
 	    cell_array_pointer = cell_array_low_addr;
 	}
     }

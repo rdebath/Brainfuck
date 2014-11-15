@@ -90,7 +90,7 @@ const char * codestylename[] = { "std"
 #define pause_runclock(x)
 #define unpause_runclock(x)
 void * taperam = 0;
-#define map_hugeram() calloc(1024,1024)
+#define map_hugeram() tcalloc(memsize,sizeof(int))
 #define unmap_hugeram() free(taperam)
 #endif
 
@@ -109,6 +109,7 @@ int opt_no_endif = 0;
 int opt_repoint = -1;
 
 int hard_left_limit = -1024;
+int memsize = 0x100000;	/* Default to 1M of tape if otherwise unspecified. */
 int enable_trace = 0;
 int debug_mode = 0;
 int iostyle = 0; /* 0=ASCII, 1=UTF8, 2=Binary, 3=Integer. */
@@ -223,7 +224,11 @@ void LongUsage(FILE * fd, const char * errormsg)
 	   "    BF instruction has been entered. If the standard input is not a\n"
 	   "    terminal the '-' is optional.\n"
 	   "\n"
+#ifndef NO_EXT_BE
 	   "    The default action is to run the code using the fastest option available.\n"
+#else
+	   "    The default action is to run the code using the array interpreter.\n"
+#endif
 	   );
     printf("\n");
     printf("   -h   This message.\n");
@@ -276,10 +281,12 @@ void LongUsage(FILE * fd, const char * errormsg)
 			(int)sizeof(int)*CHAR_BIT);
     printf("        Other bitwidths also work (including 7..32)\n");
     printf("        Full Unicode characters need 21 bits.\n");
+#ifndef NO_EXT_BE
     printf("        Default for C code is 'unknown', this is set when the C code is\n");
     printf("        compiled (and can be larger than an int eg: -DC=__int128 ).\n");
     printf("        NASM can only be 8bit.\n");
     printf("        The optimiser will be less effective if this is not specified.\n");
+#endif
     printf("\n");
     printf("   -E   End of file processing.\n");
     printf("   -E1      End of file gives no change for ',' command.\n");
@@ -288,11 +295,11 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("   -E4      End of file gives EOF (normally -1 too).\n");
     printf("   -E5      Disable ',' command, ie: treat it as a comment character.\n");
     printf("   -E6      Treat running the ',' command as an error and Stop.\n");
-#ifndef NO_EXT_BE
     printf("\n");
     printf("General extras\n");
     printf("   -fintio\n");
     printf("        Use decimal I/O instead of character I/O.\n");
+    printf("        Specify before -b1 for cell sizes below 7 bits.\n");
     printf("   -fno-negtape\n");
     printf("        Limit optimiser to no negative tape positions.\n");
     printf("   -fno-calctok\n");
@@ -303,14 +310,16 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("        Do not recreate pointer movements between loops as last stage.\n");
     printf("   -frepoint\n");
     printf("        Recreate pointer movements between loops as last stage.\n");
+    printf("   -mem %d\n", memsize);
+#ifdef NO_EXT_BE
+    printf("        Define allocation size for tape memory.\n");
+#else
+    printf("        Define array size for generated code.\n");
+    printf("        Note: This option does not apply to '-r' (usually).\n");
     printf("\n");
     printf("C generation extras\n");
     printf("   -dynmem\n");
     printf("        Use relloc() to extend tape in generated C code.\n");
-    printf("   -mem 60000\n");
-    printf("        Define array size for generated code.\n");
-    printf("   Note: the above two options do not apply to '-r'.\n");
-    printf("\n");
 #if !defined(DISABLE_DLOPEN)
     printf("   -cc clang\n");
     printf("        Choose C compiler to compile C for '-r' option.\n");
@@ -456,6 +465,14 @@ checkarg(char * opt, char * arg)
     } else if (!strcmp(opt, "-frepoint")) { opt_repoint = 1; return 1;
     } else if (!strcmp(opt, "-fintio")) { iostyle = 3; opt_no_litprt = 1; default_io=0; return 1;
     } else if (!strcmp(opt, "-help")) { help_flag++; return 1;
+    } else if (!strcmp(opt, "-mem")) {
+	if (arg == 0 || arg[0] < '0' || arg[0] > '9') {
+	    memsize = 30000;
+	    return 1;
+	} else {
+	    memsize = strtol(arg,0,10);
+	    return 2;
+	}
     }
 
 #ifndef NO_EXT_BE
@@ -882,6 +899,10 @@ process_file(void)
 	    printtree();
     } else
 	calculate_stats(); /* is in print_tree_stats() */
+
+    /* limit to proven memory range. */
+    if (node_type_counts[T_MOV] == 0 && max_pointer >= 0)
+	memsize = max_pointer+1;
 
 #ifndef NO_EXT_BE
     if (do_run) {
@@ -3138,7 +3159,6 @@ void
 print_codedump(void)
 {
     struct bfi * n = bfprog;
-    int memsz = 32768;
     int disable_c_header = 0;
 
     if (cell_size != sizeof(int)*CHAR_BIT &&
@@ -3243,7 +3263,7 @@ print_codedump(void)
 	puts("#endif");
     }
 
-    printf("bf_start(%d,%d)\n", memsz, -most_neg_maad_loop);
+    printf("bf_start(%d,%d)\n", memsize, -most_neg_maad_loop);
     while(n)
     {
 	if (enable_trace)

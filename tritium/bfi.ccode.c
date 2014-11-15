@@ -41,7 +41,6 @@
 static const char * putname = "putch";
 static int use_direct_getchar = 0;
 static int use_dynmem = 0;
-static int memsize = 30000;
 static int libtcc_specials = 0;
 #if defined(DISABLE_DLOPEN)
 static const int use_dlopen = 0;
@@ -103,16 +102,6 @@ checkarg_ccode(char * opt, char * arg)
 	use_dynmem = 1;
 	if (opt_repoint == -1) opt_repoint = 0;
 	return 1;
-    }
-    if (!strcmp(opt, "-mem")) {
-	if (arg == 0 || arg[0] < '0' || arg[0] > '9') {
-	    use_dynmem = 1;
-	    return 1;
-	} else {
-	    memsize = strtol(arg,0,10);
-	    use_dynmem = (memsize <= 0);
-	    return 2;
-	}
     }
     return 0;
 }
@@ -315,16 +304,10 @@ print_c_header(FILE * ofd)
 	}
 
 	if (node_type_counts[T_MOV] == 0) {
-	    if (min_pointer >= 0)
-		memsize = max_pointer+1;
-	    else {
+	    if (min_pointer < 0)
 		memoffset = -min_pointer;
-		memsize = max_pointer-min_pointer+1;
-	    }
-	}
-	if (hard_left_limit<0) {
+	} else if (hard_left_limit<0) {
 	    memoffset = -most_neg_maad_loop;
-	    memsize += memoffset;
 	}
 
 	if (node_type_counts[T_MOV] == 0 && memoffset == 0) {
@@ -336,32 +319,22 @@ print_c_header(FILE * ofd)
 	    fprintf(ofd, "int main(void){\n");
 	    /* These minor variations may change the speed of the Counter test
 	     * by 45% when compiled with GCC ... scheesh! */
+#if 0
+	    fprintf(ofd, "  %s mem[%d];\n", cell_type, memsize+memoffset);
+	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
+	    fprintf(ofd, "  memset(mem, 0, sizeof(mem));\n");
+#endif
 #if 1
-	    fprintf(ofd, "  %s mem[%d];\n", cell_type, memsize);
-	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
-	    fprintf(ofd, "  memset(mem, 0, sizeof(mem));\n");
-#endif
-#if 0
-	    fprintf(ofd, "static %s mem[%d];\n", cell_type, memsize);
+	    fprintf(ofd, "static %s mem[%d];\n", cell_type, memsize+memoffset);
 	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
 #endif
 #if 0
-	    fprintf(ofd, "  %s * mem = calloc(sizeof(*mem),%d);\n", cell_type, memsize);
+	    fprintf(ofd, "  %s * mem = calloc(sizeof(*mem),%d);\n", cell_type, memsize+memoffset);
 	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
 #endif
 #if 0
-	    fprintf(ofd, "  %s mem[%d] = {0};\n", cell_type, memsize);
+	    fprintf(ofd, "  %s mem[%d] = {0};\n", cell_type, memsize+memoffset);
 	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
-#endif
-#if 0
-	    fprintf(ofd, "static %s mem[%d];\n", cell_type, memsize);
-	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
-	    fprintf(ofd, "  memset(mem, 0, sizeof(mem));\n");
-#endif
-#if 0
-	    fprintf(ofd, "static %s mem[%d];\n", cell_type, memsize);
-	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
-	    fprintf(ofd, "  setbuf(stdout,0);\n");
 #endif
 	    if (memoffset > 0)
 		fprintf(ofd, "  m += %d;\n", memoffset);

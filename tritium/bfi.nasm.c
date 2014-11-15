@@ -17,7 +17,6 @@ static int link_main = 0;
 #else
 static int link_main = 1;
 #endif
-static int memsize = 0x100000;
 
 static int hello_world = 0;
 
