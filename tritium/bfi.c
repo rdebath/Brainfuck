@@ -245,8 +245,10 @@ void LongUsage(FILE * fd, const char * errormsg)
 #include "bfi.be.def"
     printf("\n");
 #endif
-    printf("   -T   Create trace statements in output C code or switch to\n");
-    printf("        profiling interpreter and turn on tracing.\n");
+    printf("   -T   Switch to the profiling interpreter and turn on tracing\n");
+#ifndef NO_EXT_BE
+    printf("        or create trace statements in output C code.\n");
+#endif
     printf("   -H   Remove headers in output code\n");
     printf("        Also prevents optimiser assuming the tape starts blank.\n");
     printf("   -#   Use '#' as a debug symbol. Note: Selects the tree interpreter.\n");
@@ -266,10 +268,11 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("   -Orun    When generating code run the interpreter over it first.\n");
     printf("   -m   Minimal processing; same as -O0\n");
     printf("\n");
-    printf("   -b8  Use 8 bit cells.\n");
+    printf("   -b   Use 8 bit cells.\n");
     printf("   -b16 Use 16 bit cells.\n");
     printf("   -b32 Use 32 bit cells.\n");
     printf("        Default for running now (-r) is %dbits.\n",
+			opt_bytedefault? CHAR_BIT:
 			(int)sizeof(int)*CHAR_BIT);
     printf("        Other bitwidths also work (including 7..32)\n");
     printf("        Full Unicode characters need 21 bits.\n");
@@ -285,6 +288,7 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("   -E4      End of file gives EOF (normally -1 too).\n");
     printf("   -E5      Disable ',' command, ie: treat it as a comment character.\n");
     printf("   -E6      Treat running the ',' command as an error and Stop.\n");
+#ifndef NO_EXT_BE
     printf("\n");
     printf("General extras\n");
     printf("   -fintio\n");
@@ -325,13 +329,18 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("        Use the TCCLIB library to run C code.\n");
 #endif
     printf("\n");
-    printf("\tNOTE: Some of the code generators are quite limited and do\n");
-    printf("\tnot support all these options. NASM is 8 bits only. The BF\n");
-    printf("\tgenerator does not include the ability to generate most of\n");
-    printf("\tthe optimisation facilities.  The dc(1) generator defaults\n");
-    printf("\tto -E6 as standard dc(1) has no character input routines.\n");
-    printf("\tMany (including dc(1)) don't support -E2,-E3 and -E4.\n");
-    printf("\tMost code generators only support binary I/O.\n");
+    printf("Asm generation extras\n");
+    printf("   -fgas\n");
+    printf("        Changes '-s' to generate i386 code for 'gcc x.s'.\n");
+    printf("\n");
+    printf("    NOTE: Some of the code generators are quite limited and do\n");
+    printf("    not support all these options. NASM is 8 bits only. The BF\n");
+    printf("    generator does not include the ability to generate most of\n");
+    printf("    the optimisation facilities.  The dc(1) generator defaults\n");
+    printf("    to -E6 as standard dc(1) has no character input routines.\n");
+    printf("    Many (including dc(1)) don't support -E2,-E3 and -E4.\n");
+    printf("    Most code generators only support binary I/O.\n");
+#endif
 
     exit(1);
 }
