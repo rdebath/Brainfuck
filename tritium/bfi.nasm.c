@@ -9,8 +9,15 @@
 
 static void print_asm_string(char * charmap, char * strbuf, int strsize);
 static void print_asm_header(void);
-static void print_nasm_header(void);
+static void print_asm_footer(void);
 static void print_hello_world(void);
+
+#ifdef __linux__
+static int link_main = 0;
+#else
+static int link_main = 1;
+#endif
+static int memsize = 0x100000;
 
 static int hello_world = 0;
 
@@ -19,16 +26,17 @@ static char * curfile = "brainfuck"; /* Hmmm */
 /* loop_class: condition at 1=> end, 2=>start, 3=>both */
 static int loop_class = 3;
 
-/* Intel GAS translation */
+/* Intel GAS translation and linkable objects. */
 static int intel_gas = 0;
+static void print_nasm_header(void);
 static void print_gas_header(void);
-static void print_gas_footer(void);
 
 int
 checkarg_nasm(char * opt, char * arg)
 {
-    if (!strcmp(opt, "-fgas")) { intel_gas = 1; return 1; }
+    if (!strcmp(opt, "-fgas")) { intel_gas = link_main = 1; return 1; }
     if (!strcmp(opt, "-fnasm")) { intel_gas = 0; return 1; }
+    if (!strcmp(opt, "-flinux")) { intel_gas = 0; link_main = 0; return 1; }
     return 0;
 }
 
@@ -57,7 +65,7 @@ print_nasm(void)
     curr_line = -1;
 
     hello_world = (total_nodes == node_type_counts[T_CHR] &&
-		    !noheader && !intel_gas);
+		    !noheader && !link_main);
 
     if (hello_world) {
 	print_hello_world();
@@ -274,11 +282,11 @@ print_nasm(void)
 
 	case T_INP:
 
-	    if (n->offset != 0 || intel_gas) {
+	    if (n->offset != 0 || link_main) {
 		printf("\tpush ecx\n");
 		printf("\tadd ecx,%d\n", n->offset);
 	    }
-	    if (!intel_gas) {
+	    if (!link_main) {
 		printf("\txor eax,eax\n");
 		printf("\tmov ebx,eax\n");
 		printf("\tcdq\n");
@@ -288,7 +296,7 @@ print_nasm(void)
 	    } else {
 		printf("\tcall getch\n");
 	    }
-	    if (n->offset != 0 || intel_gas)
+	    if (n->offset != 0 || link_main)
 		printf("\tpop ecx\n");
 	    break;
 
@@ -377,14 +385,14 @@ print_nasm(void)
 	print_asm_string(charmap, string_buffer, sp-string_buffer);
     }
 
-    if (intel_gas)
-	print_gas_footer();
+    if (link_main)
+	print_asm_footer();
 }
 
 static void
 print_asm_header(void)
 {
-    if (intel_gas)
+    if (link_main)
 	print_gas_header();
     else
 	print_nasm_header();
@@ -406,12 +414,11 @@ print_nasm_header(void)
     printf("; asmsyntax=nasm\n");
     printf("; yasm %.*s.s && chmod +x %.*s\n",
 	    (int)(ep-np), np, (int)(ep-np), np);
-    printf("; nasm also works but is VERY slow.\n");
     printf("\n");
     printf("BITS 32\n");
     printf("\n");
     if (!hello_world)
-	printf("memsize\tequ\t0x100000\n");
+	printf("memsize\tequ\t%d\n", memsize);
     printf("orgaddr\tequ\t0x08048000\n");
     printf("\torg\torgaddr\n");
     printf("\n");
@@ -503,13 +510,35 @@ print_nasm_header(void)
 static void
 print_gas_header(void)
 {
-    printf("# This is for gcc's 'gas' assembler running in 'intel' mode\n");
-    printf("# The code is 32bit so you may need a -m32\n");
-    printf("# Assembler and link with libc using \"gcc -m32 -s -o bfpgm bfpgm.s\"\n");
-    printf("# Works on Linux, NetBSD and probably any other x86 OS with GCC.\n");
-    printf("#\n");
-    printf(".intel_syntax noprefix\n");
-    printf(".text\n");
+    if (intel_gas) {
+	printf("# This is for gcc's 'gas' assembler running in 'intel' mode\n");
+	printf("# The code is 32bit so you may need a -m32\n");
+	printf("# Assembler and link with libc using \"gcc -m32 -s -o bfpgm bfpgm.s\"\n");
+	printf("# Works on Linux, NetBSD and probably any other x86 OS with GCC.\n");
+	printf("#\n");
+	printf(".intel_syntax noprefix\n");
+	printf(".text\n");
+    } else {
+	printf("; asmsyntax=nasm\n");
+	printf("; This is to be compiled using nasm to produce an elf32 object file\n");
+	printf(";   nasm -f elf32 bfprg.s\n");
+	printf("; Which is then linked with the system C compiler.\n");
+	printf(";   cc -m32 -s -o bfpgm bfpgm.o\n");
+	printf(";\n");
+	printf("%%define ptr\t\t; I'm putting these in for dumber assemblers.\n");
+	printf("%%define .byte\tdb\t; Sigh\n");
+	printf("\n");
+	printf("\tsection\t.bss\n");
+	if (most_neg_maad_loop<0)
+	    printf("\tresb %d\n", -most_neg_maad_loop);
+	printf("mem:\n");
+	printf("\tresb %d\n", memsize);
+	printf("\tsection\t.text\n");
+	printf("\textern read\n");
+	printf("\textern write\n");
+	printf("\tglobal main\n");
+	printf("\n");
+    }
 
     printf("getch:\n");
     printf("\tsub esp, 12\n");
@@ -547,22 +576,24 @@ print_gas_header(void)
     printf("\txor edx,edx\n");
     printf("\tret\n");
 
-    printf(".globl main\n");
+    if (intel_gas)
+	printf(".globl main\n");
 
     printf("main:\n");
     printf("\tpush ebp\n");
     printf("\tmov ebp, esp\n");
     printf("\tpush ebx\n");
-    printf("\tmov ecx, offset flat:buffer\n");
+    printf("\tmov ecx, %smem\n", intel_gas?"offset flat:":"");
     printf("\txor edx,edx\n");
     if ( most_neg_maad_loop != 0)
 	printf("\tadd ecx, %d\n", -most_neg_maad_loop);
 
-    printf("\t.comm buffer,%d,32\n", 0x8000 - most_neg_maad_loop);
+    if (intel_gas)
+	printf("\t.comm mem,%d,32\n", memsize - most_neg_maad_loop);
 }
 
 static void
-print_gas_footer(void)
+print_asm_footer(void)
 {
     printf("\tpop ebx\n");
     printf("\tleave\n");
@@ -575,12 +606,12 @@ print_asm_string(char * charmap, char * strbuf, int strsize)
 static int textno = -1;
     int saved_line = curr_line;
 
-    if (textno == -1 && intel_gas)
+    if (textno == -1 && link_main)
 	textno ++;
     if (textno == -1) {
 	textno++;
 
-	if (enable_trace && !intel_gas)
+	if (enable_trace && !link_main)
 	    printf("%%line 1 lib_string.s\n");
 	curr_line = -1;
 	printf("section .data\n");
@@ -611,7 +642,7 @@ static int textno = -1;
     }
 
     if (strsize <= 0) return;
-    if (strsize == 1 && !intel_gas) {
+    if (strsize == 1 && !link_main) {
 	int ch = *strbuf & 0xFF;
 	if (charmap[ch] == 0) {
 	    charmap[ch] = 1;
@@ -623,6 +654,8 @@ static int textno = -1;
 	    printf("\tjmp putch\n");
 	    if (intel_gas)
 		printf(".text\n");
+	    else if (link_main)
+		printf("section .text\n");
 	    else
 		printf("section .bftext\n");
 	    if (enable_trace && saved_line > 0)
@@ -630,16 +663,22 @@ static int textno = -1;
 	    curr_line = saved_line;
 	}
 	printf("\tcall litprt_%02x\n", ch);
-    } else if (strsize == 1 && intel_gas) {
+    } else if (strsize == 1 && link_main) {
 	int ch = *strbuf & 0xFF;
 	if (charmap[ch] == 0) {
 	    charmap[ch] = 1;
-	    printf(".section .rodata\n");
+	    if (intel_gas)
+		printf(".section .rodata\n");
+	    else
+		printf("section .rodata\n");
 	    printf("text_x%02x:\n", ch);
 	    printf("\t.byte 0x%02x\n", ch);
-	    printf(".text\n");
+	    if (intel_gas)
+		printf(".text\n");
+	    else
+		printf("section .text\n");
 	}
-	printf("\tmov eax, offset flat:text_x%02x\n", ch);
+	printf("\tmov eax, %stext_x%02x\n", intel_gas?"offset flat:":"", ch);
 	printf("\tmov edx,%d\n", strsize);
 	printf("\tcall prttext\n");
     } else {
@@ -667,6 +706,8 @@ static int textno = -1;
 	printf("\n");
 	if (intel_gas)
 	    printf(".text\n");
+	else if (link_main)
+	    printf("section .text\n");
 	else
 	    printf("section .bftext\n");
 	printf("\tmov eax,%stext_%d\n", intel_gas?"offset flat:":"", textno);
