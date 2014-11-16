@@ -39,6 +39,8 @@ print_bf(void)
     int last_offset = 0;
     int i, nocr = 0;
 
+    printf("[ BF regenerated from %s ]\n", bfname);
+
     while(n)
     {
 	if (enable_trace && !nocr) { /* Sort of! */

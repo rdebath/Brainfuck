@@ -135,6 +135,8 @@ print_c_header(FILE * ofd)
 	exit(1);
     }
 
+    fprintf(ofd, "/* Code generated from %s */\n\n", bfname);
+
     if (cell_mask > 0 && cell_size < 8 && l_iostyle == 1) l_iostyle = 0;
 
     /* Hello world mode ? */

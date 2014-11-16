@@ -112,6 +112,14 @@ print_dc(void)
 	return;
     }
 
+    if (no_v7) {
+	fprintf(ofd, "#!/usr/bin/dc\n");
+	fprintf(ofd, "# [This program requires a modern dc.]pq\n\n");
+	/* Note: the above comment blocks v7 dc from running */
+	fprintf(ofd, "# Code generated from %s\n\n", bfname);
+    } else
+	fprintf(ofd, "[ Code generated from %s ]SF\n\n", bfname);
+
     if (most_neg_maad_loop < 0 && node_type_counts[T_MOV] != 0)
 	fprintf(ofd, "[%dsp\n", -most_neg_maad_loop);
     else

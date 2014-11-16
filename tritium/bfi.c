@@ -122,6 +122,7 @@ int cell_size = 0;  /* 0 is 8,16,32 or more. 7 and up are number of bits */
 int cell_mask = -1; /* -1 is don't mask. */
 char const * cell_type = "C";
 
+char * bfname = "brainfuck";
 int curr_line = 0, curr_col = 0;
 int cmd_line = 0, cmd_col = 0;
 int bfi_num = 0;
@@ -566,6 +567,9 @@ main(int argc, char ** argv)
 #define XX 6
 #include "bfi.be.def"
 #endif
+
+    if (filecount == 1 && strcmp(filelist[0], "-"))
+	bfname = filelist[0];	/* From argv */
 
     for(ar = 0; ar<filecount; ar++)
 	load_file(filelist[ar], ar==0, ar+1>=filecount);

@@ -18,10 +18,9 @@ static int link_main = 0;
 static int link_main = 1;
 #endif
 static int ulines = 0;
+static int outp_line;
 
 static int hello_world = 0;
-
-static char * curfile = "brainfuck"; /* Hmmm */
 
 /* loop_class: condition at 1=> end, 2=>start, 3=>both */
 static int loop_class = 3;
@@ -63,7 +62,7 @@ print_nasm(void)
     int i;
 
     memset(charmap, 0, sizeof(charmap));
-    curr_line = -1;
+    outp_line = -1;
 
     hello_world = (total_nodes == node_type_counts[T_CHR] &&
 		    !noheader && !link_main);
@@ -159,10 +158,10 @@ print_nasm(void)
 	}
 
 	if (enable_trace) {
-	    if (n->line != 0 && n->line != curr_line &&
+	    if (n->line != 0 && n->line != outp_line &&
 		n->type != T_CHR && !intel_gas) {
-		printf("%%line %d+0 %s\n", n->line, curfile);
-		curr_line = n->line;
+		printf("%%line %d+0 %s\n", n->line, bfname);
+		outp_line = n->line;
 	    }
 
 	    printf("%c ", intel_gas?'#':';');
@@ -273,9 +272,9 @@ print_nasm(void)
 
 	case T_PRT:
 	    print_asm_string(0,0,0);
-	    if (enable_trace && !intel_gas && n->line != 0 && n->line != curr_line) {
-		printf("%%line %d+0 %s\n", n->line, curfile);
-		curr_line = n->line;
+	    if (enable_trace && !intel_gas && n->line != 0 && n->line != outp_line) {
+		printf("%%line %d+0 %s\n", n->line, bfname);
+		outp_line = n->line;
 	    }
 	    printf("\tmov al,[ecx%s]\n", oft(n->offset));
 	    printf("\tcall putch\n");
@@ -403,9 +402,9 @@ static void
 print_nasm_header(void)
 {
     char const *np =0, *ep;
-    if (curfile && *curfile) {
-	np = strrchr(curfile, '/');
-	if (np) np++; else np = curfile;
+    if (bfname && *bfname) {
+	np = strrchr(bfname, '/');
+	if (np) np++; else np = bfname;
     }
     if (!np || !*np) np = "brainfuck";
     ep = strrchr(np, '.');
@@ -605,7 +604,7 @@ static void
 print_asm_string(char * charmap, char * strbuf, int strsize)
 {
 static int textno = -1;
-    int saved_line = curr_line;
+    int saved_line = outp_line;
 
     if (textno == -1 && link_main)
 	textno ++;
@@ -614,7 +613,7 @@ static int textno = -1;
 
 	if (enable_trace && !link_main)
 	    printf("%%line 1 lib_string.s\n");
-	curr_line = -1;
+	outp_line = -1;
 	printf("section .data\n");
 	printf("putchbuf: db 0\n");
 	printf("section .textlib\n");
@@ -660,8 +659,8 @@ static int textno = -1;
 	    else
 		printf("section .bftext\n");
 	    if (enable_trace && saved_line > 0)
-		printf("%%line %d+0 %s\n", saved_line, curfile);
-	    curr_line = saved_line;
+		printf("%%line %d+0 %s\n", saved_line, bfname);
+	    outp_line = saved_line;
 	}
 	printf("\tcall litprt_%02x\n", ch);
     } else if (strsize == 1 && link_main) {
@@ -688,10 +687,10 @@ static int textno = -1;
 	if (intel_gas)
 	    printf(".section .rodata\n");
 	else {
-	    if (saved_line != curr_line) {
+	    if (saved_line != outp_line) {
 		if (enable_trace && saved_line > 0)
-		    printf("%%line %d+0 %s\n", saved_line, curfile);
-		curr_line = saved_line;
+		    printf("%%line %d+0 %s\n", saved_line, bfname);
+		outp_line = saved_line;
 	    }
 	    printf("section .rodata\n");
 	}
