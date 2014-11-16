@@ -391,8 +391,9 @@ print_c_header(FILE * ofd)
 	if (node_type_counts[T_INP] != 0) {
 	    fprintf(ofd, "  setbuf(stdout, 0);\n");
 	}
-	if (l_iostyle == 1)
-	    fprintf(ofd, "  setlocale(LC_ALL, \"\");\n");
+	if (node_type_counts[T_INP] != 0 || node_type_counts[T_PRT] != 0)
+	    if (l_iostyle == 1)
+		fprintf(ofd, "  setlocale(LC_ALL, \"\");\n");
     }
 
     if (enable_trace)
