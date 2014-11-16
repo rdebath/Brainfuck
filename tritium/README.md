@@ -17,12 +17,14 @@ It's optimisations include:
 
 It has multiple backends.
  * JIT compile using GUN Lightning.
+ * JIT compile using luajit's dynasm.
  * Two JIT C compiles, one using libtcc the other using gcc and dlopen().
  * A 'Tree' interpreter for debugging, profiling and tracing.
  * An array interpreter as a reasonably fast fallback for the JIT.
  * Generate C code for later compiling.
  * Generate macro calls for translation to Ruby, Perl, PHP, Awk etc.
  * Generate NASM assembler to directly create an ELF32 executable (for example a 116 byte Hello World).
+ * Generate NASM or gas (intel) assembler to link with libc.
  * Generate a program for the unix dc(1) command.
 
 And finally there is the 'cheat' option '-Orun', this runs the syntax tree as far as it can with the 'Tree' interpreter before running a code generator. If the BF program has no input (',') commands this will run the program to completion (or hang) and convert it into a 'Hello World'. However, as this currently is done using the tree interpreter it runs at less than a tenth the speed of the JIT runners.
