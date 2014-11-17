@@ -19,7 +19,7 @@
 # To manually disable a 'JITter' add one or more of the options below to the
 # make command line.
 #
-# make DO_TCC= DO_LIGHT= DO_LIBDL= DO_DYNASM=
+# make DO_TCC= DO_LIGHT= DO_MYLIGHT= DO_LIBDL= DO_DYNASM=
 #
 # The internal GNU lightning and Dynasm can also be removed by deleting the
 # relevent parts of the tools directory.
@@ -36,7 +36,6 @@ all: bfi
 INSTALL=install -p -s
 INSTALLDIR=/usr/local/bin
 INSTALLEXT=
-TOOLDIR=../tools
 
 CC=$(shell ( which gcc clang pcc ; echo cc ) | head -1 | sed 's:.*/::')
 ifneq ($(CC),cc)
@@ -46,11 +45,18 @@ CFLAGS=-O $(INCLTOOLS) $(DEFS) $(CONF)
 endif
 LDFLAGS=
 
+CPUFOUND := $(shell $(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -E -dM bfi.version.c | grep BFI_FOUND_CPU )
+
+ifneq ($(CPUFOUND),)
+# The CPUs acceptable to the tools dir are all mentioned in bfi.version.c
+TOOLDIR=../tools
+
 ifneq ($(TOOLDIR),)
 ifeq ($(filter cc tcc,$(CC)),)
 INCLTOOLS=-idirafter $(TOOLDIR)
 else
 INCLTOOLS=-I $(TOOLDIR)
+endif
 endif
 endif
 
@@ -79,15 +85,17 @@ MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 	 -Wunreachable-code -fno-common -Wpadded \
 	 -Wlarger-than=512 -Wstack-usage=512 -Wunsafe-loop-optimizations
 
-bfi:	bfi.o bfi.ccode.o bfi.gnulit.o bfi.nasm.o bfi.bf.o bfi.dc.o bfi.dasm.o \
-	clock.o taperam.o bfi.version.o
+BASEOBJ=bfi.o bfi.version.o bfi.ccode.o bfi.nasm.o bfi.bf.o bfi.dc.o \
+	clock.o taperam.o
+
+bfi:
 	$(CC) $(CFLAGS) $(LDFLAGS) -o bfi $^ $(LDLIBS) $(TARGET_ARCH)
 
 pristine: clean
 	-rm -f bfi
 
 clean:
-	-rm -f *.o bfi.dasm.amd64.h bfi.dasm.i686.h bfi.version.h
+	-rm -f *.o bfi.version.h bfi.dasm.c
 
 install: bfi
 	$(INSTALL) bfi $(INSTALLDIR)/bfi$(INSTALLEXT)
@@ -106,26 +114,15 @@ bfi.ccode.o: bfi.ccode.c bfi.tree.h bfi.run.h bfi.ccode.h
 bfi.dc.o: bfi.dc.c bfi.tree.h bfi.run.h
 bfi.nasm.o: bfi.nasm.c bfi.tree.h bfi.nasm.h
 
-bfi.dasm.o: bfi.dasm.h bfi.tree.h bfi.run.h
 taperam.o: bfi.tree.h bfi.run.h
 
 clock.o: clock.h
-
-bfi.dasm.amd64.h: bfi.dasm.x86.dasc
-	$(TOOLDIR)/dynasm/dynasm -c -o bfi.dasm.amd64.h bfi.dasm.x86.dasc
-
-bfi.dasm.i686.h: bfi.dasm.x86.dasc
-	$(TOOLDIR)/dynasm/dynasm -c -D I386 -o bfi.dasm.i686.h bfi.dasm.x86.dasc
 
 # Auto configure
 
 DO_TCC=$(wildcard /usr/include/libtcc.h)
 DO_LIBDL=$(wildcard /usr/include/dlfcn.h)
-DO_DYNASM=$(wildcard $(TOOLDIR)/dynasm/dynasm)
 DO_LIGHT=$(wildcard /usr/include/lightning.h)
-ifneq ($(CC),tcc)
-DO_MYLIGHT=$(wildcard $(TOOLDIR)/lightning.h)
-endif
 
 ifeq ($(DO_LIBDL),)
 CONF_LIBDL=-DDISABLE_DLOPEN
@@ -147,6 +144,13 @@ LIBS_TCCLIB=-ltcc
 endif
 endif
 
+# 'My' lightning is V1 and the CPUs known by version.c except amd64.
+ifneq ($(CPUFOUND),)
+ifeq ($(findstring X86_64,$(CPUFOUND)),)
+DO_MYLIGHT=$(wildcard $(TOOLDIR)/lightning.h)
+endif
+endif
+
 ifeq ($(DO_LIGHT)$(DO_MYLIGHT),)
 CONF_LIGHTNING=-DDISABLE_GNULIGHTNING
 LIBS_LIGHTNING=
@@ -155,17 +159,42 @@ DO_LIGHT2=$(wildcard /usr/include/lightning/jit_*.h)
 ifneq ($(DO_LIGHT2),)
 CONF_LIGHTNING=
 LIBS_LIGHTNING=-llightning
+LIGHTNING_OBJ=bfi.gnulit.o
 else
 CONF_LIGHTNING=-DGNULIGHTv1
 LIBS_LIGHTNING=
+LIGHTNING_OBJ=bfi.gnulit.o
 endif
 endif
 
-ifeq ($(DO_DYNASM),)
-CONF_DYNASM=-DDISABLE_DYNASM
-else
-bfi.dasm.o: bfi.dasm.amd64.h bfi.dasm.i686.h
+ifneq ($(findstring X86,$(CPUFOUND)),)
+DO_DYNASM=$(wildcard $(TOOLDIR)/dynasm/dynasm)
+
+ifneq ($(DO_DYNASM),)
+DYNASM_OBJ=bfi.dasm.o
+
+$(DYNASM_OBJ): bfi.dasm.h bfi.tree.h bfi.run.h
+
+ifneq ($(findstring X86_64,$(CPUFOUND)),)
+bfi.dasm.c: bfi.dasm.x86.dasc
+	$(TOOLDIR)/dynasm/dynasm -c -o bfi.dasm.c bfi.dasm.x86.dasc
 endif
+
+ifneq ($(findstring X86_32,$(CPUFOUND)),)
+bfi.dasm.c: bfi.dasm.x86.dasc
+	$(TOOLDIR)/dynasm/dynasm -c -D I386 -o bfi.dasm.c bfi.dasm.x86.dasc
+endif
+
+else
+CONF_DYNASM=-DDISABLE_DYNASM
+endif
+else
+CONF_DYNASM=-DDISABLE_DYNASM
+endif
+
+bfi: $(BASEOBJ) $(LIGHTNING_OBJ) $(DYNASM_OBJ)
 
 CONF=$(CONF_DYNASM) $(CONF_LIGHTNING) $(CONF_TCCLIB) $(CONF_LIBDL)
 LDLIBS=$(GNUSTK) $(LIBS_LIGHTNING) $(LIBS_TCCLIB) $(GNUDYN) $(LIBS_LIBDL)
+
+#

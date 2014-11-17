@@ -20,12 +20,16 @@
 
 #if defined(__x86_64__) || defined(__amd64__) || defined(_M_AMD64)
 #define PROCESSOR	" x64"
+#define BFI_FOUND_CPU_X86_64
 #elif defined(__i386__) || defined(_M_IX86)
 #define PROCESSOR	" i386"
+#define BFI_FOUND_CPU_X86_32
 #elif defined(__powerpc__) || defined(__PPC__)
 #define PROCESSOR	" PPC"
+#define BFI_FOUND_CPU_PPC
 #elif defined(__sparc__)
 #define PROCESSOR	" Sparc"
+#define BFI_FOUND_CPU_SPARC
 #else
 #define PROCESSOR	/*Unknown, no special code in this application.*/
 #endif

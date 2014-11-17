@@ -1,18 +1,68 @@
-/*  As I can't use #defines to control the assembler this file is assembled
- *  twice, once for i386 and once for amd64
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdint.h>
+#include <fcntl.h>
+#if !defined(LEGACYOS) && !defined(_WIN32)
+#include <sys/mman.h>
+#elif defined(_WIN32)
+# include <windows.h>
+#endif
+
+#include "bfi.tree.h"
+#include "bfi.dasm.h"
+#include "bfi.run.h"
+#include "clock.h"
+
+#include "dynasm/dasm_proto.h"
+#include "dynasm/dasm_x86.h"
+
+static int dump_code = 0;
+
+int
+checkarg_dynasm(char * opt, char * arg UNUSED)
+{
+    if (!strcmp(opt, "-dump")) {
+	dump_code = 1;
+	return 1;
+    }
+    return 0;
+}
+
+#if defined(__x86_64__) || defined(__amd64__) || defined(_M_AMD64)
+#define CPUCHECK 64
+#elif defined(__i386__) || defined(_M_IX86)
+#define CPUCHECK 32
+#else
+#warning "Supported processor not detected for DYNASM."
+#define CPUCHECK 0
+#endif
+
+/*
+ *  Notes: It is possibly to use #if commands, but the assembler (pass1)
+ *  will see ALL the lines of assembly irrespective of these directives;
+ *  therefor no '.define' commands within a '#ifdef'.
  *
- *  The C compiler then includes one to match the current compile.
+ *  The same applies the other way round, the assembler treats lines that
+ *  don't begin with a '|' character as untouchable and emits them all.
  *
- *  Just to clarify, it is still possibly to use #if commands, but the
- *  assembler (pass1) will see ALL the lines of assembly irrespective of
- *  these directives; therefor no '.define' commands within a '#ifdef'.
+ *  BUT, any line that begins with '||' is an assembler line which the
+ *  assembler will filter with .if directives and the contents of this
+ *  line (after the '||') are passed into the C source AFTER token
+ *  substitution.
  */
 
 |.if I386
+||#define CPUID "i686"
+||int dynasm_ok = (CPUCHECK==32);
 |.arch x86
 |.else
+||#define CPUID "x86_64"
+||int dynasm_ok = (CPUCHECK==64);
 |.arch x64
 |.endif
+
 |.actionlist actions
 |.section code
 |.globals GLOB_
@@ -50,7 +100,6 @@
 dasm_State *Dstate;
 void* global_labels[GLOB__MAX];
 int maxpc = 0;
-int dynasm_ok = 1;
 struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
 static void link_and_run(dasm_State **state);

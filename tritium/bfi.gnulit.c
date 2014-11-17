@@ -60,7 +60,7 @@
 #define jit_andi jit_andi_i
 #define jit_extr_uc jit_extr_uc_i
 
-#ifndef __x86_64__
+#if !defined(__x86_64__) && !defined(__amd64__) && !defined(_M_AMD64)
 #define JITLIBOK 1
 #else
 #define JITLIBOK 0

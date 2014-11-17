@@ -43,20 +43,24 @@ the BSD 'pmake' make version's extensions are incompatible with the
 gmake extensions. Ports will also be needed for the gmp library to
 compile the output of bf2cgmp.  The the nasm assembler output in link
 mode compiles and runs successfully when linked to libc by clang. The
-'gas' assembler output does not. The Makefiles prefer gcc, but adding
-'CC=clang' works fine.
+'gas' assembler output does not.
 
 The 'ports' version of GNU Lightning V2 is (of course) not auto detected
 by Tritium.  It can be pulled in using this ...
 
-$ gmake CC=clang DO_LIGHT=1 DO_LIGHT2=1 LDFLAGS=-L/usr/local/lib DEFS=-I/usr/local/include
+$ gmake DO_LIGHT=1 DO_LIGHT2=1 LDFLAGS=-L/usr/local/lib DEFS=-I/usr/local/include
+
+The LDFLAGS and DEFS may be replaced by these environment variables
+
+$ export LIBRARY_PATH=/usr/local/lib
+$ export CPATH=/usr/local/include
 
 Windows
 -------
 Cross compile of Tritium from Debian Wheezy (stable) Linux using:
-    make CC=i686-w64-mingw32-gcc DO_LIBDL=
+    make CC=i686-w64-mingw32-gcc DO_LIBDL= DO_LIGHT= DO_MYLIGHT=
 or
-    make CC=x86_64-w64-mingw32-gcc DO_LIBDL=
+    make CC=x86_64-w64-mingw32-gcc DO_LIBDL= DO_LIGHT= DO_MYLIGHT=
 
 The Dynasm JIT works so it's nice and quick. (cmd.exe, however, is slow!)
 The nasm/gas output cross compiles and runs with the -fwin32 option.
