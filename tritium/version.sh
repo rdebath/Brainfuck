@@ -6,45 +6,53 @@ MINOR=1
 SUFFIX="# Unknown @ `date -R 2>/dev/null || date`"
 BUILD=
 
+# This is expanded by git archive
+GITARCHVERSION=$Format:%nGITHASH=%h%nGITTIME="%cd"%nGITDECO="%d"$
+
+[ "$GITTIME" != "" ] && SUFFIX="$GITTIME"
+[ "$GITDECO" != "" ] && {
+    GITDECO=`echo "$GITDECO" |
+    sed \
+	-e 's/[ (),][ (),]*/ /g' \
+	-e 's/HEAD//' \
+	-e 's/master//' \
+	-e 's/  *$//' \
+	-e 's/^  *//'
+	`
+}
+
 git_describe() {
     # Get more detail than just git describe --tags
-    TAG=`git describe --tags --match='v[0-9]*.[0-9]*' --abbrev=0`
+    # tag + commits to branch from upstream + local commits + local mods.
+
+    # Find the merge base between this and the upstream.
+    ORIGIN=`git merge-base @{u} HEAD`
+
+    # Find the most recent tag.
+    TAG=`git describe --tags --match='v[0-9]*.[0-9]*' --abbrev=0 $ORIGIN`
     MAJOR=`echo $TAG | sed "s/^v\([0-9]*\).*/\1/"`
     MINOR=`echo $TAG | sed "s/^v[0-9]*\.\([0-9]*\)/\1/"`
 
-    if [ `git rev-list origin -n 1 2>/dev/null | wc -l` -eq 0 ]
-    then ORIGIN=HEAD
-    else ORIGIN=origin
-    fi
-
-    SUFFIX=
+    # Commits between the tag and the merge base and from there to HEAD
     VER=`git rev-list HEAD ${TAG:+^$TAG} . | wc -l`
-    OVER=`git rev-list $ORIGIN ${TAG:+^$TAG} . | wc -l`
     DIFF=`git rev-list $ORIGIN..HEAD . | wc -l`
-    NDIFF=`git rev-list HEAD..$ORIGIN . | wc -l`
-
-    MOD=`git status --porc . | grep "^ M" | wc -l`
-
-    HDR=`( git rev-list HEAD -n 1 . ; git rev-list $ORIGIN -n 1 . ) 2>/dev/null | uniq | wc -l`
-
-    [ "$DIFF" -eq "0" -a "$NDIFF" -eq 0 -a "$HDR" -eq 2 ] && {
-	echo WARNING: YOUR VERSION IS FORKED 1>&2
-	SUFFIX="-FORK"
-    }
-
     VER=$((VER-DIFF))
 
-    echo Origin ver: $MAJOR.$MINOR.$VER, Local commits: $DIFF, Local edits: $MOD 1>&2
-    [ "$OVER" -gt "$VER" ] &&
-	echo WARNING: Origin is ahead of your current HEAD by $((OVER-VER)) commits. 1>&2
+    # Number of modified files.
+    MOD=`git status --porc . | grep "^ M" | wc -l`
 
+    # Commentary.
+    echo Origin ver: $MAJOR.$MINOR.$VER, Local commits: $DIFF, Local edits: $MOD 1>&2
+
+    SUFFIX=
     [ "$DIFF" -ne 0 ] && SUFFIX="$SUFFIX+$DIFF"
     [ "$MOD" -ne 0 -a "$DIFF" -eq 0 ] && SUFFIX="${SUFFIX}+0"
     [ "$MOD" -ne 0 ] && SUFFIX="${SUFFIX}.${MOD}"
 
     [ "$TAG" = "" ] && SUFFIX="$SUFFIX-pre"
 
-    SUFFIX="$SUFFIX `git rev-list HEAD -n 1 . | cut -c 1-7`"
+    # Add the start of the hash on the end.
+    SUFFIX="$SUFFIX `git rev-list HEAD -n 1 . | cut -c 1-8`"
     BUILD="$VER"
 }
 
@@ -60,6 +68,9 @@ echo "#define VERSION_MAJOR    $MAJOR"
 echo "#define VERSION_MINOR    $MINOR"
 echo "#define VERSION_BUILD    $BUILD"
 echo "#define VERSION_SUFFIX   \"$SUFFIX\""
+[ "$GITHASH" != "" ] && echo "#define GITHASH $GITHASH"
+[ "$GITTIME" != "" ] && echo "#define GITTIME $GITTIME"
+[ "$GITDECO" != "" ] && echo "#define GITDECO $GITDECO"
 } > "$TMPFILE"
 
 [ -n "$1" ] && {
