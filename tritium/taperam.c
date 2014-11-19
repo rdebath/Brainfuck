@@ -43,6 +43,8 @@ size_t cell_array_alloc_len = 0;
 #warning Using small memory, use -mem option.
 #endif
 
+int huge_ram_available = 0;
+
 void *
 map_hugeram(void)
 {
@@ -128,6 +130,8 @@ restore_sigsegv(void)
     if(0 > sigaction(SIGSEGV, &saved_segv, NULL))
 	perror("Restoring SIGSEGV handler, ignoring");
 }
+
+int huge_ram_available = 1;
 
 void *
 map_hugeram(void)

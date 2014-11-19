@@ -92,6 +92,7 @@ const char * codestylename[] = { "std"
 void * taperam = 0;
 #define map_hugeram() tcalloc(memsize,sizeof(int))
 #define unmap_hugeram() free(taperam)
+#define huge_ram_available 0
 #endif
 
 char const * program = "C";
@@ -312,11 +313,13 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("   -frepoint\n");
     printf("        Recreate pointer movements between loops as last stage.\n");
     printf("   -mem %d\n", memsize);
-#ifdef NO_EXT_BE
-    printf("        Define allocation size for tape memory.\n");
-#else
-    printf("        Define array size for generated code.\n");
-    printf("        Note: This option does not apply to '-r' (usually).\n");
+    if (!huge_ram_available)
+	printf("        Define allocation size for tape memory.\n");
+    else {
+	printf("        Define array size for generated code.\n");
+	printf("        The '-r' option always uses a huge array.\n");
+    }
+#ifndef NO_EXT_BE
     printf("\n");
     printf("C generation extras\n");
     printf("   -dynmem\n");

@@ -5,6 +5,8 @@ extern int do_run;
 
 extern double run_time, io_time;
 
+extern int huge_ram_available;
+
 void run_tree(void);
 void * map_hugeram(void);
 void unmap_hugeram(void);
