@@ -18,34 +18,48 @@
 #endif
 
 #if defined(__x86_64__) || defined(__amd64__) || defined(_M_AMD64)
-#define PROCESSOR	" x64"
+#define PROCESSOR	"x64"
 #define BFI_FOUND_CPU_X86_64
 #elif defined(__i386__) || defined(_M_IX86)
-#define PROCESSOR	" i386"
+#define PROCESSOR	"i386"
 #define BFI_FOUND_CPU_X86_32
 #elif defined(__powerpc__) || defined(__PPC__)
-#define PROCESSOR	" PPC"
+#define PROCESSOR	"PPC"
 #define BFI_FOUND_CPU_PPC
 #elif defined(__sparc__)
-#define PROCESSOR	" Sparc"
+#define PROCESSOR	"Sparc"
 #define BFI_FOUND_CPU_SPARC
+#elif defined(__arm__)
+#ifdef __thumb2__
+#define PROCESSOR	"ARMv7"	/* Approx, actually ARMv6t2 */
+#elif __thumb__
+#define PROCESSOR	"ARMv6"	/* Approx, actually ARMv5t */
 #else
-#define PROCESSOR	/*Unknown, no special code in this application.*/
+#define PROCESSOR	"ARM"
+#endif
+#define BFI_UNSUPPORTED_CPU_ARM
+#elif defined(__SH4__)
+#define PROCESSOR	"SuperH-4"
+#define BFI_UNSUPPORTED_CPU_SH4
+#else
+#define PROCESSOR	"using an unknown processor"
 #endif
 
 #ifdef __linux__
-#define HOST	"Linux"PROCESSOR
+#define OSNAME	"Linux"
 #elif defined(_WIN32)
-#define HOST	"Windows"PROCESSOR
+#define OSNAME	"Windows"
 #elif defined(__FreeBSD__)
-#define HOST	"FreeBSD"PROCESSOR
+#define OSNAME	"FreeBSD"
 #elif defined(__NetBSD__)
-#define HOST	"NetBSD"PROCESSOR
+#define OSNAME	"NetBSD"
 #elif defined(__unix__)
-#define HOST	"Unix"PROCESSOR
+#define OSNAME	"Unix"
 #else
-#define HOST	"an unknown OS"
+#define OSNAME	"an unknown OS"
 #endif
+
+#define HOST  OSNAME " " PROCESSOR
 
 void
 print_banner(FILE * fd, char const * program)
