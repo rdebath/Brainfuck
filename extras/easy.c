@@ -41,7 +41,7 @@ char * bf(char * p, int r) {
     char * s;
     for(;;) {
 	switch(*p) {
-	case ':': if((*p = getc(f)) == EOF) exit(r); p[1]=':'; continue;
+	case ':': {int c;if((c = getc(f)) == EOF) exit(r); *p=c;}p[1]=':'; continue;
 	case '+': mem[m]++; break;
 	case '-': mem[m]--; break;
 	case '>': m++; break;
