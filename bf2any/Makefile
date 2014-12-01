@@ -93,7 +93,7 @@ ifeq ($(HAVE_DL),)
 LIBDL=
 LIBDLFLAG=-DDISABLE_DLOPEN
 else
-ifeq ($(findstring BSD,$(shell uname -s)),)
+ifneq ($(findstring Linux,$(shell uname -s)),)
 LIBDL=-ldl
 endif
 endif
