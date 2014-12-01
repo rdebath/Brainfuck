@@ -127,7 +127,7 @@ CONF_TCCLIB=-DDISABLE_TCCLIB
 LIBS_TCCLIB=
 else
 CONF_LIBDL=
-ifeq ($(findstring BSD,$(shell uname -s)),)
+ifneq ($(findstring Linux,$(shell uname -s)),)
 LIBS_LIBDL=-ldl
 endif
 

@@ -17,7 +17,9 @@ char * cell_array_low_addr = 0;
 size_t cell_array_alloc_len = 0;
 
 #ifdef MAP_NORESERVE
+#ifndef DISABLE_HUGERAM
 #define USEHUGERAM
+#endif
 #endif
 
 #ifdef USEHUGERAM

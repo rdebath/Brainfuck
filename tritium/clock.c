@@ -5,13 +5,16 @@
 
 #ifdef _WIN32
 #define USE_WINDOWS_CLOCKS
-#elif defined(_POSIX_MONOTONIC_CLOCK) && _POSIX_TIMERS>0
-#ifndef __GLIBC__
-#define USE_POSIX_TIMERS
-#elif __GLIBC__>2 || (__GLIBC__==2 && __GLIBC_MINOR__>=17)
+#elif defined(_POSIX_MONOTONIC_CLOCK) && defined(_POSIX_TIMERS) && defined(CLOCK_MONOTONIC)
+/* Old GCC can't deal with undefined vars in a preproc expression. */
+# if _POSIX_TIMERS>0
+#  ifndef __GLIBC__
+#   define USE_POSIX_TIMERS
+#  elif __GLIBC__>2 || (__GLIBC__==2 && __GLIBC_MINOR__>=17)
 /* Old Glibc needs -lrt so don't bother. */
-#define USE_POSIX_TIMERS
-#endif
+#   define USE_POSIX_TIMERS
+#  endif
+# endif
 #endif
 
 #include "clock.h"

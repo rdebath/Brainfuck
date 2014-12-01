@@ -1,4 +1,7 @@
 #!/bin/sh
+# We only need a POSIX shell, but if bash is available it's more likely to be good.
+if [ ! -n "$BASH_VERSION" ];then if [ "`which bash`" != "" ];then exec bash "$0" "$@"; fi ; fi
+
 [ -n "$2" ] && cd $2
 
 MAJOR=1

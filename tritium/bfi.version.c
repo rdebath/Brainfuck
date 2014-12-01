@@ -38,9 +38,18 @@
 #define PROCESSOR	"ARM"
 #endif
 #define BFI_UNSUPPORTED_CPU_ARM
+#elif defined(__MIPSEL__) || defined(__MIPSEB__)
+#define PROCESSOR	"MIPS"
+#define BFI_UNSUPPORTED_CPU_MIPS
 #elif defined(__SH4__)
 #define PROCESSOR	"SuperH-4"
 #define BFI_UNSUPPORTED_CPU_SH4
+#elif defined(__ia64__)
+#define PROCESSOR	"ia64"
+#define BFI_UNSUPPORTED_CPU_IA64
+#elif defined(__alpha__)
+#define PROCESSOR	"DEC Alpha"
+#define BFI_UNSUPPORTED_CPU_ALPHA
 #else
 #define PROCESSOR	"using an unknown processor"
 #endif
@@ -53,6 +62,12 @@
 #define OSNAME	"FreeBSD"
 #elif defined(__NetBSD__)
 #define OSNAME	"NetBSD"
+#elif defined(__hpux__)
+#define OSNAME	"HP-UX"
+#elif defined(__osf__)
+#define OSNAME	"DEC OSF/1"
+#elif defined(__APPLE__)
+#define OSNAME	"Apple"
 #elif defined(__unix__)
 #define OSNAME	"Unix"
 #else
