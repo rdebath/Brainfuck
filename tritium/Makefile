@@ -24,8 +24,11 @@
 # The internal GNU lightning and Dynasm can also be removed by deleting the
 # relevent parts of the tools directory.
 
-# Always run the version check script.
-VERSTRING := $(shell sh version.sh bfi.version.h)
+# Always running the version check script.
+# The VERSION and VERSIONID strings are for you to override eg:
+#
+#       make VERSION=v1.2.3.4 VERSIONID=Your_Name_or_ORG
+VERSTRING := $(shell sh version.sh bfi.version.h $(VERSION) $(VERSIONID))
 
 all: bfi
 

@@ -8,7 +8,11 @@
 #define VS(x) VS_S(VERSION_ ## x)
 #ifdef GITHASH
 #ifdef GITDECO
+#ifdef GITTIME
 #define VERSION VS_S(GITDECO) " " VS_S(GITHASH) " " VS_S(GITTIME)
+#else
+#define VERSION VS_S(GITDECO) " " VS_S(GITHASH)
+#endif
 #else
 #define VERSION VS(MAJOR) "." VS(MINOR) "." VS(BUILD) "? " \
 		VS_S(GITHASH) " " VS_S(GITTIME)
@@ -17,6 +21,28 @@
 #define VERSION "v" VS(MAJOR) "." VS(MINOR) "." VS(BUILD) VERSION_SUFFIX
 #endif
 
+/* This list of Operating systems is all those I've actually tried it on. */
+#ifdef __linux__
+#define OSNAME	"Linux"
+#elif defined(_WIN32)
+#define OSNAME	"Windows"
+#elif defined(__FreeBSD__)
+#define OSNAME	"FreeBSD"
+#elif defined(__NetBSD__)
+#define OSNAME	"NetBSD"
+#elif defined(__hpux__)
+#define OSNAME	"HP-UX"
+#elif defined(__osf__)
+#define OSNAME	"DEC OSF/1"
+#elif defined(__APPLE__)
+#define OSNAME	"Apple"
+#elif defined(__unix__)
+#define OSNAME	"Unix"
+#else
+#define OSNAME	"an unknown OS"
+#endif
+
+/* And here's the CPUs those OSs were running on */
 #if defined(__x86_64__) || defined(__amd64__) || defined(_M_AMD64)
 #define PROCESSOR	"x64"
 #define BFI_FOUND_CPU_X86_64
@@ -54,26 +80,7 @@
 #define PROCESSOR	"using an unknown processor"
 #endif
 
-#ifdef __linux__
-#define OSNAME	"Linux"
-#elif defined(_WIN32)
-#define OSNAME	"Windows"
-#elif defined(__FreeBSD__)
-#define OSNAME	"FreeBSD"
-#elif defined(__NetBSD__)
-#define OSNAME	"NetBSD"
-#elif defined(__hpux__)
-#define OSNAME	"HP-UX"
-#elif defined(__osf__)
-#define OSNAME	"DEC OSF/1"
-#elif defined(__APPLE__)
-#define OSNAME	"Apple"
-#elif defined(__unix__)
-#define OSNAME	"Unix"
-#else
-#define OSNAME	"an unknown OS"
-#endif
-
+/* This is what I've spotted this time. */
 #define HOST  OSNAME " " PROCESSOR
 
 void

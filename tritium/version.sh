@@ -2,8 +2,6 @@
 # We only need a POSIX shell, but if bash is available it's more likely to be good.
 if [ ! -n "$BASH_VERSION" ];then if [ "`which bash`" != "" ];then exec bash "$0" "$@"; fi ; fi
 
-[ -n "$2" ] && cd $2
-
 MAJOR=1
 MINOR=1
 SUFFIX="# Unknown @ `date -R 2>/dev/null || date`"
@@ -22,6 +20,15 @@ GITARCHVERSION=$Format:%nGITHASH=%h%nGITTIME="%cd"%nGITDECO="%d"$
 	-e 's/  *$//' \
 	-e 's/^  *//'
 	`
+}
+
+# Override from the Makefile.
+[ ".$2" != "." -a "$3" != "." ] && {
+    [ "$GITHASH" = "" ] &&
+	GITHASH="`git log -1 --format=%h 2>/dev/null`"
+    GITTIME="$GITHASH"
+    GITDECO="$2"
+    GITHASH="$3"
 }
 
 git_describe() {
