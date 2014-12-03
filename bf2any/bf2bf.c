@@ -166,6 +166,10 @@ static const char *atpling[] =
 /* Language Cupid */
 static const char * cupid[] = { "->", "<-", "><", "<>", "<<", ">>", "-<", ">-", 0 };
 
+/* Language pikalang -- https://github.com/skj3gg/pikalang */
+static const char * pikalang[] =
+    {"pipi", "pichu", "pi", "ka", "pikachu", "pikapi", "pika", "chu", 0 };
+
 /* BF Doubler doubles the cell size. */
 /* 12 cost, cells in LXXH order, with tmpzero */
 static const char * doubler_12[] =
@@ -458,6 +462,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-cp") == 0 || strcmp(arg, "-cupid") == 0) {
 	lang = cupid; langclass = L_JNWORD; return 1;
     } else
+    if (strcmp(arg, "-pika") == 0) {
+	lang = pikalang; langclass = L_CDWORDS; return 1;
+    } else
     if (strcmp(arg, "-dc1") == 0 || strcmp(arg, "-dc") == 0) {
 	lang = dc1; langclass = L_JNWORD+GEN_HEADER+C_NUMRLE; return 1;
     } else
@@ -513,6 +520,7 @@ check_arg(const char * arg)
 	"\n\t"  "-zero   'zerolang' from mescam on github"
 	"\n\t"  "-nyan   'nyan-script' from tommyschaefer on github"
 	"\n\t"  "-@!     @! from http://esolangs.org/wiki/@tention!"
+	"\n\t"  "-pika   Pikalang from https://github.com/skj3gg/pikalang"
 	"\n\t"  "-cupid  Cupid from http://esolangs.org/wiki/Cupid"
 	"\n\t"  "-dc     Convert to dc(1) using the first of below."
 	"\n\t"  "-dc1      Use an array and a pointer variable."
