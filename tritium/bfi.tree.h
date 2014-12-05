@@ -17,10 +17,11 @@ extern int opt_repoint;
 
 extern int cell_size;
 extern int cell_mask;
+extern int cell_smask;
 extern char const * cell_type;
 
-#define SM(vx) (( ((int)(vx)) <<(32-cell_size))>>(32-cell_size))
 #define UM(vx) ((vx) & cell_mask)
+#define SM(vx) ((UM(vx) ^ cell_smask) - cell_smask)
 
 #define TOKEN_LIST(Mac) \
     Mac(MOV) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \

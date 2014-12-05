@@ -119,8 +119,18 @@ char * input_string = 0;
 int libc_allows_utf8 = 0;
 int default_io = 1;
 
-int cell_size = 0;  /* 0 is 8,16,32 or more. 7 and up are number of bits */
-int cell_mask = -1; /* -1 is don't mask. */
+/*
+ * The default values here make the compiler assume that the cell is
+ * an integer type greater than or equal to a byte. Eveything should
+ * be fine even if the cell size is larger than an int.
+ *
+ * When the cell size is actually set some more optimisations will be
+ * allowed. The masks will be set to the correct values for the cell size.
+ * The cell size may be anything between ONE bit and the sizeof an int.
+ */
+int cell_size = 0;  /* Number of bits in cell */
+int cell_mask = ~0; /* Mask using & with this. */
+int cell_smask = 0; /* Xor and subtract this; normally MSB of the mask. */
 char const * cell_type = "C";
 
 char * bfname = "brainfuck";
@@ -3510,12 +3520,13 @@ set_cell_size(int cell_bits)
 	    cell_mask = (2 << (cell_size-1)) - 1;	/* GCC Whinge */
 	} else {
 	    cell_size = (int)sizeof(int)*CHAR_BIT;
-	    cell_mask = -1;
+	    cell_mask = ~0;
 	}
     } else {
 	cell_size = cell_bits;
 	cell_mask = (2 << (cell_size-1)) - 1;	/* GCC Whinge */
     }
+    cell_smask = (1U << (cell_size-1));
 
     if (verbose>5) {
 	fprintf(stderr, "Cell bits set to %d, mask = 0x%x\n",

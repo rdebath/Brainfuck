@@ -245,7 +245,7 @@ print_nasm(void)
 			n->offset, n->count,
 			n->offset2, n->count2,
 			n->offset3, n->count3);
-		if (SM(n->count2) == 0) {
+		if (UM(n->count2) == 0) {
 		    printf("\tmov bl,0\n");
 		} else if (n->count2 == -1 ) {
 		    printf("\tmov bl,byte ptr [ecx%s]\n", oft(n->offset2));
@@ -254,7 +254,7 @@ print_nasm(void)
 		    printf("\tmov al,byte ptr [ecx%s]\n", oft(n->offset2));
 		    printf("\timul ebx,eax,%d\n", SM(n->count2));
 		}
-		if (SM(n->count3) != 0) {
+		if (UM(n->count3) != 0) {
 		    printf("\tmov al,byte ptr [ecx%s]\n", oft(n->offset3));
 		    printf("\timul eax,eax,%d\n", SM(n->count3));
 		    printf("\tadd bl,al\n");
@@ -262,7 +262,7 @@ print_nasm(void)
 		printf("\tmov byte ptr [ecx%s],bl\n", oft(n->offset));
 	    }
 
-	    if (SM(n->count))
+	    if (UM(n->count))
 		printf("\tadd byte ptr [ecx%s],%d\n", oft(n->offset), SM(n->count));
 	    break;
 
