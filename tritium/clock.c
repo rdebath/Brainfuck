@@ -1,7 +1,8 @@
 
-#define _POSIX_C_SOURCE 200809L
+#define _XOPEN_SOURCE 700
 
 #include <unistd.h>
+#include <time.h>
 
 #ifdef _WIN32
 #define USE_WINDOWS_CLOCKS
@@ -20,7 +21,6 @@
 #include "clock.h"
 
 #if defined(USE_POSIX_TIMERS)
-#include <time.h>
 
 static struct timespec run_start, paused, run_pause;
 

@@ -1,4 +1,5 @@
-#define _POSIX_C_SOURCE 200809L
+#define _XOPEN_SOURCE 700
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -166,10 +167,17 @@ outcmd(int ch, int count)
 #ifndef DISABLE_DLOPEN
 	if (runmode != no_run) {
 	    runmode = run_dll;
+#if defined(_POSIX_C_SOURCE) && (_POSIX_C_SOURCE >= 200809L)
 	    if( mkdtemp(tmpdir) == 0 ) {
 		perror("mkdtemp()");
 		exit(1);
 	    }
+#else
+	    if (mkdir(mktemp(tmpdir), 0700) < 0) {
+		perror("mkdir(mktemp()");
+		exit(1);
+	    }
+#endif
 	    strcpy(ccode_name, tmpdir); strcat(ccode_name, "/"BFBASE".c");
 	    strcpy(dl_name, tmpdir); strcat(dl_name, "/"BFBASE".so");
 	    strcpy(obj_name, tmpdir); strcat(obj_name, "/"BFBASE".o");
@@ -334,6 +342,8 @@ print_cstring(void)
 #define CC "clang -m32"
 #elif defined(__clang__) && (__clang_major__>=3) && defined(__amd64__)
 #define CC "clang -m64"
+#elif defined(__PCC__)
+#define CC "pcc"
 #elif defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
 #if defined(__x86_64__)
 #if defined(__ILP32__)
@@ -346,6 +356,8 @@ print_cstring(void)
 #else
 #define CC "gcc"
 #endif
+#elif defined(__GNUC__)
+#define CC "gcc"
 #elif defined(__TINYC__)
 #define CC "tcc"
 #else

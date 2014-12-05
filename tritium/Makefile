@@ -64,10 +64,12 @@ endif
 # it wrong, doing it's 'optimisation' on calculations that are defined by the
 # C standard.
 ifeq ($(CC),gcc)
+ifneq ($(findstring MERCHANTABILITY,$(shell gcc --version)),)
 UNSAFE=-fno-delete-null-pointer-checks -fno-strict-overflow
 # -fwrapv -fno-strict-aliasing -fno-aggressive-loop-optimizations
 # -funsafe-loop-optimizations
 GNULGT=-fno-strict-aliasing -Wno-unused-value
+endif
 endif
 
 ifneq ($(STATIC_TOOLS),)

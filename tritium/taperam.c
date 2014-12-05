@@ -10,17 +10,17 @@
 #include "bfi.tree.h"
 #include "bfi.run.h"
 
+#if defined(MAP_NORESERVE) && defined(SA_SIGINFO) && defined(SA_RESETHAND)
+#ifndef DISABLE_HUGERAM
+#define USEHUGERAM
+#endif
+#endif
+
 /* Where's the tape memory start */
 char * cell_array_pointer = 0;
 /* Location of all of the tape memory. */
 char * cell_array_low_addr = 0;
 size_t cell_array_alloc_len = 0;
-
-#ifdef MAP_NORESERVE
-#ifndef DISABLE_HUGERAM
-#define USEHUGERAM
-#endif
-#endif
 
 #ifdef USEHUGERAM
 #define MEMSIZE	    2UL*1024*1024*1024

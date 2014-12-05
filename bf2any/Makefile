@@ -126,7 +126,7 @@ libtcc.lib-off:
 #-------------------------------------------------------------------------------
 # TCL doesn't use pkg-config and so is usually installed sanely, but this may
 # change as pkgconf (the svelte version) is available.
-HAVE_TCL=$(shell $(PKGCONF) --cflags --libs tcl >/dev/null 2>&1 && echo tcl)
+HAVE_TCL=$(shell ($(PKGCONF) --cflags --libs tcl ) >/dev/null 2>&1 && echo tcl)
 ifneq ($(HAVE_TCL),)
 TCLFLAG=$(shell $(PKGCONF) --cflags $(HAVE_TCL))
 TCLLIBS=$(shell $(PKGCONF) --libs $(HAVE_TCL))
@@ -162,7 +162,7 @@ libtcl.lib-off:
 # This uses 'pkg-config' to lookup the weird flags your version
 # of libpython-dev needs. If either is not available the interface
 # is disabled.
-HAVE_PYLIB=$(shell $(PKGCONF) --list-all 2>/dev/null | \
+HAVE_PYLIB=$(shell ($(PKGCONF) --list-all ) 2>/dev/null | \
 	sed -n 's/^\(python-[^ ]*\).*/\1/p' | \
 	sort -r | head -1)
 ifeq ($(HAVE_PYLIB),)
@@ -193,7 +193,7 @@ libpy.lib-off:
 # This uses 'pkg-config' to lookup the weird flags your version
 # of the lua library needs. If either is not available the interface
 # is disabled.
-HAVE_LUALIB=$(shell $(PKGCONF) --list-all 2>/dev/null | \
+HAVE_LUALIB=$(shell ($(PKGCONF) --list-all ) 2>/dev/null | \
 	sed -n -e 's/^\(luajit\) .*/\1/p' -e 's/^\(lua5\..\) .*/\1/p' | \
 	sort -r | head -1)
 ifeq ($(HAVE_LUALIB),)

@@ -563,7 +563,7 @@ link_and_run(dasm_State ** state)
     dasm_encode(state, codeptr);
     dasm_free(state);
 
-#if !defined(LEGACYOS) && !defined(_WIN32)
+#if !defined(LEGACYOS) && !defined(_WIN32) && !defined(__minix__)
     if (mprotect(codeptr, size, PROT_EXEC | PROT_READ) != 0) {
 	if (verbose)
 	    perror("mprotect read only");

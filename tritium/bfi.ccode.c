@@ -1,5 +1,6 @@
+#define _XOPEN_SOURCE 700
+
 #ifdef __STRICT_ANSI__
-#define _POSIX_C_SOURCE 200809UL
 #if __STDC_VERSION__ < 199901L
 #warning This program needs at least the C99 standard.
 #endif
@@ -28,6 +29,7 @@
 
 #ifndef DISABLE_DLOPEN
 #include <dlfcn.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <signal.h>
@@ -1015,10 +1017,17 @@ void
 run_gccode(void)
 {
     FILE * ofd;
+#if defined(_POSIX_C_SOURCE) && (_POSIX_C_SOURCE >= 200809L)
     if( mkdtemp(tmpdir) == 0 ) {
 	perror("mkdtemp()");
 	exit(1);
     }
+#else
+    if (mkdir(mktemp(tmpdir), 0700) < 0) {
+	perror("mkdir(mktemp()");
+	exit(1);
+    }
+#endif
     strcpy(ccode_name, tmpdir); strcat(ccode_name, "/"BFBASE".c");
     strcpy(dl_name, tmpdir); strcat(dl_name, "/"BFBASE".so");
     strcpy(obj_name, tmpdir); strcat(obj_name, "/"BFBASE".o");

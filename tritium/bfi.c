@@ -40,8 +40,8 @@ characters after your favorite comment marker in a very visible form.
 
 */
 
+#define _XOPEN_SOURCE 700
 #ifdef __STRICT_ANSI__
-#define _POSIX_C_SOURCE 200809UL
 #if __STDC_VERSION__ < 199901L
 #warning This program needs at least the C99 standard.
 #endif
