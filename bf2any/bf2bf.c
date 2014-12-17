@@ -126,6 +126,10 @@ static const char *rhoprime[] =
 static const char *zero[] =
     { "0+", "0-", "0++", "0--", "0.", "0?", "0/", "/0" };
 
+/* Language: yolang; http://yolang.org/ */
+static const char *yolang[] =
+    { "yo", "YO", "Yo!", "Yo?", "YO!", "yo?", "yo!", "YO?", 0 };
+
 /* dc(1) using an array and a pointer in another variable */
 static const char *dc1[] =
 {   "lp%d+sp", "lp%d-sp", "lp;a%d+lp:a", "lp;a%d-lp:a",
@@ -448,6 +452,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-zero") == 0) {
 	lang = zero; langclass = L_WORDS; return 1;
     } else
+    if (strcmp(arg, "-yo") == 0) {
+	lang = yolang; langclass = L_JNWORD; return 1;
+    } else
     if (strcmp(arg, "-nyan") == 0) {
 	lang = nyan; langclass = L_JNWORD+GEN_HEADER; return 1;
     } else
@@ -519,6 +526,7 @@ check_arg(const char * arg)
 	"\n\t"  "-pog    Pogaack."
 	"\n\t"  "-chi    In chinese."
 	"\n\t"  "-zero   'zerolang' from mescam on github"
+	"\n\t"  "-yo     'yolang' http://yolang.org/"
 	"\n\t"  "-nyan   'nyan-script' from tommyschaefer on github"
 	"\n\t"  "-@!     @! from http://esolangs.org/wiki/@tention!"
 	"\n\t"  "-pika   Pikalang from https://github.com/skj3gg/pikalang"
