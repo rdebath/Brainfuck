@@ -33,10 +33,11 @@ static void print_gas_header(void);
 int
 checkarg_nasm(char * opt, char * arg)
 {
-    if (!strcmp(opt, "-fgas")) { intel_gas = link_main = 1; return 1; }
-    if (!strcmp(opt, "-fnasm")) { intel_gas = 0; return 1; }
+    if (!strcmp(opt, "-fgas")) { intel_gas = 1; link_main = 1; return 1; }
+    if (!strcmp(opt, "-fnasm")) { intel_gas = 0; link_main = 1; return 1; }
     if (!strcmp(opt, "-flinux")) { intel_gas = 0; link_main = 0; return 1; }
     if (!strcmp(opt, "-fwin32")) { intel_gas = 1; link_main = 1; ulines = 1; return 1; }
+    if (!strcmp(opt, "-fwin32n")) { intel_gas = 0; link_main = 1; ulines = 1; return 1; }
     return 0;
 }
 
@@ -412,7 +413,8 @@ print_nasm_header(void)
 	ep = np + strlen(np);
 
     printf("; asmsyntax=nasm\n");
-    printf("; yasm %.*s.s && chmod +x %.*s\n",
+    printf("; %sasm %.*s.s && chmod +x %.*s\n",
+	    hello_world?"n":"y",
 	    (int)(ep-np), np, (int)(ep-np), np);
     printf("\n");
     printf("BITS 32\n");
@@ -467,7 +469,6 @@ print_nasm_header(void)
 	printf("; The program prolog.\n");
 	printf("; This is a special version for a 'Hello World' program.\n");
 	printf("filesize equ\tmsgend-orgaddr\n");
-	printf("_start:\n");
 	return;
     }
 
@@ -514,7 +515,11 @@ print_gas_header(void)
 	printf("# This is for gcc's 'gas' assembler running in 'intel' mode\n");
 	printf("# The code is 32bit so you may need a -m32\n");
 	printf("# Assembler and link with libc using \"gcc -m32 -s -o bfpgm bfpgm.s\"\n");
-	printf("# Works on Linux, NetBSD and probably any other x86 OS with GCC.\n");
+	if (ulines) {
+	    printf("# This uses underlines on the external variables so will probably\n");
+	    printf("# only compile for Windows.\n");
+	} else
+	    printf("# Works on Linux, NetBSD and probably any other x86 OS with GCC.\n");
 	printf("#\n");
 	printf(".intel_syntax noprefix\n");
 	printf(".text\n");
@@ -734,6 +739,20 @@ print_hello_world(void)
     int i;
 
     print_asm_header();
+
+    printf("\tsection\t.text\n");
+    printf("\tsection\t.rodata align=1\n");
+    printf("msg:\n");
+    for(i=0, n = bfprog; n; n=n->next) {
+	if (i == 0) printf("\tdb\t"); else printf(", ");
+	printf("0x%02x", n->count & 0xFF);
+	i = ((i+1) & 7);
+	if (i == 0|| n->next == 0) printf("\n");
+    }
+    printf("msgend:\n");
+    printf("\tsection .text\n");
+    printf("_start:\n");
+
     if (total_nodes > 0) {
 
 	/* printf("\txor\teax,eax\n");	Linux is zero */
@@ -743,24 +762,16 @@ print_hello_world(void)
 	printf("\tmov\tal,4\t\t; syscall 4, write\n");
 	printf("\tinc\tebx\n");
 	printf("\tmov\tecx,msg\n");
-	if (total_nodes < 128) {
-	    printf("\tmov\tdl,%d\n", total_nodes);
-	} else {
-	    printf("\tmov\tedx,%d\n", total_nodes);
-	}
+	printf("%%if msgend-msg < 128\n");
+	    printf("\tmov\tdl,msgend-msg\n");
+	printf("%%else\n");
+	    printf("\tmov\tedx,msgend-msg\n");
+	printf("%%endif\n");
 	printf("\tint\t0x80\t\t; write(ebx, ecx, edx);\n");
 	printf("\txor\teax,eax\n");
 	printf("\txor\tebx,ebx\n");
     }
     printf("\tinc\teax\t\t; syscall 1, exit\n");
     printf("\tint\t0x80\t\t; exit(0)\n");
-    printf("msg:\n");
-    for(i=0, n = bfprog; n; n=n->next) {
-	if (i == 0) printf("\tdb\t"); else printf(", ");
-	printf("0x%02x", n->count & 0xFF);
-	i = ((i+1) & 7);
-	if (i == 0|| n->next == 0) printf("\n");
-    }
-    printf("msgend:\n");
     return;
 }
