@@ -674,11 +674,31 @@ print_ccode(FILE * ofd)
 
 	case T_IF:
 	    pt(ofd, indent,n);
-	    fprintf(ofd, "if(m[%d]) ", n->offset);
-	    if (n->next->next && n->next->next->jmp == n && !enable_trace)
+	    if (n->next->next && n->next->next->jmp == n && !enable_trace) {
+#ifdef TRY_BRANCHLESS
+		if (n->next->type == T_SET) {
+		    fprintf(ofd, "m[%d] -= (m[%d] - %d) * !!m[%d];\n",
+			n->next->offset, n->next->offset, n->next->count, n->offset);
+		    n=n->jmp;
+		    break;
+		}
+		if (n->next->type == T_CALC &&
+		    n->next->count == 0 &&
+		    n->next->count2 == 1 &&
+		    n->next->count3 == 0
+		    ) {
+		    fprintf(ofd, "m[%d] -= (m[%d] - m[%d]) * !!m[%d];\n",
+			n->next->offset, n->next->offset, n->next->offset2, n->offset);
+		    n=n->jmp;
+		    break;
+		}
+#endif
+		fprintf(ofd, "if(m[%d]) ", n->offset);
 		disable_indent = 1;
-	    else
+	    } else {
+		fprintf(ofd, "if(m[%d]) ", n->offset);
 		fprintf(ofd, "{\n");
+	    }
 	    break;
 
 	case T_WHL:
