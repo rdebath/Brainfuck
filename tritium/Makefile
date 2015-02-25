@@ -63,13 +63,26 @@ endif
 # of and let everyone else pick up the pieces. In addition v4.7 of GCC does
 # it wrong, doing it's 'optimisation' on calculations that are defined by the
 # C standard.
-ifeq ($(CC),gcc)
-ifneq ($(findstring MERCHANTABILITY,$(shell gcc --version)),)
-UNSAFE=-fno-delete-null-pointer-checks -fno-strict-overflow
+ifneq ($(CC),cc)
+# Check for GCC options c/o the Linux kernel makefiles
+try-run = $(shell set -e;               \
+	TMP="$(TMPOUT).$$$$.tmp";       \
+	TMPO="$(TMPOUT).$$$$.o";        \
+	if ($(1)) >/dev/null 2>&1;      \
+	then echo "$(2)";               \
+	else echo "$(3)";               \
+	fi;                             \
+	rm -f "$$TMP" "$$TMPO")
+
+cc-option = $(call try-run,\
+        $(CC) $(1) -c -x c /dev/null -o "$$TMP",$(1),$(2))
+
+UNSAFE += $(call cc-option,-fno-strict-overflow)
+UNSAFE += $(call cc-option,-fno-delete-null-pointer-checks)
+
 # -fwrapv -fno-strict-aliasing -fno-aggressive-loop-optimizations
 # -funsafe-loop-optimizations
-GNULGT=-fno-strict-aliasing -Wno-unused-value
-endif
+GNULGT= $(call cc-option,-fno-strict-aliasing) $(call cc-option,-Wno-unused-value)
 endif
 
 ifneq ($(STATIC_TOOLS),)
