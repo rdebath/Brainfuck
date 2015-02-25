@@ -649,20 +649,18 @@ static int dld;
 	default:  ch = T_NOP; break;
 	}
 	if (ch != T_NOP) {
-#ifndef NO_BFCOMMENT
-	    /* Comment loops, can never be run */
-	    /* This BF code isn't just dead it's been buried in soft peat
-	     * for three months and recycled as firelighters. */
-
-	    if (dld ||  (ch == T_WHL && p==0 && !noheader) ||
-			(ch == T_WHL && p!=0 && p->type == T_END)   ) {
-		if (ch == T_WHL) dld ++;
-		if (ch == T_END) dld --;
-		continue;
-	    }
-#endif
-#ifndef NO_RLE
+#ifndef NO_PREOPT   /* Simple syntax optimisation */
 	    if (opt_level>=0) {
+		/* Comment loops, can never be run */
+		/* This BF code isn't just dead it's been buried in soft peat
+		 * for three months and recycled as firelighters. */
+
+		if (dld ||  (ch == T_WHL && p==0 && !noheader) ||
+			    (ch == T_WHL && p!=0 && p->type == T_END)   ) {
+		    if (ch == T_WHL) dld ++;
+		    if (ch == T_END) dld --;
+		    continue;
+		}
 		/* RLE compacting of instructions. This will be done by later
 		 * passes, but it's cheaper to do it here. */
 		if (c && p && ch == p->type){
