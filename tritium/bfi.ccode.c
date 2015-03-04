@@ -1026,6 +1026,10 @@ run_tccode(void)
 #ifndef DISABLE_DLOPEN
 #define BFBASE "bfpgm"
 
+#ifndef RTLD_LOCAL
+#define RTLD_LOCAL 0	/* Very old versions don't have this. */
+#endif
+
 static void compile_and_run(void);
 
 static char tmpdir[] = "/tmp/bfrun.XXXXXX";

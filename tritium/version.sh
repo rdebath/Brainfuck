@@ -66,7 +66,7 @@ git_describe() {
     BUILD="$VER"
 }
 
-((type git && git status ) >/dev/null 2>&1) && git_describe
+( (type git && git status ) >/dev/null 2>&1) && git_describe
 
 if [ -n "$1" ]
 then TMPFILE="$1".tmp
