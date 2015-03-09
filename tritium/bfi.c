@@ -717,7 +717,7 @@ tcalloc(size_t nmemb, size_t size)
     m = calloc(nmemb, size);
     if (m) return m;
 
-#if !defined(LEGACYOS) && !defined(_WIN32)
+#if !defined(LEGACYOS) && !defined(_WIN32) && __STDC_VERSION__ >= 199901L
     fprintf(stderr, "Allocate of %zd*%zd bytes failed, ABORT\n", nmemb, size);
 #else
     fprintf(stderr, "Memory allocation failed, ABORT\n");
