@@ -23,21 +23,28 @@ Currently 'smoke' tested on
     x86_64 running NetBSD
     i686 running Debian lenny
     i686 running Debian etch
-    i686 running Debian woody (Use make CC=cc)
+    i686 running Debian woody (GNU make is too old)
+    i686 running Debian bo (GNU make is too old)
+    i686 running Minux
+    armhf running Debian wheezy
+    mips32 running Debian wheezy
+    sh4 running Debian
+    arm nslu2 running Debian woody
     Windows i386 and amd64.
 
 Testing notes
 -------------
 
 I currently only have DynASM assembler for x86 and x86_64, the DynASM jit
-routines are safely disabled on other processors. But this still requires
-lua or luajit to assemble the code for the supported processors. If a
+routines are safely disabled on other processors.  A version of lua or
+luajit is needed to assemble the code for the supported processors. If a
 suitable lua is not installed 'minilua.c' from the luajit distribution
-will be compiled and used. If this does not compile remove or rename
-the tools/dynasm directory to disable DynASM completely.
+will be compiled and used. If this does not compile you may remove or
+rename the tools/dynasm directory to disable DynASM completely.
 
 FreeBSD x86_64
 --------------
+
 Use the ports functionality to install gmake or compile manually as
 the BSD 'pmake' make version's extensions are incompatible with the
 gmake extensions. Ports will also be needed for the gmp library to
@@ -66,5 +73,5 @@ The Dynasm JIT works so it's nice and quick. (cmd.exe, however, is slow!)
 The nasm/gas output cross compiles and runs with the -fwin32 option.
 
 The majority of the bf2any cross compile to Windows happily as they're
-plain C, but the special features, embedded interpreters etc don't work
-on non-Posix operating systems.
+plain C, but the special features, embedded interpreters etc don't
+usually work on non-Posix operating systems.
