@@ -77,12 +77,19 @@ try-run = $(shell set -e;               \
 cc-option = $(call try-run,\
         $(CC) $(1) -c -x c /dev/null -o "$$TMP",$(1),$(2))
 
+UNSAFE += $(call cc-option,-fwrapv)
 UNSAFE += $(call cc-option,-fno-strict-overflow)
 UNSAFE += $(call cc-option,-fno-delete-null-pointer-checks)
 
-# -fwrapv -fno-strict-aliasing -fno-aggressive-loop-optimizations
-# -funsafe-loop-optimizations
-GNULGT= $(call cc-option,-fno-strict-aliasing) $(call cc-option,-Wno-unused-value)
+# Clang doesn't error with unused options then gets noisy.
+UNSAFE += $(call cc-option,-Qunused-arguments)
+
+# This appears to be an amplifier not itself unsafe.
+# UNSAFE += $(call cc-option,-fno-aggressive-loop-optimizations)
+
+# Try to turn off the warning nicely first.
+GNULGT += $(call cc-option,-Wno-unused-value,-w)
+GNULGT += $(call cc-option,-fno-strict-aliasing)
 endif
 
 ifneq ($(STATIC_TOOLS),)
@@ -115,7 +122,7 @@ install: bfi
 	$(INSTALL) bfi $(INSTALLDIR)/bfi$(INSTALLEXT)
 
 bfi.gnulit.o:	bfi.gnulit.c bfi.tree.h bfi.gnulit.h bfi.run.h
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ $(GNULGT) bfi.gnulit.c
+	$(CC) $(CFLAGS) $(GNULGT) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ bfi.gnulit.c
 
 bfi.version.o: bfi.version.h
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ bfi.version.c
