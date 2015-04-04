@@ -139,32 +139,35 @@ void *
 map_hugeram(void)
 {
     char * mp;
+    unsigned long tapelength = MEMSIZE;
+
     if (cell_array_pointer != 0)
 	return cell_array_pointer;
 
-    cell_array_alloc_len = MEMSIZE + 2*MEMGUARD;
+    for(;;) {
+	cell_array_alloc_len = tapelength + 2*MEMGUARD;
 
-    /* Map the memory and two guard regions */
-    mp = mmap(0, cell_array_alloc_len,
-		PROT_READ+PROT_WRITE,
-		MAP_PRIVATE+MAP_ANONYMOUS+MAP_NORESERVE, -1, 0);
-
-    if (mp == MAP_FAILED) {
-	/* Try half size */
-	cell_array_alloc_len = MEMSIZE/2 + 2*MEMGUARD;
+	/* Map the memory and two guard regions */
 	mp = mmap(0, cell_array_alloc_len,
 		    PROT_READ+PROT_WRITE,
 		    MAP_PRIVATE+MAP_ANONYMOUS+MAP_NORESERVE, -1, 0);
-    }
 
-    if (mp == MAP_FAILED) {
-	fprintf(stderr, "Cannot map memory for cell array\n");
-	exit(1);
+	if (mp != MAP_FAILED)
+	    break;
+
+	if (tapelength < 2*MEMGUARD) {
+	    perror("Cannot map memory for cell array");
+	    exit(1);
+	}
+
+	tapelength /= 2;
     }
 
     if (cell_array_alloc_len < MEMSIZE)
 	if (verbose)
-	    fprintf(stderr, "Warning: Only able to map part of cell array, continuing.\n");
+	    fprintf(stderr,
+		    "Warning: Only able to map %luMB of cell array, continuing.\n",
+		    tapelength / (1024*1024));
 
     cell_array_low_addr = mp;
 
