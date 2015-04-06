@@ -586,7 +586,9 @@ print_ccode(FILE * ofd)
 	    }
 	    break;
 
-#define okay_for_cstr(xc) (((xc) >= ' ' && (xc) <= '~') || (xc == '\n'))
+#define okay_for_cstr(xc) (((xc) >= ' ' && (xc) <= '~') || \
+	    (xc == '\n') || (xc == '\r') || (xc == '\a') || \
+	    (xc == '\b') || (xc == '\t'))
 
 	case T_PRT:
 	    if (!disable_indent) pt(ofd, indent,n);
@@ -618,11 +620,11 @@ print_ccode(FILE * ofd)
 			    okay_for_cstr(v->next->count)) {
 		    v = v->next;
 		    if (v->count == '%') got_perc = 1;
-		    if (v->count == '\n' || v->count == '\\' || v->count == '"')
+		    if (v->count <= ' ' || v->count > '~' || v->count == '\\' || v->count == '"')
 			slen++;
 		    i++;
 		    slen++;
-		    if (v->next && v->next->count == 10)
+		    if (v->next && v->next->count == '\n')
 			;
 		    else if (slen > 132 || (slen>32 && v->count == '\n'))
 			break;
@@ -632,6 +634,10 @@ print_ccode(FILE * ofd)
 		for(j=0; j<=i; j++) {
 		    lastc = n->count;
 		    if (n->count == '\n') { *p++ = '\\'; *p++ = 'n'; } else
+		    if (n->count == '\r') { *p++ = '\\'; *p++ = 'r'; } else
+		    if (n->count == '\a') { *p++ = '\\'; *p++ = 'a'; } else
+		    if (n->count == '\b') { *p++ = '\\'; *p++ = 'b'; } else
+		    if (n->count == '\t') { *p++ = '\\'; *p++ = 't'; } else
 		    if (n->count == '\\') { *p++ = '\\'; *p++ = '\\'; } else
 		    if (n->count == '"') { *p++ = '\\'; *p++ = '"'; } else
 			*p++ = (char) /*GCC -Wconversion*/ n->count;
