@@ -35,8 +35,16 @@ git_describe() {
     # Get more detail than just git describe --tags
     # tag + commits to branch from upstream + local commits + local mods.
 
+    # What's upstream -- "--verify -q" is NOT silent despite the docs, sigh
+    UPSTREAM=`git rev-parse --verify -q @{u} 2>/dev/null`
+
+    [ "$UPSTREAM" = "" ] &&
+	UPSTREAM=`git rev-parse --verify -q master@{u} 2>/dev/null`
+
+    [ "$UPSTREAM" = "" ] && UPSTREAM=HEAD
+
     # Find the merge base between this and the upstream.
-    ORIGIN=`git merge-base @{u} HEAD`
+    ORIGIN=`git merge-base $UPSTREAM HEAD`
 
     # Find the most recent tag.
     TAG=`git describe --tags --match='v[0-9]*.[0-9]*' --abbrev=0 $ORIGIN`
