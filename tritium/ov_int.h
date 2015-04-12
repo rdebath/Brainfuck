@@ -1,0 +1,113 @@
+/*
+ * These functions are supposed to pre-check simple integer math operators
+ * for overflows without triggering the 'overflow optimisations' that
+ * GCC does. Obviously this is very expensive so I attempt to use this
+ * as little as possible.
+ *
+ * This is a very difficult thing to do so I've copied the code from here:
+ * https://www.securecoding.cert.org/confluence/display/seccode/INT32-C.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow
+ *
+ * Hopefully I haven't introduced any bugs.
+ */
+
+static inline
+signed int ov_imul(signed int a, signed int b) {
+
+  /* Propagate overflow indicator */
+  if (a == INT_MIN || b == INT_MIN) return INT_MIN;
+
+  if (a > 0) {  /* a is positive */
+    if (b > 0) {  /* a and b are positive */
+      if (a > (INT_MAX / b)) {
+        /* Handle error */
+	return INT_MIN;
+      }
+    } else { /* a positive, b nonpositive */
+      if (b < (INT_MIN / a)) {
+        /* Handle error */
+	return INT_MIN;
+      }
+    } /* a positive, b nonpositive */
+  } else { /* a is nonpositive */
+    if (b > 0) { /* a is nonpositive, b is positive */
+      if (a < (INT_MIN / b)) {
+        /* Handle error */
+	return INT_MIN;
+      }
+    } else { /* a and b are nonpositive */
+      if ( (a != 0) && (b < (INT_MAX / a))) {
+        /* Handle error */
+	return INT_MIN;
+      }
+    } /* End if a and b are nonpositive */
+  } /* End if a is nonpositive */
+
+  return a * b;
+}
+
+static inline
+signed int ov_iadd(signed int a, signed int b) {
+
+  /* Propagate overflow indicator */
+  if (a == INT_MIN || b == INT_MIN) return INT_MIN;
+
+  if (((b > 0) && (a > (INT_MAX - b))) ||
+      ((b < 0) && (a < (INT_MIN - b)))) {
+    /* Handle error */
+    return INT_MIN;
+
+  } else {
+    return a + b;
+  }
+}
+
+static inline
+signed int ov_isub(signed int a, signed int b) {
+
+  /* Propagate overflow indicator */
+  if (a == INT_MIN || b == INT_MIN) return INT_MIN;
+
+  if ((b > 0 && a < INT_MIN + b) ||
+      (b < 0 && a > INT_MAX + b)) {
+    /* Handle error */
+    return INT_MIN;
+  } else {
+    return a - b;
+  }
+}
+
+static inline
+signed int ov_idiv(signed int a, signed int b) {
+
+  /* Propagate overflow indicator */
+  if (a == INT_MIN || b == INT_MIN) return INT_MIN;
+
+  if ((b == 0) || ((a == INT_MIN) && (b == -1))) {
+    /* Handle error */
+    return INT_MIN;
+  } else {
+    return a / b;
+  }
+}
+
+static inline
+signed int ov_imod(signed int a, signed int b) {
+
+  /* Propagate overflow indicator */
+  if (a == INT_MIN || b == INT_MIN) return INT_MIN;
+
+  if ((b == 0 ) || ((a == INT_MIN) && (b == -1))) {
+    /* Handle error */
+    return INT_MIN;
+  } else {
+    return a % b;
+  }
+}
+
+static inline
+signed int ov_ineg(signed int a) {
+  /* Propagate overflow indicator, and it's an overflow on 2's-c. */
+  if (a == INT_MIN) return INT_MIN;
+  return -a;
+}
+

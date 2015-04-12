@@ -129,7 +129,7 @@ bfi.version.o: bfi.version.h
 
 bfi.o: \
     bfi.c bfi.tree.h bfi.run.h bfi.be.def bfi.ccode.h bfi.gnulit.h \
-    bfi.nasm.h bfi.bf.h bfi.dc.h clock.h
+    bfi.nasm.h bfi.bf.h bfi.dc.h clock.h ov_int.h
 bfi.bf.o: bfi.bf.c bfi.tree.h
 bfi.ccode.o: bfi.ccode.c bfi.tree.h bfi.run.h bfi.ccode.h
 bfi.dc.o: bfi.dc.c bfi.tree.h bfi.run.h

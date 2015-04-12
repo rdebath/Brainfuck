@@ -60,6 +60,7 @@ characters after your favorite comment marker in a very visible form.
 #include <wchar.h>
 #endif
 
+#include "ov_int.h"
 #include "bfi.tree.h"
 
 #ifndef NO_EXT_BE
@@ -522,6 +523,18 @@ main(int argc, char ** argv)
     else if (libc_allows_utf8) iostyle = 1;
     else iostyle = 0;
 #endif
+
+    {
+	int x, flg = sizeof(int) * 8;
+	for(x=1;x+1>x && --flg;x=(x|(x<<1)));
+	if (!flg) {
+	    fprintf(stderr, "Compile failure, we need sane integers\n");
+#ifdef __GNUC__
+	    fprintf(stderr, "Please use the -fwrapw option when compiling.\n");
+#endif
+	    exit(255);
+	}
+    }
 
     filelist = calloc(argc, sizeof*filelist);
 
@@ -2374,8 +2387,7 @@ find_known_calc_state(struct bfi * v)
 
     if (v->count2 && v->count3 && v->offset2 == v->offset3) {
 	/* This is an unlikely overflow. */
-	if (cell_size<=0 &&
-	    (double)v->count2 + (double)v->count3 != (double)(v->count2+v->count3)) {
+	if (cell_size<=0 && ov_iadd(v->count2, v->count3) == INT_MIN) {
 	    fprintf(stderr, "T_CALC merge overflow @(%d,%d)\n", v->line, v->col);
 	    return 0;
 	}
@@ -2432,24 +2444,22 @@ find_known_calc_state(struct bfi * v)
 
     if (const_found2 && cell_size<=0) {
 	/* If the calc might overflow ignore the constant */
-	int cnt1 = v->count + v->count2 * known_value2;
-	double cnt2 = (double)v->count + (double)v->count2 * (double)known_value2;
-	if ((double)cnt1 != cnt2) {
+	int cnt = ov_iadd(v->count, ov_imul(v->count2, known_value2));
+	if (cnt == INT_MIN) {
 	    if (verbose>5)
-		fprintf(stderr, "T_CALC const2 overflow %d != %.0f @(%d,%d)\n",
-				cnt1, cnt2, v->line, v->col);
+		fprintf(stderr, "T_CALC const2 overflow %d+%d*%d @(%d,%d)\n",
+			v->count, v->count2, known_value2, v->line, v->col);
 	    const_found2 = 0;
 	}
     }
 
     if (const_found3 && cell_size<=0) {
 	/* If the calc might overflow ignore the constant */
-	int cnt1 = v->count + v->count3 * known_value3;
-	double cnt2 = (double)v->count + (double)v->count3 * (double)known_value3;
-	if ((double)cnt1 != cnt2) {
+	int cnt = ov_iadd(v->count, ov_imul(v->count3, known_value3));
+	if (cnt == INT_MIN) {
 	    if (verbose>5)
-		fprintf(stderr, "T_CALC const3 overflow %d != %.0f @(%d,%d)\n",
-				cnt1, cnt2, v->line, v->col);
+		fprintf(stderr, "T_CALC const3 overflow %d+%d*%d @(%d,%d)\n",
+			v->count, v->count3, known_value3, v->line, v->col);
 	    const_found3 = 0;
 	}
     }
@@ -2549,12 +2559,10 @@ find_known_calc_state(struct bfi * v)
 	 * node wipes it. */
 	/* This is a BF standard form. */
 
-	int cnt1 = v->count2 * n2->count2;
-	double cnt2 = (double)v->count2 * (double)n2->count2;
-	if ((double)cnt1 != cnt2) {
+	if (cell_size<=0 && ov_imul(v->count2, n2->count2) == INT_MIN) {
 	    if (verbose>5)
-		fprintf(stderr, "T_CALC merge Mult overflow %d != %.0f @(%d,%d)\n",
-				cnt1, cnt2, v->line, v->col);
+		fprintf(stderr, "T_CALC merge Mult overflow %d*%d @(%d,%d)\n",
+			v->count2, n2->count2, v->line, v->col);
 	    return rv;
 	}
 
@@ -2699,14 +2707,12 @@ flatten_loop(struct bfi * v, int constant_count)
 	n = v->next;
 	while(1)
 	{
-	    int newcount1 = 0;
-	    double newcount2 = 0;
+	    int newcount = 0;
 
 	    if (n->type == T_END || n->type == T_ENDIF) break;
 	    if (n->type == T_ADD) {
-		newcount1 = n->count * constant_count;
-		newcount2 = (double)n->count * (double)constant_count;
-		if ((double)newcount1 != newcount2) {
+		newcount = ov_imul(n->count, constant_count);
+		if (newcount == INT_MIN) {
 		    if (verbose>5) fprintf(stderr, "  Loop calculation overflow @(%d,%d)\n", n->line, n->col);
 		    return 0;
 		}
@@ -2714,13 +2720,10 @@ flatten_loop(struct bfi * v, int constant_count)
 	    if (n->type == T_CALC) {
 		/* n->count2 = pow(n->count2, constant_count) */
 		int i, j = n->count2;
-		newcount1 = j;
-		newcount2 = (double)j;
-		for(i=0; i<constant_count-1; i++) {
-		    newcount1 = newcount1 * j;
-		    newcount2 = newcount2 * j;
-		}
-		if ((double)newcount1 != newcount2) {
+		newcount = j;
+		for(i=0; i<constant_count-1; i++)
+		    newcount = ov_imul(newcount, j);
+		if (newcount == INT_MIN) {
 		    if (verbose>5) fprintf(stderr, "  Loop power calculation overflow @(%d,%d)\n", n->line, n->col);
 		    return 0;
 		}
