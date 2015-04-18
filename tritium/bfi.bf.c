@@ -135,7 +135,7 @@ print_bf(void)
 	     * easily see this is true. */
 	    if (BFBasic)
 		if (n->offset == 2)
-		    printf("\n> [-]>[-]>[-]>[-]>[-]>[-]>[-]><<<<<<< <");
+		    printf("\n[-]+> [-]>[-]>[-]>[-]>[-]>[-]>[-]><<<<<<< <");
 	    break;
 
 	case T_END:
