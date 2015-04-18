@@ -15,6 +15,7 @@ extern int iostyle, eofcell;
 extern char * input_string;
 extern int opt_repoint;
 
+extern int cell_length;
 extern int cell_size;
 extern int cell_mask;
 extern int cell_smask;

@@ -176,11 +176,14 @@ print_c_header(FILE * ofd)
     fprintf(ofd, "\n");
 
     if (cell_size == 0) {
-	fprintf(ofd, "# ifdef C\n");
-	fprintf(ofd, "# include <stdint.h>\n");
-	fprintf(ofd, "# else\n");
-	fprintf(ofd, "# define C int\n");
-	fprintf(ofd, "# endif\n\n");
+	if (cell_length == 0) {
+	    fprintf(ofd, "# ifdef C\n");
+	    fprintf(ofd, "# include <stdint.h>\n");
+	    fprintf(ofd, "# else\n");
+	    fprintf(ofd, "# define C int\n");
+	    fprintf(ofd, "# endif\n\n");
+	} else
+	    fprintf(ofd, "#include <stdint.h>\n");
     }
 
     if (do_run) {
@@ -869,7 +872,12 @@ run_ccode(void)
     if (choose_runner >= 0)
 	use_dlopen = choose_runner;
     else
-	use_dlopen = ((total_nodes < 4000) || (opt_level > 3));
+#ifdef __TINYC__
+	use_dlopen = 0;
+#else
+	use_dlopen = ((total_nodes < 4000 && cell_length!=64) ||
+		      opt_level>3 || cell_length>64);
+#endif
     if (use_dlopen)
 	run_gccode();
     else

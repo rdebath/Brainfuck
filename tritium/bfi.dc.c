@@ -125,7 +125,7 @@ print_dc(void)
     else
 	fprintf(ofd, "[0sp\n");
 
-    use_lmx = ((cell_mask>0) || ((sizeof(long)>sizeof(int) && cell_size>0)));
+    use_lmx = (cell_length>0);
 
     while(n)
     {
@@ -310,13 +310,17 @@ print_dc(void)
 	fprintf(ofd, "0sALAsBLBsZLZd!=.\n");
     }
 
-    if (cell_mask > 0)
-	fprintf(ofd, "[%u+]sM [%u %% d0>M]sm\n",
-		(unsigned)cell_mask+1, (unsigned)cell_mask+1);
-    else if (sizeof(long) > sizeof(int) && cell_size > 0) {
-	fprintf(ofd, "[%lu+]sM [%lu %% d0>M]sm\n",
-		(1UL << cell_size), (1UL << cell_size));
-	/* Hmm, how do I print the integer ULONG_MAX+1 ? */
+    if (use_lmx) {
+	if (cell_mask > 0)
+	    fprintf(ofd, "[%u+]sM [%u %% d0>M]sm\n",
+		    (unsigned)cell_mask+1, (unsigned)cell_mask+1);
+	else if (cell_size == 32) {
+	    static char ttt[] = "4294967296";
+	    fprintf(ofd, "[%s+]sM [%s %% d0>M]sm\n", ttt, ttt);
+	} else {
+	    fprintf(ofd, "[2 %d^+]sM [2 %d^%% d0>M]sm\n",
+		    cell_length, cell_length);
+	}
     }
 
     if (used_lix) {

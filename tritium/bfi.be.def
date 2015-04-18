@@ -50,8 +50,8 @@ it to the list and fill in it's entry.
 
 #if XX == 6
     /* Generators normally generate code with a fixed cell size. */
-    if (cell_size == 0 && do_codestyle != c_ccode &&
-	do_codestyle != c_default && do_codestyle != c_bf)
+    if (cell_size == 0 && do_codestyle != c_default && do_codestyle != c_dc &&
+	    do_codestyle != c_ccode && do_codestyle != c_bf)
 	set_cell_size(-1);
 #endif
 
@@ -64,11 +64,16 @@ X(dynasm,DYNASM,
     case c_dynasm: run_dynasm(); break;                               )
 #if XX == 4
     if (do_run == -1 && do_codestyle == c_default &&
+	    (cell_length==0 || cell_size>0) &&
 	    verbose<3 && !enable_trace && !debug_mode && dynasm_ok) {
 	do_run = 1;
 	do_codestyle = c_dynasm;
     }
     if (do_codestyle == c_dynasm && do_run == -1) do_run = 1;
+    if (do_codestyle == c_dynasm && cell_length>0 && cell_size == 0) {
+	fprintf(stderr, "The DynASM generator does not support that cell size\n");
+	exit(255);
+    }
 #endif
 #if XX == 9
     {	int f = checkarg_dynasm(opt, arg);
@@ -86,11 +91,16 @@ X(gnulightning,GNULIGHTNING,
     case c_gnulightning: run_gnulightning(); break;                               )
 #if XX == 4
     if (do_run == -1 && do_codestyle == c_default &&
+	    (cell_length==0 || cell_size>0) &&
 	    verbose<3 && !enable_trace && !debug_mode && gnulightning_ok) {
 	do_run = 1;
 	do_codestyle = c_gnulightning;
     }
     if (do_codestyle == c_gnulightning && do_run == -1) do_run = 1;
+    if (do_codestyle == c_gnulightning && cell_length>0 && cell_size == 0) {
+	fprintf(stderr, "The GNU Lightning generator does not support that cell size\n");
+	exit(255);
+    }
 #endif
 #endif
 
@@ -130,7 +140,7 @@ X(nasm,NASM,
 #if XX == 4
     if (do_codestyle == c_nasm)
     {
-	if (cell_size && cell_size != 8) {
+	if (cell_length && cell_size != 8) {
 	    fprintf(stderr, "The -s option only supports 8 bit cells.\n");
 	    exit(255);
 	}

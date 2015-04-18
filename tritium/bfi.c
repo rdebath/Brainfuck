@@ -60,6 +60,10 @@ characters after your favorite comment marker in a very visible form.
 #include <wchar.h>
 #endif
 
+#if _POSIX_C_SOURCE >= 200809L
+#include "inttypes.h"
+#endif
+
 #include "ov_int.h"
 #include "bfi.tree.h"
 
@@ -90,8 +94,8 @@ const char * codestylename[] = { "std"
 #define finish_runclock(x,y)
 #define pause_runclock(x)
 #define unpause_runclock(x)
-void * taperam = 0;
-#define map_hugeram() tcalloc(memsize,sizeof(int))
+static int * taperam = 0;
+#define map_hugeram() (void*)((taperam = tcalloc(memsize-hard_left_limit,sizeof(int)))-hard_left_limit)
 #define unmap_hugeram() free(taperam)
 #define huge_ram_available 0
 #endif
@@ -129,7 +133,8 @@ int default_io = 1;
  * allowed. The masks will be set to the correct values for the cell size.
  * The cell size may be anything between ONE bit and the sizeof an int.
  */
-int cell_size = 0;  /* Number of bits in cell */
+int cell_length = 0;/* Number of bits in cell */
+int cell_size = 0;  /* Number of bits in cell IF they fit in an int. */
 int cell_mask = ~0; /* Mask using & with this. */
 int cell_smask = 0; /* Xor and subtract this; normally MSB of the mask. */
 char const * cell_type = "C";
@@ -292,11 +297,11 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("        Default for running now (-r) is %dbits.\n",
 			opt_bytedefault? CHAR_BIT:
 			(int)sizeof(int)*CHAR_BIT);
-    printf("        Other bitwidths also work (including 7..32)\n");
+    printf("        Other bitwidths also work (including 1..32 and maybe 64/128)\n");
     printf("        Full Unicode characters need 21 bits.\n");
 #ifndef NO_EXT_BE
     printf("        Default for C code is 'unknown', this is set when the C code is\n");
-    printf("        compiled (and can be larger than an int eg: -DC=__int128 ).\n");
+    printf("        compiled (and can be larger than an int eg: -DC=uintmax_t ).\n");
     printf("        NASM can only be 8bit.\n");
     printf("        The optimiser will be less effective if this is not specified.\n");
 #endif
@@ -353,10 +358,18 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("        Use the TCCLIB library to run C code.\n");
 #endif
     printf("\n");
-    printf("Asm generation extras\n");
+#ifndef NO_EXT_BE
+    printf("Asm generation options, these adjust the '-s' option.\n");
+    printf("   -flinux (default)\n");
+    printf("        Code for NASM to directly generate a Linux executable.\n");
     printf("   -fgas\n");
-    printf("        Changes '-s' to generate i386 code for 'gcc x.s'.\n");
+    printf("        Generate code for 'gcc -m32 x.s'.\n");
+    printf("   -fnasm\n");
+    printf("        Generate code for NASM that can be linked by GCC.\n");
+    printf("   -fwin32\n");
+    printf("        Alter -fgas code for Windows.\n");
     printf("\n");
+#endif
     printf("    NOTE: Some of the code generators are quite limited and do\n");
     printf("    not support all these options. NASM is 8 bits only. The BF\n");
     printf("    generator does not include the ability to generate most of\n");
@@ -386,11 +399,26 @@ UsageOptError(char * why)
 void
 UsageInt64(void)
 {
+#if !defined(NO_EXT_BE) && (defined(UINTMAX_MAX) || defined(__SIZEOF_INT128__))
     fprintf(stderr,
-	"You cannot *specify* a cell size > %d bits on this machine.\n"
+	"Directly available cell sizes are 1..%d", (int)(sizeof(int)*CHAR_BIT));
+#if defined(UINTMAX_MAX)
+    if (sizeof(uintmax_t) > sizeof(int))
+	fprintf(stderr, ",%d", (int)sizeof(uintmax_t)*CHAR_BIT);
+#endif
+#if defined(__SIZEOF_INT128__)
+    fprintf(stderr, ",%d", (int)sizeof(__int128)*CHAR_BIT);
+#endif
+    fprintf(stderr, " bits.\n"
+	"The generated C can be configured to use other types "
+	"using the 'C' #define.\n");
+#else
+    fprintf(stderr,
+	"You can only specify cell sizes 1..%d bits on this machine.\n"
 	"Compiled C code can use larger cells using -DC=intmax_t, but beware the\n"
 	"optimiser may make changes that are unsafe for this code.\n",
 	(int)(sizeof(int)*CHAR_BIT));
+#endif
     exit(1);
 }
 
@@ -530,7 +558,7 @@ main(int argc, char ** argv)
 	if (!flg) {
 	    fprintf(stderr, "Compile failure, we need sane integers\n");
 #ifdef __GNUC__
-	    fprintf(stderr, "Please use the -fwrapw option when compiling.\n");
+	    fprintf(stderr, "Please use the -fwrapv option when compiling.\n");
 #endif
 	    exit(255);
 	}
@@ -586,7 +614,7 @@ main(int argc, char ** argv)
 #endif
 
     if (do_run) opt_runner = 0; /* Run it in one go */
-    if (cell_size == 0 && (do_run || opt_runner))
+    if (cell_length==0 && (do_run || opt_runner))
 	set_cell_size(-1);
 
 #ifndef NO_EXT_BE
@@ -3181,16 +3209,18 @@ print_codedump(void)
 
     if (cell_size != sizeof(int)*CHAR_BIT &&
 	cell_size != sizeof(short)*CHAR_BIT &&
-	cell_size != sizeof(char)*CHAR_BIT) {
+	cell_size != sizeof(char)*CHAR_BIT &&
+	cell_length < sizeof(int)*CHAR_BIT) {
 	disable_c_header = 1;
 	if (verbose)
 	    fprintf(stderr, "Code dump C header only works for C types\n");
     }
 
     if (!noheader && !disable_c_header) {
-	printf("%s%s%s%s%s\n",
+	printf("%s%s%s%s%s%s%s\n",
 	"#ifndef bf_start"
-"\n"	"#include <unistd.h>"
+"\n"	"#include <unistd.h>",
+	(cell_length <= sizeof(int)*CHAR_BIT?"":"\n#include <stdint.h>"),
 "\n"	"#define bf_start(msz,moff) ",cell_type," mem[msz];"
 	"int main(void){register ",cell_type,"*p=mem+moff;"
 "\n"	"#define bf_end() return 0;}");
@@ -3515,9 +3545,33 @@ putch(int ch)
 void
 set_cell_size(int cell_bits)
 {
+#if !defined(NO_EXT_BE) && defined(UINTMAX_MAX)
+    if (cell_bits == (int)sizeof(uintmax_t)*CHAR_BIT) {
+	cell_length = cell_bits;
+	cell_size = 0;
+	cell_mask = ~0;
+	cell_type = "uintmax_t";
+
+	if (verbose>5) fprintf(stderr, "Cell type is %s\n", cell_type);
+	return;
+    } else
+#endif
+
+#if !defined(NO_EXT_BE) && defined(__SIZEOF_INT128__)
+    if (cell_bits == (int)sizeof(__int128)*CHAR_BIT) {
+	cell_length = cell_bits;
+	cell_size = 0;
+	cell_mask = ~0;
+	cell_type = "__int128";
+
+	if (verbose>5) fprintf(stderr, "Cell type is %s\n", cell_type);
+	return;
+    } else
+#endif
+
     if (cell_bits >= (int)sizeof(int)*CHAR_BIT || cell_bits <= 0) {
 	if (cell_bits == -1 && opt_bytedefault) {
-	    cell_size = CHAR_BIT;
+	    cell_size = 8;	/* BF definition not CHAR_BIT */
 	    cell_mask = (2 << (cell_size-1)) - 1;	/* GCC Whinge */
 	} else {
 	    cell_size = (int)sizeof(int)*CHAR_BIT;
@@ -3527,15 +3581,19 @@ set_cell_size(int cell_bits)
 	cell_size = cell_bits;
 	cell_mask = (2 << (cell_size-1)) - 1;	/* GCC Whinge */
     }
+
+    cell_length = cell_size;
     cell_smask = (1U << (cell_size-1));
 
     if (verbose>5) {
-	fprintf(stderr, "Cell bits set to %d, mask = 0x%x\n",
-		cell_size, cell_mask);
+	fprintf(stderr,
+		"Cell size=%d, cell_length=%d, mask = 0x%x/0x%x\n",
+		cell_size, cell_length, cell_mask, cell_smask);
     }
 
     if (cell_size >= 0 && cell_size < 7 && iostyle != 3) {
-	fprintf(stderr, "A minimum cell size of 7 bits is needed for ASCII.\n");
+	fprintf(stderr, "A minimum cell size of 7 bits is needed for ASCII. "
+			"Add -fintio first.\n");
 	exit(1);
     } else if (cell_size <= CHAR_BIT)
 	cell_type = "unsigned char";
