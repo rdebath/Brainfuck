@@ -107,11 +107,13 @@ int noheader = 0;
 int do_run = -1;
 
 int opt_bytedefault = 0;
-int opt_level = 3;
+int opt_level = 2;
 int opt_runner = 0;
 int opt_no_calc = 0;
 int opt_no_litprt = 0;
 int opt_no_endif = 0;
+int opt_no_kv_recursion = 0;
+int opt_no_loop_classify = 0;
 int opt_repoint = -1;
 
 int hard_left_limit = -1024;
@@ -504,6 +506,8 @@ checkarg(char * opt, char * arg)
     } else if (!strcmp(opt, "-fno-negtape")) { hard_left_limit = 0; return 1;
     } else if (!strcmp(opt, "-fno-calctok")) { opt_no_calc = 1; return 1;
     } else if (!strcmp(opt, "-fno-litprt")) { opt_no_litprt = 1; return 1;
+    } else if (!strcmp(opt, "-fno-kv-recursion")) { opt_no_kv_recursion = 1; return 1;
+    } else if (!strcmp(opt, "-fno-loop-classify")) { opt_no_loop_classify = 1; return 1;
     } else if (!strcmp(opt, "-fno-repoint")) { opt_repoint = 0; return 1;
     } else if (!strcmp(opt, "-frepoint")) { opt_repoint = 1; return 1;
     } else if (!strcmp(opt, "-fintio")) { iostyle = 3; opt_no_litprt = 1; default_io=0; return 1;
@@ -1806,7 +1810,7 @@ find_known_value_recursion(struct bfi * n, int v_offset,
     int n_used = 0;
     int distance = 0;
 
-    if (opt_level < 3) allow_recursion = 0;
+    if (opt_no_kv_recursion) allow_recursion = 0;
 
     if (hit_stop_node_p) *hit_stop_node_p = 0;
     if (n_used_p) n_used = *n_used_p;
@@ -2794,7 +2798,7 @@ classify_loop(struct bfi * v)
     int complex_loop = 0;
     int nested_loop_count = 0;
 
-    if (opt_level < 3) return 0;
+    if (opt_no_loop_classify) return 0;
     if(verbose>5) {
 	fprintf(stderr, "Classify loop: ");
 	printtreecell(stderr, 0, v);
@@ -2919,7 +2923,6 @@ flatten_multiplier(struct bfi * v)
     struct bfi *n, *dec_node = 0;
     if (v->type != T_MULT && v->type != T_CMULT) return 0;
 
-    if (opt_level<3) return 0;
     if (opt_no_calc || opt_no_endif) return 0;
 
     n = v->next;
@@ -3713,7 +3716,7 @@ convert_tree_to_runarray(void)
 	    /*FALLTHROUGH*/
 
 	case T_WHL:
-	    if (n->next->type == T_MOV && n->next->count != 0 && opt_level>0) {
+	    if (n->next->type == T_MOV && n->next->count != 0 && opt_level>=1){
 		/* Look for [<<<], [-<<<] and [-<<<+] */
 		struct bfi *n1, *n2=0, *n3=0, *n4=0;
 		n1 = n->next;

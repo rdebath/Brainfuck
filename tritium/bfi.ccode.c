@@ -872,7 +872,7 @@ run_ccode(void)
 	use_dlopen = 0;
 #else
 	use_dlopen = ((total_nodes < 4000 && cell_length!=64) ||
-		      opt_level>3 || cell_length>64);
+		      opt_level>=3 || cell_length>64);
 #endif
     if (use_dlopen)
 	run_gccode();
@@ -1137,7 +1137,7 @@ compile_and_run(void)
     int ret;
     const char * cc = CC;
     char * copt = "";
-    if (opt_level > 3)
+    if (opt_level >= 3)
 	copt = " -O3";
 
     if (cc_cmd) cc = cc_cmd;
