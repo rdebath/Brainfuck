@@ -382,13 +382,6 @@ run_gnulightning(void)
 	    load_acc_offset(n->offset);
 	    acc_loaded = 0;
 
-	    if (cell_mask > 0 && acc_hi_dirty) {
-		if (cell_mask == 0xFF)
-		    jit_extr_uc(REG_ACC,REG_ACC);
-		else
-		    jit_andi(REG_ACC, REG_ACC, cell_mask);
-	    }
-
 #ifdef GNULIGHTv1
 	    jit_prepare_i(1);
 	    jit_pusharg_i(REG_ACC);

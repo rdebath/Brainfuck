@@ -41,6 +41,7 @@
 #include "bfi.ccode.h"
 
 static const char * putname = "putch";
+static int add_mask = 0;
 static int use_direct_getchar = 0;
 static int use_dynmem = 0;
 static int libtcc_specials = 0;
@@ -181,10 +182,17 @@ print_c_header(FILE * ofd)
 	    fprintf(ofd, "# include <stdint.h>\n");
 	    fprintf(ofd, "# else\n");
 	    fprintf(ofd, "# define C int\n");
-	    fprintf(ofd, "# endif\n\n");
+	    fprintf(ofd, "# endif\n");
 	} else
 	    fprintf(ofd, "#include <stdint.h>\n");
-    }
+	fprintf(ofd, "# ifndef M\n");
+	fprintf(ofd, "# define M(v) v\n");
+	fprintf(ofd, "# endif\n\n");
+
+    } else if(add_mask>0)
+	fprintf(ofd, "#define M(v) ((v) & 0x%x)\n\n", add_mask);
+    else
+	fprintf(ofd, "#define M(v) v\n\n");
 
     if (do_run) {
 	if (use_dlopen) {
@@ -413,7 +421,6 @@ print_ccode(FILE * ofd)
 {
     int indent = 0, disable_indent = 0;
     struct bfi * n = bfprog;
-    int add_mask = 0;
     int found_rail_runner;
 
     if (cell_size > 0 &&
@@ -431,15 +438,6 @@ print_ccode(FILE * ofd)
     while(n)
     {
 	if (n->orgtype == T_END) indent--;
-	if (add_mask > 0) {
-	    switch(n->type)
-	    {
-	    case T_WHL:
-	    case T_FOR: case T_CMULT: case T_IF:
-		pt(ofd, indent, 0);
-		fprintf(ofd, "m[%d] &= %d;\n", n->offset, add_mask);
-	    }
-	}
 	switch(n->type)
 	{
 	case T_MOV:
@@ -595,12 +593,10 @@ print_ccode(FILE * ofd)
 
 	case T_PRT:
 	    if (!disable_indent) pt(ofd, indent,n);
-	    if (add_mask > 0 && (add_mask < 0xFF || iostyle != 2)) {
-		fprintf(ofd, "%s(m[%d] &= %d);\n", putname, n->offset, add_mask);
-	    } else if (n->offset == 0)
-		fprintf(ofd, "%s(*m);\n", putname);
+	    if (n->offset == 0)
+		fprintf(ofd, "%s(M(*m));\n", putname);
 	    else
-		fprintf(ofd, "%s(m[%d]);\n", putname, n->offset);
+		fprintf(ofd, "%s(M(m[%d]));\n", putname, n->offset);
 	    break;
 
 	case T_CHR:
@@ -702,10 +698,10 @@ print_ccode(FILE * ofd)
 		    break;
 		}
 #endif
-		fprintf(ofd, "if(m[%d]) ", n->offset);
+		fprintf(ofd, "if(M(m[%d])) ", n->offset);
 		disable_indent = 1;
 	    } else {
-		fprintf(ofd, "if(m[%d]) ", n->offset);
+		fprintf(ofd, "if(M(m[%d])) ", n->offset);
 		fprintf(ofd, "{\n");
 	    }
 	    break;
@@ -720,7 +716,7 @@ print_ccode(FILE * ofd)
 
 	    if (found_rail_runner && !do_run && use_dynmem && n->next->count>0) {
 		pt(ofd, indent,n);
-		fprintf(ofd, "while(m[%d]) m += %d;\n",
+		fprintf(ofd, "while(M(m[%d])) m += %d;\n",
 		    n->offset, n->next->count);
 		pt(ofd, indent,n);
 		fprintf(ofd, "m = move_ptr(m,0);\n");
@@ -804,9 +800,9 @@ print_ccode(FILE * ofd)
 	case T_MULT:
 	    pt(ofd, indent,n);
 	    if (n->offset)
-		fprintf(ofd, "while(m[%d]) ", n->offset);
+		fprintf(ofd, "while(M(m[%d])) ", n->offset);
 	    else
-		fprintf(ofd, "while(*m) ");
+		fprintf(ofd, "while(M(*m)) ");
 	    if (n->next->next && n->next->next->jmp == n && !enable_trace)
 		disable_indent = 1;
 	    else
@@ -815,7 +811,7 @@ print_ccode(FILE * ofd)
 
 	case T_FOR:
 	    pt(ofd, indent,n);
-	    fprintf(ofd, "for(;m[%d];) {\n", n->offset);
+	    fprintf(ofd, "for(;M(m[%d]);) {\n", n->offset);
 	    break;
 
 	case T_END:

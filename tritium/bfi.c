@@ -1250,10 +1250,10 @@ run_tree(void)
 		switch(n->type)
 		{
 		case T_CHR:
-		    putch( UM(n->count) );
+		    putch(n->count);
 		    break;
 		case T_PRT:
-		    putch( UM(p[n->offset]) );
+		    putch(p[n->offset]);
 		    break;
 		case T_INP:
 		    p[n->offset] = getch(p[n->offset]);
@@ -3530,8 +3530,15 @@ void
 putch(int ch)
 {
     pause_runclock();
+#ifdef __STDC_ISO_10646__
+    if (iostyle == 1 && cell_mask>0 &&
+       (cell_size > 21 || (cell_size == 21 && SM(ch) >= -128)))
+	ch = SM(ch);
+    else
+#endif
+	ch = UM(ch);
     if (iostyle == 3) {
-	printf("%d\n", UM(ch));
+	printf("%d\n", ch);
     } else
 #ifdef __STDC_ISO_10646__
     if (ch > 127 && iostyle == 1)
@@ -3550,6 +3557,7 @@ set_cell_size(int cell_bits)
 	cell_length = cell_bits;
 	cell_size = 0;
 	cell_mask = ~0;
+	cell_smask = 0;
 	cell_type = "uintmax_t";
 
 	if (verbose>5) fprintf(stderr, "Cell type is %s\n", cell_type);
@@ -3562,6 +3570,7 @@ set_cell_size(int cell_bits)
 	cell_length = cell_bits;
 	cell_size = 0;
 	cell_mask = ~0;
+	cell_smask = 0;
 	cell_type = "__int128";
 
 	if (verbose>5) fprintf(stderr, "Cell type is %s\n", cell_type);
@@ -3584,6 +3593,7 @@ set_cell_size(int cell_bits)
 
     cell_length = cell_size;
     cell_smask = (1U << (cell_size-1));
+    if (cell_smask < 127) cell_smask = 0;
 
     if (verbose>5) {
 	fprintf(stderr,
@@ -3896,12 +3906,12 @@ run_progarray(int * p)
 	    break;
 
 	case T_PRT:
-	    putch( M(*m) );
+	    putch(*m);
 	    p += 2;
 	    break;
 
 	case T_CHR:
-	    putch( M(p[2]) );
+	    putch(p[2]);
 	    p += 3;
 	    break;
 
