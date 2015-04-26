@@ -226,7 +226,7 @@ outcmd(int ch, int count)
 	if (bytecell)
 	    printf("putchar(*p);\n");
 	else
-	    printf("putchar(mpz_get_ui(*p));\n");
+	    printf("putchar(mpz_get_si(*p));\n");
 	break;
 
     case '"': print_cstring(); break;
