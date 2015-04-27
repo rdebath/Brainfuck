@@ -489,6 +489,9 @@ outcmd(int ch, int count)
 #if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
 #define MAP_ANONYMOUS MAP_ANON
 #endif
+#if defined(__minix__)
+#define NO_MPROTECT
+#endif
 
 void
 link_and_run(dasm_State ** state)
@@ -514,10 +517,13 @@ link_and_run(dasm_State ** state)
 #ifndef _WIN32
 #ifdef MAP_ANONYMOUS
     /* I allocate this with a 'PROT_EXEC' flag set so the kernel can choose
-     * to put it in the 'code area' if there is such a thing */
+     * to put it in the 'code area' if there is such a thing (i386) */
     codeptr =
 	(char *) mmap(NULL, size,
-		      PROT_READ | PROT_WRITE | PROT_EXEC,
+#ifdef NO_MPROTECT
+                      PROT_WRITE |
+#endif
+		      PROT_READ | PROT_EXEC,
 		      MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 #else
     /* This'll probably only work with Linux ... Oh, FreeBSD too. */
@@ -526,16 +532,25 @@ link_and_run(dasm_State ** state)
 	if (fd >= 0) {
 	    codeptr =
 		(char *) mmap(NULL, size,
-			      PROT_READ | PROT_WRITE | PROT_EXEC,
-			      MAP_PRIVATE, fd, 0);
+#ifdef NO_MPROTECT
+			      PROT_WRITE |
+#endif
+			      PROT_READ | PROT_EXEC, MAP_PRIVATE, fd, 0);
 	    close(fd);
-	}
+	} else
+	    codeptr = MAP_FAILED;
     }
 #endif
     if (codeptr == MAP_FAILED) {
-	perror("Unable to allocate executable memory");
+	perror("Unable to allocate memory for executable");
 	exit(1);
     }
+
+#ifndef NO_MPROTECT
+    if (mprotect(codeptr, size, PROT_WRITE | PROT_READ) != 0) {
+	perror("mprotect to enable code writing");
+    };
+#endif
 #else /*_WIN32*/
     codeptr = (char*) VirtualAlloc(0, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
     if (!codeptr) {
@@ -562,9 +577,11 @@ link_and_run(dasm_State ** state)
     /* Make it read only before we run it; also means that a context switch
      * happens so there won't be any 'bad cache' effects */
 #ifndef __WIN32
+#ifndef NO_MPROTECT
     if (mprotect(codeptr, size, PROT_EXEC | PROT_READ) != 0) {
 	perror("mprotect read only");
     };
+#endif
 #else
     DWORD oldProt = 0;
     if (!VirtualProtect(codeptr, size, PAGE_EXECUTE_READ, &oldProt)) {

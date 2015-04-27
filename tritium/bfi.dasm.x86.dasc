@@ -501,6 +501,12 @@ run_dynasm(void)
 #if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
 #define MAP_ANONYMOUS MAP_ANON
 #endif
+#ifndef MAP_FAILED
+#define MAP_FAILED (-1)
+#endif
+#if defined(__minix__)
+#define NO_MPROTECT
+#endif
 
 typedef int (*fnptr)(char* memory);
 fnptr code = 0;
@@ -519,9 +525,14 @@ link_and_run(dasm_State ** state)
 
 #if !defined(LEGACYOS) && !defined(_WIN32)
 #ifdef MAP_ANONYMOUS
+    /* I allocate this with a 'PROT_EXEC' flag set so the kernel can choose
+     * to put it in the 'code area' if there is such a thing (i386) */
     codeptr =
 	(char *) mmap(NULL, size,
-		      PROT_READ | PROT_WRITE | PROT_EXEC,
+#ifdef NO_MPROTECT
+		      PROT_WRITE |
+#endif
+		      PROT_READ | PROT_EXEC,
 		      MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 #else
     /* This'll probably only work with Linux ... Oh, FreeBSD too. */
@@ -530,17 +541,25 @@ link_and_run(dasm_State ** state)
 	if (fd >= 0) {
 	    codeptr =
 		(char *) mmap(NULL, size,
-			      PROT_READ | PROT_WRITE | PROT_EXEC,
-			      MAP_PRIVATE, fd, 0);
+#ifdef NO_MPROTECT
+			      PROT_WRITE |
+#endif
+			      PROT_READ | PROT_EXEC, MAP_PRIVATE, fd, 0);
 	    close(fd);
 	} else
 	    codeptr = MAP_FAILED;
     }
 #endif
     if (codeptr == MAP_FAILED) {
-	perror("Unable to allocate executable memory");
+	perror("Unable to allocate memory for executable");
 	exit(1);
     }
+
+#ifndef NO_MPROTECT
+    if (mprotect(codeptr, size, PROT_WRITE | PROT_READ) != 0) {
+	perror("mprotect to enable code writing");
+    };
+#endif
 #elif defined(_WIN32)
     codeptr = (char*) VirtualAlloc(0, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
     if (!codeptr) {
@@ -555,7 +574,7 @@ link_and_run(dasm_State ** state)
     dasm_encode(state, codeptr);
     dasm_free(state);
 
-#if !defined(LEGACYOS) && !defined(_WIN32) && !defined(__minix__)
+#if !defined(LEGACYOS) && !defined(_WIN32) && !defined(NO_MPROTECT)
     if (mprotect(codeptr, size, PROT_EXEC | PROT_READ) != 0) {
 	if (verbose)
 	    perror("mprotect read only");
