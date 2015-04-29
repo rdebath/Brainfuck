@@ -1096,23 +1096,25 @@ run_gccode(void)
 /* If we're 32 bit on a 64bit or vs.versa. we need an extra option */
 #ifndef CC
 #if defined(__clang__) && (__clang_major__>=3) && defined(__i386__)
-#define CC "clang -m32"
+#define CC "clang -m32 -fwrapv"
 #elif defined(__clang__) && (__clang_major__>=3) && defined(__amd64__)
-#define CC "clang -m64"
+#define CC "clang -m64 -fwrapv"
 #elif defined(__PCC__)
 #define CC "pcc"
 #elif defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
 #if defined(__x86_64__)
 #if defined(__ILP32__)
-#define CC "gcc -mx32"
+#define CC "gcc -mx32 -fwrapv"
 #else
-#define CC "gcc -m64"
+#define CC "gcc -m64 -fwrapv"
 #endif
 #elif defined(__i386__)
-#define CC "gcc -m32"
+#define CC "gcc -m32 -fwrapv"
 #else
-#define CC "gcc"
+#define CC "gcc -fwrapv"
 #endif
+#elif defined(__GNUC__) && (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 3)
+#define CC "gcc -fwrapv"
 #elif defined(__GNUC__)
 #define CC "gcc"
 #elif defined(__TINYC__)
