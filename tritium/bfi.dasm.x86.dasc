@@ -404,7 +404,11 @@ run_dynasm(void)
 #else
 	    | mov REG_C, REG_A
 #endif
-	    | mov64 rax, (uint64_t)(uintptr_t) putch
+#ifdef __code_model_small__
+	    | mov   eax, (uintptr_t) putch
+#else
+	    | mov64 rax, (uintptr_t) putch
+#endif
 	    | call  rax
 	    |.endif
 	    break;
@@ -428,7 +432,11 @@ run_dynasm(void)
 #else
 	    | mov REG_C, REG_A
 #endif
-	    | mov64 rax, (uint64_t)(uintptr_t) putch
+#ifdef __code_model_small__
+	    | mov   eax, (uintptr_t) putch
+#else
+	    | mov64 rax, (uintptr_t) putch
+#endif
 	    | call  rax
 	    |.endif
 	    break;
@@ -447,7 +455,11 @@ run_dynasm(void)
 #else
 	    | mov REG_C, REG_A
 #endif
-	    | mov64 rax, (uint64_t)(uintptr_t) getch
+#ifdef __code_model_small__
+	    | mov   eax, (uintptr_t) getch
+#else
+	    | mov64 rax, (uintptr_t) getch
+#endif
 	    | call  rax
 	    |.endif
 	    /* Note: REG_A must be eax/rax */
@@ -457,7 +469,11 @@ run_dynasm(void)
 	    |.if I386
 	    | call &failout
 	    |.else
-	    | mov64 rax, (uint64_t)(uintptr_t) failout
+#ifdef __code_model_small__
+	    | mov   eax, (uintptr_t) failout
+#else
+	    | mov64 rax, (uintptr_t) failout
+#endif
 	    | call  rax
 	    |.endif
 	    break;
@@ -590,8 +606,10 @@ link_and_run(dasm_State ** state)
     /* Write generated machine code to a temporary file.
     // View with:
     //  objdump -D -b binary -mi386 -Mx86,intel code.bin
+    //  objdump -D -b binary -mi386 -Mx86-64,intel --adjust-vma=0x777777777000 code.bin
     // or
-    //  ndisasm -b32 code.bin
+    //  ndisasm -b32 -o 0x77777000 /tmp/code-dasm.bin
+    //  ndisasm -b64 -o 0x777777777000 /tmp/code-dasm.bin
     */
     if (dump_code)
     {
@@ -600,6 +618,10 @@ link_and_run(dasm_State ** state)
 	fwrite(codeptr, size, 1, f);
 	fclose(f);
 	fprintf(stderr, "Dynasm "CPUID" code dumped to file '%s'\n", fname);
+	fprintf(stderr, "codeptr = 0x%lx\n", (unsigned long) codeptr);
+	fprintf(stderr, "putch   = 0x%lx\n", (unsigned long) &putch);
+	fprintf(stderr, "getch   = 0x%lx\n", (unsigned long) &getch);
+	fprintf(stderr, "failout = 0x%lx\n", (unsigned long) &failout);
     }
 
     if (verbose)

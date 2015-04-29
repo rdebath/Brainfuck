@@ -422,8 +422,13 @@ outcmd(int ch, int count)
 	|.if I386
 	| call &getchar
 	|.else
+#ifdef __code_model_small__
+	| mov	eax, (uintptr_t) getchar
+	| call  rax
+#else
 	| mov64 rax, (uintptr_t) getchar
 	| call  rax
+#endif
 	|.endif
 	| cmp   REG_A, -1
 	| jz >1
@@ -456,8 +461,13 @@ outcmd(int ch, int count)
 #else
 	| movzx rcx, byte [REG_P]
 #endif
+#ifdef __code_model_small__
+	| mov	eax, (uintptr_t) putchar
+	| call  rax
+#else
 	| mov64 rax, (uintptr_t) putchar
 	| call  rax
+#endif
 	|.endif
 	break;
 
@@ -599,6 +609,9 @@ link_and_run(dasm_State ** state)
     FILE   *f = fopen("/tmp/code.bin", "w");
     fwrite(codeptr, size, 1, f);
     fclose(f);
+    fprintf(stderr, "codeptr = 0x%lx\n", (unsigned long) codeptr);
+    fprintf(stderr, "putchar = 0x%lx\n", (unsigned long) &putchar);
+    fprintf(stderr, "getchar = 0x%lx\n", (unsigned long) &getchar);
 #endif
 
     /* Remove the stdout output buffer */
