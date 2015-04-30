@@ -121,7 +121,7 @@ int memsize = 0x100000;	/* Default to 1M of tape if otherwise unspecified. */
 int enable_trace = 0;
 int debug_mode = 0;
 int iostyle = 0; /* 0=ASCII, 1=UTF8, 2=Binary, 3=Integer. */
-int eofcell = 0; /* 0=>?, 1=> No Change, 2= -1, 3= 0, 4=EOF, 5=No Input. */
+int eofcell = 0; /* 0=>?, 1=> No Change, 2= -1, 3= 0, 4=EOF, 5=No Input, 6=Abort. */
 char * input_string = 0;
 int libc_allows_utf8 = 0;
 int default_io = 1;
@@ -234,7 +234,7 @@ void LongUsage(FILE * fd, const char * errormsg)
 	fprintf(fd, "   -h   Long help message. (Pipe it through more)\n");
 	fprintf(fd, "   -v   Verbose, repeat for more.\n");
 	fprintf(fd, "   -b   Use byte cells not integer.\n");
-	fprintf(fd, "   -En  End of file processing.\n");
+	fprintf(fd, "   -z   End of file gives 0. -e=-1, -n=skip.\n");
 	exit(1);
     }
 
@@ -309,9 +309,9 @@ void LongUsage(FILE * fd, const char * errormsg)
 #endif
     printf("\n");
     printf("   -E   End of file processing.\n");
-    printf("   -E1      End of file gives no change for ',' command.\n");
-    printf("   -E2      End of file gives -1.\n");
-    printf("   -E3      End of file gives 0.\n");
+    printf("   -n  -E1  End of file gives no change for ',' command.\n");
+    printf("   -e  -E2  End of file gives -1.\n");
+    printf("   -z  -E3  End of file gives 0.\n");
     printf("   -E4      End of file gives EOF (normally -1 too).\n");
     printf("   -E5      Disable ',' command, ie: treat it as a comment character.\n");
     printf("   -E6      Treat running the ',' command as an error and Stop.\n");
@@ -469,6 +469,10 @@ checkarg(char * opt, char * arg)
 	    } else
 		eofcell=strtol(arg,0,10);
 	    return 2;
+	case 'n': eofcell = 1; break;
+	case 'e': eofcell = 2; break;
+	case 'z': eofcell = 3; break;
+
 	case 'b':
 	    if (!arg_is_num) {
 		set_cell_size(8);
