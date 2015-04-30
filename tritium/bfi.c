@@ -64,6 +64,10 @@ characters after your favorite comment marker in a very visible form.
 #include "inttypes.h"
 #endif
 
+#if _POSIX_VERSION >= 200809L
+#define ENABLE_BFARG
+#endif
+
 #include "ov_int.h"
 #include "bfi.tree.h"
 
@@ -123,6 +127,9 @@ int debug_mode = 0;
 int iostyle = 0; /* 0=ASCII, 1=UTF8, 2=Binary, 3=Integer. */
 int eofcell = 0; /* 0=>?, 1=> No Change, 2= -1, 3= 0, 4=EOF, 5=No Input, 6=Abort. */
 char * input_string = 0;
+#ifdef ENABLE_BFARG
+char * program_string = 0;
+#endif
 int libc_allows_utf8 = 0;
 int default_io = 1;
 
@@ -167,7 +174,7 @@ int profile_min_cell = 0;
 int profile_max_cell = 0;
 
 /* Reading */
-void load_file(char * fname, int is_first, int is_last);
+void load_file(FILE * ifd, int is_first, int is_last);
 void process_file(void);
 
 /* Building */
@@ -481,22 +488,36 @@ checkarg(char * opt, char * arg)
 		set_cell_size(strtol(arg,0,10));
 		return 2;
 	    }
+#ifdef ENABLE_BFARG
+	case 'P':
+#endif
 	case 'I':
 	    if (arg == 0)
 		return 0;
 	    else
 	    {
 		unsigned len = 0, z;
-		z = (input_string!=0);
-		if (z) len += strlen(input_string);
+		char * str;
+#ifdef ENABLE_BFARG
+		if (opt[1]=='I') str=input_string; else str=program_string;
+#else
+		str=input_string;
+#endif
+		z = (str!=0);
+		if (z) len += strlen(str);
 		len += strlen(arg) + 2;
-		input_string = realloc(input_string, len);
-		if(!input_string) {
+		str = realloc(str, len);
+		if(!str) {
 		    perror("realloc"); exit(1);
 		}
-		if (!z) *input_string = 0;
-		strcat(input_string, arg);
-		strcat(input_string, "\n");
+		if (!z) *str = 0;
+		strcat(str, arg);
+		strcat(str, "\n");
+#ifdef ENABLE_BFARG
+		if (opt[1]=='I') input_string=str; else program_string=str;
+#else
+		input_string=str;
+#endif
 	    }
 	    return 2;
 	default:
@@ -608,6 +629,14 @@ main(int argc, char ** argv)
 
     if(help_flag)
 	LongUsage(stdout, 0);
+
+#ifdef ENABLE_BFARG
+    if(program_string) {
+	if(filecount)
+	    Usage("Error: File arguments and -P cannot be used together");
+    } else
+#endif
+
     if(filecount == 0) {
 	if (isatty(STDIN_FILENO))
 	    Usage("Error: Filename or '-' should be specified");
@@ -633,9 +662,32 @@ main(int argc, char ** argv)
     if (filecount == 1 && strcmp(filelist[0], "-"))
 	bfname = filelist[0];	/* From argv */
 
-    for(ar = 0; ar<filecount; ar++)
-	load_file(filelist[ar], ar==0, ar+1>=filecount);
+    for(ar = 0; ar<filecount; ar++) {
+	FILE * ifd;
+	char * fname = filelist[ar];
+
+	if (!fname || strcmp(fname, "-") == 0) ifd = stdin;
+	else if ((ifd = fopen(fname, "r")) == 0) {
+	    perror(fname);
+	    exit(1);
+	}
+
+	load_file(ifd, ar==0, ar+1>=filecount);
+
+	if (ifd!=stdin) fclose(ifd);
+    }
     free(filelist); filelist = 0;
+
+#ifdef ENABLE_BFARG
+    if(program_string) {
+	FILE * pfd = fmemopen(program_string, strlen(program_string), "r");
+	if (pfd == NULL) { perror("fmemopen"); exit(8); }
+
+	load_file(pfd, 1, 1);
+
+	fclose(pfd);
+    }
+#endif
 
     process_file();
 
@@ -653,9 +705,8 @@ main(int argc, char ** argv)
  * cleanups and warnings are done on the tree.
  */
 void
-load_file(char * fname, int is_first, int is_last)
+load_file(FILE * ifd, int is_first, int is_last)
 {
-    FILE * ifd;
     int ch, lid = 0;
     struct bfi *p=0, *n=bfprog;
 
@@ -667,11 +718,6 @@ static int dld;
 
     curr_line = 1; curr_col = 0;
 
-    if (!fname || strcmp(fname, "-") == 0) ifd = stdin;
-    else if ((ifd = fopen(fname, "r")) == 0) {
-	perror(fname);
-	exit(1);
-    }
     while((ch = getc(ifd)) != EOF &&
 			(ifd!=stdin || ch != '!' || !n || dld || jst )) {
 	int c = 0;
@@ -731,7 +777,6 @@ static int dld;
 		n->count = c;
 	}
     }
-    if (ifd!=stdin) fclose(ifd);
 
     if (!is_last) return;
 
