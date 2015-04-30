@@ -521,7 +521,7 @@ run_gnulightning(void)
     jit_flush_code(startptr, jit_get_ip().ptr);
 
     if (verbose)
-	fprintf(stderr, "Generated %d bytes of machine code, running\n",
+	fprintf(stderr, "Generated %d bytes of V1 GNU Lightning code, running\n",
 		(int)(jit_get_ip().ptr - (char*)startptr));
 
     start_runclock();
@@ -535,7 +535,7 @@ run_gnulightning(void)
     codeptr = jit_emit();
 
     if (verbose)
-	fprintf(stderr, "Generated %d bytes of machine code, running\n",
+	fprintf(stderr, "Generated %d bytes of V2 GNU Lightning code, running\n",
 	    (int)((char*)jit_address(end) - (char*)jit_address(start)));
 
     jit_clear_state();

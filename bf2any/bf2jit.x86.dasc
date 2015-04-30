@@ -7,9 +7,11 @@
 #include <sys/mman.h>
 #else
 # include <windows.h>
-# include <inttypes.h>
 #endif
-#if _POSIX_VERSION >= 199506L
+
+/* LLONG_MAX came in after inttypes.h, limits.h is very old. */
+#include <limits.h>
+#if _POSIX_VERSION >= 199506L || defined(LLONG_MAX)
 #include <inttypes.h>
 #endif
 

@@ -40,13 +40,10 @@ characters after your favorite comment marker in a very visible form.
 
 */
 
-#define _XOPEN_SOURCE 700
 #ifdef __STRICT_ANSI__
 #if __STDC_VERSION__ < 199901L
 #warning This program needs at least the C99 standard.
 #endif
-#else
-#define _GNU_SOURCE
 #endif
 
 #include <stdlib.h>
@@ -54,13 +51,14 @@ characters after your favorite comment marker in a very visible form.
 #include <unistd.h>
 #include <limits.h>
 #include <string.h>
-#if !defined(LEGACYOS) && !defined(_WIN32)
+#if !defined(LEGACYOS) && _POSIX_VERSION >= 200112L
 #include <locale.h>
 #include <langinfo.h>
 #include <wchar.h>
 #endif
 
-#if _POSIX_C_SOURCE >= 200809L
+/* LLONG_MAX came in after inttypes.h, limits.h is very old. */
+#if _POSIX_VERSION >= 199506L || defined(LLONG_MAX)
 #include "inttypes.h"
 #endif
 
@@ -229,7 +227,7 @@ int checkarg(char * opt, char * arg);
 void LongUsage(FILE * fd, const char * errormsg)
 {
 #ifdef NO_EXT_BE
-    fprintf(fd, "%s: LITE version, compiled: %s\n", program, __DATE__);
+    fprintf(fd, "%s: LITE version\n", program);
 #else
     print_banner(fd, program);
 #endif
@@ -570,7 +568,7 @@ main(int argc, char ** argv)
     opt_bytedefault = !strcmp(program, "bf");
 
 #ifdef __STDC_ISO_10646__
-#if !defined(LEGACYOS) && !defined(_WIN32)
+#if !defined(LEGACYOS) && _POSIX_VERSION >= 200112L
     setlocale(LC_ALL, "");
     if (!opt_bytedefault)
 	if (!strcmp("UTF-8", nl_langinfo(CODESET))) libc_allows_utf8 = 1;
@@ -581,17 +579,18 @@ main(int argc, char ** argv)
     else iostyle = 0;
 #endif
 
+#if defined(__GNUC__) \
+    && (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 3)
     {
 	int x, flg = sizeof(int) * 8;
 	for(x=1;x+1>x && --flg;x=(x|(x<<1)));
 	if (!flg) {
 	    fprintf(stderr, "Compile failure, we need sane integers\n");
-#ifdef __GNUC__
 	    fprintf(stderr, "Please use the -fwrapv option when compiling.\n");
-#endif
 	    exit(255);
 	}
     }
+#endif
 
     filelist = calloc(argc, sizeof*filelist);
 
@@ -812,9 +811,10 @@ tcalloc(size_t nmemb, size_t size)
     if (m) return m;
 
 #if !defined(LEGACYOS) && !defined(_WIN32) && __STDC_VERSION__ >= 199901L
-    fprintf(stderr, "Allocate of %zd*%zd bytes failed, ABORT\n", nmemb, size);
+    fprintf(stderr, "Allocate of %zu*%zu bytes failed, ABORT\n", nmemb, size);
 #else
-    fprintf(stderr, "Memory allocation failed, ABORT\n");
+    fprintf(stderr, "Allocate of %lu*%lu bytes failed, ABORT\n",
+	    (unsigned long)nmemb, (unsigned long)size);
 #endif
     exit(42);
 }
@@ -1149,11 +1149,11 @@ print_tree_stats(void)
 	    fprintf(stderr, "Run time %.6fs, cycles %.0f, %.3fns/cycle\n",
 		run_time, profile_hits, 1000000000.0*run_time/profile_hits);
 
-	fprintf(stderr, "Tokens: ");
+	fprintf(stderr, "Tokens:");
 	for(i=0; i<TCOUNT; i++) {
 	    if (node_type_counts[i]) {
-		if (c>60) { fprintf(stderr, "\n... "); c = 0; }
-		c += fprintf(stderr, "%s%s=%d", c?", ":"",
+		if (c>60) { fprintf(stderr, "\n..."); c = 0; }
+		c += fprintf(stderr, "%s%s=%d", c?", ":" ",
 			    tokennames[i], node_type_counts[i]);
 	    }
 	    if (node_profile_counts[i])

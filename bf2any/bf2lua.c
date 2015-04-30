@@ -1,12 +1,9 @@
-#ifndef DISABLE_LIBLUA
-#define _XOPEN_SOURCE 700
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
-#if !defined(DISABLE_LIBLUA) && (!defined(_POSIX_C_SOURCE) || (_POSIX_C_SOURCE < 200809L))
+#if !defined(DISABLE_LIBLUA) && (_POSIX_VERSION < 200809L)
 #define DISABLE_LIBLUA
 #endif
 

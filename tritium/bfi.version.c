@@ -1,6 +1,6 @@
 
 #include <stdio.h>
-#include "bfi.tree.h"
+
 #include "bfi.version.h"
 
 #define VS_Q(x) #x
@@ -36,6 +36,10 @@
 #define OSNAME	"DEC OSF/1"
 #elif defined(__APPLE__)
 #define OSNAME	"Apple"
+#elif defined(__EMSCRIPTEN__)
+#define OSNAME	"Emscripten"
+#elif defined(__ultrix__)
+#define OSNAME	"Ultrix"
 #elif defined(__unix__)
 #define OSNAME	"Unix"
 #else
@@ -76,6 +80,10 @@
 #elif defined(__alpha__)
 #define PROCESSOR	"DEC Alpha"
 #define BFI_UNSUPPORTED_CPU_ALPHA
+#elif defined(__vax__)
+#define PROCESSOR	"VAX"
+#elif defined(__asmjs__)
+#define PROCESSOR	"using asm.js"
 #else
 #define PROCESSOR	"using an unknown processor"
 #endif

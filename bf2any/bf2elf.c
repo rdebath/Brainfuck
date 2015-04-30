@@ -1,9 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
+#if _POSIX_VERSION >= 199506L
 #include <stdint.h>
+#endif
 
 #include "bf2any.h"
 
@@ -142,9 +146,14 @@ check_arg(const char * arg)
 void
 outcmd(int ch, int count)
 {
-    int32_t p;		/* BEWARE: Assuming this is a good int. */
     FILE * ofd;
+#if _POSIX_VERSION >= 199506L
+    int32_t p;
+    int8_t arg;
+#else
+    int p;		/* BEWARE: Assuming this is a good int. */
     signed char arg;	/* Another assembler type: one byte signed. */
+#endif
 
     /* limit count to the range of a signed char */
     while (count>127) { outcmd(ch, 127); count -= 127; }

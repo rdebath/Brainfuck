@@ -1,20 +1,16 @@
-#define _XOPEN_SOURCE 700
-
 #ifdef __STRICT_ANSI__
-#if __STDC_VERSION__ < 199901L
-#warning This program needs at least the C99 standard.
-#endif
-
 #ifndef DISABLE_TCCLIB
+
 #ifdef __GNUC__
 #if __GNUC__<4 || ( __GNUC__==4 && __GNUC_MINOR__<7 )
 #error "This GNUC version doesn't work properly with libtcc and -std=c99 turned on."
 #endif
 #endif
-#endif
 
-#else
-#define _GNU_SOURCE
+/* Required for open_memstream */
+#define _XOPEN_SOURCE 700
+
+#endif
 #endif
 
 #include <stdlib.h>
@@ -1051,7 +1047,7 @@ void
 run_gccode(void)
 {
     FILE * ofd;
-#if defined(_POSIX_C_SOURCE) && (_POSIX_C_SOURCE >= 200809L)
+#if _POSIX_VERSION >= 200809L
     if( mkdtemp(tmpdir) == 0 ) {
 	perror("mkdtemp()");
 	exit(1);

@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <limits.h>
-#if !defined(LEGACYOS) && !defined(_WIN32)
+#if _POSIX_MAPPED_FILES
 #include <sys/mman.h>
 #include <signal.h>
 #endif
@@ -10,7 +10,7 @@
 #include "bfi.tree.h"
 #include "bfi.run.h"
 
-#if defined(MAP_NORESERVE) && defined(SA_SIGINFO) && defined(SA_RESETHAND)
+#if defined(MAP_NORESERVE) && defined(SA_SIGINFO) && defined(SA_RESETHAND) && !defined(__asmjs__)
 #ifndef DISABLE_HUGERAM
 #define USEHUGERAM
 #endif

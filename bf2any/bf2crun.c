@@ -1,5 +1,3 @@
-#define _XOPEN_SOURCE 700
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -168,7 +166,7 @@ outcmd(int ch, int count)
 #ifndef DISABLE_DLOPEN
 	if (runmode != no_run) {
 	    runmode = run_dll;
-#if defined(_POSIX_C_SOURCE) && (_POSIX_C_SOURCE >= 200809L)
+#if _POSIX_VERSION >= 200809L
 	    if( mkdtemp(tmpdir) == 0 ) {
 		perror("mkdtemp()");
 		exit(1);

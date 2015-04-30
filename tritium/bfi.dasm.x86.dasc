@@ -2,12 +2,17 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <stdint.h>
 #include <fcntl.h>
-#if !defined(LEGACYOS) && !defined(_WIN32)
+#if _POSIX_MAPPED_FILES
 #include <sys/mman.h>
 #elif defined(_WIN32)
 # include <windows.h>
+#endif
+
+/* LLONG_MAX came in after inttypes.h, limits.h is very old. */
+#include <limits.h>
+#if _POSIX_VERSION >= 199506L || defined(LLONG_MAX)
+#include <inttypes.h>
 #endif
 
 #include "bfi.tree.h"
