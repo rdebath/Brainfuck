@@ -15,8 +15,7 @@ bf2gas32
 bf2gas64
 bf2go
 bf2jit
-bf2jit.amd64.h
-bf2jit.i686.h
+bf2jit.c
 bf2julia
 bf2lua
 bf2nav

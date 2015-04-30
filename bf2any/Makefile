@@ -11,7 +11,7 @@
 #
 # Beware: pkg-config doesn't cope with multiarch.
 
-CC=$(shell ( which gcc clang pcc ; echo cc ) | head -1 | sed 's:.*/::')
+CC := $(shell ( which gcc clang pcc ; echo cc ) | head -1 | sed 's:.*/::')
 INSTALL=install -p -s
 INSTALLDIR=/usr/local/bin
 INSTALLEXT=
@@ -23,7 +23,12 @@ ALLEXE=\
 
 TOOLDIR=../tools
 LDLIBS=
+
 ifneq ($(wildcard $(TOOLDIR)/dynasm/dynasm),)
+CPUFOUND := $(shell $(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -DDETECT_ONLY \
+		-E -dM -x c bf2jit.x86.dasc | grep DASM_FOUND_CPU )
+endif
+ifneq ($(CPUFOUND),)
 ALLEXE+=bf2jit
 endif
 
@@ -32,7 +37,7 @@ all:	bf2any.o bf2const.o $(ALLEXE)
 clean:
 	-rm -f $(ALLEXE)
 	-rm -f libtcc.lib-off libtcc.lib-on libtcl.lib-off libtcl.lib-on
-	-rm -f bf2jit.amd64.h bf2jit.i686.h
+	-rm -f bf2jit.c
 	-rm -f *.o
 
 # Install all we can make, but don't fail if some can't be built.
@@ -77,14 +82,20 @@ bf2gas64.o: bf2gas.c
 
 #-------------------------------------------------------------------------------
 # Assemble the dynasm machine code.
-bf2jit.o: bf2jit.c bf2jit.amd64.h bf2jit.i686.h
+ifneq ($(CPUFOUND),)
+bf2jit.o: bf2jit.c
 	$(CC) $(CFLAGS) -I$(TOOLDIR) $(TARGET_ARCH) -c -o $@ bf2jit.c
 
-bf2jit.amd64.h: bf2jit.x86.dasc
-	$(TOOLDIR)/dynasm/dynasm -c -o bf2jit.amd64.h bf2jit.x86.dasc
+ifneq ($(findstring X86_64,$(CPUFOUND)),)
+bf2jit.c: bf2jit.x86.dasc
+	$(TOOLDIR)/dynasm/dynasm -c -o bf2jit.c bf2jit.x86.dasc
+endif
 
-bf2jit.i686.h: bf2jit.x86.dasc
-	$(TOOLDIR)/dynasm/dynasm -c -D I386 -o bf2jit.i686.h bf2jit.x86.dasc
+ifneq ($(findstring X86_32,$(CPUFOUND)),)
+bf2jit.c: bf2jit.x86.dasc
+	$(TOOLDIR)/dynasm/dynasm -c -D I386 -o bf2jit.c bf2jit.x86.dasc
+endif
+endif
 
 #-------------------------------------------------------------------------------
 # Libraries for running C code in process.

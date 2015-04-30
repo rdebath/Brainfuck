@@ -1,9 +1,54 @@
-/*  As I can't use #defines to control the assembler this file is assembled
- *  twice, once for i386 and once for amd64
- *
- *  The C compiler then includes one to match the current compile.
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <fcntl.h>
+#ifndef _WIN32
+#include <sys/mman.h>
+#else
+# include <windows.h>
+# include <inttypes.h>
+#endif
+#if _POSIX_VERSION >= 199506L
+#include <inttypes.h>
+#endif
+
+#include "bf2any.h"
+
+/*
+ * dasm64 translation from BF, runs at about 5,000,000,000 instructions per second.
  */
 
+#if defined(__x86_64__) || defined(__amd64__) || defined(_M_AMD64)
+#define CPUCHECK 64
+#define DASM_FOUND_CPU_X86_64
+#elif defined(__i386__) || defined(_M_IX86)
+#define CPUCHECK 32
+#define DASM_FOUND_CPU_X86_32
+#else
+#warning "Supported processor not detected."
+#endif
+
+#ifndef DETECT_ONLY
+#if !CPUCHECK
+int check_arg(const char * arg)
+{
+    fprintf(stderr, "Build failed: Supported processor not detected.\n");
+    exit(255);
+    return 0;
+}
+void outcmd(int ch, int count) { }
+#else
+
+#include "dynasm/dasm_proto.h"
+#include "dynasm/dasm_x86.h"
+
+/*  The rest of the file is processed by DynASM then C.
+ *
+ *  The Makefile takes care of making sure that the I386 flag matches
+ *  the processor that the compiler detects by first preprocessing this
+ *  code with 'DETECT_ONLY' enabled.
+ */
 /*
  *  The "actionlist" command defines the name of the data blob that
  *  the first pass of the assembler will use to pass it's data to the
@@ -24,10 +69,15 @@
  */
 
 |.if I386
+||#define CPUID "i686"
+||enum { okay=1/(CPUCHECK==32) };
 |.arch x86
 |.else
+||#define CPUID "x86_64"
+||enum { okay=1/(CPUCHECK==64) };
 |.arch x64
 |.endif
+
 |.actionlist actions
 |.section code
 |.globals GLOB_
@@ -637,3 +687,6 @@ link_and_run(dasm_State ** state)
 #endif
     free(tapemem);
 }
+
+#endif
+#endif
