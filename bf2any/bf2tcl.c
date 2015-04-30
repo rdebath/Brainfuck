@@ -4,7 +4,7 @@
 #include <unistd.h>
 
 #if !defined(DISABLE_LIBTCL) && (_POSIX_VERSION < 200809L)
-#define DISABLE_LIBTCL
+#include "usemktemp.c"
 #endif
 
 #ifndef DISABLE_LIBTCL
@@ -52,9 +52,13 @@ outcmd(int ch, int count)
     switch(ch) {
     case '!':
 #ifndef DISABLE_LIBTCL
-	if (!do_dump)
+	if (!do_dump) {
+#ifndef DISABLE_OPENMEMSTREAM
 	    ofd = open_memstream(&tclcode, &tclcodesize);
-	else
+#else
+	    ofd = open_tempfile();
+#endif
+	} else
 #endif
 	    ofd = stdout;
 	fprintf(ofd, "%s%d%s%d%s",
@@ -111,7 +115,11 @@ outcmd(int ch, int count)
 
 #ifndef DISABLE_LIBTCL
     if (!do_dump && ch == '~') {
+#ifndef DISABLE_OPENMEMSTREAM
 	fclose(ofd);
+#else
+        reload_tempfile(ofd, &tclcode, &tclcodesize);
+#endif
 
 	/* The bare interpreter method. Works fine for BF code.
 	 */

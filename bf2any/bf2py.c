@@ -1,5 +1,5 @@
 #ifndef DISABLE_LIBPY
-/* This must be first; hopefully nothing else must be first too */
+/* This must be first; hopefully nothing else "must be first" too */
 #include <Python.h>
 #endif
 
@@ -8,6 +8,11 @@
 #include <string.h>
 
 #include "bf2any.h"
+
+/* Ah, yes, this should be first too ... idiots. */
+#if !defined(DISABLE_LIBPY) && (_POSIX_VERSION < 200809L)
+#include "usemktemp.c"
+#endif
 
 /*
  * Python translation from BF, runs at about 18,000,000 instructions per second.
@@ -53,9 +58,13 @@ outcmd(int ch, int count)
     switch(ch) {
     case '!':
 #ifndef DISABLE_LIBPY
-        if (!do_dump)
+        if (!do_dump) {
+#ifndef DISABLE_OPENMEMSTREAM
 	    ofd = open_memstream(&pycode, &pycodesize);
-	else
+#else
+	    ofd = open_tempfile();
+#endif
+	} else
 #endif
 	    ofd = stdout;
 
@@ -125,7 +134,11 @@ outcmd(int ch, int count)
 
 #ifndef DISABLE_LIBPY
     if (!do_dump && ch == '~') {
+#ifndef DISABLE_OPENMEMSTREAM
 	fclose(ofd);
+#else
+        reload_tempfile(ofd, &pycode, &pycodesize);
+#endif
 
 	/* The bare interpreter method. Works fine for BF code.
 	 */

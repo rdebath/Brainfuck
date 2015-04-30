@@ -4,7 +4,7 @@
 #include <unistd.h>
 
 #if !defined(DISABLE_LIBLUA) && (_POSIX_VERSION < 200809L)
-#define DISABLE_LIBLUA
+#include "usemktemp.c"
 #endif
 
 #ifndef DISABLE_LIBLUA
@@ -110,9 +110,13 @@ outcmd(int ch, int count)
 
     if (ch != '~') return;
 #ifndef DISABLE_LIBLUA
-    if (!do_dump)
+    if (!do_dump) {
+#ifndef DISABLE_OPENMEMSTREAM
 	ofd = open_memstream(&luacode, &luacodesize);
-    else
+#else
+	ofd = open_tempfile();
+#endif
+    } else
 #endif
     {
 	ofd = stdout;
@@ -174,7 +178,11 @@ outcmd(int ch, int count)
     if (!do_dump && ch == '~') {
 	int status, result;
 	lua_State *L;
+#ifndef DISABLE_OPENMEMSTREAM
         fclose(ofd);
+#else
+	reload_tempfile(ofd, &luacode, &luacodesize);
+#endif
 
 	L = luaL_newstate();
 	luaL_openlibs(L); /* Load Lua libraries */
