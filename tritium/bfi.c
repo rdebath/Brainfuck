@@ -1729,44 +1729,6 @@ invariants_scan(void)
 		n = n3;
 	    break;
 
-	case T_MOV:
-	    if (n->count == 0) {
-		/* Hmmm; NOP movement */
-		node_changed = 1;
-		n->type = T_NOP;
-		break;
-	    }
-
-	    n2 = n->prev;
-	    while (n2 && n2->type != T_MOV
-			&& n2->orgtype != T_WHL && n2->orgtype != T_END) {
-		n2->offset -= n->count;
-		n2->offset2 -= n->count;
-		n2->offset3 -= n->count;
-		n->prev = n2->prev;
-		if (n->prev) n->prev->next = n; else bfprog = n;
-
-		n2->next = n->next;
-		if (n2->next) n2->next->prev = n2;
-
-		n2->prev = n;
-		n->next = n2;
-
-		n2 = n->prev;
-		if(n2) { n->line = n2->line; n->col = n2->col; }
-	    }
-
-	    if (n && n2 && n2->type == T_MOV && n->type == T_MOV) {
-		/* Hmm, merge two movements */
-		n->count += n2->count;
-		n2->count = 0;
-		n2->type = T_NOP;
-		if (n->count == 0)
-		    n->type = T_NOP;
-		n = n2;
-		node_changed = 1;
-	    }
-	    break;
 	}
 
 	if (n && n->type == T_DEAD && n->jmp) {
