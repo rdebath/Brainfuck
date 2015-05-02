@@ -176,11 +176,19 @@ static const char * pikalang[] =
 /* BF Doubler doubles the cell size. */
 /* 12 cost, cells in LXXH order, with tmpzero */
 static const char * doubler_12[] =
+#if 1
+    {">>>>", "<<<<", ">>+>+[<-]<[-<<+>]<", ">>+>[<-]<[-<<->]>>-<<<",
+    ">>>.<<<", "[-]>>>[-],<<<",
+    ">>+>[<-]<[-<+<[>-]>[>]<[->+<]]>-" "[+<<",
+    ">>+>[<-]<[-<+<[>-]>[>]<[->+<]]>-" "]<<",
+    ">>[-]<[-]<"};
+#else
     {">>>>", "<<<<", ">+<+[>-]>[->>+<]<<", ">+<[>-]>[->>-<]<<-",
     ".", ">>>[-]<<<[-],",
     ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "[+<",
     ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "]<",
     ">[-]>[-]<<"};
+#endif
 
 /* Copy cell cost, cells in LXXH order, with tmpzero */
 static const char * doubler_copy_LXXH[] =
