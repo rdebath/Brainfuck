@@ -1405,9 +1405,6 @@ delete_tree(void)
  *  This routine relocates T_MOV instructions past other instruction types
  *  in an effort to merge the T_MOVs together and hopefully have them cancel
  *  out completely.
- *
- *  This is currently run at an early stage so it doesn't need to work for
- *  the enhanced token types.
  */
 void
 pointer_scan(void)
@@ -1442,7 +1439,8 @@ pointer_scan(void)
 	}
 
 	if (n->type == T_MOV && n->next) {
-	    if (n->next->type == T_MOV) {
+	    switch(n->next->type) {
+	    case T_MOV:
 		if(verbose>4)
 		    fprintf(stderr, "Merge movements.\n");
 		/* Merge movments */
@@ -1459,10 +1457,8 @@ pointer_scan(void)
 		    n = n2;
 		}
 		continue;
-	    } else if ( n->next->type == T_ADD ||
-			n->next->type == T_SET ||
-			n->next->type == T_PRT ||
-			n->next->type == T_INP) {
+
+	    case T_PRT: case T_CHR: case T_INP: case T_ADD: case T_SET:
 		if(verbose>4)
 		    fprintf(stderr, "Push past command.\n");
 		/* Put movement after a normal cmd. */
@@ -1477,7 +1473,43 @@ pointer_scan(void)
 		n->prev = n2;
 		if(n4) n4->prev = n;
 		continue;
-	    } else if (n->next->type == T_WHL) {
+
+	    case T_CALC:
+		if(verbose>4)
+		    fprintf(stderr, "Push past command.\n");
+		/* Put movement after a normal cmd. */
+		n2 = n->next;
+		n2->offset += n->count;
+		if (n2->count2)
+		    n2->offset2 += n->count;
+		if (n2->count3)
+		    n2->offset3 += n->count;
+		n3 = n->prev;
+		n4 = n2->next;
+		if(n3) n3->next = n2; else bfprog = n2;
+		n2->next = n;
+		n->next = n4;
+		n2->prev = n3;
+		n->prev = n2;
+		if(n4) n4->prev = n;
+		continue;
+
+	    case T_STOP: case T_DUMP:
+		if(verbose>4)
+		    fprintf(stderr, "Push past command.\n");
+		/* Put movement after a normal cmd. */
+		n2 = n->next;
+		n3 = n->prev;
+		n4 = n2->next;
+		if(n3) n3->next = n2; else bfprog = n2;
+		n2->next = n;
+		n->next = n4;
+		n2->prev = n3;
+		n->prev = n2;
+		if(n4) n4->prev = n;
+		continue;
+
+	    case T_WHL: case T_MULT: case T_CMULT: case T_FOR: case T_IF:
 		if(verbose>4)
 		    fprintf(stderr, "Push round a loop.\n");
 		/* Push this record past the entire loop */
@@ -1514,13 +1546,16 @@ pointer_scan(void)
 		if(n3) n3->prev = n4;
 		n4->next = n3;
 		n4->prev = n2;
+		break;
 
-	    } else {
+	    case T_END: case T_ENDIF:
+	    default:
 		/* Stuck behind an end loop, can't push past this */
 		/* Make the line & col of the movement the same as the
 		 * T_END that's blocked it. */
 		n->line = n->next->line;
 		n->col = n->next->col;
+		break;
 	    }
 	}
 	/* Push it off the end of the program */
