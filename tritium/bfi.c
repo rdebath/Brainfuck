@@ -118,6 +118,7 @@ int opt_no_litprt = 0;
 int opt_no_endif = 0;
 int opt_no_kv_recursion = 0;
 int opt_no_loop_classify = 0;
+int opt_no_kvmov = 0;
 int opt_repoint = -1;
 
 int hard_left_limit = -1024;
@@ -203,6 +204,7 @@ void find_known_value_recursion(struct bfi * n, int v_offset,
 		int allow_recursion,
 		struct bfi * n_stop,
 		int * hit_stop_node_p,
+		int * base_shift_p,
 		int * n_used_p,
 		int * unknown_found_p);
 int search_for_update_of_offset(struct bfi *n, struct bfi *v, int n_offset);
@@ -334,6 +336,12 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("        Disable the T_CALC token.\n");
     printf("   -fno-litprt\n");
     printf("        Disable the T_CHR token and printf() strings.\n");
+    printf("   -fno-kv-recursion\n");
+    printf("        Disable recursive known value optimisations.\n");
+    printf("   -fno-loop-classify\n");
+    printf("        Disable loop classification optimisations.\n");
+    printf("   -fno-kv-mov\n");
+    printf("        Disable T_MOV known value optimisations.\n");
     printf("   -fno-repoint\n");
     printf("        Do not recreate pointer movements between loops as last stage.\n");
     printf("   -frepoint\n");
@@ -537,6 +545,7 @@ checkarg(char * opt, char * arg)
     } else if (!strcmp(opt, "-fno-litprt")) { opt_no_litprt = 1; return 1;
     } else if (!strcmp(opt, "-fno-kv-recursion")) { opt_no_kv_recursion = 1; return 1;
     } else if (!strcmp(opt, "-fno-loop-classify")) { opt_no_loop_classify = 1; return 1;
+    } else if (!strcmp(opt, "-fno-kv-mov")) { opt_no_kvmov = 1; return 1;
     } else if (!strcmp(opt, "-fno-repoint")) { opt_repoint = 0; return 1;
     } else if (!strcmp(opt, "-frepoint")) { opt_repoint = 1; return 1;
     } else if (!strcmp(opt, "-fintio")) { iostyle = 3; opt_no_litprt = 1; default_io=0; return 1;
@@ -1853,6 +1862,7 @@ find_known_value_recursion(struct bfi * n, int v_offset,
 		int allow_recursion,
 		struct bfi * n_stop,
 		int * hit_stop_node_p,
+		int * base_shift_p,
 		int * n_used_p,
 		int * unknown_found_p)
 {
@@ -1872,6 +1882,7 @@ find_known_value_recursion(struct bfi * n, int v_offset,
     int const_found = 0, known_value = 0, non_zero_unsafe = 0;
     int n_used = 0;
     int distance = 0;
+    int base_shift = 0;
 
     if (opt_no_kv_recursion) allow_recursion = 0;
 
@@ -1940,6 +1951,21 @@ find_known_value_recursion(struct bfi * n, int v_offset,
 		goto break_break;
 	    break;
 
+	case T_MOV:
+	    if (unmatched_ends || opt_no_kvmov) {
+		if(verbose>5) {
+		    fprintf(stderr, "Search blocked by: ");
+		    printtreecell(stderr, 0,n);
+		    fprintf(stderr, "\n");
+		}
+		*unknown_found_p = 1;
+		goto break_break;
+	    }
+
+	    v_offset += n->count;
+	    base_shift += n->count;
+	    break;
+
 	case T_END:
 	    if (n->offset == v_offset) {
 		/* We don't know if this node will be hit */
@@ -1956,28 +1982,34 @@ find_known_value_recursion(struct bfi * n, int v_offset,
 	    if (n->jmp->offset == v_offset) {
 		n_used = 1;
 	    }
+#ifndef NO_RECURSION
+	    if (!allow_recursion) {
+		unmatched_ends++;
+		break;
+	    }
+#endif
 
 #ifndef NO_RECURSION
 	    /* Check both n->jmp and n->prev
 	     * If they are compatible we may still have a known value.
 	     */
 	    if (allow_recursion) {
-		int known_value2 = 0, non_zero_unsafe2 = 0, hit_stop2 = 0;
+		int known_value2 = 0, non_zero_unsafe2 = 0, hit_stop2 = 0, base_shift2 = 0;
 
 		if (verbose>5) fprintf(stderr, "%d: T_END: searching for double known\n", __LINE__);
 		find_known_value_recursion(n->prev, v_offset,
 		    0, &const_found, &known_value2, &non_zero_unsafe2,
-		    allow_recursion-1, n->jmp, &hit_stop2, &n_used,
+		    allow_recursion-1, n->jmp, &hit_stop2, &base_shift2, &n_used,
 		    unknown_found_p);
 		if (const_found) {
 		    if (verbose>5) fprintf(stderr, "%d: Const found in loop.\n", __LINE__);
 		    hit_stop2 = 0;
 		    find_known_value_recursion(n->jmp->prev, v_offset,
 			0, &const_found, &known_value, &non_zero_unsafe,
-			allow_recursion-1, n_stop, &hit_stop2, &n_used,
+			allow_recursion-1, n_stop, &hit_stop2, &base_shift2, &n_used,
 			unknown_found_p);
 
-		    if (hit_stop2) {
+		    if (hit_stop2 && known_value2 == 0) {
 			const_found = 1;
 			known_value = known_value2;
 			non_zero_unsafe = non_zero_unsafe2;
@@ -1987,7 +2019,7 @@ find_known_value_recursion(struct bfi * n, int v_offset,
 			const_found = 0;
 			*unknown_found_p = 1;
 		    }
-		} else if (hit_stop2) {
+		} else if (hit_stop2 && base_shift2 == 0) {
 		    if (verbose>5) fprintf(stderr, "%d: Nothing found in loop; continuing.\n", __LINE__);
 
 		    n_used = 1;
@@ -2029,27 +2061,31 @@ find_known_value_recursion(struct bfi * n, int v_offset,
 	     * If they are compatible we may still have a known value.
 	     */
 	    if (allow_recursion) {
-		int known_value2 = 0, non_zero_unsafe2 = 0, hit_stop2 = 0;
+		int known_value2 = 0, non_zero_unsafe2 = 0, hit_stop2 = 0, base_shift2 = 0;
 
 		if (verbose>5) fprintf(stderr, "%d: WHL: searching for double known\n", __LINE__);
 		find_known_value_recursion(n->jmp->prev, v_offset,
 		    0, &const_found, &known_value2, &non_zero_unsafe2,
-		    allow_recursion-1, n, &hit_stop2, &n_used,
+		    allow_recursion-1, n, &hit_stop2, &base_shift2, &n_used,
 		    unknown_found_p);
 		if (const_found) {
 		    if (verbose>5) fprintf(stderr, "%d: Const found in loop.\n", __LINE__);
+		    hit_stop2 = 0;
 		    find_known_value_recursion(n->prev, v_offset,
 			0, &const_found, &known_value, &non_zero_unsafe,
-			allow_recursion-1, 0, 0, &n_used,
+			allow_recursion-1, n_stop, &hit_stop2, &base_shift2, &n_used,
 			unknown_found_p);
 
-		    if (const_found && known_value != known_value2) {
+		    if (hit_stop2) {
+			const_found = 0;
+			*unknown_found_p = 1;
+		    } else if (const_found && known_value != known_value2) {
 			if (verbose>5) fprintf(stderr, "%d: Two known values found %d != %d\n", __LINE__,
 				known_value, known_value2);
 			const_found = 0;
 			*unknown_found_p = 1;
 		    }
-		} else if (hit_stop2) {
+		} else if (hit_stop2 && base_shift2 == 0) {
 		    if (verbose>5) fprintf(stderr, "%d: Nothing found in loop; continuing.\n", __LINE__);
 
 		    break;
@@ -2059,9 +2095,9 @@ find_known_value_recursion(struct bfi * n, int v_offset,
 		n = 0;
 	    }
 	    goto break_break;
+#else
+	    /*FALLTHROUGH*/
 #endif
-
-	case T_MOV:
 	default:
 	    if(verbose>5) {
 		fprintf(stderr, "Search blocked by: ");
@@ -2106,6 +2142,7 @@ break_break:
     *const_found_p = const_found;
     *known_value_p = known_value;
     *unsafe_p = non_zero_unsafe;
+    if (base_shift_p) *base_shift_p = base_shift;
     if (n_used_p) *n_used_p = n_used;
     if (n_found) {
 	/* If "n" is safe to modify return it too. */
@@ -2125,6 +2162,8 @@ break_break:
 		    SEARCHDEPTH-allow_recursion, v_offset);
 	if (hit_stop_node_p)
 	    fprintf(stderr, ", hitstop=%d", *hit_stop_node_p);
+	if (base_shift_p)
+	    fprintf(stderr, ", base_shift=%d", *base_shift_p);
 	fprintf(stderr, "\n  From ");
 	printtreecell(stderr, 0,n);
 	fprintf(stderr, "\n");
@@ -2139,7 +2178,7 @@ find_known_value(struct bfi * n, int v_offset,
     int unknown_found = 0;
     find_known_value_recursion(n, v_offset,
 		n_found, const_found_p, known_value_p, unsafe_p,
-		SEARCHDEPTH, 0, 0, 0, &unknown_found);
+		SEARCHDEPTH, 0, 0, 0, 0, &unknown_found);
 
     if (unknown_found) {
 	if (verbose>5)
