@@ -2469,7 +2469,8 @@ find_known_calc_state(struct bfi * v)
     if (v->count2 && v->count3 && v->offset2 == v->offset3) {
 	/* This is an unlikely overflow. */
 	if (cell_size<=0 && ov_iadd(v->count2, v->count3) == INT_MIN) {
-	    fprintf(stderr, "T_CALC merge overflow @(%d,%d)\n", v->line, v->col);
+	    if (verbose>5)
+		fprintf(stderr, "T_CALC merge overflow @(%d,%d)\n", v->line, v->col);
 	    return 0;
 	}
 
