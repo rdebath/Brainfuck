@@ -213,6 +213,9 @@ function print_line() {
 	} else if (match(s, ".* "))  {
 	    print substr(s, 1, RLENGTH-1) > of
 	    lstr = substr(lstr, RLENGTH+1);
+	} else if (match(s, ".*[ )}]"))  {
+	    print substr(s, 1, RLENGTH) > of
+	    lstr = substr(lstr, RLENGTH+1);
 	} else {
 	    print lstr > of
 	    lstr = "";
