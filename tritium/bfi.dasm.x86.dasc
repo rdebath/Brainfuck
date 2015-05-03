@@ -83,18 +83,16 @@ checkarg_dynasm(char * opt, char * arg UNUSED)
 |.define REG_P, esi
 |.define REG_A, eax
 |.define REG_AL, al
-|.define REG_B, ebx
-|.define REG_BL, bl
+|.define REG_D, edx
 |.define REG_C, ecx
 |.define REG_Z, edi
 |.else
-|.define REG_P, r15
+|.define REG_P, rbx
 |.define REG_A, eax
 |.define REG_AL, al
-|.define REG_B, edx
-|.define REG_BL, dl
+|.define REG_D, edx
 |.define REG_C, ecx
-|.define REG_Z, ebx
+|.define REG_Z, r14d
 /* Windows is, of course, different.
  * This time it may not even be Microsoft's fault!?!? */
 |.define PRM, rdi
@@ -117,6 +115,8 @@ static int acc_offset = 0;
 static int acc_dirty = 0;
 static int acc_hi_dirty = 0;
 static int tape_step = 0;
+static int acc_const = 0;
+static int acc_const_val = 0;
 
 static void
 clean_acc(void)
@@ -150,11 +150,14 @@ set_acc_offset(int offset)
     acc_loaded = 1;
     acc_dirty = 1;
     acc_hi_dirty = 1;
+    acc_const = 0;
 }
 
 static void
 load_acc_offset(int offset)
 {
+    acc_const = 0;
+
     if (acc_loaded) {
 	if (acc_offset == offset) return;
 	if (acc_dirty)
@@ -254,16 +257,28 @@ run_dynasm(void)
 	    break;
 
 	case T_SET:
-	    set_acc_offset(offset);
-	    if (count == 0) {
-		| xor REG_A, REG_A
-#if 0
-	    } else if (count >= -128 && count < 128) {
-		| lea REG_A, [REG_Z+count]
-#endif
+	    if (acc_const && acc_const_val == count) {
+		set_acc_offset(offset);
+	    } else if (acc_const && acc_const_val+1 == count) {
+		set_acc_offset(offset);
+		| inc REG_A
+	    } else if (acc_const && acc_const_val-1 == count) {
+		set_acc_offset(offset);
+		| dec REG_A
 	    } else {
-		| mov REG_A, count
+		set_acc_offset(offset);
+		if (count == 0) {
+		    | xor REG_A, REG_A
+#if 0
+		} else if (count >= -128 && count < 128) {
+		    | lea REG_A, [REG_Z+count]
+#endif
+		} else {
+		    | mov REG_A, count
+		}
 	    }
+	    acc_const = 1;
+	    acc_const_val = count;
 	    break;
 
 	case T_CALC:
@@ -306,34 +321,34 @@ run_dynasm(void)
 		int count3 = n->count3;
 
 		if (tape_step > 1) {
-		    | mov REG_B, [REG_P+ (n->offset3*tape_step) ]
+		    | mov REG_D, [REG_P+ (n->offset3*tape_step) ]
 		} else {
-		    | movzx REG_B, byte [REG_P+ (n->offset3) ]
+		    | movzx REG_D, byte [REG_P+ (n->offset3) ]
 		}
 
 		if (count3 == -2 || count3 == -3 || count3 == -5) {
-		    | neg REG_B
+		    | neg REG_D
 		    count3 = -count3;
 		}
 
 		if (count3 == -1) {
-		    | neg REG_B
+		    | neg REG_D
 		} else if (count3 == 2) {
-		    | add REG_B, REG_B
+		    | add REG_D, REG_D
 		} else if (count3 == 3) {
-		    | lea REG_B, [REG_B+REG_B*2]
+		    | lea REG_D, [REG_D+REG_D*2]
 		} else if (count3 == 5) {
-		    | lea REG_B, [REG_B+REG_B*4]
+		    | lea REG_D, [REG_D+REG_D*4]
 		} else if (count3 == 6) {
-		    | lea REG_B, [REG_B+REG_B*2]
-		    | add REG_B, REG_B
+		    | lea REG_D, [REG_D+REG_D*2]
+		    | add REG_D, REG_D
 		} else if (count3 == 10) {
-		    | lea REG_B, [REG_B+REG_B*4]
-		    | add REG_B, REG_B
+		    | lea REG_D, [REG_D+REG_D*4]
+		    | add REG_D, REG_D
 		} else if (count3 != 1) {
-		    | imul REG_B, REG_B, (count3)
+		    | imul REG_D, REG_D, (count3)
 		}
-		| add REG_A, REG_B
+		| add REG_A, REG_D
 	    }
 
 	    if (n->count) {
@@ -388,7 +403,7 @@ run_dynasm(void)
 
 	case T_ENDIF:
 	    clean_acc();
-	    acc_loaded = 0;
+	    acc_const = acc_loaded = 0;
 
 	    | =>(n->count):
 	    break;
@@ -420,8 +435,8 @@ run_dynasm(void)
 
 	case T_CHR:
 	    clean_acc();
+	    acc_const = acc_loaded = 0;
 	    /* TODO: Strings */
-	    acc_loaded = 0;
 	    if (count >= -128 && count < 128) {
 		| lea REG_A, [REG_Z+count]
 	    } else {
@@ -453,7 +468,7 @@ run_dynasm(void)
 	    |.if I386
 	    | push REG_A
 	    | call &getch
-	    | pop REG_B
+	    | pop REG_D
 	    |.else
 #ifndef _WIN32
 	    | mov PRM_D, REG_A
@@ -624,6 +639,7 @@ link_and_run(dasm_State ** state)
 	fclose(f);
 	fprintf(stderr, "Dynasm "CPUID" code dumped to file '%s'\n", fname);
 	fprintf(stderr, "codeptr = 0x%lx\n", (unsigned long) codeptr);
+	fprintf(stderr, "size    = %lu\n", (unsigned long) size);
 	fprintf(stderr, "putch   = 0x%lx\n", (unsigned long) &putch);
 	fprintf(stderr, "getch   = 0x%lx\n", (unsigned long) &getch);
 	fprintf(stderr, "failout = 0x%lx\n", (unsigned long) &failout);
