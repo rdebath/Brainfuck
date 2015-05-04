@@ -31,7 +31,7 @@ static void print_nasm_header(void);
 static void print_gas_header(void);
 
 int
-checkarg_nasm(char * opt, char * arg)
+checkarg_nasm(char * opt, char * arg UNUSED)
 {
     if (!strcmp(opt, "-fgas")) { intel_gas = 1; link_main = 1; return 1; }
     if (!strcmp(opt, "-fnasm")) { intel_gas = 0; link_main = 1; return 1; }

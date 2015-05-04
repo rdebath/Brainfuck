@@ -10,7 +10,7 @@
 int BFBasic = 0;
 
 int
-checkarg_bf(char * opt, char * arg)
+checkarg_bf(char * opt, char * arg UNUSED)
 {
     if (!strcmp(opt, "-fbfbasic")) { BFBasic = 1; return 1; }
     return 0;

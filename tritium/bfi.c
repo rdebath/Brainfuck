@@ -142,7 +142,7 @@ int default_io = 1;
  * allowed. The masks will be set to the correct values for the cell size.
  * The cell size may be anything between ONE bit and the sizeof an int.
  */
-int cell_length = 0;/* Number of bits in cell */
+unsigned cell_length = 0;/* Number of bits in cell */
 int cell_size = 0;  /* Number of bits in cell IF they fit in an int. */
 int cell_mask = ~0; /* Mask using & with this. */
 int cell_smask = 0; /* Xor and subtract this; normally MSB of the mask. */
