@@ -132,6 +132,7 @@ char * program_string = 0;
 #endif
 int libc_allows_utf8 = 0;
 int default_io = 1;
+static int insane_ints = 0;
 
 /*
  * The default values here make the compiler assume that the cell is
@@ -240,6 +241,8 @@ void LongUsage(FILE * fd, const char * errormsg)
 	fprintf(fd, "   -v   Verbose, repeat for more.\n");
 	fprintf(fd, "   -b   Use byte cells not integer.\n");
 	fprintf(fd, "   -z   End of file gives 0. -e=-1, -n=skip.\n");
+	if (insane_ints)
+	    fprintf(fd, "\nBEWARE: The C compiler does NOT use twos-complement arithmetic.\n");
 	exit(1);
     }
 
@@ -385,6 +388,9 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("    Many (including dc(1)) don't support -E2,-E3 and -E4.\n");
     printf("    Most code generators only support binary I/O.\n");
 #endif
+
+    if (insane_ints)
+	printf("\nBEWARE: The C compiler does NOT use twos-complement arithmetic.\n");
 
     exit(1);
 }
@@ -579,18 +585,20 @@ main(int argc, char ** argv)
     else iostyle = 0;
 #endif
 
-#if defined(__GNUC__) \
-    && (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 3)
     {
 	int x, flg = sizeof(int) * 8;
-	for(x=1;x+1>x && --flg;x=(x|(x<<1)));
+	for(x=1;x+2>=x && --flg;x=(x|(x<<1))); /* -fwrapv must be enabled */
 	if (!flg) {
+#if defined(__GNUC__) \
+    && (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ > 3)
 	    fprintf(stderr, "Compile failure, we need sane integers\n");
 	    fprintf(stderr, "Please use the -fwrapv option when compiling.\n");
 	    exit(255);
+#else
+	    insane_ints =1;
+#endif
 	}
     }
-#endif
 
     filelist = calloc(argc, sizeof*filelist);
 
