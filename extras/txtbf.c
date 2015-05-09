@@ -39,16 +39,19 @@
 #include <string.h>
 #include <stdlib.h>
 
-void check_if_best(char * name);
 void gen_unzoned(char * buf);
+void check_if_best(char * buf, char * name);
 
 void gen_subrange(char * buf, int subrange, int flg_zoned, int flg_nonl);
 void gen_ascii(char * buf);
 void gen_multonly(char * buf);
+void gen_multbyte(char * buf);
 void gen_nestloop(char * buf);
 void gen_slipnest(char * buf);
 void gen_special(char * buf, char * initcode, char * name);
 void gen_twoflower(char * buf);
+void gen_trislipnest(char * buf);
+
 int runbf(char * prog, int m);
 
 #define MAX_CELLS 256
@@ -64,11 +67,12 @@ int runbf(char * prog, int m);
 /* Some Hello World prefixes */
 #define HELLOCODE  "++++++++++[>+++++++>++++++++++>+++>+<<<<-]"
 #define HELLOCODE1 "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]"
-#define HELLOCODE2 ">+>+>++>++<[>[->++++<<+++>]<<]"
-#define HELLOCODE3 ">+>++++>+>+>+++<[>[->+++<<++>]<<]"
+#define HELLOCODE2 ">+>+>++>++[>[->++++<<+++>]<<]"
+#define HELLOCODE3 ">+>++++>+>+>+++[>[->+++<<++>]<<]"
 #define HELLOCODE4 "+++++++++[>++++++[>++>++>++>++>+<<<<<-]>>+>->>-[<]<-]"
-#define HELLOCODE5 ">+>+>++>+++<[>[->++<<+++>]<<]"
-#define HELLOCODE6 ">+>+>++>+++<[>[->+++<<+++>]<<]"
+#define HELLOCODE5 ">+>+>++>+++[>[->++<<+++>]<<]"
+#define HELLOCODE6 ">+>+>++>+++[>[->+++<<+++>]<<]"
+#define HELLOCODE7 "+++++++[>+++++[>+++>+++>+++<<<-]>+>->>+[<]<-]"
 
 /* This is a prefix for huge ASCII files */
 #define HUGEPREFIX \
@@ -77,6 +81,7 @@ int runbf(char * prog, int m);
 		    "++++++>++++++++++>+++++++++++>+++++<<<<<<<<<<<<-]"
 
 char linebuf[30000];        /* Only one buffer full for searching.  */
+int flg_binary = 0;
 int flg_init = 0;
 int flg_clear = 0;
 int flg_signed = 1;
@@ -85,9 +90,10 @@ int flg_rtz = 0;
 int enable_multloop = 0;
 int enable_multdblloop = 0;
 int multloop_maxcell = 5;
-int multloop_maxinc = 10;
 int multloop_maxloop = 20;
+int multloop_maxinc = 10;
 int flg_nestloop = 0;
+int enable_trislipnest = 0;
 
 int enable_sliploop = 0;
 int sliploop_maxcell = 7;
@@ -110,11 +116,16 @@ char * str_start = 0;
 int str_max = 0, str_next = 0;
 int str_cells_used = 0;
 
+char bf_print_buf[64];
+int bf_print_off = 0;
+
 char * best_str = 0;
 int best_len = -1;
 int best_cells = 1;
 
 char * special_init = 0;
+
+static int cells[MAX_CELLS];
 
 int
 main(int argc, char ** argv)
@@ -131,6 +142,9 @@ main(int argc, char ** argv)
 		verbose = strtol(argv[1]+2, 0, 10);
 	    else
 		verbose++;
+	    argc--; argv++;
+	} else if (strcmp(argv[1], "-binary") == 0) {
+	    flg_binary = 1;
 	    argc--; argv++;
 	} else if (strcmp(argv[1], "-init") == 0) {
 	    flg_init = 1;
@@ -150,12 +164,13 @@ main(int argc, char ** argv)
 	    sliploop_maxind = 8;
 	    enable_multloop = 1;
 	    multloop_maxcell = 7;
-	    multloop_maxinc = 12;
 	    multloop_maxloop = 32;
+	    multloop_maxinc = 12;
 	    enable_multdblloop = 1;
 	    enable_twocell = 1;
 	    enable_subrange = 1;
 	    flg_nestloop = 1;
+	    enable_trislipnest = 1;
 	    argc--; argv++;
 	} else if (strncmp(argv[1], "-I", 2) == 0) {
 	    special_init = argv[1]+2;
@@ -175,8 +190,8 @@ main(int argc, char ** argv)
 	    special_init = RUNNERCODE1;
 	    enable_multloop = 1;
 	    multloop_maxcell = 5;
-	    multloop_maxinc = 10;
 	    multloop_maxloop = 20;
+	    multloop_maxinc = 10;
 	    enable_multdblloop = 0;
 	    enable_subrange = 1;
 	    enable_twocell = 1;
@@ -226,15 +241,15 @@ main(int argc, char ** argv)
 	} else if (strcmp(argv[1], "-mult") == 0) {
 	    enable_multloop = 1;
 	    multloop_maxcell = 5;
-	    multloop_maxinc = 10;
 	    multloop_maxloop = 20;
+	    multloop_maxinc = 10;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-mult2") == 0) {
 	    enable_multloop = 1;
 	    multloop_maxcell = 7;
-	    multloop_maxinc = 12;
 	    multloop_maxloop = 32;
+	    multloop_maxinc = 12;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-q") == 0) {
@@ -249,14 +264,17 @@ main(int argc, char ** argv)
 	    enable_subrange = 1;
 	    argc--; argv++;
 
-	} else if (strncmp(argv[1], "-M", 2) == 0) {
+	} else if (strncmp(argv[1], "-multcell=", 10) == 0) {
 	    enable_multloop = 1;
-	    if (argv[1][2] == '+')
-		multloop_maxinc = atol(argv[1]+3);
-	    if (argv[1][2] == '*')
-		multloop_maxloop = atol(argv[1]+3);
-	    if (argv[1][2] == '=')
-		multloop_maxcell = atol(argv[1]+3);
+	    multloop_maxcell = atol(argv[1]+10);
+	    argc--; argv++;
+	} else if (strncmp(argv[1], "-multloop=", 10) == 0) {
+	    enable_multloop = 1;
+	    multloop_maxloop = atol(argv[1]+10);
+	    argc--; argv++;
+	} else if (strncmp(argv[1], "-multincr=", 10) == 0) {
+	    enable_multloop = 1;
+	    multloop_maxinc = atol(argv[1]+10);
 	    argc--; argv++;
 	} else if (strcmp(argv[1], "-N") == 0) {
 	    flg_nestloop = !flg_nestloop;
@@ -264,6 +282,10 @@ main(int argc, char ** argv)
 
 	} else if (strncmp(argv[1], "-S", 2) == 0) {
 	    special_init = argv[1]+2;
+	    argc--; argv++;
+
+	} else if (strcmp(argv[1], "-tri") == 0) {
+	    enable_trislipnest = !enable_trislipnest;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-h") == 0) {
@@ -287,6 +309,7 @@ main(int argc, char ** argv)
 	    fprintf(stderr, "-D      Search double multiply loops\n");
 	    fprintf(stderr, "-slip   Search short slip loops\n");
 	    fprintf(stderr, "-slip2  Search long slip loops\n");
+	    fprintf(stderr, "-tri    Search trislip loops\n");
 	    fprintf(stderr, "-N      Search nested loops v.long\n");
 	    fprintf(stderr, "-s10    Try just one subrange multiply size\n");
 	    fprintf(stderr, "-M+99   Specify multiply loop max increment\n");
@@ -313,9 +336,11 @@ main(int argc, char ** argv)
 	int override_for_bigtext = 0, last_clear = 0;
 
 	while((c = fgetc(ifd)) != EOF) {
-	    if (c == '\r') { eatnl = 1; c = '\n'; }
-	    else if (c == '\n' && eatnl) { eatnl = 0; continue; }
-	    else eatnl = 0;
+	    if (!flg_binary) {
+		if (c == '\r') { eatnl = 1; c = '\n'; }
+		else if (c == '\n' && eatnl) { eatnl = 0; continue; }
+		else eatnl = 0;
+	    }
 	    if (c == 0) continue;
 
 	    *p++ = c;
@@ -359,6 +384,11 @@ main(int argc, char ** argv)
 	    if (special_init != 0)
 		gen_special(linebuf, special_init, "cmd special");
 
+	    if (enable_twocell) {
+		if (verbose>2) fprintf(stderr, "Trying two cell routine.\n");
+		gen_twoflower(linebuf);
+	    }
+
 	    if (subrange_count <= 0 && !special_init) {
 		if (verbose>2) fprintf(stderr, "Trying special strings\n");
 		gen_special(linebuf, HUGEPREFIX, "big ASCII");
@@ -368,16 +398,12 @@ main(int argc, char ** argv)
 		gen_special(linebuf, RUNNERCODE4, "mult*32 to 128/-96");
 		gen_special(linebuf, HELLOCODE, "hello111 mult");
 		gen_special(linebuf, HELLOCODE1, "hello106 nest");
-		gen_special(linebuf, HELLOCODE2, "hello104 slip");
-		gen_special(linebuf, HELLOCODE3, "hello119 slip");
+		gen_special(linebuf, HELLOCODE2, "hello103 slip");
+		gen_special(linebuf, HELLOCODE3, "hello118 slip");
 		gen_special(linebuf, HELLOCODE4, "hello183 nest");
-		gen_special(linebuf, HELLOCODE5, "hello120 slip");
+		gen_special(linebuf, HELLOCODE5, "hello119 slip");
 		gen_special(linebuf, HELLOCODE6, "BFoRails slip");
-	    }
-
-	    if (enable_twocell) {
-		if (verbose>2) fprintf(stderr, "Trying two cell routine.\n");
-		gen_twoflower(linebuf);
+		gen_special(linebuf, HELLOCODE7, "brainfuck nest");
 	    }
 
 	    if (subrange_count > 0) {
@@ -411,9 +437,19 @@ main(int argc, char ** argv)
 		}
 	    }
 
+	    if (enable_trislipnest) {
+		if (verbose>2) fprintf(stderr, "Trying tri-slip routine.\n");
+		gen_trislipnest(linebuf);
+	    }
+
 	    if (enable_multloop) {
 		if (verbose>2) fprintf(stderr, "Trying multiply loops.\n");
 		gen_multonly(linebuf);
+	    }
+
+	    if (enable_multloop && bytewrap) {
+		if (verbose>2) fprintf(stderr, "Trying byte multiply loops.\n");
+		gen_multbyte(linebuf);
 	    }
 
 	    if (enable_sliploop) {
@@ -472,11 +508,22 @@ output_str(char * s)
 }
 
 void
-check_if_best(char * name)
+check_if_best(char * buf, char * name)
 {
     if (best_len == -1 || best_len > str_next || (best_len == str_next && str_cells_used < best_cells)) {
+
+	memset(cells, 0, sizeof(cells));
+	runbf(str_start, 0);
+	if (strncmp(buf, bf_print_buf, sizeof(bf_print_buf)) != 0) {
+	    fprintf(stderr, "ERROR: Consistancy check for generated BF code FAILED.\n");
+	    fprintf(stderr, "Code: '%s'\n", str_start);
+	    fprintf(stderr, "Problem: \"%s\"\n", buf);
+	    exit(99);
+	}
+
 	if (best_str) free(best_str);
-	best_str = strdup(str_start);
+	best_str = malloc(str_next+1);
+	memcpy(best_str, str_start, str_next+1);
 	best_len = str_next;
 	best_cells = str_cells_used;
     }
@@ -491,8 +538,6 @@ check_if_best(char * name)
 		    name, str_next, str_cells_used);
     }
 }
-
-static int cells[MAX_CELLS];
 
 inline int
 add_chr(int ch)
@@ -730,7 +775,7 @@ gen_subrange(char * buf, int subrange, int flg_zoned, int flg_nonl)
 	currcell = clear_tape(currcell);
     }
 
-    check_if_best(name);
+    check_if_best(buf, name);
 }
 
 /******************************************************************************/
@@ -816,6 +861,7 @@ return_to_top:
 	    for(i=0; i<cellincs[0]; i++)
 		add_chr('+');
 	}
+
 	if (maxcell == 1 && cellincs[1] == 1) {
 	    /* Copy loop */
 	    cells[0] = cellincs[0];
@@ -846,7 +892,162 @@ return_to_top:
 
 	gen_unzoned(buf);
 
-	check_if_best("multiply loop");
+	check_if_best(buf, "multiply loop");
+    }
+}
+
+/******************************************************************************/
+/*
+   This does a brute force search through all the simple multiplier
+   loops upto a certain size for BYTE cells only.
+
+   The text is then generated using a closest next function.
+ */
+void
+gen_multbyte(char * buf)
+{
+    int cellincs[10] = {0};
+    int cellincs2[10] = {0};
+    int maxcell = 0;
+    int currcell=0;
+    int i, cnt, hasneg;
+
+static int bestloopset[256];
+static int bestloopinit[256];
+static int bestloopstep[256];
+static int loopcnt[256][256];
+
+    for(;;)
+    {
+	/* Loop through all possible patterns */
+	for(i=0; ; i++) {
+	    if (i >= multloop_maxcell+1) return;
+	    cellincs[i]++;
+	    if (i == 0) {
+		if (cellincs[i] <= multloop_maxloop) break;
+	    } else {
+		if (cellincs[i] <= multloop_maxinc) break;
+	    }
+	    cellincs[i] = 1;
+	}
+
+	for(maxcell=0; cellincs[maxcell] != 0; )
+	    maxcell++;
+
+	/* I need the basic structure of a loop */
+	if (maxcell < 3) continue;
+
+	maxcell--; currcell=0;
+
+	cellincs2[0] = cellincs[0];
+	hasneg = 0;
+	for(i=maxcell; i>0; i--) {
+	    cellincs2[i] = ((cellincs[i]&1?1:-1) * ((cellincs[i]+1)/2));
+	    if (i>1 && cellincs2[i] < 0)
+		hasneg = 1;
+	}
+	hasneg |= (cellincs2[0]<0 || cellincs2[1] != -1);
+	if (!hasneg) continue;
+
+	/* How many times will this go round. */
+	if ((cnt = loopcnt[cellincs2[0] & 0xFF][cellincs2[1] & 0xFF]) == 0)
+	{
+	    int sum = cellincs2[0];
+	    cnt = 0;
+	    while (sum && cnt < 256) {
+		cnt++;
+		sum = ((sum + (cellincs2[1] & 0xFF)) & 0xFF);
+	    }
+	    loopcnt[cellincs2[0] & 0xFF][cellincs2[1] & 0xFF] = cnt;
+	}
+	if (cnt >= 256) continue;
+
+	/* Remeber the shortest pairing that will get us a specific loop count. */
+	if (bestloopset[cnt] != 0 ) {
+	    if (cellincs2[0] != bestloopinit[cnt] || cellincs2[1] != bestloopstep[cnt]) {
+		if (cellincs2[1]+cellincs2[0] >= bestloopinit[cnt]+bestloopstep[cnt])
+		    continue;
+	    } else {
+		if (cellincs2[1]+cellincs2[0] > bestloopinit[cnt]+bestloopstep[cnt])
+		    continue;
+	    }
+	}
+	bestloopset[cnt] = 1;
+	bestloopinit[cnt] = cellincs2[0];
+	bestloopstep[cnt] = cellincs2[1];
+
+	reinit_state();
+	/* Clear the working cells */
+	if (flg_init) {
+	    for(i=maxcell; i>=0; i--) {
+		    while(currcell < i) { add_chr('>'); currcell++; }
+		    while(currcell > i) { add_chr('<'); currcell--; }
+		    add_str("[-]");
+		    cells[i] = 0;
+	    }
+	}
+
+	str_cells_used = maxcell+1;
+
+	if (cellincs2[0] == 127 && bytewrap) {
+	    add_str(">++[<+>++]<");
+	} else if (cellincs2[0]>15) {
+	    char best_factor[] = {
+		0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,
+		4, 4, 6, 6, 5, 7, 7, 7, 6, 5, 5, 9, 7, 7, 6, 6,
+		8, 8, 8, 7, 6, 6, 6, 6, 8, 8, 7, 7,11, 9, 9, 9};
+
+	    int l,r;
+	    int sr = cellincs2[0];
+	    if (sr<(int)sizeof(best_factor))
+		l = best_factor[sr];
+	    else l = 10;
+	    r = sr/l;
+	    if(r>1) add_chr('>');
+	    for(i=0; i<l; i++) add_chr('+');
+	    if(r>1) {
+		add_str("[<");
+		for(i=0; i<r; i++) add_chr('+');
+		add_str(">-]<");
+	    }
+	    for(i=l*r; i<sr; i++) add_chr('+');
+	} else {
+	    for(i=0; i<cellincs2[0]; i++) add_chr('+');
+	    for(i=0; i<-cellincs2[0]; i++) add_chr('-');
+	}
+
+	if (maxcell == 1 && cellincs2[1] == 1) {
+	    /* Copy loop */
+	    ;
+	} else {
+	    int j;
+	    add_chr('[');
+
+	    for(i=1; i<=maxcell; i++) {
+		for(j=0; j<cellincs2[i]; j++) add_chr('+');
+		for(j=0; j<-cellincs2[i]; j++) add_chr('-');
+		add_chr('>');
+	    }
+
+	    for(i=1; i<=maxcell; i++)
+		add_chr('<');
+
+	    add_chr(']');
+	}
+
+	if (best_len>0 && str_next > best_len) continue;	/* Too big already */
+
+	if (verbose>3)
+	    fprintf(stderr, "Trying byte multiply: %s\n", str_start);
+
+	cells[0] = 0;
+	for(i=2; i<=maxcell; i++) {
+	    cells[i-1] = (0xFF & ( cellincs2[i] * cnt )) ;
+	}
+
+	gen_unzoned(buf);
+
+	check_if_best(buf, "byte multiply loop");
     }
 }
 
@@ -905,8 +1106,6 @@ return_to_top:
 		cellincs[3], cellincs[4], cellincs[5],
 		cellincs[6], cellincs[7], cellincs[8]);
 
-//  ++++++++[>++++[>++>+++>+++>+<<<<-]>+>->+>>+[<]<-]
-
 	for(j=0; j<cellincs[0]; j++)
 	    add_chr('+');
 	add_chr('[');
@@ -964,7 +1163,7 @@ return_to_top:
 
 	gen_unzoned(buf);
 
-	check_if_best("nested loop");
+	check_if_best(buf, "nested loop");
     }
 }
 
@@ -1015,7 +1214,7 @@ return_to_top:
 	    for(j=0; j<cellincs[i]; j++)
 		add_chr('+');
 	}
-	add_str("<[>[->");
+	add_str("[>[->");
 	for(i=0; i<cellincs[0]; i++)
 	    add_chr('+');
 	add_str("<<");
@@ -1038,7 +1237,7 @@ return_to_top:
 
 	gen_unzoned(buf);
 
-	check_if_best("slipping loop");
+	check_if_best(buf, "slipping loop");
     }
 }
 
@@ -1103,7 +1302,7 @@ gen_special(char * buf, char * initcode, char * name)
 	/* Something went wrong; the code is invalid */
 	if (*codeptr) {
 	    fprintf(stderr, "Special code failed to run cellptr=%d countdown=%d iptr=%d '%s'\n",
-		    m, countdown, codeptr-initcode, initcode);
+		    m, countdown, (int)(codeptr-initcode), initcode);
 	    return;
 	}
 	remaining_offset = m;
@@ -1128,12 +1327,16 @@ gen_special(char * buf, char * initcode, char * name)
 
     gen_unzoned(buf);
 
-    check_if_best(name);
+    check_if_best(buf, name);
 }
 
 /*******************************************************************************
  * Given a set of cells and a string to generate them already in the buffer
  * this routine uses those cells to make the string.
+ *
+ * It adds up the number of '<>' and '+-' needed to get each cell to the next
+ * value then chooses the lowest. This is only optimal with repeat counts
+ * below about 10.
  */
 void
 gen_unzoned(char * buf)
@@ -1285,8 +1488,86 @@ gen_twoflower(char * buf)
 
     currcell = clear_tape(currcell);
 
-    check_if_best("twocell");
+    check_if_best(buf, "twocell");
 }
+
+/******************************************************************************/
+/* >+>++>+>+>+++[>[->+++>[->++<]<<<++>]<<] */
+
+void
+gen_trislipnest(char * buf)
+{
+    int cellincs[8] = {0};
+    int maxcell = 0;
+    int currcell=0;
+    int i;
+
+    for(;;)
+    {
+return_to_top:
+	{
+	    for(i=0; ; i++) {
+		if (i == 8) return;
+		cellincs[i]++;
+		if (cellincs[i] > 4)
+		    ;
+		else
+		    break;
+		cellincs[i] = 1;
+	    }
+
+	    maxcell = 8;
+	    currcell=0;
+	}
+
+	reinit_state();
+	if (flg_init) {
+	    /* Clear the working cells */
+	    for(i=maxcell; i>=0; i--) {
+		while(currcell < i) { add_chr('>'); currcell++; }
+		while(currcell > i) { add_chr('<'); currcell--; }
+		add_str("[-]");
+		cells[i] = 0;
+	    }
+	}
+
+	for(i=3;i<8 && cellincs[i];i++) {
+	    int j;
+	    add_chr('>');
+	    for(j=0; j<cellincs[i]; j++)
+		add_chr('+');
+	}
+	add_str("[>[->");
+	for(i=0; i<cellincs[0]; i++)
+	    add_chr('+');
+	add_str(">[->");
+	for(i=0; i<cellincs[1]; i++)
+	    add_chr('+');
+	add_str("<]<<<");
+	for(i=0; i<cellincs[2]; i++)
+	    add_chr('+');
+	add_str(">]<<]");
+
+	if (verbose>3)
+	    fprintf(stderr, "Running triloop: %s\n", str_start);
+
+	if (best_len>0 && str_next > best_len) goto return_to_top;	/* Too big already */
+
+	/* This is the most reliable way of making sure we have the correct
+	 * cells position as produced by the string we've built so far.
+	 */
+	if (runbf(str_start, 0) != 0) continue;
+
+	if (verbose>3)
+	    fprintf(stderr, "Counting triloop\n");
+
+	gen_unzoned(buf);
+
+	check_if_best(buf, "tri sliping loop");
+    }
+}
+
+/******************************************************************************/
 
 struct bfi { int mov; int cmd; int arg; } *pgm = 0;
 int pgmlen = 0;
@@ -1298,7 +1579,7 @@ runbf(char * prog, int m)
     int maxcell = 0, countdown = 10000;
     while((ch = *prog++)) {
 	int r = (ch == '<' || ch == '>' || ch == '+' || ch == '-');
-	if (r || (ch == ']' && j>=0) || ch == '[' ) {
+	if (r || (ch == ']' && j>=0) || ch == '[' || ch == '.') {
 	    if (ch == '<') {ch = '>'; r = -r;}
 	    if (ch == '-') {ch = '+'; r = -r;}
 	    if (r && p>=0 && pgm[p].cmd == ch) { pgm[p].arg += r; continue; }
@@ -1319,6 +1600,7 @@ runbf(char * prog, int m)
     while(j>=0) { p=j; j=pgm[j].arg; pgm[p].arg=0; pgm[p].cmd = '+'; }
     if (!pgm) return 0;
     pgm[n+1].mov = pgm[n+1].cmd = 0;
+    bf_print_off = 0;
 
     for(n=0; ; n++) {
 	m += pgm[n].mov;
@@ -1334,6 +1616,10 @@ runbf(char * prog, int m)
             case '[':   if (cells[m] == 0) n=pgm[n].arg; break;
             case ']':   if (cells[m] != 0) n=pgm[n].arg; break;
             case '>':   m += pgm[n].arg; break;
+	    case '.':
+		if (bf_print_off < sizeof(bf_print_buf))
+		    bf_print_buf[bf_print_off++] = cells[m];
+		break;
         }
     }
 }
