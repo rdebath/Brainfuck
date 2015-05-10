@@ -44,7 +44,7 @@ MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 	 -Wlarger-than=512 -Wstack-usage=512 -Wunsafe-loop-optimizations
 
 OBJECTS=bfi.o bfi.version.o bfi.ccode.o bfi.nasm.o bfi.bf.o bfi.dc.o \
-	clock.o taperam.o
+	bfi.runarray.o clock.o taperam.o
 
 CONF=$(CONF_DYNASM) $(CONF_LIGHTNING) $(CONF_TCCLIB) $(CONF_LIBDL)
 LDLIBS=$(GNUSTK) $(LIBS_LIGHTNING) $(LIBS_TCCLIB) $(GNUDYN) $(LIBS_LIBDL)
