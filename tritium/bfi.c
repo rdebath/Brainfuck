@@ -149,7 +149,7 @@ int cell_mask = ~0; /* Mask using & with this. */
 int cell_smask = 0; /* Xor and subtract this; normally MSB of the mask. */
 char const * cell_type = "C";
 
-char * bfname = "brainfuck";
+const char * bfname = "brainfuck";
 int curr_line = 0, curr_col = 0;
 int cmd_line = 0, cmd_col = 0;
 int bfi_num = 0;
@@ -563,8 +563,8 @@ int
 main(int argc, char ** argv)
 {
     int ar, opton=1;
-    char *p;
-    char ** filelist = 0;
+    const char *p;
+    const char ** filelist = 0;
     int filecount = 0;
 
     program = argv[0];
@@ -671,7 +671,7 @@ main(int argc, char ** argv)
 
     for(ar = 0; ar<filecount; ar++) {
 	FILE * ifd;
-	char * fname = filelist[ar];
+	const char * fname = filelist[ar];
 
 	if (!fname || strcmp(fname, "-") == 0) ifd = stdin;
 	else if ((ifd = fopen(fname, "r")) == 0) {

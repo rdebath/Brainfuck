@@ -1014,7 +1014,15 @@ run_tccode(void)
 
 #if !defined(TCCDONE)
     {
+    static char arg0_tcclib[] = "tcclib";
+    static char * args[] = {arg0_tcclib, 0};
+    /*
+	Hmm, I want to do the above without named initialisers ... so it looks
+	like this ... but without the const problem.
+
     static char * args[] = {"tcclib", 0};
+     */
+
 	if (verbose)
 	    fprintf(stderr, "Running C Code using libtcc tcc_run() to compile & run.\n");
 
@@ -1134,7 +1142,7 @@ compile_and_run(void)
     char cmdbuf[256];
     int ret;
     const char * cc = CC;
-    char * copt = "";
+    const char * copt = "";
     if (opt_level >= 3)
 	copt = " -O3";
 

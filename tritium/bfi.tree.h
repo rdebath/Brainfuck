@@ -15,7 +15,7 @@
 #define __attribute__(__ignored__)
 #endif
 
-extern char * bfname;
+extern const char * bfname;
 extern int noheader, enable_trace, hard_left_limit, memsize, most_neg_maad_loop;
 extern int min_pointer, max_pointer;
 extern int opt_level;
