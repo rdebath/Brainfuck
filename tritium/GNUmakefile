@@ -172,20 +172,22 @@ try-run = $(shell set -e;               \
         fi;                             \
         rm -f "$$TMP" "$$TMPO" )
 
+TRYCC=$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c -x c -
+
 # Does libtcc.h exist ?
 DO_TCC := $(call try-run,\
-	echo '\#include <libtcc.h>' | $(CC) -c -x c - -o "$$TMP",1)
+	echo '\#include <libtcc.h>' | $(TRYCC) -o "$$TMP",1)
 
 # How about lightning.h ?
 DO_LIGHT := $(call try-run,\
 	{ echo '\#include <lightning.h>'; \
 	  echo '\#ifdef jit_addi'; echo '\#error Not V1'; echo '\#endif'; \
-	  } | $(CC) -c -x c - -o "$$TMP",1)
+	  } | $(TRYCC) -o "$$TMP",1)
 
 DO_LIGHT2 := $(call try-run,\
 	{ echo '\#include <lightning.h>'; \
 	  echo '\#ifdef jit_addi_i'; echo '\#error Not V2'; echo '\#endif'; \
-	  } | $(CC) -c -x c - -o "$$TMP",1)
+	  } | $(TRYCC) -o "$$TMP",1)
 
 endif
 
