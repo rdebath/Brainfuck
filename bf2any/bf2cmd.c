@@ -19,6 +19,8 @@ struct stkdat { struct stkdat * up; int id; } *sp = 0;
 int
 check_arg(const char * arg)
 {
+    if (strcmp(arg, "-O") == 0) return 1;
+    if (strcmp(arg, "-intcells") == 0) return sizeof(int)==4;
     return 0;
 }
 
@@ -27,15 +29,62 @@ outcmd(int ch, int count)
 {
     switch(ch) {
     case '!':
-	printf( "%s%d%s%d%s",
+	/*
+	 *  Note: using just "SETLOCAL" here, this way MEMORY cells from this
+	 *  run will be erased at the end, BUT pre-existing cells will not be
+	 *  cleared before the run.
+	 */
+	printf( "%s%d%s",
 	    "@ECHO OFF\r\n"
-	    "SET MEMSIZE=",tapesz,"\r\n"
-	    "SET /A I_=MEMSIZE-1\r\n"
-	    "FOR /L %%P IN (0,1,%I_%) DO SET MEMORY%%P=0\r\n"
+	    "SETLOCAL ENABLEDELAYEDEXPANSION\r\n"
 	    "SET PTR=",tapeinit,"\r\n"
-	    "SET OUTS=\r\n"
+	    "FOR /F %%A IN ('\"PROMPT $H &ECHO ON &FOR %%B IN (1) DO REM\"') DO SET BS=%%A\r\n"
+	    "FOR /F %%A IN ('\"PROMPT $E &ECHO ON &FOR %%B IN (1) DO REM\"') DO SET ESC=%%A\r\n"
 	    );
+
+	puts("SET ASCII=\"#$%%&'()*+,-./0123456789:;<#>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\"\r");
+
+	puts("GOTO :STARTCODE\r");
+	puts("\r");
+
+	puts(":put\r");
+	puts("SET /A CH=MEMORY%PTR%^&127\r");
+	puts("SET /A AC=%CH%-34\r");
+
+	puts("IF %CH% EQU 10 (\r");
+	puts("ECHO.\r");
+	puts(") ELSE IF %CH% EQU 61 (\r");
+	puts("<NUL SET /P=.%BS%=\r");
+	puts(") ELSE IF %CH% EQU 127 (\r");
+	puts("rem\r");
+	puts(") ELSE IF %CH% GTR 34 (\r");
+	puts("<NUL SET /P=!ASCII:~%AC%,1!\r");
+	puts(") ELSE IF %CH% EQU 32 (\r");
+	puts("<NUL SET /P=:%BS% \r");
+	puts(") ELSE IF %CH% EQU 33 (\r");
+	puts("<NUL SET /P=^^!\r");
+	puts(") ELSE IF %CH% EQU 34 (\r");
+	puts("<NUL SET /P=\"\"\"\r");
+	puts(")\r");
+
+	puts("EXIT /B 0\r");
+	puts("\r");
+	puts(":STARTCODE\r");
 	break;
+
+    case '=': printf("SET /A MEMORY%%PTR%%=%d\r\n", count); break;
+    case 'B':
+	    if(bytecell) { puts("SET /A MEMORY%PTR%=MEMORY%PTR%^&255\r"); }
+	    printf( "SET /A V=MEMORY%%PTR%%\r\n");
+	    break;
+
+    case 'M': printf("SET /A MEMORY%%PTR%%=MEMORY%%PTR%%+V*%d\r\n", count); break;
+    case 'N': printf("SET /A MEMORY%%PTR%%=MEMORY%%PTR%%-V*%d\r\n", count); break;
+    case 'S': printf("SET /A MEMORY%%PTR%%=MEMORY%%PTR%%+V\r\n"); break;
+    case 'Q': printf("IF %%V%% NEQ 0 (SET /A MEMORY%%PTR%%=%d )\r\n", count); break;
+    case 'm': printf("IF %%V%% NEQ 0 (SET /A MEMORY%%PTR%%=MEMORY%%PTR%%+V*%d)\r\n", count); break;
+    case 'n': printf("IF %%V%% NEQ 0 (SET /A MEMORY%%PTR%%=MEMORY%%PTR%%-V*%d)\r\n", count); break;
+    case 's': printf("IF %%V%% NEQ 0 (SET /A MEMORY%%PTR%%=MEMORY%%PTR%%+V)\r\n"); break;
 
     case 'X': printf("ECHO Abort Infinite Loop & EXIT\n"); break;
 
@@ -43,26 +92,6 @@ outcmd(int ch, int count)
     case '-': printf("SET /A MEMORY%%PTR%%=MEMORY%%PTR%%-%d\r\n", count); break;
     case '<': printf("SET /A PTR=PTR-%d\r\n", count); break;
     case '>': printf("SET /A PTR=PTR+%d\r\n", count); break;
-
-#if 0	/* Neater version; but very slow */
-    case '[':
-	if(bytecell) { puts("SET /A MEMORY%PTR%=MEMORY%PTR%^&255\r"); }
-	loopid++;
-	printf( ":LOOP%d\r\n", loopid);
-	if(bytecell) { puts("SET /A MEMORY%PTR%=MEMORY%PTR%^&255\r"); }
-	printf( "SET /A M=MEMORY%%PTR%%\r\n"
-		"IF NOT %%M%% == 0 (\r\n"
-		"CALL :WHILE%d\r\n"
-		"GOTO :LOOP%d\r\n"
-		":WHILE%d\r\n",
-		loopid,
-		loopid,
-		loopid);
-	break;
-    case ']':
-	printf("GOTO :EOF\r\n)\r\n");
-	break;
-#endif
 
     case '[':
 	{
@@ -88,7 +117,6 @@ outcmd(int ch, int count)
 	    printf( ":LOOP%dE\r\n", n->id);
 	    free(n);
 	}
-
 	break;
 
     case '.':
@@ -100,31 +128,6 @@ outcmd(int ch, int count)
 	do_input = 1;
 	break;
     case '~':
-	if (do_output) {
-	    puts("IF NOT \"%OUTS%\" == \"\" ECHO.%OUTS%\r");
-	    puts("GOTO :EOF\r");
-	    puts(":put\r");
-	    puts("SET /A CH=MEMORY%PTR%^&127\r");
-	    puts("IF \"%CH%\"==\"10\" (\r");
-	    puts("ECHO.%OUTS%\r");
-	    puts("SET OUTS=\r");
-	    { int i;
-		for(i=' '; i<'~'; i++) {
-		    if (i =='%' || i=='"' || i=='&' || i=='^' || i=='|'
-			|| i=='>' || i=='<' || i=='(' || i==')') {
-			printf(") ELSE IF \"%%CH%%\"==\"%d\" (\r\n", i);
-			printf("SET \"OUTS=%%OUTS%%^%c\"\r\n", i);
-		    } else {
-			printf(") ELSE IF \"%%CH%%\"==\"%d\" (\r\n", i);
-			printf("SET \"OUTS=%%OUTS%%%c\"\r\n", i);
-		    }
-		}
-	    }
-	    printf(") ELSE IF \"%%CH%%\"==\"%d\" (\r\n", 27);
-	    printf("SET \"OUTS=%%OUTS%%%c\"\r\n", 27);
-	    puts(")\r");
-	}
-	puts("GOTO :EOF\r");
 	break;
     }
 }
