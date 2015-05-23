@@ -36,7 +36,10 @@ all:	bf2any.o bf2const.o $(ALLEXE)
 
 clean:
 	-rm -f $(ALLEXE)
-	-rm -f libtcc.lib-off libtcc.lib-on libtcl.lib-off libtcl.lib-on
+	-rm -f libtcc.lib-off libtcc.lib-on
+	-rm -f libtcl.lib-off libtcl.lib-on
+	-rm -f liblua.lib-off liblua.lib-on
+	-rm -f libpy.lib-off libpy.lib-on
 	-rm -f bf2jit.c
 	-rm -f *.o
 
