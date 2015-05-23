@@ -254,8 +254,6 @@ void LongUsage(FILE * fd, const char * errormsg)
 	   "\n"
 #ifndef NO_EXT_BE
 	   "    The default action is to run the code using the fastest option available.\n"
-#else
-	   "    The default action is to run the code using the array interpreter.\n"
 #endif
 	   );
     printf("\n");
@@ -263,12 +261,14 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("   -v   Verbose, repeat for more.\n");
     printf("\n");
     printf("   -r   Run in interpreter.\n");
+#ifndef NO_EXT_BE
     printf("        There are two normal interpreters a tree based one with full profiling\n");
     printf("        and tracing support and a faster array based one.\n");
     printf("        The array based one will be used unless:\n");
     printf("            * The -# option is used.\n");
     printf("            * The -T option is used.\n");
     printf("            * Three or more -v options are used.\n");
+#endif
     printf("\n");
     printf("   -A   Generate output to be compiled or assembled.\n");
     printf("        (opposite of -r, use -b32 to add C header to default.)\n");
@@ -1021,7 +1021,17 @@ process_file(void)
     if (node_type_counts[T_MOV] == 0 && max_pointer >= 0)
 	memsize = max_pointer+1;
 
-#ifndef NO_EXT_BE
+#ifdef NO_EXT_BE
+    if (do_run) {
+	run_tree();
+	if (verbose>2) {
+	    print_tree_stats();
+	    printtree();
+	}
+	unmap_hugeram();
+    } else
+	print_codedump();
+#else
     if (do_run) {
 	if (total_nodes == node_type_counts[T_CHR])
 	    do_codestyle = c_default; /* Be lazy for a 'Hello World'. */
@@ -1030,8 +1040,6 @@ process_file(void)
     }
 
     if (do_codestyle == c_default) {
-#endif
-
 	if (do_run) {
 	    if (verbose>2 || debug_mode || enable_trace
 		|| total_nodes == node_type_counts[T_CHR]) {
@@ -1053,8 +1061,6 @@ process_file(void)
 	    unmap_hugeram();
 	} else
 	    print_codedump();
-
-#ifndef NO_EXT_BE
     } else {
 	if (do_run) {
 
