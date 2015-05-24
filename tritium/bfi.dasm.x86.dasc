@@ -3,10 +3,10 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
-#if _POSIX_MAPPED_FILES
-#include <sys/mman.h>
-#elif defined(_WIN32)
+#if defined(_WIN32)
 # include <windows.h>
+#else
+# include <sys/mman.h>
 #endif
 
 /* LLONG_MAX came in after inttypes.h, limits.h is very old. */
