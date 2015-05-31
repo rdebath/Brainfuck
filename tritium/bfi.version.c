@@ -28,6 +28,8 @@
 #define OSNAME	"Windows"
 #elif defined(__FreeBSD__)
 #define OSNAME	"FreeBSD"
+#elif defined(__OpenBSD__)
+#define OSNAME	"OpenBSD"
 #elif defined(__NetBSD__)
 #define OSNAME	"NetBSD"
 #elif defined(__hpux__)
@@ -49,16 +51,24 @@
 /* And here's the CPUs those OSs were running on */
 #if defined(__x86_64__) || defined(__amd64__) || defined(_M_AMD64)
 #define PROCESSOR	"x64"
+#ifdef __ELF__
 #define BFI_FOUND_CPU_X86_64
+#endif
 #elif defined(__i386__) || defined(_M_IX86)
 #define PROCESSOR	"i386"
+#ifdef __ELF__
 #define BFI_FOUND_CPU_X86_32
+#endif
 #elif defined(__powerpc__) || defined(__PPC__)
 #define PROCESSOR	"PPC"
+#ifdef __ELF__
 #define BFI_FOUND_CPU_PPC
+#endif
 #elif defined(__sparc__)
 #define PROCESSOR	"Sparc"
+#ifdef __ELF__
 #define BFI_FOUND_CPU_SPARC
+#endif
 #elif defined(__arm__)
 #ifdef __thumb2__
 #define PROCESSOR	"ARMv7"	/* Approx, actually ARMv6t2 */
@@ -67,19 +77,14 @@
 #else
 #define PROCESSOR	"ARM"
 #endif
-#define BFI_UNSUPPORTED_CPU_ARM
 #elif defined(__MIPSEL__) || defined(__MIPSEB__)
 #define PROCESSOR	"MIPS"
-#define BFI_UNSUPPORTED_CPU_MIPS
 #elif defined(__SH4__)
 #define PROCESSOR	"SuperH-4"
-#define BFI_UNSUPPORTED_CPU_SH4
 #elif defined(__ia64__)
 #define PROCESSOR	"ia64"
-#define BFI_UNSUPPORTED_CPU_IA64
 #elif defined(__alpha__)
 #define PROCESSOR	"DEC Alpha"
-#define BFI_UNSUPPORTED_CPU_ALPHA
 #elif defined(__vax__)
 #define PROCESSOR	"VAX"
 #elif defined(__asmjs__)
