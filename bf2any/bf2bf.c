@@ -44,7 +44,7 @@
 #define L_BFRLE         0x13    /* bfrle(token, count); */
 #define L_BFXML         0x14    /* bfxml(token, count); */
 #define L_UGLYBF        0x15    /* bfugly(token, count); */
-
+#define L_MALBRAIN      0x16    /* malbrain(token, count); */
 
 static const char bf[] = "><+-.,[]";
 static const char * bfout[] = { ">", "<", "+", "-", ".", ",", "[", "]", 0 };
@@ -333,6 +333,7 @@ static void headsecks(int ch, int count);
 static void bfrle(int ch, int count);
 static void bfxml(int ch, int count);
 static void bfugly(int ch, int count);
+static void malbrain(int ch, int count);
 static void bftranslate(int ch, int count);
 static void bfreprint(void);
 
@@ -498,6 +499,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-rle") == 0) {
 	lang = bc; langclass = L_CRLE; return 1;
     } else
+    if (strcmp(arg, "-malbrain") == 0) {
+	lang = 0; langclass = L_MALBRAIN; return 1;
+    } else
     if (strcmp(arg, "-dump") == 0) {
 	lang = 0; langclass = L_TOKENS; return 1;
     } else
@@ -537,6 +541,7 @@ check_arg(const char * arg)
 	"\n\t"  "-@!     @! from http://esolangs.org/wiki/@tention!"
 	"\n\t"  "-pika   Pikalang from https://github.com/skj3gg/pikalang"
 	"\n\t"  "-cupid  Cupid from http://esolangs.org/wiki/Cupid"
+	"\n\t"  "-malbrain Malbrain translation"
 	"\n\t"  "-dc     Convert to dc(1) using the first of below."
 	"\n\t"  "-dc1      Use an array and a pointer variable."
 	"\n\t"  "-dc2      Use an array with the pointer on the stack (not V7)."
@@ -696,6 +701,7 @@ outcmd(int ch, int count)
     case L_BFRLE:	bfrle(ch, count); break;
     case L_BFXML:	bfxml(ch, count); break;
     case L_UGLYBF:	bfugly(ch, count); break;
+    case L_MALBRAIN:	malbrain(ch, count); break;
     }
 
     if (ch == '~' && (langclass & GEN_HEADER) != 0)
@@ -840,6 +846,19 @@ bfugly(int ch, int count)
 	count >>= 1;
 	stars++;
     }
+}
+
+static void
+malbrain(int ch, int count)
+{
+    char * p;
+
+    if (! (p = strchr(bf,ch))) return;
+    while (p-bf != state) {
+	pc('>');
+	state = ((state + 1) &7);
+    }
+    while (count-->0) pc('.');
 }
 
 /*
