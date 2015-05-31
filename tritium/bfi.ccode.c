@@ -177,7 +177,7 @@ print_c_header(FILE * ofd)
 	    fprintf(ofd, "# ifdef C\n");
 	    fprintf(ofd, "# include <stdint.h>\n");
 	    fprintf(ofd, "# else\n");
-	    fprintf(ofd, "# define C int\n");
+	    fprintf(ofd, "# define C unsigned int\n");
 	    fprintf(ofd, "# endif\n");
 	} else
 	    fprintf(ofd, "#include <stdint.h>\n");
@@ -615,7 +615,7 @@ print_ccode(FILE * ofd)
 			    okay_for_cstr(v->next->count)) {
 		    v = v->next;
 		    if (v->count == '%') got_perc = 1;
-		    if (v->count <= ' ' || v->count > '~' || v->count == '\\' || v->count == '"')
+		    if (v->count < ' ' || v->count > '~' || v->count == '\\' || v->count == '"')
 			slen++;
 		    i++;
 		    slen++;

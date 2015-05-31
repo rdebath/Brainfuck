@@ -3680,5 +3680,5 @@ set_cell_size(int cell_bits)
     else if (cell_bits > (int)sizeof(int)*CHAR_BIT) {
 	UsageInt64();
     } else
-	cell_type = "int";
+	cell_type = "unsigned int";
 }
