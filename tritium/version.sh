@@ -1,6 +1,6 @@
 #!/bin/sh
 # We only need a POSIX shell, but if bash is available it's more likely to be good.
-if [ ! -n "$BASH_VERSION" ];then if [ "`which bash`" != "" ];then exec bash "$0" "$@"; fi ; fi
+if [ ! -n "$BASH_VERSION" ];then if [ "`which 2>/dev/null bash`" != "" ];then exec bash "$0" "$@"; fi ; fi
 
 MAJOR=1
 MINOR=1

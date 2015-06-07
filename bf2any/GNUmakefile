@@ -11,7 +11,7 @@
 #
 # Beware: pkg-config doesn't cope with multiarch.
 
-CC := $(shell ( which gcc clang pcc ; echo cc ) | head -1 | sed 's:.*/::')
+CC := $(shell ( which 2>/dev/null gcc clang pcc ; echo cc ) | head -1 | sed 's:.*/::')
 INSTALL=install -p -s
 INSTALLDIR=/usr/local/bin
 INSTALLEXT=
