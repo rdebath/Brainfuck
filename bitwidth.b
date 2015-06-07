@@ -189,6 +189,18 @@ Multiply by 256 again to get 65536
 	and is likely to prevent almost all forms of optimisation
 	+[[>]<-[,]+[>]<-]
 
+	Clean up any debris
+	>++++++++[[>]+[<]>-]>[>]<[[-]<]<
+
+	Check that an offset of 128 will work
+	+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>-[+<-]
+
+	Check there are enough cells; This takes 18569597 steps
+	It's a bit long but it should be okay for most interpreters
+	>++++++[<+++>-]<+[>+++++++++<-]>+[[->+>+<<]>>
+	[-<<+>>]<[<[->>+<<]+>[->>+<<]+[>]<-]<-]<[-<]
+
 	One last thing: an exclamation point is not a valid BF instruction!
 
 	Print the newline
