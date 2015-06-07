@@ -24,6 +24,9 @@
 #include "dynasm/dasm_x86.h"
 
 static int dump_code = 0;
+static int use_sse4_2 = -1;
+
+static void check_for_sse4_2(void);
 
 int
 checkarg_dynasm(char * opt, char * arg UNUSED)
@@ -32,6 +35,8 @@ checkarg_dynasm(char * opt, char * arg UNUSED)
 	dump_code = 1;
 	return 1;
     }
+    if (!strcmp(opt, "-fsse4_2")) { use_sse4_2 = 1; return 1; }
+    if (!strcmp(opt, "-fno-sse4_2")) { use_sse4_2 = 0; return 1; }
     return 0;
 }
 
@@ -85,12 +90,14 @@ checkarg_dynasm(char * opt, char * arg UNUSED)
 |.define REG_AL, al
 |.define REG_D, edx
 |.define REG_C, ecx
+|.define REG_CW, ecx
 |.else
 |.define REG_P, rbx
 |.define REG_A, eax
 |.define REG_AL, al
 |.define REG_D, edx
 |.define REG_C, ecx
+|.define REG_CW, rcx
 /* Windows is, of course, different.
  * This time it may not even be Microsoft's fault!?!? */
 |.define PRM, rdi
@@ -199,6 +206,8 @@ run_dynasm(void)
 	run_tree();
 	return;
     }
+
+    if (use_sse4_2 < 0) check_for_sse4_2();
 
     dasm_init(Dst, 1);
     dasm_setupglobal(Dst, global_labels, GLOB__MAX);
@@ -353,8 +362,67 @@ run_dynasm(void)
 
 	    break;
 
-	case T_IF:
-	case T_WHL: case T_MULT: case T_CMULT: case T_FOR:
+	case T_WHL:
+	    if (cell_mask == 0xFF && tape_step == 1 && use_sse4_2>0 &&
+		n->next->type == T_MOV && n->next->count == 1 &&
+		n->next->next && n->next->next->jmp == n) {
+
+		/* This is a strlen ...
+		 *  I'm using the "pcmpistri" instruction to allow top speed
+		 *  when I'm doing a long search, but that instruction has a
+		 *  large startup time. So I'm checking [N] and [N+1] manually
+		 *  and if either of them is zero I avoid the overhead.
+		 */
+
+		if (verbose>1)
+		    fprintf(stderr, "Strlen @(%d,%d)\n", n->line, n->col);
+
+		count = n->next->count;
+		load_acc_offset(n->offset);
+		clean_acc();
+		acc_const = acc_loaded = 0;
+
+		| cmp   REG_AL, 0
+		| jz   >1
+		| add REG_P, 1
+		if (acc_offset) {
+		    | movzx REG_A, byte [REG_P+acc_offset]
+		} else {
+		    | movzx REG_A, byte [REG_P]
+		}
+		| cmp   REG_AL, 0
+		| jz   >1
+
+
+		if (n->offset) {
+		    | add REG_P, n->offset
+		}
+
+		| mov        REG_A, -16
+		| pxor       xmm0, xmm0
+
+		| 3:
+		| add        REG_A, 16
+		| pcmpistri  xmm0, [REG_P + REG_A], 0x08
+		| jnz        <3
+
+		| add        REG_C, REG_A
+		| add        REG_P, REG_CW
+
+		if (n->offset) {
+		    | add REG_P, -n->offset
+		}
+
+		load_acc_offset(n->offset);
+		clean_acc();
+
+		| 1:
+
+		n = n->jmp;
+		break;
+	    }
+
+	case T_IF: case T_MULT: case T_CMULT: case T_FOR:
 	    load_acc_offset(n->offset);
 	    clean_acc();
 
@@ -682,5 +750,31 @@ link_and_run(dasm_State ** state)
     (void)VirtualFree(codeptr, 0, MEM_RELEASE);
 #else
     free(codeptr);
+#endif
+}
+
+#ifndef __SSE4_2__
+#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
+#include <cpuid.h>
+#endif
+#endif
+
+static void
+check_for_sse4_2(void)
+{
+#ifdef __SSE4_2__
+    use_sse4_2 = 1;
+#else
+    use_sse4_2 = 0;
+
+#ifdef bit_SSE4_2
+    int i;
+    unsigned a, b, c, d;
+
+    i =  __get_cpuid(1, &a, &b, &c, &d);
+
+    if (i && (c & bit_SSE4_2))
+	use_sse4_2 = 1;
+#endif
 #endif
 }
