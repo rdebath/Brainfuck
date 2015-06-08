@@ -311,7 +311,9 @@ run_dynasm(void)
 		| xor REG_A, REG_A
 	    }
 
-	    if (n->count3 != 0) {
+	    if (n->count3 == 1 && tape_step > 1) {
+		| add REG_A, [REG_P+ (n->offset3*tape_step) ]
+	    } else if (n->count3 != 0) {
 		int count3 = n->count3;
 
 		if (tape_step > 1) {
