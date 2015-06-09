@@ -218,7 +218,7 @@ convert_tree_to_runarray(void)
 }
 
 #if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
-__attribute__((optimize(3),noinline,hot,aligned(64)))
+__attribute__((optimize(3),noinline,hot))
 #endif
 
 static void
