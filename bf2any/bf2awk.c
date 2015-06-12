@@ -20,6 +20,7 @@
 
 int do_input = 0;
 int ind = 0;
+int use_functions = 0;
 #define I printf("%*s", ind*4, "")
 
 static void print_cstring(void);
@@ -29,6 +30,15 @@ check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
     if (strcmp(arg, "-savestring") == 0) return 1;
+    if (strcmp(arg, "-fn") == 0) {
+	use_functions = 1;
+	return 1;
+    }
+    if (strcmp("-h", arg) ==0) {
+	fprintf(stderr, "%s\n",
+	"\t"    "-fn     Use a getch function.");
+	return 1;
+    } else
     return 0;
 }
 
@@ -77,7 +87,6 @@ outcmd(int ch, int count)
 	ind--;
 	printf("}\n");
 
-#ifndef INLINEGETCH
 	if (do_input) {
 	    printf("\n");
 	    printf("function getch() {\n");
@@ -102,7 +111,6 @@ outcmd(int ch, int count)
 	    printf("    m[p] = ord[c]\n");
 	    printf("}\n");
 	}
-#endif
 	break;
 
     case '.':
@@ -111,10 +119,12 @@ outcmd(int ch, int count)
 	break;
     case '"': print_cstring(); break;
 
-#ifndef INLINEGETCH
-    case ',': I; printf("getch()\n"); do_input++; break;
-#else
     case ',':
+	if (use_functions) {
+	    I; printf("getch()\n"); do_input++;
+	    break;
+	}
+
 	I; printf("while(1) {\n");
 	I; printf("    if (goteof) break\n");
 	I; printf("    if (!gotline) {\n");
@@ -139,7 +149,6 @@ outcmd(int ch, int count)
 	I; printf("    break\n");
 	I; printf("}\n");
 	break;
-#endif
     }
 }
 
