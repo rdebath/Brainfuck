@@ -5,14 +5,17 @@
 #include "bf2any.h"
 
 /*
+ * Ksh translation from BF, runs at about 750,000 instructions per second.
  * Bash translation from BF, runs at about 340,000 instructions per second.
  *
- * This is specially optimised for the BASH shell, it's still slower than
+ * This has special optimisations for the BASH shell, it's still slower than
  * all the other modern shells I can find easily.
  */
 
 int do_input = 0;
 int ind = 0;
+int bash_only = 0;
+
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
 
@@ -20,6 +23,14 @@ int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
+    if (strcmp(arg, "-ksh") == 0) { bash_only = 0; return 1; }
+    if (strcmp(arg, "-bash") == 0) { bash_only = 1; return 1; }
+    if (strcmp("-h", arg) ==0) {
+	fprintf(stderr, "%s\n",
+	"\t"    "-bash   Generate special bash code."
+	"\n\t"  "-ksh    Allow for bash or ksh.");
+	return 1;
+    } else
     return 0;
 }
 
@@ -28,8 +39,12 @@ outcmd(int ch, int count)
 {
     switch(ch) {
     case '!':
-	pr("#!/bin/bash");
-	pr("set -f +B");
+	if (bash_only) {
+	    pr("#!/bin/bash");
+	    pr("set -f +B");
+	} else
+	    pr("#!/bin/ksh");
+
 	pr("brainfuck() {");
 	ind++;
         prv("((P=%d))", tapeinit); break;
@@ -69,7 +84,27 @@ outcmd(int ch, int count)
 	pr("}");
 
 	pr("");
-	pr("o(){ printf -v C '\\\\%%04o' $((M[P]&=255)); echo -n -e \"$C\" ; }");
+	if (bash_only)
+	    pr("o(){ printf -v C '\\\\%%04o' $((M[P]&=255)); echo -n -e \"$C\" ; }");
+	else {
+	    pr("");
+	    pr("if [ .`echo -n` = .-n ]");
+	    pr("then");
+	    pr("    echon() { echo \"$1\\c\"; }");
+	    pr("    echoe() { echo \"$1\\c\"; }");
+	    pr("else");
+	    pr("    echon() { echo -n \"$1\"; }");
+	    pr("    if [ .`echo -e` = .-e ]");
+	    pr("    then echoe() { echo -n \"$1\"; }");
+	    pr("    else if [ .`echo -e '\\070\\c'` = .8 ]");
+	    pr("         then echoe() { echo -e \"$1\\c\"; }");
+	    pr("         else echoe() { echo -n -e \"$1\"; }");
+	    pr("         fi");
+	    pr("    fi");
+	    pr("fi");
+	    pr("");
+	    pr("o(){ echoe \"`printf '\\\\\\\\%%04o' $((M[P]&255))`\" ; }");
+	}
 
 	if (do_input) {
 	    pr("");
@@ -89,11 +124,18 @@ outcmd(int ch, int count)
 	    pr("        ((M[P]=10))");
 	    pr("        return");
 	    pr("    }");
-	    pr("    c=\"${line:0:1}\"");
-	    pr("    line=\"${line:1}\"");
-	    pr("");
-	    pr("    printf -v C %%d \\'\"$c\"");
-	    pr("    M[$P]=$C");
+	    if (bash_only) {
+		pr("    c=\"${line:0:1}\"");
+		pr("    line=\"${line:1}\"");
+		pr("");
+		pr("    printf -v C %%d \\'\"$c\"");
+	    } else {
+		pr("    C=\"$line\"");
+		pr("    while [ ${#C} -gt 1 ] ; do C=\"${C%%?}\"; done");
+		pr("    line=\"${line#?}\"");
+		pr("    C=`echon \"$C\" |od -d |awk 'NR==1{print 0+$2;}'`");
+	    }
+	    pr("    ((M[P]=C))");
 	    pr("}");
 	}
 

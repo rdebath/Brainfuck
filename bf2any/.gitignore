@@ -1,7 +1,6 @@
 bf2asmjs
 bf2awk
 bf2bas
-bf2bash
 bf2bf
 bf2cgmp
 bf2clojure
@@ -17,6 +16,7 @@ bf2go
 bf2jit
 bf2jit.c
 bf2julia
+bf2ksh
 bf2lua
 bf2nav
 bf2neko
