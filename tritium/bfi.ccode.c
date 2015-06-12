@@ -99,7 +99,7 @@ checkarg_ccode(char * opt, char * arg)
 #endif
     if (!strcmp(opt, "-dynmem")) {
 	use_dynmem = 1;
-	if (opt_repoint == -1) opt_repoint = 0;
+	if (opt_regen_mov == -1) opt_regen_mov = 0;
 	return 1;
     }
     return 0;

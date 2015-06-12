@@ -167,7 +167,7 @@ X(bf,BF,
 #if XX == 4
     if (do_codestyle == c_bf) {
 	opt_no_calc = opt_no_endif = opt_no_litprt = 1;
-	opt_repoint = 0;
+	opt_regen_mov = 0;
 
 	if (!default_io) {
 	    fprintf(stderr, "The -F option only supports default I/O.\n");

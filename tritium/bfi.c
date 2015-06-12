@@ -119,7 +119,8 @@ int opt_no_endif = 0;
 int opt_no_kv_recursion = 0;
 int opt_no_loop_classify = 0;
 int opt_no_kvmov = 0;
-int opt_repoint = -1;
+int opt_regen_mov = -1;
+int opt_pointerrescan = 0;
 
 int hard_left_limit = -1024;
 int memsize = 0x100000;	/* Default to 1M of tape if otherwise unspecified. */
@@ -353,10 +354,10 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("        Disable loop classification optimisations.\n");
     printf("   -fno-kv-mov\n");
     printf("        Disable T_MOV known value optimisations.\n");
-    printf("   -fno-repoint\n");
-    printf("        Do not recreate pointer movements between loops as last stage.\n");
-    printf("   -frepoint\n");
-    printf("        Recreate pointer movements between loops as last stage.\n");
+    printf("   -fno-loop-offset\n");
+    printf("        Regenerate pointer move tokens to remove offsets to loops.\n");
+    printf("   -fpointer-rescan\n");
+    printf("        Rerun the pointer scan pass after other optimisations.\n");
 #ifndef NO_EXT_BE
     printf("\n");
     printf("C generation extras\n");
@@ -551,8 +552,9 @@ checkarg(char * opt, char * arg)
     } else if (!strcmp(opt, "-fno-kv-recursion")) { opt_no_kv_recursion = 1; return 1;
     } else if (!strcmp(opt, "-fno-loop-classify")) { opt_no_loop_classify = 1; return 1;
     } else if (!strcmp(opt, "-fno-kv-mov")) { opt_no_kvmov = 1; return 1;
-    } else if (!strcmp(opt, "-fno-repoint")) { opt_repoint = 0; return 1;
-    } else if (!strcmp(opt, "-frepoint")) { opt_repoint = 1; return 1;
+    } else if (!strcmp(opt, "-fpointer-rescan")) { opt_pointerrescan = 1; return 1;
+    } else if (!strcmp(opt, "-fno-loop-offset")) { opt_regen_mov = 1; return 1;
+    } else if (!strcmp(opt, "-floop-offset")) { opt_regen_mov = 0; return 1;
     } else if (!strcmp(opt, "-fintio")) { iostyle = 3; opt_no_litprt = 1; default_io=0; return 1;
     } else if (!strcmp(opt, "-help")) { help_flag++; return 1;
     } else if (!strcmp(opt, "-mem")) {
@@ -1008,13 +1010,29 @@ process_file(void)
 	    invariants_scan();
 	    tickend("Time for invariant scan");
 
+	    if (opt_pointerrescan) {
+		tickstart();
+		calculate_stats();
+		if (min_pointer < 0) {
+		    struct bfi * n = tcalloc(1, sizeof*n);
+		    n->inum = bfi_num++;
+		    n->type = T_MOV;
+		    n->orgtype = T_NOP;
+		    n->next = bfprog;
+		    n->count = -min_pointer;
+		    bfprog = n;
+		}
+		pointer_scan();
+		tickend("Time for second pointer scan");
+	    }
+
 	    if (!noheader)
 		trim_trailing_sets();
 	}
 
 	if (opt_runner) try_opt_runner();
 
-	if (opt_repoint != 0)
+	if (opt_regen_mov != 0)
 	    pointer_regen();
 
 	if (verbose>2)
@@ -1597,9 +1615,9 @@ pointer_regen(void)
     int current_shift = 0;
 
     calculate_stats();
-    if (opt_repoint != 1) {
+    if (opt_regen_mov != 1) {
 	if (node_type_counts[T_MOV] == 0) return;
-	if (min_pointer >= -128 && max_pointer <= 127) return;
+	if (min_pointer >= -128 && max_pointer <= 1023) return;
     }
 
     while(n)
@@ -3349,7 +3367,7 @@ print_codedump(void)
 	if (enable_trace)
 	    puts("#define posn(l,c) /* Line l Column c */");
 
-	/* See:  opt_repoint */
+	/* See:  opt_regen_mov */
 	if (node_type_counts[T_MOV])
 	    puts("#define ptradd(x) p += x;");
 

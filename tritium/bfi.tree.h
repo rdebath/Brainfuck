@@ -21,7 +21,7 @@ extern int min_pointer, max_pointer;
 extern int opt_level;
 extern int iostyle, eofcell;
 extern char * input_string;
-extern int opt_repoint;
+extern int opt_regen_mov;
 
 extern unsigned cell_length;
 extern int cell_size;
