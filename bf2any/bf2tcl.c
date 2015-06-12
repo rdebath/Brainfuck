@@ -25,6 +25,7 @@ int do_dump = 0;
 FILE * ofd;
 char * tclcode = 0;
 size_t tclcodesize = 0;
+int use_utf8 = 0;
 
 static void print_cstring(void);
 
@@ -43,6 +44,10 @@ check_arg(const char * arg)
 	return 1;
     } else
 #endif
+    if (strcmp(arg, "-utf8") == 0) {
+	use_utf8 = 1;
+	return 1;
+    } else
     return 0;
 }
 
@@ -61,11 +66,18 @@ outcmd(int ch, int count)
 	} else
 #endif
 	    ofd = stdout;
-	fprintf(ofd, "%s%d%s%d%s",
+	fprintf(ofd, "%s",
 		"#!/usr/bin/tclsh\n"
 		"package require Tcl 8.5\n"
 		"fconfigure stdout -buffering none\n"
-		"fconfigure stdin -buffering none\n"
+		"fconfigure stdin -buffering none\n");
+
+	if (use_utf8) {
+	    oputs("fconfigure stdin -encoding utf-8");
+	    oputs("fconfigure stdout -encoding utf-8");
+	}
+
+	fprintf(ofd, "%s%d%s%d%s",
 		"proc run_bf {} {\n"
 		"set d [lrepeat ",tapesz," 0]\n"
 		"set dc ", tapeinit, "\n");

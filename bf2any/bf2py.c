@@ -20,12 +20,11 @@
  * There is a limit on the number of nested loops was 20 now 100.
  */
 
-/* #define USEOS // else USESYS */
-
 int ind = 0;
 #define I fprintf(ofd, "%*s", ind*4, "")
 
 int do_dump = 0;
+int use_syslib = 1;
 
 FILE * ofd;
 char * pycode = 0;
@@ -49,6 +48,10 @@ check_arg(const char * arg)
 	return 1;
     } else
 #endif
+    if (strcmp(arg, "-oslib") == 0) {
+	use_syslib = 0;
+	return 1;
+    } else
     return 0;
 }
 
@@ -69,11 +72,11 @@ outcmd(int ch, int count)
 	    ofd = stdout;
 
 	fprintf(ofd, "#!/usr/bin/python\n");
-#ifndef USEOS
-	fprintf(ofd, "import sys\n");
-#else
-	fprintf(ofd, "import os\n");
-#endif
+	if (use_syslib)
+	    fprintf(ofd, "import sys\n");
+	else
+	    fprintf(ofd, "import os\n");
+
 	if (tapelen > 0) {
 	    fprintf(ofd, "m = [0] * %d\n", tapesz);
 	} else {
@@ -113,23 +116,33 @@ outcmd(int ch, int count)
 	ind--;
 	break;
 
-#ifndef USEOS
-    case '.': I; fprintf(ofd, "sys.stdout.write(chr(m[p]))\n");
-	      I; fprintf(ofd, "sys.stdout.flush()\n");
-	      break;
-    case ',':
-	I; fprintf(ofd, "c = sys.stdin.read(1);\n");
-	I; fprintf(ofd, "if c != '' :\n");
-	ind++; I; ind--; fprintf(ofd, "m[p] = ord(c)\n");
+    case '.':
+	I; fprintf(ofd, "try:\n");
+	ind++;
+	if (use_syslib) {
+	    I; fprintf(ofd, "sys.stdout.write(chr(m[p]))\n");
+	    I; fprintf(ofd, "sys.stdout.flush()\n");
+	} else {
+	    I; fprintf(ofd, "os.write(1, chr(m[p]).encode('ascii'))\n");
+	}
+	ind--;
+	I; fprintf(ofd, "except:\n");
+	ind++;
+	I; fprintf(ofd, "pass\n");
+	ind--;
 	break;
-#else
-    case '.': I; fprintf(ofd, "os.write(1, chr(m[p]).encode('ascii'))\n"); break;
+
     case ',':
-	I; fprintf(ofd, "c = os.read(0, 1);\n");
-	I; fprintf(ofd, "if c != '' :\n");
-	ind++; I; ind--; fprintf(ofd, "m[p] = ord(c)\n");
+	if (use_syslib) {
+	    I; fprintf(ofd, "c = sys.stdin.read(1);\n");
+	    I; fprintf(ofd, "if c != '' :\n");
+	    ind++; I; ind--; fprintf(ofd, "m[p] = ord(c)\n");
+	} else {
+	    I; fprintf(ofd, "c = os.read(0, 1);\n");
+	    I; fprintf(ofd, "if c != '' :\n");
+	    ind++; I; ind--; fprintf(ofd, "m[p] = ord(c)\n");
+	}
 	break;
-#endif
     }
 
 #ifndef DISABLE_LIBPY

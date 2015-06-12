@@ -106,7 +106,7 @@ print_cstring(void)
 	if (!*str) break;
 
 	if (*str == '\n') gotnl = 1;
-	if (*str == '"' || *str == '\\' || *str == '#') {
+	if (*str == '"' || *str == '\\') {
 	    buf[outlen++] = '\\'; buf[outlen++] = *str;
 	} else if (*str >= ' ' && *str <= '~') {
 	    buf[outlen++] = *str;

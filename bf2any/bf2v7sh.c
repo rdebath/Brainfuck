@@ -184,8 +184,10 @@ outcmd(int ch, int count)
 		    printf("%d ) echon '%c' ;;\n", i, i);
 		else if (i == 10 )
 		    printf("%d ) echo ;;\n", i);
-		else
+		else if (i < 64)
 		    printf("%d ) echoe '\\%03o' ;;\n", i, i);
+		else
+		    printf("%d ) echoe '\\%04o' ;;\n", i, i);
 	    }
 	    printf("esac\n}\n");
 	    printf("%s\n",

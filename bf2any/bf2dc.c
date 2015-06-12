@@ -234,7 +234,7 @@ static void
 print_dcstring(void)
 {
     char * str = get_string();
-    char buf[80];
+    char buf[BUFSIZ];
     size_t outlen = 0;
     int badchar = 0;
 
