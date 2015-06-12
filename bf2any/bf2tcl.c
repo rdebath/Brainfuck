@@ -105,10 +105,10 @@ outcmd(int ch, int count)
 	if(bytecell) { I; oputs("lset d $dc [expr {[lindex $d $dc] % 256}]"); }
 	ind--; I; fprintf(ofd, "}\n");
 	break;
-    case '.': I; oputs("puts -nonewline [format \"%c\" [lindex $d $dc]]"); break;
+    case '.': I; oputs("puts -nonewline [format %c [lindex $d $dc]]"); break;
     case '"': print_cstring(); break;
     case ',':
-	I; oputs("set c [scan [read stdin 1] \"%c\"]");
+	I; oputs("set c [scan [read stdin 1] %c]");
 	I; oputs("if {$c != {}} {lset d $dc $c}");
 	break;
     }
