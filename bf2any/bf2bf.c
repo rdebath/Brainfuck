@@ -473,7 +473,7 @@ check_arg(const char * arg)
     if (strcmp(arg, "-xml") == 0) {
 	lang = 0; langclass = L_BFXML; return 1;
     } else
-    if (strcmp(arg, "-ugly") == 0) {
+    if (strcmp(arg, "-uglybf") == 0) {
 	lang = 0; langclass = L_UGLYBF; return 1;
     } else
     if (strcmp(arg, "-@!") == 0) {
