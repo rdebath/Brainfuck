@@ -173,7 +173,7 @@ print_dc(void)
 	    save_cell(n->offset);
 	    break;
 
-	case T_IF: case T_MULT: case T_CMULT: case T_FOR:
+	case T_IF: case T_MULT: case T_CMULT:
 	case T_WHL:
 	    stackdepth++;
 	    fprintf(ofd, "[\n");

@@ -106,7 +106,7 @@ convert_tree_to_runarray(void)
 	     * T_ADD instructions, but that will only happen if the optimiser
 	     * section is turned off.
 	     */
-	case T_FOR: case T_IF:
+	case T_IF:
 	    p[-1] = T_WHL;
 	    /*FALLTHROUGH*/
 

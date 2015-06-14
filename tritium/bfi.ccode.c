@@ -805,11 +805,6 @@ print_ccode(FILE * ofd)
 		fprintf(ofd, "{\n");
 	    break;
 
-	case T_FOR:
-	    pt(ofd, indent,n);
-	    fprintf(ofd, "for(;M(m[%d]);) {\n", n->offset);
-	    break;
-
 	case T_END:
 	case T_ENDIF:
 	    if (disable_indent) {

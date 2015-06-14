@@ -913,8 +913,7 @@ printtreecell(FILE * efd, int indent, struct bfi * n)
     case T_DEAD: fprintf(efd, "if(0) id=%d, ", n->count); break;
     case T_STOP: fprintf(efd, "[%d], ", n->offset); break;
 
-    case T_FOR: case T_IF: case T_MULT: case T_CMULT:
-    case T_WHL:
+    case T_WHL: case T_IF: case T_MULT: case T_CMULT:
 	fprintf(efd, "[%d],id=%d, ", n->offset, n->count);
 	break;
 
@@ -1291,8 +1290,7 @@ run_tree(void)
 		}
 		break;
 
-	    case T_MULT: case T_CMULT:
-	    case T_IF: case T_FOR:
+	    case T_IF: case T_MULT: case T_CMULT:
 
 	    case T_WHL: if(UM(p[n->offset]) == 0) n=n->jmp;
 		break;
@@ -1514,7 +1512,7 @@ pointer_scan(void)
 		if(n4) n4->prev = n;
 		continue;
 
-	    case T_WHL: case T_MULT: case T_CMULT: case T_FOR: case T_IF:
+	    case T_WHL: case T_IF: case T_MULT: case T_CMULT:
 		if(verbose>4)
 		    fprintf(stderr, "Push round a loop.\n");
 		/* Push this record past the entire loop */
@@ -1606,7 +1604,7 @@ pointer_regen(void)
     {
 	switch(n->type)
 	{
-	case T_WHL: case T_MULT: case T_CMULT: case T_FOR: case T_END:
+	case T_WHL: case T_MULT: case T_CMULT: case T_END:
 	case T_IF: case T_ENDIF:
 	    if (n->offset != current_shift) {
 		if (n->prev && n->prev->type == T_MOV) {
@@ -2052,7 +2050,6 @@ find_known_value_recursion(struct bfi * n, int v_offset,
 	case T_MULT:
 	case T_CMULT:
 	case T_WHL:
-	case T_FOR:
 	    if (n->offset == v_offset)
 		n_used = 1;
 	    if (unmatched_ends>0)
@@ -2339,7 +2336,7 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 	    if (verbose>5) fprintf(stderr, "  Make literal putchar.\n");
 	    return 1;
 
-	case T_IF: case T_FOR: case T_MULT: case T_CMULT:
+	case T_IF: case T_MULT: case T_CMULT:
 	case T_WHL: /* Change to (possible) constant loop or dead code. */
 	    if (!non_zero_unsafe) {
 		if (known_value == 0) {
@@ -2348,17 +2345,15 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 		    return 1;
 		}
 
-		/* A T_IF or a T_FOR with an index of 1 is a simple block */
-		if (v->type == T_IF ||
-		   (v->type == T_FOR && known_value == 1) ) {
+		/* A T_IF is a simple block */
+		if (v->type == T_IF) {
 		    v->type = T_NOP;
 		    v->jmp->type = T_NOP;
-		    if (verbose>5) fprintf(stderr, "  Change Loop to T_NOP.\n");
+		    if (verbose>5) fprintf(stderr, "  Change T_IF to T_NOP.\n");
 		    return 1;
 		}
 
-		if (v->type == T_MULT || v->type == T_CMULT ||
-			v->type == T_FOR || v->type == T_WHL)
+		if (v->type == T_MULT || v->type == T_CMULT || v->type == T_WHL)
 		    return flatten_loop(v, known_value);
 	    }
 	    break;
@@ -2485,7 +2480,7 @@ search_for_update_of_offset(struct bfi *n, struct bfi *v, int n_offset)
     {
 	switch(n->type)
 	{
-	case T_IF: case T_FOR: case T_MULT: case T_CMULT: case T_WHL:
+	case T_WHL: case T_IF: case T_MULT: case T_CMULT:
 
 	case T_ADD: case T_SET: case T_CALC:
 	    if (n->offset == n_offset)
@@ -2901,7 +2896,6 @@ classify_loop(struct bfi * v)
     int has_add = 0;
     int typewas;
     int most_negoff = 0;
-    int complex_loop = 0;
     int nested_loop_count = 0;
 
     if (opt_no_loop_classify) return 0;
@@ -2919,11 +2913,7 @@ classify_loop(struct bfi * v)
     {
 	if (n == 0 || n->type == T_MOV) return 0;
 	if (n->type != T_ADD && n->type != T_SET) {
-	    complex_loop = 1;
-
-	    /* If the loop count is modified inside a subloop this is a problem. */
-	    if (n->orgtype == T_WHL) nested_loop_count++;
-	    if (n->orgtype == T_END) nested_loop_count--;
+	    return 0;
 	} else {
 	    if (n->offset == v->offset) {
 		if (dec_node) return 0; /* Two updates, nope! */
@@ -2950,15 +2940,6 @@ classify_loop(struct bfi * v)
 	if (verbose>4 && v->type != T_IF)
 	    fprintf(stderr, "Possible Infinite loop at %d:%d\n", v->line, v->col);
 	return 0;
-    }
-
-    if (complex_loop) {
-	/* Complex contents but loop is simple so call it a for loop. */
-	if (v->type == T_WHL) {
-	    if(verbose>5) fprintf(stderr, "Changed Complex loop to T_FOR\n");
-	    v->type = T_FOR;
-	}
-	return (v->type != typewas);
     }
 
     /* Found a loop that contains only T_ADD and T_SET where the loop
@@ -3388,7 +3369,7 @@ print_codedump(void)
 	"\n"	"#define set_tmi(o1,o2,o3,o4,o5,o6) p[o1] = o2 + p[o3] * o4 + p[o5] * o6;");
 
 	if(node_type_counts[T_MULT] || node_type_counts[T_CMULT]
-	    || node_type_counts[T_FOR] || node_type_counts[T_WHL]) {
+	    || node_type_counts[T_WHL]) {
 	    puts("#define lp_start(x,y,z,c) while(p[x]) { /* if(p[x]==0) goto y; z: */");
 	    puts("#define lp_end(x,y,z) } /* if(p[x]) goto y; z: */");
 	}
@@ -3557,7 +3538,7 @@ print_codedump(void)
 	    printf("if_end(lbl_%d)\n", n->jmp->count);
 	    break;
 
-	case T_MULT: case T_CMULT: case T_FOR:
+	case T_MULT: case T_CMULT:
 	case T_WHL:
 	    printf("lp_start(%d,lbl_%d,loop_%d,%s)\n",
 		    n->offset, n->count, n->count, tokennames[n->type]);

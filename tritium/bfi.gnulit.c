@@ -304,7 +304,7 @@ run_gnulightning(void)
 	    }
 	    break;
 
-	case T_IF: case T_MULT: case T_CMULT: case T_FOR:
+	case T_IF: case T_MULT: case T_CMULT:
 	case T_WHL:
 	    load_acc_offset(n->offset);
 	    clean_acc();

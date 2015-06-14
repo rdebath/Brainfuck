@@ -301,7 +301,7 @@ print_nasm(void)
 		printf("\tpop ecx\n");
 	    break;
 
-	case T_MULT: case T_CMULT: case T_IF: case T_FOR:
+	case T_MULT: case T_CMULT: case T_IF:
 	case T_WHL:
 
 	    /* Need a "near" for jumps that we know are a long way away because

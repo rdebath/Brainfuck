@@ -83,8 +83,7 @@ print_bf(void)
 	    while(v && v->prev->type != T_END && v->prev->type != T_ENDIF && (
 		n->type == T_MULT ||
 		n->type == T_CMULT ||
-		n->type == T_IF ||
-		n->type == T_FOR));
+		n->type == T_IF));
 	}
 
 	if (n->type == T_MOV) {
@@ -124,7 +123,7 @@ print_bf(void)
 	    break;
 
 	case T_MULT: case T_CMULT:
-	case T_IF: case T_FOR:
+	case T_IF:
 	    nocr = 1;
 	case T_WHL:
 	    putchar('[');
