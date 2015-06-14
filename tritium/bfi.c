@@ -330,10 +330,21 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("   -fintio\n");
     printf("        Use decimal I/O instead of character I/O.\n");
     printf("        Specify before -b1 for cell sizes below 7 bits.\n");
+    printf("   -mem %d\n", memsize);
+    if (!huge_ram_available)
+	printf("        Define allocation size for tape memory.\n");
+    else {
+	printf("        Define array size for generated code.\n");
+	printf("        The '-r' option always uses a huge array.\n");
+    }
+    printf("\n");
+    printf("Optimisation extras\n");
     printf("   -fno-negtape\n");
     printf("        Limit optimiser to no negative tape positions.\n");
     printf("   -fno-calctok\n");
     printf("        Disable the T_CALC token.\n");
+    printf("   -fno-endif\n");
+    printf("        Disable the T_IF and T_ENDIF tokens.\n");
     printf("   -fno-litprt\n");
     printf("        Disable the T_CHR token and printf() strings.\n");
     printf("   -fno-kv-recursion\n");
@@ -346,13 +357,6 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("        Do not recreate pointer movements between loops as last stage.\n");
     printf("   -frepoint\n");
     printf("        Recreate pointer movements between loops as last stage.\n");
-    printf("   -mem %d\n", memsize);
-    if (!huge_ram_available)
-	printf("        Define allocation size for tape memory.\n");
-    else {
-	printf("        Define array size for generated code.\n");
-	printf("        The '-r' option always uses a huge array.\n");
-    }
 #ifndef NO_EXT_BE
     printf("\n");
     printf("C generation extras\n");
@@ -542,6 +546,7 @@ checkarg(char * opt, char * arg)
 	return 1;
     } else if (!strcmp(opt, "-fno-negtape")) { hard_left_limit = 0; return 1;
     } else if (!strcmp(opt, "-fno-calctok")) { opt_no_calc = 1; return 1;
+    } else if (!strcmp(opt, "-fno-endif")) { opt_no_endif = 1; return 1;
     } else if (!strcmp(opt, "-fno-litprt")) { opt_no_litprt = 1; return 1;
     } else if (!strcmp(opt, "-fno-kv-recursion")) { opt_no_kv_recursion = 1; return 1;
     } else if (!strcmp(opt, "-fno-loop-classify")) { opt_no_loop_classify = 1; return 1;
@@ -1594,7 +1599,7 @@ pointer_regen(void)
     calculate_stats();
     if (opt_repoint != 1) {
 	if (node_type_counts[T_MOV] == 0) return;
-	if (min_pointer > -120 && max_pointer < 120) return;
+	if (min_pointer >= -128 && max_pointer <= 127) return;
     }
 
     while(n)
@@ -1755,10 +1760,10 @@ invariants_scan(void)
 	    node_changed = scan_one_node(n2, &n3);
 	    if (!node_changed)
 		node_changed = scan_one_node(n, &n3);
-	    if (!node_changed)
-		node_changed = classify_loop(n2);
-	    if (!node_changed)
-		node_changed = flatten_multiplier(n2);
+	    if (!node_changed && n->type == T_END)
+		    node_changed = classify_loop(n2);
+	    if (!node_changed && (n2->type == T_MULT || n2->type == T_CMULT))
+		    node_changed = flatten_multiplier(n2);
 
 	    if (node_changed)
 		n = n3;
@@ -2418,6 +2423,7 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 			    known_value2 != 0)
 			    return 1;
 
+			if (verbose>5) fprintf(stderr, "    Also move save of loop counter.\n");
 			/* Okay, move it out, before the T_SET */
 			n2 = add_node_after(v);
 			n2->type = n->type;
@@ -2427,8 +2433,7 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 			n->type = T_NOP;
 			return 1;
 		    }
-#endif
-#if 1
+
 		    /* Of course it's unlikely that the programmer zero'd
 		     * the temp first! */
 		    if (n && n->type == T_CALC && n->count == 0 &&
@@ -2450,6 +2455,7 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 			    known_value2 != 0)
 			    return 1;
 
+			if (verbose>5) fprintf(stderr, "    Also move add of loop counter.\n");
 			/* Okay, move it out, before the T_SET */
 			n2 = add_node_after(v);
 			n2->type = n->type;
@@ -2905,7 +2911,8 @@ classify_loop(struct bfi * v)
 	fprintf(stderr, "\n");
     }
 
-    if (!v || v->orgtype != T_WHL) return 0;
+    /* We can only reclassify loops that were loops and STILL ARE */
+    if (!v || v->orgtype != T_WHL || v->type == T_IF) return 0;
     typewas = v->type;
     n = v->next;
     while(n != v->jmp)
@@ -3011,6 +3018,20 @@ classify_loop(struct bfi * v)
 	    }
 	}
     }
+    if (verbose>6) {
+	fprintf(stderr, "Loop is now: ");
+	printtreecell(stderr, 0,v);
+	fprintf(stderr, "\n");
+
+	n = v->next;
+	while(n != v->jmp)
+	{
+	    fprintf(stderr, "\t: ");
+	    printtreecell(stderr, 0,n);
+	    fprintf(stderr, "\n");
+	    n = n->next;
+	}
+    }
     return (v->type != typewas);
 }
 
@@ -3023,7 +3044,7 @@ flatten_multiplier(struct bfi * v)
     struct bfi *n, *dec_node = 0;
     if (v->type != T_MULT && v->type != T_CMULT) return 0;
 
-    if (opt_no_calc || opt_no_endif) return 0;
+    if (opt_no_calc || (opt_no_endif && v->type == T_CMULT)) return 0;
 
     n = v->next;
     while(n != v->jmp)
@@ -3067,6 +3088,20 @@ flatten_multiplier(struct bfi * v)
 	    n1->prev = n2;
 	    n2->next = n1;
 	    if(n1->next) n1->next->prev = n1;
+	}
+    }
+    if (verbose>6) {
+	fprintf(stderr, "Loop is now: ");
+	printtreecell(stderr, 0,v);
+	fprintf(stderr, "\n");
+
+	n = v->next;
+	while(n != v->jmp)
+	{
+	    fprintf(stderr, "\t: ");
+	    printtreecell(stderr, 0,n);
+	    fprintf(stderr, "\n");
+	    n = n->next;
 	}
     }
 
