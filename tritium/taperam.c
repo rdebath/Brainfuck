@@ -146,6 +146,8 @@ map_hugeram(void)
 
     for(;;) {
 	cell_array_alloc_len = tapelength + 2*MEMGUARD;
+	if (hard_left_limit<0)
+	    cell_array_alloc_len += MEMSKIP;
 
 	/* Map the memory and two guard regions */
 	mp = mmap(0, cell_array_alloc_len,
