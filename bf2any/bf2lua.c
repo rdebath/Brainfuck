@@ -318,7 +318,7 @@ print_cstring(char * str)
 	} else {
 	    char buf2[16];
 	    int n;
-	    sprintf(buf2, "\\%03o", *str & 0xFF);
+	    sprintf(buf2, "\\%d", *str & 0xFF);
 	    for(n=0; buf2[n]; n++)
 		buf[outlen++] = buf2[n];
 	}
