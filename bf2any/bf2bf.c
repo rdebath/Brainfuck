@@ -45,6 +45,7 @@
 #define L_BFXML         0x14    /* bfxml(token, count); */
 #define L_UGLYBF        0x15    /* bfugly(token, count); */
 #define L_MALBRAIN      0x16    /* malbrain(token, count); */
+#define L_HANOILOVE     0x17    /* hanoilove(token, count); */
 
 static const char bf[] = "><+-.,[]";
 static const char * bfout[] = { ">", "<", "+", "-", ".", ",", "[", "]", 0 };
@@ -334,6 +335,7 @@ static void bfrle(int ch, int count);
 static void bfxml(int ch, int count);
 static void bfugly(int ch, int count);
 static void malbrain(int ch, int count);
+static void hanoilove(int ch, int count);
 static void bftranslate(int ch, int count);
 static void bfreprint(void);
 
@@ -507,6 +509,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-malbrain") == 0) {
 	lang = 0; langclass = L_MALBRAIN; return 1;
     } else
+    if (strcmp(arg, "-hanoilove") == 0) {
+	lang = 0; langclass = L_HANOILOVE; return 1;
+    } else
     if (strcmp(arg, "-dump") == 0) {
 	lang = 0; langclass = L_TOKENS; return 1;
     } else
@@ -547,6 +552,7 @@ check_arg(const char * arg)
 	"\n\t"  "-pika   Pikalang from https://github.com/skj3gg/pikalang"
 	"\n\t"  "-cupid  Cupid from http://esolangs.org/wiki/Cupid"
 	"\n\t"  "-malbrain Malbrain translation"
+	"\n\t"  "-hanoilove Hanoi Love translation"
 	"\n\t"  "-dc     Convert to dc(1) using the first of below."
 	"\n\t"  "-dc1      Use an array and a pointer variable."
 	"\n\t"  "-dc2      Use an array with the pointer on the stack (not V7)."
@@ -707,6 +713,7 @@ outcmd(int ch, int count)
     case L_BFXML:	bfxml(ch, count); break;
     case L_UGLYBF:	bfugly(ch, count); break;
     case L_MALBRAIN:	malbrain(ch, count); break;
+    case L_HANOILOVE:	hanoilove(ch, count); break;
     }
 
     if (ch == '~' && (langclass & GEN_HEADER) != 0)
@@ -864,6 +871,78 @@ malbrain(int ch, int count)
 	state = ((state + 1) &7);
     }
     while (count-->0) pc('.');
+}
+
+static void
+hanoilove(int ch, int count)
+{
+    /*	Plain translation:
+
+	>       ..,...'...
+	<       .,.'..
+	+       ,.;'...
+	-       .,...`.'...
+	.       .,'"'...
+	,       .,",'...
+	[       ...'..,'...:
+	]       ...,!...;.
+    */
+
+    /*  This is a somewhat better translation.
+	Other options include using binary encoding on stack A to get larger
+	numbers. BUT, this is only useful for larger than (approx) 20.
+     */
+    while (count-->0) switch (ch) {
+    case '#':
+	pc('#');
+	break;
+    case '>':
+	while(state != 1) {state = (state+1)%4; pc('.');}
+	pc('\'');
+	while(state != 2) {state = (state+1)%4; pc('.');}
+	pc(',');
+	break;
+    case '<':
+	while(state != 2) {state = (state+1)%4; pc('.');}
+	pc('\'');
+	while(state != 1) {state = (state+1)%4; pc('.');}
+	pc(',');
+	break;
+    case '+':
+	while(state != 0) {state = (state+1)%4; pc('.');}
+	pc(';');
+	break;
+    case '-':
+	while(state != 0) {state = (state+1)%4; pc('.');}
+	pc('`');
+	break;
+    case '.':
+	/* Beware the '"' command may be interpreted using the next physical
+	   character not the next command character. Also the relative
+	   priority of the stack D special case and the I/O special case
+	   isn't documented.
+	 */
+	while(state == 3) {state = (state+1)%4; pc('.');}
+	if (col+2>maxcol) pc('\n');
+	pc('"'); pc('\'');
+	break;
+    case ',':
+	while(state == 3) {state = (state+1)%4; pc('.');}
+	if (col+2>maxcol) pc('\n');
+	pc('"'); pc(',');
+	break;
+    case '[':
+	while(state != 3) {state = (state+1)%4; pc('.');}
+	pc('\'');
+	pc(':');
+	break;
+    case ']':
+	while(state != 3) {state = (state+1)%4; pc('.');}
+	pc(',');
+	pc('!');
+	pc(';');
+	break;
+    }
 }
 
 /*
