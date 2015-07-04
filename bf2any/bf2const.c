@@ -120,7 +120,9 @@ flush_tape(int no_output, int keep_knowns)
 		    if (p->is_set) {
 			if (enable_be_optim) {
 			    outcmd('=', p->v);
-			} else if (p->cleaned) {
+			} else if (p->cleaned &&
+				(!enable_bf_optim ||
+				 abs(p->v-p->cleaned_val) <= abs(p->v)+3)) {
 			    if (p->v > p->cleaned_val)
 				outcmd('+', p->v-p->cleaned_val);
 			    if (p->v < p->cleaned_val)
