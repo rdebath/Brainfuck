@@ -129,6 +129,11 @@ static const char *zero[] =
 static const char *yolang[] =
     { "yo", "YO", "Yo!", "Yo?", "YO!", "yo?", "yo!", "YO?", 0 };
 
+/* Language: けいおんfuck; https://gist.github.com/wasabili/562178 */
+static const char *k_on_fuck[] =
+    { "うんうんうん", "うんうんたん", "うんたんうん", "うんたんたん",
+      "たんうんうん", "たんうんたん", "たんたんうん", "たんたんたん", 0 };
+
 /* dc(1) using an array and a pointer in another variable */
 static const char *dc1[] =
 {   "lp%d+sp", "lp%d-sp", "lp;a%d+lp:a", "lp;a%d-lp:a",
@@ -469,6 +474,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-yo") == 0) {
 	lang = yolang; langclass = L_JNWORD; return 1;
     } else
+    if (strcmp(arg, "-kon") == 0) {
+	lang = k_on_fuck; langclass = L_JNWORD; return 1;
+    } else
     if (strcmp(arg, "-nyan") == 0) {
 	lang = nyan; langclass = L_JNWORD+GEN_HEADER; return 1;
     } else
@@ -547,6 +555,7 @@ check_arg(const char * arg)
 	"\n\t"  "-chi    In chinese."
 	"\n\t"  "-zero   'zerolang' from mescam on github"
 	"\n\t"  "-yo     'yolang' http://yolang.org/"
+	"\n\t"  "-kon    K-on fuck."
 	"\n\t"  "-nyan   'nyan-script' from tommyschaefer on github"
 	"\n\t"  "-@!     @! from http://esolangs.org/wiki/@tention!"
 	"\n\t"  "-pika   Pikalang from https://github.com/skj3gg/pikalang"
@@ -609,11 +618,14 @@ ps(const char * s)
 
     while (*s) {
 	putchar(*s);
-	/* Count UTF-8 codepoints. This is easy, but actually wrong as
-	 * we really want the display width (eg: Chinese characters are
-	 * double width, usually. */
-	if ((*s&0xC0) != 0x80)
+	/* Count UTF-8 codepoints. This is easy, but actually wrong */
+	if ((*s&0xC0) != 0x80) {
 	    col++;
+	    /* So we add a tiny fix to make Chinese characters double width.
+	     * It's still not right, but no longer quite as wrong */
+	    if ((*s&0xFF) >= 0xE3 && (*s&0xFF) <= 0xEA)
+		col++;
+	}
 	s++;
     }
 }
