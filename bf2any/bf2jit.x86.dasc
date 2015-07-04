@@ -554,6 +554,9 @@ outcmd(int ch, int count)
 #if defined(__minix__)
 #define NO_MPROTECT
 #endif
+#if !defined(MAP_FAILED)
+#define MAP_FAILED (-1)
+#endif
 
 void
 link_and_run(dasm_State ** state)
