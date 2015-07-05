@@ -41,12 +41,13 @@ int ind = 0;
  * Temps: %eax (set to zero for most FN calls)
  */
 
-#define AX	"rax"
+#define AX	"eax"
 #define BX	"rbx"
 #define CX	"rcx"
 #define DX	"rdx"
 #define BP	"rbp"
 #define SP	"rsp"
+#define DI	"edi"
 #endif
 
 int
@@ -93,7 +94,10 @@ outcmd(int ch, int count)
 	break;
     case ',':
 	puts("call getchar");
+	puts("cmp "AX", -1");
+	printf("je %df\n", ind*2+3);
 	puts("mov byte ptr ["BX"], al");
+	printf("%d:\n", ind*2+3);
 	break;
     case '.':
 	puts("movzx "AX", byte ptr ["BX"]");
@@ -102,7 +106,7 @@ outcmd(int ch, int count)
 	puts("call putchar");
 	puts("pop "AX);
 #else
-	puts("mov rdi, "AX);
+	puts("mov "DI", "AX);
 	puts("call putchar");
 #endif
 	break;
