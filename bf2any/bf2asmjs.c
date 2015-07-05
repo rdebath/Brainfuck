@@ -5,7 +5,7 @@
 #include "bf2any.h"
 
 /*
- * Asmjs translation From BF, performance depends on browser.
+ * Asmjs translation From BF, performance depends on browser/interpreter.
  *
  * See: https://github.com/olahol/bf2asmjs
  * And: http://asmjs.org/
@@ -14,7 +14,7 @@
  * has been started. This is done by writing some of the generated loops
  * in a coroutine form and having it return whenever it needs more data.
  * The problem with that is that it needs a Javascript goto and stupidly
- * Javascript doesn't support goto. No matter I can do the same using
+ * Javascript doesn't support goto. No matter, I can do the same using
  * an even more obscure but legal layout, the state machine.
  *
  * Confusion is raised to an even higher level by mixing the two
@@ -23,8 +23,11 @@
  * See: http://www.chiark.greenend.org.uk/~sgtatham/coroutines.html
  *  (But javascript has nothing to hide the ugly details)
  *
- * This obviously needs a simple html wrapper to run it there are two in:
- *  https://github.com/rdebath/LostKingdom
+ * This obviously needs a simple html wrapper to run it in the browser,
+ * there are two in:  https://github.com/rdebath/LostKingdom
+ *
+ * OTOH: The required code to run under nodejs is included directly, no
+ *       other additions are needed.
  */
 
 struct instruction {
@@ -227,9 +230,9 @@ loutcmd(int ch, int count, struct instruction *n)
 	    I; printf("if ((v|0) >= 0) {\n");
 	    ind ++;
 	    I; printf("%s = v;\n", mp);
-	    I; printf("moreinp = 0;\n");
 	    ind --;
-	    I; printf("} else break;\n");
+	    I; printf("} else if ((v|0) < -1) break;\n");
+	    I; printf("moreinp = 0;\n");
 	    ind --;
 	    I; printf("}\n");
 
@@ -283,25 +286,70 @@ loutcmd(int ch, int count, struct instruction *n)
 		"\n"
 		"    return { reset: reset, run: run };\n"
 		"}\n"
-		"\n"
-		"// Save BF function and interface\n"
-		"    ctx[\"BFprogram\"] = BF(ctx, {\n"
-		"        put: function (i) {\n"
-		"                   if (i == 10) {\n"
-		"                       BFoutputText += BFoutputChar + BFoutputLine;\n"
-		"                       BFoutputChar = '\\n';\n"
-		"                       BFoutputLine = '';\n"
-		"                   } else {\n"
-		"                       BFoutputLine += String.fromCharCode(i);\n"
-		"                   }\n"
-		"             }\n"
-		"        , get: function () {\n"
-		"                   var c = BFinputText.charCodeAt(BFinputPtr) || -1;\n"
-		"                   BFinputPtr++;\n"
-		"                   return c;\n"
-		"               }\n"
-		"    }, new ArrayBuffer(%d));\n"
-		"})(this)\n", tapesz * (bytecell?1:4));
+		"\n");
+
+	printf(
+	"// Save BF function and interface"
+"\n"
+"\n"	"    if (typeof process === 'undefined' || typeof process.exit === 'undefined' ||"
+"\n"	"        typeof process.stdout === 'undefined' || typeof process.stdin === 'undefined' ){"
+"\n"
+"\n"	"\tctx[\"BFprogram\"] = BF(ctx, {"
+"\n"	"\t    put: function (i) {"
+"\n"	"\t\t       if (i == 10) {"
+"\n"	"\t\t\t   BFoutputText += BFoutputChar + BFoutputLine;"
+"\n"	"\t\t\t   BFoutputChar = '\\n';"
+"\n"	"\t\t\t   BFoutputLine = '';"
+"\n"	"\t\t       } else {"
+"\n"	"\t\t\t   BFoutputLine += String.fromCharCode(i);"
+"\n"	"\t\t       }"
+"\n"	"\t\t }"
+"\n"	"\t    , get: function () {"
+"\n"	"\t\t       var c = BFinputText.charCodeAt(BFinputPtr) || -2;"
+"\n"	"\t\t       BFinputPtr++;"
+"\n"	"\t\t       return c;"
+"\n"	"\t\t   }"
+"\n"	"\t}, new ArrayBuffer(%d));"
+"\n"
+"\n"	"    } else {"
+"\n"
+"\n"	"\tvar JSinputText = \"\";"
+"\n"	"\tvar JSinputPtr = 0;"
+"\n"
+"\n"	"\tvar BFprogram = BF(global, {"
+"\n"	"\t    put: function (i) {"
+"\n"	"\t\t    process.stdout.write(String.fromCharCode(i));"
+"\n"	"\t\t }"
+"\n"	"\t    , get: function () {"
+"\n"	"\t\t       if (JSinputPtr < 0) return -1;"
+"\n"	"\t\t       var c = JSinputText.charCodeAt(JSinputPtr) || -2;"
+"\n"	"\t\t       JSinputPtr++;"
+"\n"	"\t\t       return c;"
+"\n"	"\t\t   }"
+"\n"	"\t}, new ArrayBuffer(%d));"
+"\n"
+"\n"	"\tif (BFprogram.run() == -1)"
+"\n"	"\t    process.exit(0);"
+"\n"
+"\n"	"\tprocess.stdin.on('readable', function () {"
+"\n"	"\t    var chunk = process.stdin.read();"
+"\n"	"\t    if (chunk !== null) {"
+"\n"	"\t\tJSinputText = \"\" + chunk;"
+"\n"	"\t\tJSinputPtr = 0;"
+"\n"	"\t\tif (BFprogram.run() == -1)"
+"\n"	"\t\t    process.exit(0);"
+"\n"	"\t    }"
+"\n"	"\t});"
+"\n"
+"\n"	"\tprocess.stdin.on('end', function() {"
+"\n"	"\t    JSinputPtr = -1;"
+"\n"	"\t    while (BFprogram.run() != -1) ;"
+"\n"	"\t    process.exit(0);"
+"\n"	"\t});"
+"\n"	"    }"
+"\n"
+"\n"	"})(this)"
+		, tapesz * (bytecell?1:4), tapesz * (bytecell?1:4));
 	break;
 
     }
