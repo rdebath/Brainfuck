@@ -73,8 +73,8 @@ outcmd(int ch, int count)
     case ',': pr("getch"); do_input++; break;
 
     case '[':
-	if(bytecell) { pr("while [[ $((M[P]&=255)) != 0 ]] ; do"); }
-	else { pr("while [[ $((M[P])) != 0 ]] ; do"); }
+	if(bytecell) { pr("while (( (M[P]&=255) != 0)) ; do"); }
+	else { pr("while ((M[P] != 0)) ; do"); }
 	ind++;
 	break;
     case ']': ind--; pr("done"); break;
@@ -87,6 +87,7 @@ outcmd(int ch, int count)
 	if (bash_only)
 	    pr("o(){ printf -v C '\\\\%%04o' $((M[P]&=255)); echo -n -e \"$C\" ; }");
 	else {
+	    int i;
 	    pr("");
 	    pr("if [ .`echo -n` = .-n ]");
 	    pr("then");
@@ -103,7 +104,23 @@ outcmd(int ch, int count)
 	    pr("    fi");
 	    pr("fi");
 	    pr("");
-	    pr("o(){ echoe \"`printf '\\\\\\\\%%04o' $((M[P]&255))`\" ; }");
+
+
+	    pr("# This will work, but it's really slow ...");
+	    pr("# o(){ echoe \"`printf '\\\\\\\\%%04o' $((M[P]&255))`\" ; }");
+	    printf("o() {\n");
+	    printf("case $((M[P]+0)) in\n");
+	    for(i=0; i<256; i++) {
+		if (i >= ' ' && i <= '~' && i != '\'' && i != '\\')
+		    printf("%d ) echon '%c' ;;\n", i, i);
+		else if (i == 10 )
+		    printf("%d ) echo ;;\n", i);
+		else if (i < 64)
+		    printf("%d ) echoe '\\%03o' ;;\n", i, i);
+		else
+		    printf("%d ) echoe '\\%04o' ;;\n", i, i);
+	    }
+	    printf("esac\n}\n");
 	}
 
 	if (do_input) {
