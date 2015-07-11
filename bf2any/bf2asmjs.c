@@ -37,9 +37,11 @@ struct instruction {
     int has_inp;
     struct instruction * next;
     struct instruction * loop;
+    char * cstr;
 } *pgm = 0, *last = 0, *jmpstack = 0;
 
 void loutcmd(int ch, int count, struct instruction *n);
+static void print_cstring(char * str);
 
 static int do_input = 0;
 static int ind = 2;
@@ -48,6 +50,7 @@ static int icount = 0;
 
 static const char * mp;
 static int ptrstep = 1;
+static int tapealloc = 32768;
 
 #define I printf("%*s", ind*4, "")
 #define IO(d) printf("%*s", (ind+(d))*4, "")
@@ -56,6 +59,7 @@ int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
+    if (strcmp(arg, "-savestring") == 0) return 1;
     return 0;
 }
 
@@ -91,7 +95,8 @@ outcmd(int ch, int count)
 	    j->has_inp++;
 	    j=j->loop;
 	}
-    }
+    } else if (ch == '"')
+	n->cstr = strdup(get_string());
 
     if (ch != '~') return;
 
@@ -102,6 +107,8 @@ outcmd(int ch, int count)
 	mp = "m[p>>2]";
 	ptrstep = 4;
     }
+
+    tapealloc = (tapesz + 4096) & -4096;
 
     for(n=pgm; n; n=n->next) {
 	if (n->loop && n->loop->has_inp)
@@ -125,6 +132,8 @@ outcmd(int ch, int count)
     while(pgm) {
 	n = pgm;
 	pgm = pgm->next;
+	if (n->cstr)
+	    free(n->cstr);
 	memset(n, '\0', sizeof*n);
 	free(n);
     }
@@ -149,6 +158,7 @@ loutcmd(int ch, int count, struct instruction *n)
     case '<': I; printf("p = (p - %d)|0;\n", count*ptrstep); break;
     case '>': I; printf("p = (p + %d)|0;\n", count*ptrstep); break;
     case '.': I; printf("o(%s|0);\n", mp); break;
+    case '"': print_cstring(n->cstr); break;
     }
 
     if (n->has_inp == 0) {
@@ -207,7 +217,7 @@ loutcmd(int ch, int count, struct instruction *n)
 		"    var m = new stdlib.Int32Array(heap);\n"
 		);
 	printf("%s%d%s",
-		"    var p = ", tapeinit * (bytecell?1:4), ";\n"
+		"    var p = ", tapeinit * ptrstep, ";\n"
 		"    var v = 0;\n"
 		"    var o = ffi.put;\n"
 		"    var get = ffi.get;\n"
@@ -239,7 +249,7 @@ loutcmd(int ch, int count, struct instruction *n)
 	    printf("%s",
 		"            switch(j|0)\n"
 		"            {\n"
-	        "            case -1: reset(); while((get()|0) != -1);\n"
+	        "            case -1: reset(); while((get()|0) != -257);\n"
 		"            case 0:\n"
 		"                j = 0;\n"
 		);
@@ -266,7 +276,7 @@ loutcmd(int ch, int count, struct instruction *n)
 		"    function reset() {\n"
 		"        var i = 0;\n"
 		"        while ((i|0) < (%d|0)) {\n",
-		tapesz * (bytecell?1:4)
+		tapealloc * ptrstep
 		);
 	if (bytecell)
 	    printf(
@@ -305,7 +315,7 @@ loutcmd(int ch, int count, struct instruction *n)
 "\n"	"\t\t       }"
 "\n"	"\t\t }"
 "\n"	"\t    , get: function () {"
-"\n"	"\t\t       var c = BFinputText.charCodeAt(BFinputPtr) || -2;"
+"\n"	"\t\t       var c = BFinputText.charCodeAt(BFinputPtr) || -257;"
 "\n"	"\t\t       BFinputPtr++;"
 "\n"	"\t\t       return c;"
 "\n"	"\t\t   }"
@@ -330,7 +340,7 @@ loutcmd(int ch, int count, struct instruction *n)
 "\n"	"\t\t }"
 "\n"	"\t    , get: function () {"
 "\n"	"\t\t       if (JSinputPtr < 0) return -1;"
-"\n"	"\t\t       var c = JSinputText.charCodeAt(JSinputPtr) || -2;"
+"\n"	"\t\t       var c = JSinputText.charCodeAt(JSinputPtr) || -257;"
 "\n"	"\t\t       JSinputPtr++;"
 "\n"	"\t\t       return c;"
 "\n"	"\t\t   }"
@@ -357,8 +367,18 @@ loutcmd(int ch, int count, struct instruction *n)
 "\n"	"    }"
 "\n"
 "\n"	"})(this)"
-		, tapesz * (bytecell?1:4), tapesz * (bytecell?1:4));
+	    "\n", tapealloc * ptrstep, tapealloc * ptrstep);
 	break;
 
+    }
+}
+
+static void
+print_cstring(char * str)
+{
+    if (!str) return;
+
+    for( ; *str; str++) {
+	I; printf("o(%d);\n", 255 & *str);
     }
 }
