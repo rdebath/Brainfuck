@@ -49,6 +49,10 @@
 
 */
 
+struct byteonly {
+    char bytes[64+1];
+};
+
 static inline int
 is_big_endian(void)
 {
@@ -77,6 +81,7 @@ main(void)
 #endif
 {
     int e = is_big_endian();
+    int known_weird = 0;
 #if !defined(CHAR_BIT) || !defined(CHAR_MIN) || !defined(CHAR_MAX)
     int char_bit, char_min = 0, char_max = 0;
 #endif
@@ -90,21 +95,53 @@ main(void)
     else
 	printf("LITTLE ENDIAN");
 
-    printf(" C%d:S%d:I%d:L%d P%d\n",
+    printf(" C%d:S%d:I%d:L%d P%d Struct-%d\n",
 	(int)sizeof(char), (int)sizeof(short), (int)sizeof(int),
-	(int)sizeof(long), (int)sizeof(char*));
+	(int)sizeof(long), (int)sizeof(char*), (int)sizeof(struct byteonly)-64);
 
     if ( !(~1==-2) )
 	printf("WARNING: This is not a twos-complement machine\n\n");
 
-    {
-        int y=0, x, flg = sizeof(int) * CHAR_BIT +2;
-        for(x=1;x>y && --flg;y=x,x=(x|(x<<1)));
-	x = sizeof(int) * CHAR_BIT +2 - flg;
+    if (!known_weird) {
+        int x, flg = sizeof(int) * CHAR_BIT +2;
+        for(x=1;x+1>x && --flg;x=(x|(x<<1)));
+	x = sizeof(int) * CHAR_BIT +3 - flg;
+
+	known_weird = 1;
         if (x >= sizeof(int) * CHAR_BIT)
-            printf("WARNING: Signed integers are insane (too big for their bit size).\n");
+            printf("WARNING(A): Signed integers are insane (too big for their bit size).\n");
 	else if (x != sizeof(int) * CHAR_BIT -1)
-	    printf("WARNING: Signed integers have %d magnitude bits.\n", x);
+	    printf("WARNING(A): Signed integers have %d magnitude bits.\n", x);
+	else
+	    known_weird = 0;
+    }
+
+    if (!known_weird) {
+        int x, y=0, flg = sizeof(int) * CHAR_BIT * 2;
+        for(x=1;x>y && --flg;y=x,x=(x<<1));
+	x = sizeof(int) * CHAR_BIT * 2  - flg;
+
+	known_weird = 1;
+        if (x >= sizeof(int) * CHAR_BIT)
+            printf("WARNING(B): Signed integers are insane (too big for their bit size).\n");
+	else if (x != sizeof(int) * CHAR_BIT -1)
+	    printf("WARNING(B): Signed integers have %d magnitude bits.\n", x);
+	else
+	    known_weird = 0;
+    }
+
+    if (!known_weird) {
+        int x, flg = sizeof(int) * CHAR_BIT +2;
+        for(x=1;x+2>=x && --flg;x=(x|(x<<1)));
+	x = sizeof(int) * CHAR_BIT +3 - flg;
+
+	known_weird = 1;
+        if (x >= sizeof(int) * CHAR_BIT)
+            printf("WARNING(C): Signed integers are insane (too big for their bit size).\n");
+	else if (x != sizeof(int) * CHAR_BIT -1)
+	    printf("WARNING(C): Signed integers have %d magnitude bits.\n", x);
+	else
+	    known_weird = 0;
     }
 
 #ifdef __STDC_VERSION__
