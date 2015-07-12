@@ -36,5 +36,4 @@ void interpret(char * pgm) {
 	    }
 	    break;
     }
-    return 0;
 }
