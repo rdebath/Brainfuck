@@ -1,0 +1,33 @@
+%c=qw(XX $p++ XZ $p-- XY D++ YX D-- ZY D&=255;while(D){ YZ D&=255;} YY print+chrD ZZ D=ord(getc) ZX print+join(",",@b),"\n");
+$/=$,;$_=<>;s/[XYZ]//g;s/\(\.\)/X/g;s/\[\.\]/Y/g;s/{\.}/Z/g;s/[^XYZ]//g;s/../$c{$&}; /g;s[D]'$b[$p]'g;eval;
+=begin comment
+
+/* From: https://gist.github.com/ELLIOTTCABLE/402586 */
+/* I wrote “Hello, world!” for whatever mad, mad genius wrote this version of Brainfuck:
+	    http://pastie.org/private/siw6uoan1cd6shuao7r8hw (dead link)
+*/
+
+(.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] {.}[.] (.)(.) (.)[.] (.)[.] (.)[.] (.)[.]
+(.)[.] (.)[.] (.)[.] (.)(.) (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)(.) (.)[.]
+(.)[.] (.)[.] (.)(.) (.)[.] (.){.} (.){.} (.){.} (.){.} [.](.) [.]{.} (.)(.) (.)[.] (.)[.] [.][.] (.)(.) (.)[.]
+[.][.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] [.][.] [.][.] (.)[.] (.)[.] (.)[.] [.][.] (.)(.) (.)[.]
+(.)[.] [.][.] (.){.} (.){.} (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.] (.)[.]
+(.)[.] (.)[.] (.)[.] [.][.] (.)(.) [.][.] (.)[.] (.)[.] (.)[.] [.][.] [.](.) [.](.) [.](.) [.](.) [.](.) [.](.)
+[.][.] [.](.) [.](.) [.](.) [.](.) [.](.) [.](.) [.](.) [.](.) [.][.] (.)(.) (.)[.] [.][.] (.)(.) [.][.]
+
+#{.}[.][.](.)[.]{.}{.}[.]
+
+#   (.)(.)  move memory pointer one right
+#   (.){.}  move memory pointer one left
+#   (.)[.]  increase the current cell
+#   [.](.)  decrease the current cell
+#   [.][.]  output the current cell as character
+#   {.}{.}  input a byte to current cell
+#   [.]{.}  jump back to the corresponding start loop
+#   {.}[.]  if the current cell is zero, jump past the corresponding end loop, otherwise continue
+
+#   {.}(.)  output the current state of the storage tape
+
+#[.]{.}
+
+# See also: http://codegolf.stackexchange.com/questions/84/interpret-brainfuck#answer-933
