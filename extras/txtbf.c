@@ -92,6 +92,7 @@ int enable_multdblloop = 0;
 int multloop_maxcell = 5;
 int multloop_maxloop = 20;
 int multloop_maxinc = 10;
+int multloop_no_prefix = 0;
 int flg_nestloop = 0;
 int enable_trislipnest = 0;
 
@@ -250,6 +251,10 @@ main(int argc, char ** argv)
 	    multloop_maxcell = 7;
 	    multloop_maxloop = 32;
 	    multloop_maxinc = 12;
+	    argc--; argv++;
+
+	} else if (strcmp(argv[1], "-mult-bare") == 0) {
+            multloop_no_prefix = 1;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-q") == 0) {
@@ -704,7 +709,7 @@ gen_subrange(char * buf, int subrange, int flg_zoned, int flg_nonl)
 
     /* Generate the init strings */
     if (maxcell > 1) {
-	if (subrange>15) {
+	if (subrange>15 && !multloop_no_prefix) {
 	    char best_factor[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,
 		4, 4, 6, 6, 5, 7, 7, 7, 6, 5, 5, 9, 7, 7, 6, 6,
@@ -837,7 +842,7 @@ return_to_top:
 
 	if (cellincs[0] == 127 && bytewrap) {
 	    add_str(">++[<+>++]<");
-	} else if (cellincs[0]>15) {
+	} else if (cellincs[0]>15 && !multloop_no_prefix) {
 	    char best_factor[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,
 		4, 4, 6, 6, 5, 7, 7, 7, 6, 5, 5, 9, 7, 7, 6, 6,
@@ -991,7 +996,7 @@ static int loopcnt[256][256];
 
 	if (cellincs2[0] == 127 && bytewrap) {
 	    add_str(">++[<+>++]<");
-	} else if (cellincs2[0]>15) {
+	} else if (cellincs2[0]>15 && !multloop_no_prefix) {
 	    char best_factor[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,
 		4, 4, 6, 6, 5, 7, 7, 7, 6, 5, 5, 9, 7, 7, 6, 6,
@@ -1378,8 +1383,10 @@ gen_unzoned(char * buf)
 	while(diff<0) { add_chr('-'); cells[currcell]--; diff++; }
 	if (bytewrap) cells[currcell] &= 255;
 
-//	while(cells[currcell] < c) { add_chr('+'); cells[currcell]++; }
-//	while(cells[currcell] > c) { add_chr('-'); cells[currcell]--; }
+#if 0
+	while(cells[currcell] < c) { add_chr('+'); cells[currcell]++; }
+	while(cells[currcell] > c) { add_chr('-'); cells[currcell]--; }
+#endif
 
 	if(!add_chr('.')) return;
     }
