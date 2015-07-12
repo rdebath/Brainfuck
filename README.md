@@ -45,23 +45,9 @@ There are several BF interpreters and tools in this repository.
 
   In addition it highlights SOME of the other characters as comments.  Generally it tries (with moderate success) to distinguish between proper comments and sequences that are probably supposed to be comments but actually contain active BF command characters. In addition it tries to identify the 'dead code' style comment loops highlighting any BF command characters within the loop in the 'PreProc' style to distinguish them from commands that may actually be executed.
 
-3. BF 2 Bash.sh
+3. Tritium (officially Ρ‴) this BF interpreter/compiler/JIT runner makes other programs look slow. It is simply the fastest BF interpreter you'll find.
 
-  A brainfuck interpreter written entirely in Bash scripting, it contains no references to external commands and doesn't even invoke a subshell. It's a bit slow, but because it does a tiny bit of optimisation it is just about quick enough for LostKng.b.
-
-4. BF2C.awk
-
-  This awk script does a moderate amount of BF optimisation and converts the BF to a file that it feeds into the system C compiler. I hesitate to call the created language C, because, frankly it'd be a reasonable entry for the IOCCC. Even so the C compiler will compile it and this script will then invoke the created executable. This technically makes this a JIT runner.
-
-5. bf2c_v1.b
-
-  A simple BF to C converter written in BF, it's a direct translation preserving as much of the identity of BF in the final C code as possible. In effect the BF isn't translated, just tokenised.
-  
-6. bf2c_v2.b
-
-  A more complex BF to C converter in BF. This one does run length encoding ... in a rather unusual way.
-  
-7. Brainfuck to anything. Well not exactly anything but the list includes ...
+4. Brainfuck to anything. Well not exactly anything but the list includes ...
   * run -- a direct interpreter -- blisteringly quick too for one without JIT.
   * jit -- OTOH this one uses LuaJIT's Dynasm, it's the fastest bf2any program.
   * crun -- Convert to C and run using libtcc or libdl. TCC quicker than bf2run ... just, GCC is a lot quicker, even without GCC doing any optimisation.
@@ -98,7 +84,10 @@ There are several BF interpreters and tools in this repository.
   The ones marked *no-opt* are not properly optimised as the BE can't generate all the needed op-codes. The ones marked *deoptimised* have even the RLE reverted. The FE can still optimise in all cases, but without the BE optimisation only constant folding will occur.
   They have all been tested using many of the BF programs from the [Esoteric Files Archive](https://github.com/graue/esofiles/tree/master/brainfuck/src) (And of course tortured!)
 
-8. Tritium (officially Ρ‴) this BF interpreter/compiler/JIT runner makes the bf2any programs look slow. It is simply the fastest BF interpreter you'll find.
+5. The 'extras' subdirectory.
+
+6. The 'umueller' directory contains the second brainfuck compiler written by Urban Müller.
+  It was written in June 1993.  The previous one was 296 bytes long, used longword cells (That's 32bits on the Amiga) and did not require 'Amiga OS 2.0'.
 
 Copyrights
 ==========
