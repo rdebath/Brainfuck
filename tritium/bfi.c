@@ -1461,7 +1461,9 @@ pointer_scan(void)
 		}
 		continue;
 
-	    case T_PRT: case T_CHR: case T_INP: case T_ADD: case T_SET:
+	    case T_PRT: case T_CHR: case T_INP:
+	    case T_ADD: case T_SET:
+	    case T_DUMP:
 		if(verbose>4)
 		    fprintf(stderr, "Push past command.\n");
 		/* Put movement after a normal cmd. */
@@ -1497,7 +1499,7 @@ pointer_scan(void)
 		if(n4) n4->prev = n;
 		continue;
 
-	    case T_STOP: case T_DUMP:
+	    case T_STOP:
 		if(verbose>4)
 		    fprintf(stderr, "Push past command.\n");
 		/* Put movement after a normal cmd. */
