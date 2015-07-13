@@ -900,10 +900,8 @@ hanoilove(int ch, int count)
 	]       ...,!...;.
     */
 
-    /*  This is a somewhat better translation.
-	Other options include using binary encoding on stack A to get larger
-	numbers. BUT, this is only useful for larger than (approx) 20.
-     */
+    /*  This is a somewhat better translation. */
+
     while (count-->0) switch (ch) {
     case '#':
 	pc('#');
@@ -921,12 +919,40 @@ hanoilove(int ch, int count)
 	pc(',');
 	break;
     case '+':
-	while(state != 0) {state = (state+1)%4; pc('.');}
-	pc(';');
-	break;
     case '-':
+	if (count > 22) {
+	    int maxbit, v;
+
+	    while(state != 1) {state = (state+1)%4; pc('.');}
+	    pc('\''); // Save reg
+	    while(state != 0) {state = (state+1)%4; pc('.');}
+
+	    for(v=count+1,maxbit=0; v; v>>=1,maxbit++)
+		;
+	    maxbit = (1<<(maxbit-2));
+
+	    // reg = 2
+	    pc(','); pc(';');
+
+	    for(v=count+1; maxbit; ) {
+		if (v & maxbit) pc(';');
+		maxbit >>= 1;
+		if (!maxbit) break;
+		pc('\''); pc(';');
+	    }
+	    pc('\''); // Save count
+
+	    while(state != 1) {state = (state+1)%4; pc('.');}
+	    pc(','); // pop saved reg
+
+	    count = 0;
+	}
 	while(state != 0) {state = (state+1)%4; pc('.');}
-	pc('`');
+
+	if (ch == '+')
+	    pc(';');
+	else
+	    pc('`');
 	break;
     case '.':
 	/* Beware the '"' command may be interpreted using the next physical
@@ -935,12 +961,12 @@ hanoilove(int ch, int count)
 	   isn't documented.
 	 */
 	while(state == 3) {state = (state+1)%4; pc('.');}
-	if (col+2>maxcol) pc('\n');
+	if (col+2>maxcol && maxcol) pc('\n');
 	pc('"'); pc('\'');
 	break;
     case ',':
 	while(state == 3) {state = (state+1)%4; pc('.');}
-	if (col+2>maxcol) pc('\n');
+	if (col+2>maxcol && maxcol) pc('\n');
 	pc('"'); pc(',');
 	break;
     case '[':
