@@ -14,7 +14,8 @@
 
 int do_input = 0;
 int ind = 0;
-int bash_only = 0;
+int select_bash = 0;
+int select_ksh = 0;
 
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
@@ -23,8 +24,8 @@ int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
-    if (strcmp(arg, "-ksh") == 0) { bash_only = 0; return 1; }
-    if (strcmp(arg, "-bash") == 0) { bash_only = 1; return 1; }
+    if (strcmp(arg, "-ksh") == 0) { select_ksh = 1; return 1; }
+    if (strcmp(arg, "-bash") == 0) { select_bash = 1; return 1; }
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-bash   Generate special bash code."
@@ -39,12 +40,13 @@ outcmd(int ch, int count)
 {
     switch(ch) {
     case '!':
-	if (bash_only) {
+	if (select_bash) {
 	    pr("#!/bin/bash");
 	    pr("set -f +B");
 	} else
 	    pr("#!/bin/ksh");
 
+	pr("export LC_ALL=C");
 	pr("brainfuck() {");
 	ind++;
         prv("((P=%d))", tapeinit); break;
@@ -74,7 +76,7 @@ outcmd(int ch, int count)
 
     case '[':
 	if(bytecell) { pr("while (( (M[P]&=255) != 0)) ; do"); }
-	else { pr("while ((M[P] != 0)) ; do"); }
+	else { pr("while ((M[P])) ; do"); }
 	ind++;
 	break;
     case ']': ind--; pr("done"); break;
@@ -83,11 +85,7 @@ outcmd(int ch, int count)
 	ind--;
 	pr("}");
 
-	pr("");
-	if (bash_only)
-	    pr("o(){ printf -v C '\\\\%%04o' $((M[P]&=255)); echo -n -e \"$C\" ; }");
-	else {
-	    int i;
+	if (!select_bash || select_ksh) {
 	    pr("");
 	    pr("if [ .`echo -n` = .-n ]");
 	    pr("then");
@@ -103,11 +101,25 @@ outcmd(int ch, int count)
 	    pr("         fi");
 	    pr("    fi");
 	    pr("fi");
-	    pr("");
+	}
 
+	pr("");
+	if (select_bash && select_ksh) {
+	    pr("o(){");
+	    pr("    if printf -v C '\\\\%%04o' $((M[P]&=255)) 2>/dev/null");
+	    pr("    then echo -n -e \"$C\"");
+	    pr("    else");
+	    pr("        o(){ echoe \"`printf '\\\\\\\\%%04o' $((M[P]&255))`\" ; }");
+	    pr("        o");
+	    pr("    fi");
+	    pr("}");
+	} else if (select_bash)
+	    pr("o(){ printf -v C '\\\\%%04o' $((M[P]&=255)); echo -n -e \"$C\" ; }");
+	else if (select_ksh)
+	    pr("o(){ echoe \"`printf '\\\\\\\\%%04o' $((M[P]&255))`\" ; }");
+	else {
+	    int i;
 
-	    pr("# This will work, but it's really slow ...");
-	    pr("# o(){ echoe \"`printf '\\\\\\\\%%04o' $((M[P]&255))`\" ; }");
 	    printf("o() {\n");
 	    printf("case $((M[P]+0)) in\n");
 	    for(i=0; i<256; i++) {
@@ -141,7 +153,7 @@ outcmd(int ch, int count)
 	    pr("        ((M[P]=10))");
 	    pr("        return");
 	    pr("    }");
-	    if (bash_only) {
+	    if (select_bash) {
 		pr("    c=\"${line:0:1}\"");
 		pr("    line=\"${line:1}\"");
 		pr("");
