@@ -126,6 +126,8 @@ s/%\(.\)/\1%/
 }
 
 /%\./ { 
+    s/=\(....\)\(.*\)/=\1\2\1|/
+
     /0022|$/ {
 	:endprint
 	h
@@ -242,26 +244,17 @@ s/%\(.\)/\1%/
 	s/1333|/./g
 
 	# Ignore non-ASCII and most control characters.
-	s/[023]...|/./g
+	s/0...|//g
+	s/[23]...|/./g
 
 	# Do the "|" symbol last.
 	s/1330|/|/g
 
-	x
-	/^END/ {
-	    # If this is the end of the program let sed print it
-	    x
-	    b EOF
-	}
-	x
 	p
 	x
 	s/:[^:]*$/:/
     }
 
-    /%\./ { 
-	s/=\(....\)\(.*\)/=\1\2\1|/
-    }
     b next
 }
 
@@ -272,8 +265,7 @@ s/%\(.\)/\1%/
 
 # At the use the existing "." code to convert the last of the printout.
 /[0-9][0-9][0-9][0-9]|$/ {
-    s/.*:/END:::/
+    s/.*:/:%::/
     b endprint
 }
-s/.*//
-:EOF
+d
