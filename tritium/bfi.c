@@ -1828,6 +1828,8 @@ invariants_scan(void)
 	if (!node_changed) {
 	    n=n->next;
 	}
+	else if (node_changed && n && n->prev)
+	    n = n->prev;
     }
 }
 
@@ -2234,6 +2236,7 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 		if (n && n->offset == v->offset &&
 			(n->type == T_ADD || n->type == T_CALC) ) {
 		    n->count += v->count;
+		    if (cell_mask > 0) n->count = SM(n->count);
 		    v->type = T_NOP;
 		    if (verbose>5) fprintf(stderr, "  Delete this node.\n");
 		    if (n->count == 0 && n->type == T_ADD) {
@@ -2548,6 +2551,7 @@ find_known_calc_state(struct bfi * v)
 	/* Merge identical sides */
 	v->count2 += v->count3;
 	v->count3 = 0;
+	if (cell_mask > 0) v->count2 = SM(v->count2);
 	rv = 1;
     }
 
@@ -2620,12 +2624,14 @@ find_known_calc_state(struct bfi * v)
     if (const_found2) {
 	v->count += v->count2 * known_value2;
 	v->count2 = 0;
+	if (cell_mask > 0) v->count = SM(v->count);
 	rv = 1;
 	n2_valid = 0;
     }
 
     if (const_found3) {
 	v->count += v->count3 * known_value3;
+	if (cell_mask > 0) v->count = SM(v->count);
 	v->count3 = 0;
 	rv = 1;
     }
@@ -2721,6 +2727,7 @@ find_known_calc_state(struct bfi * v)
 
 	v->offset2 = n2->offset2;
 	v->count2 = v->count2 * n2->count2;
+	if (cell_mask > 0) v->count2 = SM(v->count2);
 
 	n2->type = T_NOP;
 	if (n2->prev) n2->prev->next = n2->next; else bfprog = n2->next;
@@ -2890,13 +2897,16 @@ flatten_loop(struct bfi * v, int constant_count)
     while(1)
     {
 	if (n->type == T_END || n->type == T_ENDIF) break;
-	if (n->type == T_ADD)
+	if (n->type == T_ADD) {
 	    n->count = n->count * constant_count;
+	    if (cell_mask > 0) n->count = SM(n->count);
+	}
 	if (n->type == T_CALC) {
 	    /* n->count2 = pow(n->count2, constant_count) */
 	    int i, j = n->count2;
 	    for(i=0; i<constant_count-1; i++)
 		n->count2 = n->count2 * j;
+	    if (cell_mask > 0) n->count2 = SM(n->count2);
 	}
 	n=n->next;
     }
