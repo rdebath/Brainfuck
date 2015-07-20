@@ -30,7 +30,7 @@
 
 #define L_WORDS         0       /* Words with spaces */
 
-#define L_CWORDS        (L_WORDS+C_HEADERS)
+#define L_CWORDS        (L_JNWORD+C_HEADERS)
 #define L_CDWORDS       (L_WORDS+C_HEADERS+C_DEFINES)
 #define L_CRLE          (L_WORDS+C_HEADERS+C_DEFINES+C_RLE)
 
@@ -39,7 +39,7 @@
 #define L_BF            3       /* Generated code is BF. */
 
 #define L_TOKENS        0x10    /* Print the tokens one per line. */
-#define L_RISBF         0x11    /* while (count-->0) risbf(ch); */
+#define L_RISBF         0x11    /* risbf(token, count); */
 #define L_HEADSECKS     0x12    /* headsecks(token, count); */
 #define L_BFRLE         0x13    /* bfrle(token, count); */
 #define L_BFXML         0x14    /* bfxml(token, count); */
@@ -52,14 +52,14 @@ static const char * bfout[] = { ">", "<", "+", "-", ".", ",", "[", "]", 0 };
 
 /* Language "C" */
 static const char * cbyte[] = { "m+=1;", "m-=1;", "++*m;", "--*m;",
-		   "write(1,m,1);", "read(0,m,1);", "while(*m){", "}", 0 };
+		   "write(1,m,1);", "read(0,m,1);", "while(*m) {", "}", 0 };
 
 static const char * cbyte_rle[] = { ";m+=1", ";m-=1", ";*m+=1", ";*m-=1",
 		   ";write(1,m,1)", ";read(0,m,1)", ";while(*m){", ";}", "+1"};
 
 static const char * cint[] = { "m+=1;", "m-=1;", "++*m;", "--*m;",
-	"putchar(*m);", "{int _c=getchar();if(_c!=EOF)*m=_c;}",
-	"while(*m){", "}", 0 };
+	"putchar(*m);", "{int (_c) = getchar(); if(_c!=EOF) *m=_c; }",
+	"while(*m) {", "}", 0 };
 
 static const char * cint_rle[] = { ";m+=1", ";m-=1", ";*m+=1", ";*m-=1",
 	";putchar(*m)", ";{int _c=getchar();if(_c!=EOF)*m=_c;}",
@@ -111,7 +111,7 @@ static const char * bewbs[] =
 
 /* Language COW: Not quite as simple as some commands aren't direct replacements. */
 static const char * moo[] = {"moO", "mOo", "MoO", "MOo",
-		"MMMMOOMooOOOmooMMM", "OOOMoo", "MOOmoOmOo", "MoOMOomoo"};
+	    "MMM MOO Moo OOO moo MMM", "OOO Moo", "MOO moO mOo", "MoO MOo moo"};
 
 /* Some random Chinese words */
 static const char *chinese[] =
@@ -334,7 +334,7 @@ struct instruction { int ch; int count; struct instruction * next; } *pgm = 0, *
 const char ** doubler = doubler_copy;
 const char ** bfquad = bfquadz;
 
-static void risbf(int ch);
+static void risbf(int ch, int count);
 static void headsecks(int ch, int count);
 static void bfrle(int ch, int count);
 static void bfxml(int ch, int count);
@@ -438,7 +438,7 @@ check_arg(const char * arg)
     if (strcmp(arg, "-blub") == 0) {
 	lang = blub; langclass = L_WORDS; return 1;
     } else
-    if (strcmp(arg, "-moo") == 0) {
+    if (strcmp(arg, "-moo") == 0 || strcmp(arg, "-cow") == 0) {
 	lang = moo; langclass = L_JNWORD; return 1;
     } else
     if (strcmp(arg, "-fk") == 0) {
@@ -617,14 +617,18 @@ ps(const char * s)
     if (L_BASE == L_WORDS && col != 0) pc(' '); else pc(0);
 
     while (*s) {
-	putchar(*s);
-	/* Count UTF-8 codepoints. This is easy, but actually wrong */
-	if ((*s&0xC0) != 0x80) {
-	    col++;
-	    /* So we add a tiny fix to make Chinese characters double width.
-	     * It's still not right, but no longer quite as wrong */
-	    if ((*s&0xFF) >= 0xE3 && (*s&0xFF) <= 0xEA)
+	if (*s == ' ') {
+	    if (L_BASE == L_WORDS && col != 0) pc(' '); else pc(0);
+	} else {
+	    putchar(*s);
+	    /* Count UTF-8 codepoints. This is easy, but actually wrong */
+	    if ((*s&0xC0) != 0x80) {
 		col++;
+		/* So we add a tiny fix to make Chinese characters double width.
+		 * It's still not right, but no longer quite as wrong */
+		if ((*s&0xFF) >= 0xE3 && (*s&0xFF) <= 0xEA)
+		    col++;
+	    }
 	}
 	s++;
     }
@@ -673,22 +677,8 @@ outcmd(int ch, int count)
 	    printf("m += %d;\n", tapeinit);
     }
 
-    if (ch == '!' && (langclass & GEN_HEADER) != 0) {
-	if (L_BASE == L_JNWORD) {
-	    char * basep = strdup(lang[8]);
-	    char * s, * t = basep;
-
-	    while(s=strchr(t, ' '),s) {	/* Whinging GCC */
-		*s = 0;
-		ps(t);
-		t = s+1;
-	    }
-	    ps(t);
-
-	    free(basep);
-	} else
-	    ps(lang[8]);
-    }
+    if (ch == '!' && (langclass & GEN_HEADER) != 0)
+	ps(lang[8]);
 
     switch (L_BASE) {
     case L_WORDS:
@@ -718,7 +708,7 @@ outcmd(int ch, int count)
 	break;
 
     case L_TOKENS:	printf("%c %d\n", ch, count); col = 0; break;
-    case L_RISBF:	while (count-->0) risbf(ch); break;
+    case L_RISBF:	risbf(ch, count); break;
     case L_HEADSECKS:	headsecks(ch, count); break;
     case L_BF:		bftranslate(ch, count); break;
     case L_BFRLE:	bfrle(ch, count); break;
@@ -744,10 +734,180 @@ outcmd(int ch, int count)
     }
 }
 
+/*
+ *  This will output multiple copies of the input code with auto detection
+ *  of the bit sizes. The autodetect is VERY easy to prove by static analysis
+ *  so, in theory, only one of them should make it into the final executable.
+ *
+ *  NB: The bf2const routines are capable of this.
+ *
+ *  In addition the temps required by the double and quad conversions
+ *  are explicitly zeroed after each pointer movement. This should also
+ *  aid more complex forms of static analysis.
+ *
+ */
 static void
-risbf(int ch)
+bftranslate(int ch, int count)
 {
-    switch(ch) {
+    char * p;
+    if ((p = strchr(bf,ch)) || (enable_debug && ch == '#')) {
+	if (bf_multi) {
+	    struct instruction * n = calloc(1, sizeof*n);
+	    if (!n) { perror("bf2multi"); exit(42); }
+
+	    n->ch = ch;
+	    n->count = count;
+	    if (!last) pgm = n; else last->next = n;
+	    last = n;
+	} else {
+	    if (ch == '>' || ch == '<') tmp_clean = 0;
+	    else if (ch == '.' || ch == ',' || ch == '#') ;
+	    else if (!tmp_clean && lang[8]) {
+		pmc(lang[8]); tmp_clean = 1;
+	    }
+	    if (ch == '#') pc('\n');
+	    if (p)
+		while(count-->0) pmc(lang[p-bf]);
+	    else
+		pc(ch);
+	    if (ch == '#') pc('\n');
+	}
+	return;
+    }
+
+    if (ch == '!') {
+	if (bf_multi == 1 || bf_multi == 2 || bf_multi == 4)
+	    bf_multi = 0;
+    }
+
+    if (ch == '~' && bf_multi) {
+	/* Note: All these cell size checks assume the cell size, if limited,
+	 * is a power of two. The three below are the normal sizes, anything
+	 * over 65536 is assumed to be large enough.
+	 *
+	 * The tests can be reordered and the compacted lump in the first
+	 * section can be manually replaced by the original code if wanted.
+	 */
+	if ((bf_multi & 7) == 7) {
+	    /* This generates 65536 to check for larger than 16bit cells. */
+	    pc(0); puts("// This generates 65536 to check for larger than 16bit cells");
+	    pmc(">[-]<[-]++[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]+>[");
+	    pmc(">\n\n");
+
+	    pc(0); puts("// This code may be replaced by the original source");
+	    lang = bfout; bfreprint();
+	    pc('\n'); puts("// to here");
+
+	    pmc("\n<[-]]<\n\n");
+
+	    pc(0); puts("// This section is cell doubling for 16bit cells");
+	    /* This generates 256 to check for larger than byte cells. */
+	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]<[");
+
+	    /* This generates 65536 to check for cells upto 16 bits */
+	    pmc("[-]>[-]++[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]+<[>-<[-]]>[");
+	    pmc(">");
+	    pmc("\n\n");
+
+	    lang = doubler; bfreprint();
+
+	    pmc("\n\n");
+	    pmc("<[-]]<");
+	    pmc("[-]]\n\n");
+
+	    pc(0); puts("// This section is cell quadrupling for 8bit cells");
+	    /* This generates 256 to check for cells upto 8 bits */
+	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]+<[>-<[-]]>[>");
+	    pmc("\n\n");
+
+	    lang = bfquad; bfreprint();
+
+	    pmc("\n\n");
+	    pmc("<[-]]<");
+	} else if ((bf_multi & 7) != 5) {
+	    /* The two cell size checks here are independent, they can be
+	     * reordered or used on their own.
+	     */
+
+	    /* This generates 256 to check for larger than byte cells. */
+	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]");
+	    pmc("<[" ">>\n\n");
+
+	    if ((bf_multi&1) == 0) lang = doubler; else lang = bfout;
+	    bfreprint();
+
+	    pmc("\n\n<<[-]]\n\n");
+
+	    /* This generates 256 to check for cells upto 8 bits */
+	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]");
+	    pmc("+<[>-<[-]]>[>");
+
+	    pmc("\n\n");
+
+	    if(bf_multi&4) lang = bfquad;
+	    else if (bf_multi&2) lang = doubler;
+	    bfreprint();
+
+	    pmc("\n\n");
+	    pmc("<[-]]<");
+	} else {
+	    /* Eight bit and thirty two bit. */
+	    /* This condition is a bit more difficult to optimise and a bit
+	     * smaller than the simple multiply list above.
+	     * It checks for binary cells of 16bits or less. */
+	    pmc("++>>+++++[-<<[->++++++++<]>[-<+>]>]<");
+	    pmc("+<[[-]>>");
+	    pmc("\n\n");
+
+	    lang = bfout;
+	    bfreprint();
+
+	    /* This is an "else" condition, the code cannot be resequenced */
+	    pmc("\n\n");
+	    pmc("<[-]<[-]]>[>");
+	    pmc("\n\n");
+
+	    lang = bfquad;
+	    bfreprint();
+
+	    pmc("\n\n");
+	    pmc("<[-]]<");
+	}
+    }
+}
+
+static void
+bfreprint(void)
+{
+    struct instruction * n = pgm;
+    tmp_clean = 0;
+    for(; n; n=n->next) {
+	int ch = n->ch;
+	int count = n->count;
+	char * p;
+	if ((p = strchr(bf,ch))) {
+	    if (ch == '>' || ch == '<') tmp_clean = 0;
+	    else if (ch == '.' || ch == ',') ;
+	    else if (!tmp_clean && lang[8]) {
+		pmc(lang[8]); tmp_clean = 1;
+	    }
+	    while(count-->0) pmc(lang[p-bf]);
+	} else {
+	    if (ch == '#') pc('\n');
+	    pc(ch);
+	    if (ch == '#') pc('\n');
+	}
+    }
+}
+
+/******************************************************************************/
+/*       Now some other small, but not completely trivial tranlations.        */
+/******************************************************************************/
+
+static void
+risbf(int ch, int count)
+{
+    while(count-->0) switch(ch) {
     case '>':
 	if (state!=1) pc('*'); state=1;
 	pc('+');
@@ -980,171 +1140,5 @@ hanoilove(int ch, int count)
 	pc('!');
 	pc(';');
 	break;
-    }
-}
-
-/*
- *  This will output multiple copies of the input code with auto detection
- *  of the bit sizes. The autodetect is VERY easy to prove by static analysis
- *  so, in theory, only one of them should make it into the final executable.
- *
- *  NB: The bf2const routines are capable of this.
- *
- *  In addition the temps required by the double and quad conversions
- *  are explicitly zeroed after each pointer movement. This should also
- *  aid more complex forms of static analysis.
- *
- */
-static void
-bftranslate(int ch, int count)
-{
-    char * p;
-    if ((p = strchr(bf,ch)) || (enable_debug && ch == '#')) {
-	if (bf_multi) {
-	    struct instruction * n = calloc(1, sizeof*n);
-	    if (!n) { perror("bf2multi"); exit(42); }
-
-	    n->ch = ch;
-	    n->count = count;
-	    if (!last) pgm = n; else last->next = n;
-	    last = n;
-	} else {
-	    if (ch == '>' || ch == '<') tmp_clean = 0;
-	    else if (ch == '.' || ch == ',' || ch == '#') ;
-	    else if (!tmp_clean && lang[8]) {
-		pmc(lang[8]); tmp_clean = 1;
-	    }
-	    if (ch == '#') pc('\n');
-	    if (p)
-		while(count-->0) pmc(lang[p-bf]);
-	    else
-		pc(ch);
-	    if (ch == '#') pc('\n');
-	}
-	return;
-    }
-
-    if (ch == '!') {
-	if (bf_multi == 1 || bf_multi == 2 || bf_multi == 4)
-	    bf_multi = 0;
-    }
-
-    if (ch == '~' && bf_multi) {
-	/* Note: All these cell size checks assume the cell size, if limited,
-	 * is a power of two. The three below are the normal sizes, anything
-	 * over 65536 is assumed to be large enough.
-	 *
-	 * The tests can be reordered and the compacted lump in the first
-	 * section can be manually replaced by the original code if wanted.
-	 */
-	if ((bf_multi & 7) == 7) {
-	    /* This generates 65536 to check for larger than 16bit cells. */
-	    pc(0); puts("// This generates 65536 to check for larger than 16bit cells");
-	    pmc(">[-]<[-]++[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]+>[");
-	    pmc(">\n\n");
-
-	    pc(0); puts("// This code may be replaced by the original source");
-	    lang = bfout; bfreprint();
-	    pc('\n'); puts("// to here");
-
-	    pmc("\n<[-]]<\n\n");
-
-	    pc(0); puts("// This section is cell doubling for 16bit cells");
-	    /* This generates 256 to check for larger than byte cells. */
-	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]<[");
-
-	    /* This generates 65536 to check for cells upto 16 bits */
-	    pmc("[-]>[-]++[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]+<[>-<[-]]>[");
-	    pmc(">");
-	    pmc("\n\n");
-
-	    lang = doubler; bfreprint();
-
-	    pmc("\n\n");
-	    pmc("<[-]]<");
-	    pmc("[-]]\n\n");
-
-	    pc(0); puts("// This section is cell quadrupling for 8bit cells");
-	    /* This generates 256 to check for cells upto 8 bits */
-	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]+<[>-<[-]]>[>");
-	    pmc("\n\n");
-
-	    lang = bfquad; bfreprint();
-
-	    pmc("\n\n");
-	    pmc("<[-]]<");
-	} else if ((bf_multi & 7) != 5) {
-	    /* The two cell size checks here are independent, they can be
-	     * reordered or used on their own.
-	     */
-
-	    /* This generates 256 to check for larger than byte cells. */
-	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]");
-	    pmc("<[" ">>\n\n");
-
-	    if ((bf_multi&1) == 0) lang = doubler; else lang = bfout;
-	    bfreprint();
-
-	    pmc("\n\n<<[-]]\n\n");
-
-	    /* This generates 256 to check for cells upto 8 bits */
-	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]");
-	    pmc("+<[>-<[-]]>[>");
-
-	    pmc("\n\n");
-
-	    if(bf_multi&4) lang = bfquad;
-	    else if (bf_multi&2) lang = doubler;
-	    bfreprint();
-
-	    pmc("\n\n");
-	    pmc("<[-]]<");
-	} else {
-	    /* Eight bit and thirty two bit. */
-	    /* This condition is a bit more difficult to optimise and a bit
-	     * smaller than the simple multiply list above.
-	     * It checks for binary cells of 16bits or less. */
-	    pmc("++>>+++++[-<<[->++++++++<]>[-<+>]>]<");
-	    pmc("+<[[-]>>");
-	    pmc("\n\n");
-
-	    lang = bfout;
-	    bfreprint();
-
-	    /* This is an "else" condition, the code cannot be resequenced */
-	    pmc("\n\n");
-	    pmc("<[-]<[-]]>[>");
-	    pmc("\n\n");
-
-	    lang = bfquad;
-	    bfreprint();
-
-	    pmc("\n\n");
-	    pmc("<[-]]<");
-	}
-    }
-}
-
-static void
-bfreprint(void)
-{
-    struct instruction * n = pgm;
-    tmp_clean = 0;
-    for(; n; n=n->next) {
-	int ch = n->ch;
-	int count = n->count;
-	char * p;
-	if ((p = strchr(bf,ch))) {
-	    if (ch == '>' || ch == '<') tmp_clean = 0;
-	    else if (ch == '.' || ch == ',') ;
-	    else if (!tmp_clean && lang[8]) {
-		pmc(lang[8]); tmp_clean = 1;
-	    }
-	    while(count-->0) pmc(lang[p-bf]);
-	} else {
-	    if (ch == '#') pc('\n');
-	    pc(ch);
-	    if (ch == '#') pc('\n');
-	}
     }
 }
