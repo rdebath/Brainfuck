@@ -19,14 +19,23 @@
 # is dumped into /usr/local. This makes hardcoded paths ineffective.
 if [ ! -n "$BASH_VERSION" -a ! -n "$KSH_VERSION" ];then exec bash "$0" "$@" ;fi
 
-set -f +B
-export LC_COLLATE=C LC_CTYPE=C
+# Test that this shell has substrings.
+( line=nnynnn; j=2; [[ "${line:j:1}" == y ]] ) 2>/dev/null || {
+    if [ ! -n "$BASH_VERSION" ];then exec bash "$0" "$@" ;fi
+    echo "This bash version doesn't work correctly" 1>&2
+    exit
+}
+
+set -f
+( set +B 2>/dev/null ) && set +B
+export LC_ALL=C
 
 runbf() {
 c=0
 i=''
 cmd=""
 xc=0
+pc=
 
 while read line
 do  ll=${#line}
@@ -50,8 +59,9 @@ do  ll=${#line}
 	}
 	[[ "$i" != "" ]] && addcmd $i $c
 
-	if [[ "$m" -eq 0 ]]
+	if ((m==0))
 	then
+	    [ "$pc" = "[" -a "$ni" = "]" ] && addcmd "X" 1
 	    addcmd $ni 1
 	    i=''
 	else
@@ -59,35 +69,37 @@ do  ll=${#line}
 	fi
     done
 
-    [[ "$((xc+=1))" -ge 1024 ]] &&
-	if ((xc % 256 == 0))
-	then echo -n -e " Loaded $xc lines\r" 1>&2
-	fi
+    if (( (xc+=1) >= 1024 && xc % 256 == 0))
+    then echo -n -e " Loaded $xc lines\r" 1>&2
+    fi
 
 done < "$1"
 
 addcmd $i $c
 IFS='
-     ' pgm="${lines[*]}"
+ ' pgm="${lines[*]}"
 
-[[ "$xc" -ge 1024 ]] &&
-    echo 'Running program ...                    ' 1>&2
+((xc>=1024)) && echo 'Running program ...                    ' 1>&2
 
-P=0
+typeset -a M
+typeset -i P=0
+
 eval "$pgm"
 }
 
 addcmd() {
     cnt="$2"
+    pc="$1"
     if ((cnt == 0)) ;then return; fi
 
     case "$1" in
     ">" ) cmd='((P=P+'$cnt'))' ;;
     "+" ) cmd='((M[P]=255&(M[P]+'$cnt')))' ;;
-    "[" ) cmd='while ((M[P] != 0)) ; do :' ;;
+    "[" ) cmd='while ((M[P])) ; do' ;;
     "]" ) cmd='done' ;;
     "," ) cmd='getch' ;;
     "." ) cmd='o' ;;
+    "X" ) cmd='echo Infinite loop 1>&2 ; exit 1' ;;
     esac
     [ "$cmd" != "" ] && {
 	lc=$((lc+1))
@@ -95,10 +107,15 @@ addcmd() {
     }
 }
 
+# o() { printf "\x$(printf %x $((M[P])) )" ; }
+# o() { echo -n -e "`printf '\\\\%04o' $((M[P]))`" ; }
+
+# Bash does the other variant rather slowly.
 o(){
-    printf -v C '\%04o' $((M[P])) 2>/dev/null || {
-	# Bash does this variant rather slowly.
-	o(){ echo -n -e "`printf '\\\\%04o' $((M[P]))`" ; }
+    C=XX
+    printf -v C '\%04o' $((M[P])) >/dev/null 2>&1 ||:
+    [[ "$C" = "XX" ]] && {
+	o() { printf "\x$(printf %x $((M[P])) )" ; }
 	o;return
     }
     echo -n -e "$C"
@@ -123,7 +140,7 @@ getch() {
     ch="${line:0:1}"
     line="${line:1}"
 
-    M[P]=`printf %d \'"$ch"`
+    M[P]=`printf %d "'$ch"`
 }
 
 runbf "$@"
