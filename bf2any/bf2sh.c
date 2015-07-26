@@ -87,8 +87,11 @@ outcmd(int ch, int count)
 	pr("         fi");
 	pr("    fi");
 	pr("fi");
+	pr("if [ .`echoe '\\171'` = .y ]");
+	pr("then o(){ echoe \"`printf '\\\\\\\\%%03o' $((M$P&255))`\" ; }");
+	pr("else o(){ echoe \"`printf '\\\\\\\\%%04o' $((M$P&255))`\" ; }");
+	pr("fi");
 	pr("");
-	pr("o(){ echoe \"`printf '\\\\\\\\%%04o' $((M$P&255))`\" ; }");
 
 	if (do_input) {
 	    pr("");
