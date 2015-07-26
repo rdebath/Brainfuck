@@ -74,7 +74,11 @@ outcmd(int ch, int count)
     }
 
     switch(ch) {
-    case '!': printf("#!/bin/sh\nbf(){\n"); break;
+    case '!':
+	printf("#!/bin/sh\n");
+	printf("{ unalias -a ;} 2>/dev/null ||: # ksh ('93)\n");
+	printf("bf(){\n");
+	break;
     case '~':
 	printf("}\n");
 
