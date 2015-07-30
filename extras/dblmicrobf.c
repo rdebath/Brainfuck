@@ -7,10 +7,18 @@
  * size (upto a complete integer). The working code is the same size, but
  * all the #define's take a bit of space.
  */
+#include <unistd.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <stdio.h>
+
+#if _POSIX_VERSION < 200809L
+#define getdelim my_getdelim
+int getdelim(char **lineptr, size_t *n, int delim, FILE *stream);
+#endif
+
 #ifndef CELLSIZE
 
-#define _POSIX_C_SOURCE 200809L
-#include <stdio.h>
 int main (int argc, char *argv[]) {
     char *b=0, *p, t[65536]={0};
     unsigned short m=0;
@@ -47,8 +55,6 @@ int main (int argc, char *argv[]) {
 #define CELLMOD(x) (((x) + CELLSIZE) % CELLSIZE)
 #endif
 
-#define _POSIX_C_SOURCE 200809L
-#include <stdio.h>
 int main (int argc, char *argv[]) {
     char *b=0, *p; CELLTYPE t[65536]={0};
     unsigned short m=0;
@@ -69,5 +75,33 @@ int main (int argc, char *argv[]) {
 	case ']': if(t[m]!=0)while((i+=(*p==']')-(*p=='['))&&p>b)p--;break;
     }
     return 0;
+}
+#endif
+
+#if _POSIX_VERSION < 200809L
+int
+getdelim(char **lineptr, size_t *n, int delim, FILE *stream) {
+  size_t i;
+  if (!lineptr || !n) {
+    errno=EINVAL;
+    return -1;
+  }
+  if (!*lineptr) *n=0;
+  for (i=0; ; ) {
+    int x;
+    if (i>=*n) {
+      int tmp=*n+100;
+      char* new=realloc(*lineptr,tmp);
+      if (!new) return -1;
+      *lineptr=new; *n=tmp;
+    }
+    x=fgetc(stream);
+    if (x==EOF) { if (!i) return -1; (*lineptr)[i]=0; return i; }
+    (*lineptr)[i]=x;
+    ++i;
+    if (x==delim) break;
+  }
+  (*lineptr)[i]=0;
+  return i;
 }
 #endif
