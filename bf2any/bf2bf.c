@@ -86,7 +86,7 @@ static const char * pogaack[] =
 
 /* Language "triplet" */
 static const char * trip[] =
-    { "OOI", "IOO", "III", "OOO", "OIO", "IOI", "IIO", "OII" };
+    { "001", "100", "111", "000", "010", "101", "110", "011" };
 
 /* Language "Descriptive BF" */
 static const char * nice[] =
@@ -430,7 +430,7 @@ check_arg(const char * arg)
 	lang = fish; langclass = L_CDWORDS; return 1;
     } else
     if (strcmp(arg, "-trip") == 0 || strcmp(arg, "-triplet") == 0) {
-	lang = trip; langclass = L_CDWORDS; return 1;
+	lang = trip; langclass = L_JNWORD; return 1;
     } else
     if (strcmp(arg, "-ook") == 0) {
 	lang = ook; langclass = L_WORDS; return 1;
@@ -537,9 +537,9 @@ check_arg(const char * arg)
 	"\n\t"  "-nice   Nice memorable C translation."
 	"\n\t"  "-mini   Compact C translation."
 	"\n\t"  "-fish   There once was a (dead) fish named Fred"
-	"\n\t"  "-trip   Triplet like translation"
-	"\n\t"  "-ook    Ook!"
-	"\n\t"  "-blub   Blub!"
+	"\n\t"  "-trip   Triplet -- http://esolangs.org/wiki/Triplet"
+	"\n\t"  "-ook    Ook! -- http://esolangs.org/wiki/Ook!"
+	"\n\t"  "-blub   Blub -- http://esolangs.org/wiki/Blub"
 	"\n\t"  "-moo    Cow -- http://www.frank-buss.de/cow.html"
 	"\n\t"  "-fk     fuck fuck"
 	"\n\t"  "-head   Headsecks."
