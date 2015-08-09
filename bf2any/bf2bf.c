@@ -20,7 +20,7 @@
 
 #define C_HEADERS       0x100   /* Add C Header & footer */
 #define C_DEFINES       0x200   /* #defines in the header */
-#define C_RLE           0x400   /* #define for RLE in the header */
+#define GEN_RLE         0x400   /* Use RLE token */
 #define GEN_HEADER      0x800   /* Generic header and footer. */
 #define C_NUMRLE        0x3000  /* RLE using %d in <>+- */
 #define C_ADDRLE        0x2000  /* RLE using %d in +- */
@@ -32,7 +32,7 @@
 
 #define L_CWORDS        (L_JNWORD+C_HEADERS)
 #define L_CDWORDS       (L_WORDS+C_HEADERS+C_DEFINES)
-#define L_CRLE          (L_WORDS+C_HEADERS+C_DEFINES+C_RLE)
+#define L_CRLE          (L_WORDS+C_HEADERS+C_DEFINES+GEN_RLE)
 
 #define L_JNWORD        1       /* Words NO spaces */
 #define L_CHARS         2       /* Add strings char by char. */
@@ -82,7 +82,7 @@ static const char *f__k[] =
 /* Language "pogaack" */
 static const char * pogaack[] =
 		{"pogack!", "pogaack!", "pogaaack!", "poock!",
-		"pogaaack?", "poock?", "pogack?", "pogaack?"};
+		"pogaaack?", "poock?", "pogack?", "pogaack?", "pock!"};
 
 /* Language "triplet" */
 static const char * trip[] =
@@ -445,7 +445,7 @@ check_arg(const char * arg)
 	lang = f__k; langclass = L_CDWORDS; return 1;
     } else
     if (strcmp(arg, "-pog") == 0 || strcmp(arg, "-pogaack") == 0) {
-	lang = pogaack; langclass = L_WORDS; return 1;
+	lang = pogaack; langclass = L_WORDS+GEN_RLE; return 1;
     } else
     if (strcmp(arg, "-:") == 0) {
 	lang = dotty; langclass = L_CHARS; return 1;
@@ -646,7 +646,7 @@ outcmd(int ch, int count)
     char * p;
 
     if (ch == '!') {
-	if (!(langclass & C_RLE)) {
+	if (!(langclass & GEN_RLE)) {
 	    if (bytecell) c = cbyte; else c = cint;
 	} else {
 	    if (bytecell) c = cbyte_rle; else c = cint_rle;
@@ -665,7 +665,7 @@ outcmd(int ch, int count)
 		i=(14-j)%8;
 		printf("#define %s %s\n", lang[i], c[i]);
 	    }
-	    if (langclass & C_RLE) {
+	    if (langclass & GEN_RLE) {
 		printf("#define %s %s\n", lang[8], c[8]);
 		printf("#define _ ;return 0;}\n");
 	    } else
@@ -698,7 +698,7 @@ outcmd(int ch, int count)
 	    }
 	    while(count-->0){
 		ps(lang[v]);
-		if (langclass & C_RLE)
+		if (langclass & GEN_RLE)
 		    while(count-->0) ps(lang[8]);
 	    }
 	}
