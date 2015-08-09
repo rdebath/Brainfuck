@@ -655,14 +655,16 @@ outcmd(int ch, int count)
     }
 
     if (ch == '!' && (langclass & C_HEADERS) != 0) {
-	int i;
+	int i,j;
 	if (bytecell)
 	    printf("#include<unistd.h>\n");
 	else
 	    printf("#include<stdio.h>\n");
 	if (langclass & C_DEFINES) {
-	    for (i=0; i<8; i++)
+	    for (j=0; j<8; j++){
+		i=(14-j)%8;
 		printf("#define %s %s\n", lang[i], c[i]);
+	    }
 	    if (langclass & C_RLE) {
 		printf("#define %s %s\n", lang[8], c[8]);
 		printf("#define _ ;return 0;}\n");
