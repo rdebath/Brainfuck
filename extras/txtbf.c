@@ -1,17 +1,20 @@
 /*
  *  This program takes a text input and generates BF code to create that text.
  *
- *  If the input text is larger than 'linebuf' it uses a simple algorithmic
- *  method to generate the code from a fixed 'init string'.
+ *  This program will search for the shortest piece of BF code it can. If
+ *  all the search options are turned on it can take a VERY long time to
+ *  run. But it can give very good results. Even in the default mode it
+ *  is likely to give significantly better results than other converters.
  *
- *  If the input fits in linebuf this program will search for the shortest
- *  piece of BF code it can. If all the search options are turned on it can
- *  take a VERY long time to run. But it can give very good results.
+ *  The program uses several methods to attempt to generate the shortest
+ *  result. In the default mode it will try the normal method of changing
+ *  a single cell using the best loops it can. This is rarely the best.
  *
- *  For small text first the fixed init strings are tested.
- *  Secondly a generic two cell generator is tried.
+ *  Most of the options use a loop of set of loops to setup a collection
+ *  of cells to various values then use a simple "closest choice" routine
+ *  to pick the "correct" cell.
  *
- *  The 'subrange' method is uses a multiply loop to set a collection of
+ *  The 'subrange' method is uses a multiply loop to set the collection of
  *  cells to the center values of short ranges of possible values. The
  *  cell values are sorted by frequency. Each cell is either used only
  *  with the characters from the 'correct' zone or using a find the
@@ -48,8 +51,9 @@ void gen_multonly(char * buf);
 void gen_multbyte(char * buf);
 void gen_nestloop(char * buf);
 void gen_slipnest(char * buf);
-void gen_special(char * buf, char * initcode, char * name);
+void gen_special(char * buf, char * initcode, char * name, int failquiet);
 void gen_twoflower(char * buf);
+void gen_twobyte(char * buf);
 void gen_trislipnest(char * buf);
 
 int runbf(char * prog, int m);
@@ -58,29 +62,86 @@ int runbf(char * prog, int m);
 
 /* These setup strings have, on occasion, given good results */
 
+/* This is a prefix for huge ASCII files */
+#define HUGEPREFIX "+++[>+++++++<-]>[>[++++++>]+[<]>-]"
+
 /* Some very generic multiply loops */
 #define RUNNERCODE1 "++++++++++++++[>+++++>+++++++>++++++++>++>++++++<<<<<-]"
 #define RUNNERCODE2 ">+++++[<++++++>-]<++[>+>++>+++>++++<<<<-]"
 #define RUNNERCODE3 ">+++++[<++++++>-]<++[>+>++>+++>++++>+++++>++++++>+++++++<<<<<<<-]"
 #define RUNNERCODE4 ">+++++[<++++++>-]<++[>+>++>+++>++++>->-->---<<<<<<<-]"
 
-/* Some Hello World prefixes */
-#define HELLOCODE  "++++++++++[>+++++++>++++++++++>+++>+<<<<-]"
-#define HELLOCODE1 "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]"
-#define HELLOCODE2 ">+>+>++>++[>[->++++<<+++>]<<]"
-#define HELLOCODE3 ">+>++++>+>+>+++[>[->+++<<++>]<<]"
-#define HELLOCODE4 "+++++++++[>++++++[>++>++>++>++>+<<<<<-]>>+>->>-[<]<-]"
-#define HELLOCODE5 ">+>+>++>+++[>[->++<<+++>]<<]"
-#define HELLOCODE6 ">+>+>++>+++[>[->+++<<+++>]<<]"
-#define HELLOCODE7 "+++++++[>+++++[>+++>+++>+++<<<-]>+>->>+[<]<-]"
+/* Some Hello World prefixes, so you don't have to do big runs. */
+char * hello_world[] = {
+    "+++++++++++++++[>++++++++>+++++++>++>+++<<<<-]",
+    "+++++++++++++++[>+++++++>++++++++>++>+++<<<<-]",
+    "+++++++++++++++[>+++++>+++++>++++++>+++>++<<<<<-]",
+    "+++++++++++++++[>+++++>+++++>++++++>++>+++<<<<<-]",
+    "++++++++++++++[>+++++>+++++++>++++++>+++<<<<-]",
+    "++++++++++++++[>+++++>+++++++>++++++>+++>++<<<<<-]",
+    "++++++++++++++[>+++++>+++++++>++++++>++>+++<<<<<-]",
+    "++++++++++++++[>+++++>+++++++>+++>++++++<<<<-]",
+    "+++++++++++[>++++++>+++++++>++++++++>++++>+++>+<<<<<<-]",
+    "+++++++++++[>+>++++++>+++++++>++++++++>++++>+++<<<<<<-]",
+    "++++++++++[>+++++++>++++++++++>++++>+<<<<-]",
+    "++++++++++[>+++++++>++++++++++>+++>+<<<<-]",
+    "++++++++[>+++++++++>++++<<-]",
 
-/* This is a prefix for huge ASCII files */
-#define HUGEPREFIX \
-		    "++++++++[>+++++++++++++>++++>++++++++++++++>++++++" \
-		    "+++++++++>++++++++++++>++++++>+++++++>++++++++>+++" \
-		    "++++++>++++++++++>+++++++++++>+++++<<<<<<<<<<<<-]"
+    ">++++++[<++++>-]<[>+++>++++>+++++>++<<<<-]",
+    ">++++++[<++++>-]<[>+++>++++>++>+++++<<<<-]",
+    ">++++[<++++>-]<+[>++++>++++++>+++++++>++<<<<-]",
+    ">++++[<++++>-]<+[>++++>++++++>+++++>++<<<<-]",
+    ">++++[<++++>-]<+[>++++>++++++>++>+++++++<<<<-]",
+    ">++++[<++++>-]<+[>++++>++++++>++>+++++<<<<-]",
 
-char linebuf[30000];        /* Only one buffer full for searching.  */
+    0 };
+
+char * hello_world2[] = {
+    "+++++++++++[>++++[>++>++>++>+>+<<<<<-]>->+>>-[<]<-]",
+    "+++++++++[>++++++[>++>++>++>++>+<<<<<-]>>+>->>-[<]<-]",
+    "+++++++++[>++++[>++>+++>+++>+++>+<<<<<-]>>->>+>+[<]<-]",
+    "+++++++++[>++++[>++>+++>+++>+>+++<<<<<-]>>->>+>+[<]<-]",
+    "++++++++[>++++[>++>+++>+++>+++>+<<<<<-]>+>+>+>-[<]<-]",
+    "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]",
+    "++++++++[>++++[>++>+++>+++>+>+<<<<<-]>+>+>->+[<]<-]",
+    "+++++++[>+++++[>+++>+++>+++<<<-]>+>->>+[<]<-]",
+
+    "++++++++[>++++[>+++>++>+<<<-]>->+<<<-]",
+    "++++++++[>++++[>++>+++>+++>+<<<<-]>+>-<<<-]",
+    "++++++++[>++++[>++>++>+++>+<<<<-]>+>+>-<<<<-]",
+    "+++[>+++++[>+++++>+++++>++++++>+++>++<<<<<-]>-<<-]",
+    "+++[>+++++[>+++++>+++++>++++++>++>+++<<<<<-]>-<<-]",
+
+    ">+>++++>+>+>+++[>[->+++<<++>]<<]",
+    ">+>++++>+>+>+++[>[->+++>[->++<]<<<++>]<<]",
+    ">+>++>++>+++[>[->+++<<+++>]<<]",
+    ">+>++>+>++>+++++[>[->++<<++>]<<]",
+    ">+>+>+++++++>++>+++[>[->+++<<+++>]<<]",
+    ">+>+>++>+++[>[->+++<<+++>]<<]",
+    ">+>+>++>+++[>[->++<<+++>]<<]",
+    ">+>+>++>++[>[->++++<<+++>]<<]",
+    ">+>+>+>++[>[->++++<<+++>]<<]",
+    ">+>+>+>+>++++[>[->+++<<+++>]<<]",
+
+    0 };
+
+    /* Bytewrap strings */
+char * hello_world_byte[] = {
+    "+++++++++++++[+++++++>++>++>----->---->+++<<<<<]",
+    "+++++++++++++[+++++++>->++>++>----->---->+++<<<<<<]",
+    "+++++++++++++[------->+>-->-->+++++>--->++++<<<<<<]",
+    "+++++++++++++[------->-->-->+++++>--->++++<<<<<]",
+    "++++++[+++++++>->++>++>---->+++>-<<<<<<]",
+    "++++[------->-->--->--->->++++<<<<<]",
+    "++[+++++++>++++>->->->++>-<<<<<<]",
+    "++[+++++++>++++>->->->--->++<<<<<<]",
+    "++[--------------->-->--->->+++++<<<<]",
+    "+[------->->->+++<<<]",
+    ">+++++[<++++>-]<[++>+++++>+++>---->+<<<<]",
+    ">++++[<++++>-]<[++>+++>+++>---->+<<<<]",
+
+    0 };
+
 int flg_binary = 0;
 int flg_init = 0;
 int flg_clear = 0;
@@ -93,7 +154,7 @@ int multloop_maxcell = 5;
 int multloop_maxloop = 20;
 int multloop_maxinc = 10;
 int multloop_no_prefix = 0;
-int flg_nestloop = 0;
+int enable_nestloop = 0;
 int enable_trislipnest = 0;
 
 int enable_sliploop = 0;
@@ -170,7 +231,7 @@ main(int argc, char ** argv)
 	    enable_multdblloop = 1;
 	    enable_twocell = 1;
 	    enable_subrange = 1;
-	    flg_nestloop = 1;
+	    enable_nestloop = 1;
 	    enable_trislipnest = 1;
 	    argc--; argv++;
 	} else if (strncmp(argv[1], "-I", 2) == 0) {
@@ -180,10 +241,7 @@ main(int argc, char ** argv)
 	    enable_multdblloop = 0;
 	    enable_subrange = 0;
 	    enable_twocell = 0;
-	    flg_nestloop = 0;
-	    flg_init = 0;
-	    flg_clear = 0;
-	    flg_rtz = 0;
+	    enable_nestloop = 0;
 
 	    argc--; argv++;
 
@@ -196,10 +254,7 @@ main(int argc, char ** argv)
 	    enable_multdblloop = 0;
 	    enable_subrange = 1;
 	    enable_twocell = 1;
-	    flg_nestloop = 0;
-	    flg_init = 1;
-	    flg_clear = 0;
-	    flg_rtz = 0;
+	    enable_nestloop = 0;
 
 	    argc--; argv++;
 
@@ -282,7 +337,7 @@ main(int argc, char ** argv)
 	    multloop_maxinc = atol(argv[1]+10);
 	    argc--; argv++;
 	} else if (strcmp(argv[1], "-N") == 0) {
-	    flg_nestloop = !flg_nestloop;
+	    enable_nestloop = !enable_nestloop;
 	    argc--; argv++;
 
 	} else if (strncmp(argv[1], "-S", 2) == 0) {
@@ -335,10 +390,12 @@ main(int argc, char ** argv)
 	ifd = fopen(argv[1], "r");
     if (ifd == 0) perror(argv[1]);
     else {
+	char * linebuf, * p;
+	int linebuf_size = 0;
 	int c;
-	char * p = linebuf;
 	int eatnl = 0;
-	int override_for_bigtext = 0, last_clear = 0;
+	p = linebuf = malloc(linebuf_size = 2048);
+	if(!linebuf) { perror("malloc"); exit(1); }
 
 	while((c = fgetc(ifd)) != EOF) {
 	    if (!flg_binary) {
@@ -349,133 +406,128 @@ main(int argc, char ** argv)
 	    if (c == 0) continue;
 
 	    *p++ = c;
-	    if (p-linebuf >= (int)sizeof(linebuf)-1) {
-		*p++ = 0;
-		if (!override_for_bigtext) {
-		    override_for_bigtext = 1;
-		    best_len = -2; /* Disable 'best' processing. */
-
-		    if (special_init == 0)
-			special_init = HUGEPREFIX;
-
-		    fprintf(stderr, "Input too large, using '%s'.\n",
-			    special_init);
-
-		    last_clear = flg_clear;
-		    flg_clear = 0; flg_rtz = 1;
-		    gen_special(linebuf, special_init, "Big buffer");
-		    flg_init = 0;
-		} else
-		    gen_unzoned(linebuf);
-
-		p = linebuf;
-
-		if (str_start) {
-		    output_str(str_start);
-		    str_start[str_next=0] = 0;
-		}
+	    if (p-linebuf >= linebuf_size-1) {
+		size_t off = p-linebuf;
+		linebuf = realloc(linebuf, linebuf_size += 2048);
+		if(!linebuf) { perror("realloc"); exit(1); }
+		p = linebuf+off;
 	    }
 	}
 	*p++ = 0;
 	if (ifd != stdin) fclose(ifd);
 
-	if (override_for_bigtext) {
-	    flg_clear = last_clear;
-	    gen_unzoned(linebuf);
-	    if (str_start)
-		output_str(str_start);
-	} else {
+	if (special_init != 0)
+	    gen_special(linebuf, special_init, "cmd special", 0);
+	else
+	    gen_special(linebuf, "", "Bare cells", 0);
 
-	    if (special_init != 0)
-		gen_special(linebuf, special_init, "cmd special");
+	if (enable_twocell) {
+	    if (verbose>3) fprintf(stderr, "Trying two cell routine.\n");
+	    gen_twoflower(linebuf);
+	    if (bytewrap) {
+		if (verbose>3) fprintf(stderr, "Trying byte two cell routine.\n");
+		gen_twobyte(linebuf);
+	    }
+	}
 
-	    if (enable_twocell) {
-		if (verbose>2) fprintf(stderr, "Trying two cell routine.\n");
-		gen_twoflower(linebuf);
+	if (subrange_count <= 0 && !special_init) {
+	    char ** hellos;;
+	    char namebuf[64];
+
+	    if (verbose>2) fprintf(stderr, "Trying special strings\n");
+
+	    gen_special(linebuf, HUGEPREFIX, "big ASCII", 0);
+	    gen_special(linebuf, RUNNERCODE1, "mult English", 0);
+	    gen_special(linebuf, RUNNERCODE2, "mult*32 to 128", 0);
+	    gen_special(linebuf, RUNNERCODE3, "mult*32 to 224", 0);
+	    gen_special(linebuf, RUNNERCODE4, "mult*32 to 128/-96", 0);
+
+	    for (hellos = hello_world; *hellos; hellos++) {
+		sprintf(namebuf, "Hello world %d", hellos-hello_world);
+		gen_special(linebuf, *hellos, namebuf, 0);
 	    }
 
-	    if (subrange_count <= 0 && !special_init) {
-		if (verbose>2) fprintf(stderr, "Trying special strings\n");
-		gen_special(linebuf, HUGEPREFIX, "big ASCII");
-		gen_special(linebuf, RUNNERCODE1, "mult English");
-		gen_special(linebuf, RUNNERCODE2, "mult*32 to 128");
-		gen_special(linebuf, RUNNERCODE3, "mult*32 to 224");
-		gen_special(linebuf, RUNNERCODE4, "mult*32 to 128/-96");
-		gen_special(linebuf, HELLOCODE, "hello111 mult");
-		gen_special(linebuf, HELLOCODE1, "hello106 nest");
-		gen_special(linebuf, HELLOCODE2, "hello103 slip");
-		gen_special(linebuf, HELLOCODE3, "hello118 slip");
-		gen_special(linebuf, HELLOCODE4, "hello183 nest");
-		gen_special(linebuf, HELLOCODE5, "hello119 slip");
-		gen_special(linebuf, HELLOCODE6, "BFoRails slip");
-		gen_special(linebuf, HELLOCODE7, "brainfuck nest");
+	    if (bytewrap) for (hellos = hello_world_byte; *hellos; hellos++) {
+		sprintf(namebuf, "Hello bytes %d", hellos-hello_world_byte);
+		gen_special(linebuf, *hellos, namebuf, 0);
 	    }
+	}
 
-	    if (subrange_count > 0) {
-		reinit_state();
-		gen_subrange(linebuf,subrange_count,1,0);
-	    } else if (subrange_count == 0) {
+	if (subrange_count > 0) {
+	    reinit_state();
+	    gen_subrange(linebuf,subrange_count,1,0);
+	} else if (subrange_count == 0) {
 
-		if (enable_subrange) {
-		    if (verbose>2) fprintf(stderr, "Trying subrange routines.\n");
-		    subrange_count=10;
-		    {
+	    if (enable_subrange) {
+		if (verbose>2) fprintf(stderr, "Trying subrange routines.\n");
+		subrange_count=10;
+		{
+		    reinit_state();
+		    gen_subrange(linebuf,subrange_count,1,0);
+		}
+
+		for(subrange_count = 2; subrange_count<33; subrange_count++)
+		    if (subrange_count!=10) {
 			reinit_state();
 			gen_subrange(linebuf,subrange_count,1,0);
 		    }
 
-		    for(subrange_count = 2; subrange_count<33; subrange_count++)
-			if (subrange_count!=10) {
-			    reinit_state();
-			    gen_subrange(linebuf,subrange_count,1,0);
-			}
+		for(subrange_count = 2; subrange_count<33; subrange_count++) {
+		    reinit_state();
+		    gen_subrange(linebuf,subrange_count,0,0);
+		}
 
-		    for(subrange_count = 2; subrange_count<33; subrange_count++) {
-			reinit_state();
-			gen_subrange(linebuf,subrange_count,0,0);
-		    }
-
-		    for(subrange_count = 2; subrange_count<33; subrange_count++) {
-			reinit_state();
-			gen_subrange(linebuf,subrange_count,0,1);
-		    }
+		for(subrange_count = 2; subrange_count<33; subrange_count++) {
+		    reinit_state();
+		    gen_subrange(linebuf,subrange_count,0,1);
 		}
 	    }
 
-	    if (enable_trislipnest) {
-		if (verbose>2) fprintf(stderr, "Trying tri-slip routine.\n");
-		gen_trislipnest(linebuf);
-	    }
+	    subrange_count = 0;
+	}
 
-	    if (enable_multloop) {
-		if (verbose>2) fprintf(stderr, "Trying multiply loops.\n");
-		gen_multonly(linebuf);
+	if (subrange_count <= 0 && !special_init) {
+	    char ** hellos;;
+	    char namebuf[64];
+	    for (hellos = hello_world2; *hellos; hellos++) {
+		sprintf(namebuf, "Complex world %d", hellos-hello_world2);
+		gen_special(linebuf, *hellos, namebuf, 0);
 	    }
+	}
 
-	    if (enable_multloop && bytewrap) {
-		if (verbose>2) fprintf(stderr, "Trying byte multiply loops.\n");
-		gen_multbyte(linebuf);
-	    }
+	if (enable_trislipnest) {
+	    if (verbose>2) fprintf(stderr, "Trying tri-slip routine.\n");
+	    gen_trislipnest(linebuf);
+	}
 
-	    if (enable_sliploop) {
-		if (verbose>2) fprintf(stderr, "Trying 'slipping loop' routine.\n");
-		gen_slipnest(linebuf);
-	    }
+	if (enable_multloop) {
+	    if (verbose>2) fprintf(stderr, "Trying multiply loops.\n");
+	    gen_multonly(linebuf);
+	}
 
-	    if(flg_nestloop) {
-		if (verbose>2) fprintf(stderr, "Trying 'nested loop' routine.\n");
-		reinit_state();
-		gen_nestloop(linebuf);
-	    }
+	if (enable_multloop && bytewrap) {
+	    if (verbose>2) fprintf(stderr, "Trying byte multiply loops.\n");
+	    gen_multbyte(linebuf);
+	}
 
-	    if (best_len>=0) {
-		if (verbose)
-		    fprintf(stderr, "BF Size = %d, %.2f bf/char, cells = %d\n",
-			best_len, best_len * 1.0/ strlen(linebuf), best_cells);
+	if (enable_sliploop) {
+	    if (verbose>2) fprintf(stderr, "Trying 'slipping loop' routine.\n");
+	    gen_slipnest(linebuf);
+	}
 
-		output_str(best_str);
-		free(str_start); str_start = 0; str_max = str_next = 0;
-	    }
+	if(enable_nestloop) {
+	    if (verbose>2) fprintf(stderr, "Trying 'nested loop' routine.\n");
+	    reinit_state();
+	    gen_nestloop(linebuf);
+	}
+
+	if (best_len>=0) {
+	    if (verbose)
+		fprintf(stderr, "BF Size = %d, %.2f bf/char, cells = %d\n",
+		    best_len, best_len * 1.0/ strlen(linebuf), best_cells);
+
+	    output_str(best_str);
+	    free(str_start); str_start = 0; str_max = str_next = 0;
 	}
 	output_str("\n");
     }
@@ -928,7 +980,7 @@ static int loopcnt[256][256];
 	for(i=0; ; i++) {
 	    if (i >= multloop_maxcell+1) return;
 	    cellincs[i]++;
-	    if (i == 0) {
+	    if (i < 2) {
 		if (cellincs[i] <= multloop_maxloop) break;
 	    } else {
 		if (cellincs[i] <= multloop_maxinc) break;
@@ -1261,7 +1313,7 @@ return_to_top:
  */
 
 void
-gen_special(char * buf, char * initcode, char * name)
+gen_special(char * buf, char * initcode, char * name, int failquiet)
 {
     int maxcell = 0;
     int currcell=0;
@@ -1271,7 +1323,7 @@ gen_special(char * buf, char * initcode, char * name)
     reinit_state();
 
     if (verbose>3)
-	fprintf(stderr, "Running Special code: %s\n", initcode);
+	fprintf(stderr, "Running '%s' code: %s\n", name, initcode);
 
     /* Work out what the 'special' code does to the cell array ... How?
      *
@@ -1282,13 +1334,16 @@ gen_special(char * buf, char * initcode, char * name)
     if(0) {
 	remaining_offset = runbf(initcode, 0);
 	if (remaining_offset<0) {
-	    fprintf(stderr, "Special code failed '%s'\n", initcode);
+	    fprintf(stderr, "Code '%s' failed '%s'\n", name, initcode);
 	    return;
 	}
     } else {
 	char *codeptr, *b;
 	int m=0, nestlvl=0;
 	int countdown = 100000;
+
+	maxcell = -1;
+	str_cells_used = maxcell+1;
 
 	for(codeptr=b=initcode;*codeptr;codeptr++) {
 	    switch(*codeptr) {
@@ -1300,14 +1355,15 @@ gen_special(char * buf, char * initcode, char * name)
 		case ']': if(cells[m]!=0)while((nestlvl+=(*codeptr==']')-(*codeptr=='['))&&codeptr>b)codeptr--;break;
 	    }
 	    if (m<0 || m>= MAX_CELLS || --countdown == 0) break;
-	    if (m>maxcell) maxcell = m;
+	    if (m>maxcell) { maxcell = m; str_cells_used = maxcell+1; }
 	    if (bytewrap) cells[m] &= 255;
 	}
 
 	/* Something went wrong; the code is invalid */
 	if (*codeptr) {
-	    fprintf(stderr, "Special code failed to run cellptr=%d countdown=%d iptr=%d '%s'\n",
-		    m, countdown, (int)(codeptr-initcode), initcode);
+	    if (!failquiet || verbose>3)
+		fprintf(stderr, "Code '%s' failed to run cellptr=%d countdown=%d iptr=%d '%s'\n",
+			name, m, countdown, (int)(codeptr-initcode), initcode);
 	    return;
 	}
 	remaining_offset = m;
@@ -1315,14 +1371,13 @@ gen_special(char * buf, char * initcode, char * name)
 
     if (flg_init) {
 	/* Clear the working cells */
+	if (maxcell<0) maxcell=0;
 	for(i=maxcell; i>=0; i--) {
 	    while(currcell < i) { add_chr('>'); currcell++; }
 	    while(currcell > i) { add_chr('<'); currcell--; }
 	    add_str("[-]");
 	}
     }
-
-    str_cells_used = maxcell+1;
 
     add_str(initcode);
     while(remaining_offset<0) { add_chr('>'); remaining_offset++; }
@@ -1349,7 +1404,8 @@ gen_unzoned(char * buf)
     char * p;
     int i;
     int currcell = 0;
-    if (str_cells_used == 0) str_cells_used=1;
+    int more_cells = 0;
+    if (str_cells_used <= 0) { more_cells=1; str_cells_used=1; }
 
     /* Print each character, use closest cell. */
     for(p=buf; *p;) {
@@ -1358,17 +1414,17 @@ gen_unzoned(char * buf)
 	int usecell, diff;
 	if (flg_signed) c = (signed char)c; else c = (unsigned char)c;
 	usecell = 0;
-	for(i=0; i<str_cells_used; i++) {
+	for(i=0; i<str_cells_used+more_cells; i++) {
 	    int range = c - cells[i];
 	    if (bytewrap) range = (signed char)range;
 	    range = abs(range);
 	    range += abs(currcell-i);
-	    if (range == minrange) {
+	    if (range == minrange && i!=str_cells_used) {
 		if (abs(currcell-i) < abs(usecell-i)) {
 		    usecell = i;
 		    minrange = range;
 		}
-	    } else if (range < minrange) {
+	    } else if (range + 3*(i==str_cells_used) < minrange) {
 		usecell = i;
 		minrange = range;
 	    }
@@ -1376,6 +1432,11 @@ gen_unzoned(char * buf)
 
 	while(currcell > usecell) { add_chr('<'); currcell--; }
 	while(currcell < usecell) { add_chr('>'); currcell++; }
+
+	if (currcell>=str_cells_used) {
+	    str_cells_used++;
+	    if (flg_init) add_str("[-]");
+	}
 
 	diff = c - cells[currcell];
 	if (bytewrap) diff = (signed char)diff;
@@ -1496,6 +1557,317 @@ gen_twoflower(char * buf)
     currcell = clear_tape(currcell);
 
     check_if_best(buf, "twocell");
+}
+
+/*******************************************************************************
+ * This is a generator that uses one cell as a multipler to get a second to
+ * the correct value. It uses a table to remove the need for an explicit
+ * search.
+ *
+ * Note: this doesn't use sqrt() to find the shortest loop because that doesn't
+ * actually work despite seeming like it should.
+ *
+ * It's the classic algorithm but only rarely is it the shortest.
+ */
+
+void
+gen_twobyte(char * buf)
+{
+    /* This table gives the shortest strings (using a byte multiplier form)
+     * for all the values upto 255. It was created with a simple brute force
+     * search.
+     */
+
+static char * convbyte[] = {
+    "", /* (0, 1) non-wrapping */
+    "+", /* (1, 1) non-wrapping */
+    "++", /* (2, 1) non-wrapping */
+    "+++", /* (3, 1) non-wrapping */
+    "++++", /* (4, 1) non-wrapping */
+    "+++++", /* (5, 1) non-wrapping */
+    "++++++", /* (6, 1) non-wrapping */
+    "+++++++", /* (7, 1) non-wrapping */
+    "++++++++", /* (8, 1) non-wrapping */
+    "+++++++++", /* (9, 1) non-wrapping */
+    "++++++++++", /* (10, 1) non-wrapping */
+    "+++++++++++", /* (11, 1) non-wrapping */
+    "++++++++++++", /* (12, 1) non-wrapping */
+    "+++++++++++++", /* (13, 1) non-wrapping */
+    "++++++++++++++", /* (14, 1) non-wrapping */
+    "+++++++++++++++", /* (15, 1) non-wrapping */
+    ">++++[<++++>-]<", /* (15, 2) non-wrapping */
+    ">++++[<++++>-]<+", /* (16, 2) non-wrapping */
+    ">+++[<++++++>-]<", /* (16, 2) non-wrapping */
+    ">+++[<++++++>-]<+", /* (17, 2) non-wrapping */
+    ">++++[<+++++>-]<", /* (16, 2) non-wrapping */
+    ">+++[<+++++++>-]<", /* (17, 2) non-wrapping */
+    ">+++[<+++++++>-]<+", /* (18, 2) non-wrapping */
+    ">++++[<++++++>-]<-", /* (18, 2) non-wrapping */
+    ">++++[<++++++>-]<", /* (17, 2) non-wrapping */
+    ">+++++[<+++++>-]<", /* (17, 2) non-wrapping */
+    ">+++++[<+++++>-]<+", /* (18, 2) non-wrapping */
+    ">+++[<+++++++++>-]<", /* (19, 2) non-wrapping */
+    ">++++[<+++++++>-]<", /* (18, 2) non-wrapping */
+    ">++++[<+++++++>-]<+", /* (19, 2) non-wrapping */
+    ">+++++[<++++++>-]<", /* (18, 2) non-wrapping */
+    ">+++++[<++++++>-]<+", /* (19, 2) non-wrapping */
+    ">++++[<++++++++>-]<", /* (19, 2) non-wrapping */
+    ">++++[<++++++++>-]<+", /* (20, 2) non-wrapping */
+    ">--[<-->+++++++]<--", /* (19, 2) wrapping */
+    ">--[<-->+++++++]<-", /* (18, 2) wrapping */
+    ">--[<-->+++++++]<", /* (17, 2) wrapping */
+    ">---[<+>+++++++]<", /* (17, 2) wrapping */
+    ">---[<+>+++++++]<+", /* (18, 2) wrapping */
+    ">---[<+>+++++++]<++", /* (19, 2) wrapping */
+    ">--[<+>++++++]<---", /* (18, 2) wrapping */
+    ">--[<+>++++++]<--", /* (17, 2) wrapping */
+    ">--[<+>++++++]<-", /* (16, 2) wrapping */
+    ">--[<+>++++++]<", /* (15, 2) wrapping */
+    ">--[<+>++++++]<+", /* (16, 2) wrapping */
+    ">--[<+>++++++]<++", /* (17, 2) wrapping */
+    ">--[<+>++++++]<+++", /* (18, 2) wrapping */
+    ">-[<+>-----]<----", /* (17, 2) wrapping */
+    ">-[<+>-----]<---", /* (16, 2) wrapping */
+    ">-[<+>-----]<--", /* (15, 2) wrapping */
+    ">-[<+>-----]<-", /* (14, 2) wrapping */
+    ">-[<+>-----]<", /* (13, 2) wrapping */
+    ">-[<+>-----]<+", /* (14, 2) wrapping */
+    ">-[<+>-----]<++", /* (15, 2) wrapping */
+    ">-[<+>-----]<+++", /* (16, 2) wrapping */
+    ">-[<+>-----]<++++", /* (17, 2) wrapping */
+    ">-[<+>-----]<+++++", /* (18, 2) wrapping */
+    ">-[<+>+++++++++]<", /* (17, 2) wrapping */
+    ">-[<+>+++++++++]<+", /* (18, 2) wrapping */
+    ">----[<+>----]<----", /* (19, 2) wrapping */
+    ">----[<+>----]<---", /* (18, 2) wrapping */
+    ">----[<+>----]<--", /* (17, 2) wrapping */
+    ">----[<+>----]<-", /* (16, 2) wrapping */
+    ">----[<+>----]<", /* (15, 2) wrapping */
+    ">----[<+>----]<+", /* (16, 2) wrapping */
+    ">----[<+>----]<++", /* (17, 2) wrapping */
+    ">----[<+>----]<+++", /* (18, 2) wrapping */
+    ">----[<--->----]<", /* (17, 2) wrapping */
+    ">----[<--->----]<+", /* (18, 2) wrapping */
+    ">----[<--->----]<++", /* (19, 2) wrapping */
+    ">-[<+>-------]<---", /* (18, 2) wrapping */
+    ">-[<+>-------]<--", /* (17, 2) wrapping */
+    ">-[<+>-------]<-", /* (16, 2) wrapping */
+    ">-[<+>-------]<", /* (15, 2) wrapping */
+    ">-[<+>-------]<+", /* (16, 2) wrapping */
+    ">-[<+>-------]<++", /* (17, 2) wrapping */
+    ">-[<+>-------]<+++", /* (18, 2) wrapping */
+    ">-[<+>---]<--------", /* (19, 2) wrapping */
+    ">-[<+>---]<-------", /* (18, 2) wrapping */
+    ">-[<+>---]<------", /* (17, 2) wrapping */
+    ">-[<+>---]<-----", /* (16, 2) wrapping */
+    ">-[<+>---]<----", /* (15, 2) wrapping */
+    ">-[<+>---]<---", /* (14, 2) wrapping */
+    ">-[<+>---]<--", /* (13, 2) wrapping */
+    ">-[<+>---]<-", /* (12, 2) wrapping */
+    ">-[<+>---]<", /* (11, 2) wrapping */
+    ">-[<+>---]<+", /* (12, 2) wrapping */
+    ">-[<+>---]<++", /* (13, 2) wrapping */
+    ">-[<+>---]<+++", /* (14, 2) wrapping */
+    ">-[<+>---]<++++", /* (15, 2) wrapping */
+    ">-[<+>---]<+++++", /* (16, 2) wrapping */
+    ">-[<+>---]<++++++", /* (17, 2) wrapping */
+    ">-[<+>---]<+++++++", /* (18, 2) wrapping */
+    ">-[<+>---]<++++++++", /* (19, 2) wrapping */
+    ">-[<+>---]<+++++++++", /* (20, 2) wrapping */
+    ">-[<++>-----]<-------", /* (21, 2) wrapping */
+    ">-[<++>-----]<------", /* (20, 2) wrapping */
+    ">-[<++>-----]<-----", /* (19, 2) wrapping */
+    ">-[<++>-----]<----", /* (18, 2) wrapping */
+    ">-[<++>-----]<---", /* (17, 2) wrapping */
+    ">-[<++>-----]<--", /* (16, 2) wrapping */
+    ">-[<++>-----]<-", /* (15, 2) wrapping */
+    ">-[<++>-----]<", /* (14, 2) wrapping */
+    ">-[<++>-----]<+", /* (15, 2) wrapping */
+    ">-[<++>-----]<++", /* (16, 2) wrapping */
+    ">-[<++>-----]<+++", /* (17, 2) wrapping */
+    ">-[<++>-----]<++++", /* (18, 2) wrapping */
+    ">-[<++>-----]<+++++", /* (19, 2) wrapping */
+    ">-[<-->-------]<--", /* (18, 2) wrapping */
+    ">-[<-->-------]<-", /* (17, 2) wrapping */
+    ">-[<-->-------]<", /* (16, 2) wrapping */
+    ">-[<-->-------]<+", /* (17, 2) wrapping */
+    ">-[<-->-------]<++", /* (18, 2) wrapping */
+    ">-[<++>+++++++++]<-", /* (19, 2) wrapping */
+    ">-[<++>+++++++++]<", /* (18, 2) wrapping */
+    ">-[<++>+++++++++]<+", /* (19, 2) wrapping */
+    ">--------[<+++>--]<", /* (19, 2) wrapping */
+    ">----[<+++++>--]<-", /* (18, 2) wrapping */
+    ">----[<+++++>--]<", /* (17, 2) wrapping */
+    ">------[<+++>--]<", /* (17, 2) wrapping */
+    ">----[<+++>--]<--", /* (17, 2) wrapping */
+    ">----[<+++>--]<-", /* (16, 2) wrapping */
+    ">----[<+++>--]<", /* (15, 2) wrapping */
+    ">--[<+>--]<----", /* (15, 2) wrapping */
+    ">--[<+>--]<---", /* (14, 2) wrapping */
+    ">--[<+>--]<--", /* (13, 2) wrapping */
+    ">--[<+>--]<-", /* (12, 2) wrapping */
+    ">--[<+>--]<", /* (11, 2) wrapping */
+    ">--[<->--]<-", /* (12, 2) wrapping */
+    ">--[<->--]<", /* (11, 2) wrapping */
+    ">--[<->--]<+", /* (12, 2) wrapping */
+    ">--[<->--]<++", /* (13, 2) wrapping */
+    ">--[<->--]<+++", /* (14, 2) wrapping */
+    ">--[<->--]<++++", /* (15, 2) wrapping */
+    ">----[<--->--]<", /* (15, 2) wrapping */
+    ">----[<--->--]<+", /* (16, 2) wrapping */
+    ">----[<--->--]<++", /* (17, 2) wrapping */
+    ">------[<--->--]<", /* (17, 2) wrapping */
+    ">----[<----->--]<", /* (17, 2) wrapping */
+    ">----[<----->--]<+", /* (18, 2) wrapping */
+    ">--------[<--->--]<", /* (19, 2) wrapping */
+    ">-[<-->+++++++++]<-", /* (19, 2) wrapping */
+    ">-[<-->+++++++++]<", /* (18, 2) wrapping */
+    ">-[<-->+++++++++]<+", /* (19, 2) wrapping */
+    ">-[<++>-------]<--", /* (18, 2) wrapping */
+    ">-[<++>-------]<-", /* (17, 2) wrapping */
+    ">-[<++>-------]<", /* (16, 2) wrapping */
+    ">-[<++>-------]<+", /* (17, 2) wrapping */
+    ">-[<++>-------]<++", /* (18, 2) wrapping */
+    ">-[<-->-----]<-----", /* (19, 2) wrapping */
+    ">-[<-->-----]<----", /* (18, 2) wrapping */
+    ">-[<-->-----]<---", /* (17, 2) wrapping */
+    ">-[<-->-----]<--", /* (16, 2) wrapping */
+    ">-[<-->-----]<-", /* (15, 2) wrapping */
+    ">-[<-->-----]<", /* (14, 2) wrapping */
+    ">-[<-->-----]<+", /* (15, 2) wrapping */
+    ">-[<-->-----]<++", /* (16, 2) wrapping */
+    ">-[<-->-----]<+++", /* (17, 2) wrapping */
+    ">-[<-->-----]<++++", /* (18, 2) wrapping */
+    ">-[<-->-----]<+++++", /* (19, 2) wrapping */
+    ">-[<-->-----]<++++++", /* (20, 2) wrapping */
+    ">-[<-->-----]<+++++++", /* (21, 2) wrapping */
+    ">-[<->---]<---------", /* (20, 2) wrapping */
+    ">-[<->---]<--------", /* (19, 2) wrapping */
+    ">-[<->---]<-------", /* (18, 2) wrapping */
+    ">-[<->---]<------", /* (17, 2) wrapping */
+    ">-[<->---]<-----", /* (16, 2) wrapping */
+    ">-[<->---]<----", /* (15, 2) wrapping */
+    ">-[<->---]<---", /* (14, 2) wrapping */
+    ">-[<->---]<--", /* (13, 2) wrapping */
+    ">-[<->---]<-", /* (12, 2) wrapping */
+    ">-[<->---]<", /* (11, 2) wrapping */
+    ">-[<->---]<+", /* (12, 2) wrapping */
+    ">-[<->---]<++", /* (13, 2) wrapping */
+    ">-[<->---]<+++", /* (14, 2) wrapping */
+    ">-[<->---]<++++", /* (15, 2) wrapping */
+    ">-[<->---]<+++++", /* (16, 2) wrapping */
+    ">-[<->---]<++++++", /* (17, 2) wrapping */
+    ">-[<->---]<+++++++", /* (18, 2) wrapping */
+    ">-[<->---]<++++++++", /* (19, 2) wrapping */
+    ">-[<->-------]<---", /* (18, 2) wrapping */
+    ">-[<->-------]<--", /* (17, 2) wrapping */
+    ">-[<->-------]<-", /* (16, 2) wrapping */
+    ">-[<->-------]<", /* (15, 2) wrapping */
+    ">-[<->-------]<+", /* (16, 2) wrapping */
+    ">-[<->-------]<++", /* (17, 2) wrapping */
+    ">-[<->-------]<+++", /* (18, 2) wrapping */
+    ">----[<+++>----]<--", /* (19, 2) wrapping */
+    ">----[<+++>----]<-", /* (18, 2) wrapping */
+    ">----[<+++>----]<", /* (17, 2) wrapping */
+    ">----[<->----]<---", /* (18, 2) wrapping */
+    ">----[<->----]<--", /* (17, 2) wrapping */
+    ">----[<->----]<-", /* (16, 2) wrapping */
+    ">----[<->----]<", /* (15, 2) wrapping */
+    ">----[<->----]<+", /* (16, 2) wrapping */
+    ">----[<->----]<++", /* (17, 2) wrapping */
+    ">----[<->----]<+++", /* (18, 2) wrapping */
+    ">----[<->----]<++++", /* (19, 2) wrapping */
+    ">-[<->+++++++++]<-", /* (18, 2) wrapping */
+    ">-[<->+++++++++]<", /* (17, 2) wrapping */
+    ">-[<->-----]<-----", /* (18, 2) wrapping */
+    ">-[<->-----]<----", /* (17, 2) wrapping */
+    ">-[<->-----]<---", /* (16, 2) wrapping */
+    ">-[<->-----]<--", /* (15, 2) wrapping */
+    ">-[<->-----]<-", /* (14, 2) wrapping */
+    ">-[<->-----]<", /* (13, 2) wrapping */
+    ">-[<->-----]<+", /* (14, 2) wrapping */
+    ">-[<->-----]<++", /* (15, 2) wrapping */
+    ">-[<->-----]<+++", /* (16, 2) wrapping */
+    ">-[<->-----]<++++", /* (17, 2) wrapping */
+    ">--[<->++++++]<---", /* (18, 2) wrapping */
+    ">--[<->++++++]<--", /* (17, 2) wrapping */
+    ">--[<->++++++]<-", /* (16, 2) wrapping */
+    ">--[<->++++++]<", /* (15, 2) wrapping */
+    ">--[<->++++++]<+", /* (16, 2) wrapping */
+    ">--[<->++++++]<++", /* (17, 2) wrapping */
+    ">--[<->++++++]<+++", /* (18, 2) wrapping */
+    ">---[<->+++++++]<--", /* (19, 2) wrapping */
+    ">---[<->+++++++]<-", /* (18, 2) wrapping */
+    ">---[<->+++++++]<", /* (17, 2) wrapping */
+    ">--[<++>+++++++]<", /* (17, 2) wrapping */
+    ">--[<++>+++++++]<+", /* (18, 2) wrapping */
+    ">--[<++>+++++++]<++", /* (19, 2) wrapping */
+    ">----[<-------->+]<-", /* (20, 2) wrapping */
+    ">----[<-------->+]<", /* (19, 2) wrapping */
+    ">-----[<------>+]<-", /* (19, 2) wrapping */
+    ">-----[<------>+]<", /* (18, 2) wrapping */
+    ">----[<------->+]<-", /* (19, 2) wrapping */
+    ">----[<------->+]<", /* (18, 2) wrapping */
+    ">---[<--------->+]<", /* (19, 2) wrapping */
+    ">-----[<----->+]<-", /* (18, 2) wrapping */
+    ">-----[<----->+]<", /* (17, 2) wrapping */
+    ">----[<------>+]<", /* (17, 2) wrapping */
+    ">----[<------>+]<+", /* (18, 2) wrapping */
+    ">---[<------->+]<-", /* (18, 2) wrapping */
+    ">---[<------->+]<", /* (17, 2) wrapping */
+    ">----[<----->+]<", /* (16, 2) wrapping */
+    ">---[<------>+]<-", /* (17, 2) wrapping */
+    ">---[<------>+]<", /* (16, 2) wrapping */
+    ">----[<---->+]<-", /* (16, 2) wrapping */
+    ">----[<---->+]<", /* (15, 2) wrapping */
+    "---------------", /* (15, 1) wrapping */
+    "--------------", /* (14, 1) wrapping */
+    "-------------", /* (13, 1) wrapping */
+    "------------", /* (12, 1) wrapping */
+    "-----------", /* (11, 1) wrapping */
+    "----------", /* (10, 1) wrapping */
+    "---------", /* (9, 1) wrapping */
+    "--------", /* (8, 1) wrapping */
+    "-------", /* (7, 1) wrapping */
+    "------", /* (6, 1) wrapping */
+    "-----", /* (5, 1) wrapping */
+    "----", /* (4, 1) wrapping */
+    "---", /* (3, 1) wrapping */
+    "--", /* (2, 1) wrapping */
+    "-", /* (1, 1) wrapping */
+};
+    const int maxcell = 1;
+    int currcell=0;
+    char * p;
+
+    reinit_state();
+
+    /* Clear the working cells */
+    if (flg_init) add_str(">[-]<[-]");
+
+    str_cells_used = maxcell+1;
+
+    /* Print each character */
+    for(p=buf; *p; p++) {
+	int ch = *p & 255;
+	int diff = (ch-cells[0]) & 255;
+	int l1 = strlen(convbyte[diff]);
+	int l2 = strlen(convbyte[ch & 255])+3;
+
+	if (l2<l1) {
+	    add_str("[-]");
+	    add_str(convbyte[ch & 255]);
+	} else
+	    add_str(convbyte[diff]);
+	cells[0] = ch;
+
+	add_chr('.');
+	if (best_len>0 && str_next > best_len) return;	/* Too big already */
+    }
+
+    currcell = clear_tape(currcell);
+
+    check_if_best(buf, "twobyte");
 }
 
 /******************************************************************************/
