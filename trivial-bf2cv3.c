@@ -1,9 +1,16 @@
 #include <stdio.h>
+#include <string.h>
+
+const char bf[] = "><+-.,[]";
+const char tk[] = "rludoibex";
 
 int
-main(void)
+main(int argc, char **argv)
 {
-    int rle = 0, cc = 0, ch;
+    int lastc = -1, cc = 0, ch;
+    FILE * fd = argc>1?fopen(argv[1],"r"):stdin;
+    if(!fd) { perror(argv[1]); return 1; }
+
     puts("#include<unistd.h>");
     puts("#define r ;m+=1");
     puts("#define l ;m-=1");
@@ -15,26 +22,19 @@ main(void)
     puts("#define e ;}");
     puts("#define x +1");
     puts("#define _ ;return 0;}");
-    puts("char mem[30000];int main(){register char*m=mem;");
+    puts("char mem[30000];int main(){register char*m=mem");
 
-    while((ch = getchar()) != EOF) {
-	int och = 0, rleok = 1;
-	if (ch == '+') och = 'u';
-	else if (ch == '-') och = 'd';
-	else if (ch == '<') och = 'l';
-	else if (ch == '>') och = 'r';
-	else
-	{
-	    rleok = 0;
-	    if (ch == '.') och = 'o';
-	    else if (ch == ',') och = 'i';
-	    else if (ch == '[') och = 'b';
-	    else if (ch == ']') och = 'e';
-	}
-	if (och) {
-	    if (rle == och) putchar('x');
-	    else putchar(och);
-	    if (rleok) rle = och; else rle = 0;
+    while((ch=getc(fd)) != EOF) {
+	char * p = strchr(bf,ch);
+	if (p) {
+	    ch = p-bf;
+	    if (ch < 4) {
+		if (ch == lastc) ch = 8;
+		else lastc = ch;
+	    } else
+		lastc = -1;
+
+	    putchar(tk[ch]);
 	    if (++cc == 38) {
 		putchar('\n');
 		cc = 0;

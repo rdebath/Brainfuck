@@ -9,6 +9,7 @@ int main (int argc, char *argv[]) {
     char * stk_p[1000];
     short stk_m[1000];
     int sp = 0;
+    setbuf(stdout,0);
 
     if(!fp || getdelim(&b,&r,argc>1?'\0':'!',fp)<0)
 	perror(argv[1]);

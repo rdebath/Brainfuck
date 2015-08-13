@@ -16,6 +16,7 @@ char * cc[] = {
 int main(int argc, char ** argv) {
 	char * s;
 	int c;
+	FILE * fd = argc>1?fopen(argv[1],"r"):stdin;
 
 	puts(	"#include <stdio.h>"
 	"\n"	"int array[30000];"
@@ -23,7 +24,7 @@ int main(int argc, char ** argv) {
 	"\n"	"register int p = 0;"
 	"\n"	"setbuf(stdout,0);");
 
-	while((c=getchar()) != EOF)
+	while((c=getc(fd)) != EOF)
 		if ((s = strchr(bf, c)))
 			puts(cc[s-bf]);
 
