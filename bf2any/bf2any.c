@@ -4,8 +4,10 @@
 
 #include "bf2any.h"
 
+int opt_cellsize = 0;
 int bytecell = 0;
 int tapelen = 30000;
+int opt_optim = 0;
 int enable_optim = 0;
 int enable_be_optim = 0;
 int enable_bf_optim = 0;
@@ -295,33 +297,38 @@ static int zstate = 0;
 /*
  *  Decode arguments for the FE
  */
-int byte_supported, nobyte_supported;
 int enable_rle = 0;
 
 int
 check_argv(const char * arg)
 {
-    if (byte_supported && strcmp(arg, "-b") == 0) {
-	check_arg(arg);
+    if (strcmp(arg, "-b") == 0) {
+	if (check_arg("--no-byte") && !check_arg(arg))
+	    return 0;
+
 	bytecell++;
-    } else if (nobyte_supported && strcmp(arg, "-no-byte") == 0) {
-	check_arg(arg);
+	opt_cellsize = 1;
+
+    } else if (strcmp(arg, "-no-byte") == 0) {
+	if (check_arg("-b") && !check_arg(arg))
+	    return 0;
+
 	bytecell=0;
+	opt_cellsize = 1;
 
     } else if (strcmp(arg, "-m") == 0) {
 	check_arg(arg);
-	enable_optim = 0;
-	enable_be_optim = 0;
-	keep_dead_code = 1;
+	enable_optim = enable_be_optim = enable_bf_optim = enable_mov_optim = 0;
+	opt_optim = keep_dead_code = 1;
     } else if (strcmp(arg, "-O") == 0) {
-	enable_optim = 1;
-	check_arg(arg);
+	enable_be_optim = enable_bf_optim = enable_mov_optim = 0;
+	opt_optim = enable_optim = enable_be_optim = 1;
     } else if (strcmp(arg, "-Obf") == 0) {
-	enable_bf_optim=1;
-	enable_optim = 0;
+	enable_optim = enable_be_optim = enable_bf_optim = enable_mov_optim = 0;
+	opt_optim = enable_be_optim = enable_bf_optim = 1;
     } else if (strcmp(arg, "-Omov") == 0) {
-	enable_mov_optim=1;
-	enable_optim = 0;
+	enable_optim = enable_be_optim = enable_bf_optim = enable_mov_optim = 0;
+	opt_optim = enable_be_optim = enable_mov_optim = 1;
 
     } else if (strcmp(arg, "-#") == 0 && check_arg(arg)) {
 	enable_debug++;
@@ -362,20 +369,16 @@ main(int argc, char ** argv)
     FILE * ifd;
     int digits = 0, number = 0, multi = 1;
     int qstring = 0;
+    char ** filelist = 0;
+    int filecount = 0;
 
-    byte_supported = check_arg("-b");
-    nobyte_supported = check_arg("-no-byte");
-    if (!byte_supported && !nobyte_supported)
-	nobyte_supported = byte_supported = 1;
-    bytecell = !nobyte_supported;
-    enable_be_optim = check_arg("-O");
-    enable_optim = !check_arg("-no-default-opt");
+    filelist = calloc(argc, sizeof*filelist);
 
-    for(;;) {
-	if (argc < 2 || argv[1][0] != '-' || argv[1][1] == '\0') {
-	    break;
+    for(ar=1;ar<argc;ar++) {
+	if (argv[ar][0] != '-' || argv[ar][1] == '\0') {
+	    filelist[filecount++] = argv[ar];
 
-	} else if (strcmp(argv[1], "-h") == 0) {
+	} else if (strcmp(argv[ar], "-h") == 0) {
 
 	    fprintf(stderr, "%s: [options] [File]\n", pgm);
 	    fprintf(stderr, "%s\n",
@@ -390,15 +393,15 @@ main(int argc, char ** argv)
 	    "\n\t"  "-M30000 Set length of tape, -M for dynamic if available."
 	    );
 
-	    check_arg(argv[1]);
+	    check_arg(argv[ar]);
 	    exit(0);
-	} else if (check_argv(argv[1])) {
-	    argc--; argv++;
-	} else if (strcmp(argv[1], "--") == 0) {
-	    argc--; argv++;
+	} else if (check_argv(argv[ar])) {
+	    ;
+	} else if (strcmp(argv[ar], "--") == 0) {
+	    ;
 	    break;
-	} else if (argv[1][0] == '-') {
-	    char * ap = argv[1]+1;
+	} else if (argv[ar][0] == '-') {
+	    char * ap = argv[ar]+1;
 	    static char buf[4] = "-X";
 	    while(*ap) {
 		buf[1] = *ap;
@@ -408,22 +411,37 @@ main(int argc, char ** argv)
 	    }
 	    if (*ap) {
 		fprintf(stderr, "Unknown option '%s'; try -h for option list\n",
-			argv[1]);
+			argv[ar]);
 		exit(1);
 	    }
-	    argc--; argv++;
-	} else break;
+	} else
+	    filelist[filecount++] = argv[ar];
     }
 
+    /* Defaults if not told */
+    if (!opt_cellsize)
+	bytecell = (check_arg("-b") && !check_arg("-no-byte"));
+
+    if (!opt_optim)
+	enable_be_optim = enable_optim = !check_arg("-no-default-opt");
+
+    if (enable_be_optim)
+	enable_be_optim = check_arg("-O");
+
+    if (filecount == 0)
+	filelist[filecount++] = "-";
+
+    /* Now we do it ... */
     outrun('!', 0);
-    for(ar=0+(argc>1); ar<argc; ar++) {
-	if (argc<=1 || strcmp(argv[ar], "-") == 0) {
+    for(ar=0; ar<filecount; ar++) {
+
+	if (strcmp(filelist[ar], "-") == 0) {
 	    ifd = stdin;
 	    current_file = "stdin";
-	} else if((ifd = fopen(argv[ar],"r")) == 0) {
-	    perror(argv[ar]); exit(1);
+	} else if((ifd = fopen(filelist[ar],"r")) == 0) {
+	    perror(filelist[ar]); exit(1);
 	} else
-	    current_file = argv[ar];
+	    current_file = filelist[ar];
 
 	while((ch = getc(ifd)) != EOF && (ifd!=stdin || ch != '!' ||
 		qstring || lc || b || (c==0 && cf==0))) {

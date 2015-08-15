@@ -46,7 +46,8 @@
 #define L_UGLYBF        0x15    /* bfugly(token, count); */
 #define L_MALBRAIN      0x16    /* malbrain(token, count); */
 #define L_HANOILOVE     0x17    /* hanoilove(token, count); */
-#define L_EXCON         0x18    /* excon(token, count); */
+#define L_ASCII         0x18    /* ascii(token, count); */
+#define L_EXCON         0x19    /* ascii(token, count); */
 
 static const char bf[] = "><+-.,[]";
 static const char * bfout[] = { ">", "<", "+", "-", ".", ",", "[", "]", 0 };
@@ -339,6 +340,7 @@ static struct instruction *pgm = 0, *last = 0, *jmpstack = 0;
 const char ** doubler = doubler_copy;
 const char ** bfquad = bfquadz;
 
+static int disable_optimisation(void);
 static void risbf(int ch, int count);
 static void headsecks(int ch, int count);
 static void bfrle(int ch, int count);
@@ -346,7 +348,7 @@ static void bfxml(int ch, int count);
 static void bfugly(int ch, int count);
 static void malbrain(int ch, int count);
 static void hanoilove(int ch, int count);
-static void excon(int ch, int count);
+static void ascii(int ch, int count);
 static void bftranslate(int ch, int count);
 static void bfreprint(void);
 
@@ -354,7 +356,8 @@ int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-#") == 0) return 1;
-    if (strcmp(arg, "-no-default-opt") == 0) return 1;
+    if (strcmp(arg, "-no-default-opt") == 0) return disable_optimisation();
+    if (strcmp(arg, "-O") == 0) return !disable_optimisation();
 
     if (strcmp(arg, "-c") == 0) {
 	lang = cbyte; langclass = L_CWORDS; return 1;
@@ -526,6 +529,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-hanoilove") == 0) {
 	lang = 0; langclass = L_HANOILOVE; return 1;
     } else
+    if (strcmp(arg, "-ascii") == 0) {
+	lang = 0; langclass = L_ASCII; return 1;
+    } else
     if (strcmp(arg, "-excon") == 0) {
 	lang = 0; langclass = L_EXCON; return 1;
     } else
@@ -571,6 +577,7 @@ check_arg(const char * arg)
 	"\n\t"  "-cupid  Cupid from http://esolangs.org/wiki/Cupid"
 	"\n\t"  "-malbrain Malbrain translation"
 	"\n\t"  "-hanoilove Hanoi Love translation"
+	"\n\t"  "-ascii  Convert BF to ASCII"
 	"\n\t"  "-excon  EXCON translation -- http://esolangs.org/wiki/EXCON"
 	"\n\t"  "-dc     Convert to dc(1) using the first of below."
 	"\n\t"  "-dc1      Use an array and a pointer variable."
@@ -589,6 +596,16 @@ check_arg(const char * arg)
 	return 1;
     } else
 	return 0;
+}
+
+static int disable_optimisation(void)
+{
+    switch(L_BASE) {
+    case L_ASCII:
+    case L_EXCON:
+	return 0;
+    }
+    return 1;
 }
 
 static void
@@ -728,7 +745,8 @@ outcmd(int ch, int count)
     case L_UGLYBF:	bfugly(ch, count); break;
     case L_MALBRAIN:	malbrain(ch, count); break;
     case L_HANOILOVE:	hanoilove(ch, count); break;
-    case L_EXCON:       excon(ch, count); break;
+    case L_EXCON:
+    case L_ASCII:       ascii(ch, count); break;
     }
 
     if (ch == '~' && (langclass & GEN_HEADER) != 0)
@@ -740,10 +758,7 @@ outcmd(int ch, int count)
 	    col += printf("%s%s", col?" ":"", "_");
 	else if (langclass & C_HEADERS)
 	    col += printf("%s%s", col?" ":"", "return 0;}");
-	if(col) {
-	    if (linefix != EOF) putchar(linefix);
-	    putchar('\n');
-	}
+	if(col) pc('\n');
     }
 }
 
@@ -1157,7 +1172,7 @@ hanoilove(int ch, int count)
 }
 
 void
-excon(int ch, int count)
+ascii(int ch, int count)
 {
     if (ch != '!' && ch != '~')
     {
@@ -1191,11 +1206,7 @@ excon(int ch, int count)
 	setbuf(stdout, 0);
 
 	for(n=pgm; n; n=n->next) switch(n->ch) {
-	    default:
-		fprintf(stderr, "Illegal command in EXCOM() stream: %d\n", n->ch);
-		exit(1);
 
-#ifdef EXCON_OPTIM
 	    case '=': m->val = n->count; break;
 	    case 'B': v = (m->val & msk); break;
 	    case 'm': /* if (v == 0) break; */
@@ -1205,7 +1216,6 @@ excon(int ch, int count)
 	    case 's': /* if (v == 0) break; */
 	    case 'S': m->val = m->val + v; break;
 	    case 'Q': if (v != 0) m->val = n->count; break;
-#endif
 
 	    case '+': m->val = m->val + n->count; break;
 	    case '-': m->val = m->val - n->count; break;
@@ -1231,39 +1241,46 @@ excon(int ch, int count)
 		    m=m->next;
 		}
 		break;
-#ifdef EXCON_ASCII
-	    case '.': putchar(m->val & 0xFF); break;
-	    case ',': if((v=getchar()) != EOF) m->val = v; break;
-#else
-	    case '.':
-		v = (m->val & 0xFF);
-		{
-		    int bit = 1;
-		    for(bit = 1; bit < 0x100; bit <<=1) {
-			if ((outch & bit) != (v & bit)) {
-			    if (bit < outbit) {
-				pc(':');
-				outbit = 1;
-				outch = 0;
-				bit = 1;
-			    }
-			}
-			if ((outch & bit) != (v & bit)) {
-			    while (bit > outbit) {
-				outbit <<= 1;
-				pc('<');
-			    }
-			    outch ^= outbit;
-			    pc('^');
-			}
-		    }
-		}
-		pc('!');
-		break;
-	    case ',': break;
-#endif
 	    case '[': if((m->val & msk) == 0) n=n->loop; break;
 	    case ']': if((m->val & msk) != 0) n=n->loop; break;
+
+	    case '.':
+		switch(L_BASE) {
+		case L_ASCII:
+		    putchar(m->val & 0xFF); break;
+		case L_EXCON:
+		    v = (m->val & 0xFF);
+		    {
+			int bit = 1;
+			for(bit = 1; bit < 0x100; bit <<=1) {
+			    if ((outch & bit) != (v & bit)) {
+				if (bit < outbit) {
+				    pc(':');
+				    outbit = 1;
+				    outch = 0;
+				    bit = 1;
+				}
+			    }
+			    if ((outch & bit) != (v & bit)) {
+				while (bit > outbit) {
+				    outbit <<= 1;
+				    pc('<');
+				}
+				outch ^= outbit;
+				pc('^');
+			    }
+			}
+		    }
+		    pc('!');
+		    break;
+		}
+		break;
+
+	    case ',':
+		if (L_BASE == L_ASCII) {
+		    if((v=getchar()) != EOF) m->val = v;
+		}
+		break;
 	}
     }
 }
