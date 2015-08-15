@@ -51,9 +51,7 @@ static intmax_t overflows, underflows;
 	} else if (!strcmp(argv[1], "-w")) {
 	    cell_mask=65535; argc--; argv++;
 	} else if (!strcmp(argv[1], "-p")) {
-	    physical_overflow++; argc--; argv++;
-	} else if (!strcmp(argv[1], "-P")) {
-	    physical_overflow=2; argc--; argv++;
+	    physical_overflow=1; argc--; argv++;
 	} else if (!strcmp(argv[1], "-q")) {
 	    quick_summary=1; argc--; argv++;
 	} else if (!strcmp(argv[1], "-Q")) {
@@ -94,27 +92,32 @@ static intmax_t overflows, underflows;
 	case 2: m--; if(tape_min>m) tape_min = m; break;
 	case 3:
 	    if (mem[TM(m)] == cell_mask) hard_wrap = 1;
-	    mem[TM(m)]++;
+	    if(m<0) neg_array = 1;
+
 	    if(physical_overflow) {
-		if (mem[TM(m)] > cell_mask) { overflows++; mem[TM(m)] &= cell_mask; profile[pgm[p]*3 + 2]++; }
+		if (mem[TM(m)] == cell_mask)
+		    { overflows++; mem[TM(m)] = -1; profile[pgm[p]*3 + 2]++; }
 	    } else {
 		/* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
-		if(mem[TM(m)] > 0x3FFFFFFF)
-		    { overflows++; mem[TM(m)] &= cell_mask; profile[pgm[p]*3 + 2]++; }
+		if(mem[TM(m)] == INT_MAX)
+		    { overflows++; mem[TM(m)] = -1; profile[pgm[p]*3 + 2]++; }
 	    }
-	    if(m<0) neg_array = 1;
+
+	    mem[TM(m)]++;
 	    break;
 	case 4:
 	    if (mem[TM(m)] == 0) hard_wrap = 1;
-	    mem[TM(m)]--;
-	    if(physical_overflow) {
-		if (mem[TM(m)] < -cell_mask/2 || (physical_overflow>1 && mem[TM(m)] < 0))
-		    { underflows++; mem[TM(m)] &= cell_mask; profile[pgm[p]*3 + 2]++; }
-	    } else {
-		if(mem[TM(m)] < -0x3FFFFFFF)
-		    { underflows++; mem[TM(m)] &= cell_mask; profile[pgm[p]*3 + 2]++; }
-	    }
 	    if(m<0) neg_array = 1;
+
+	    if(physical_overflow) {
+		if (mem[TM(m)] == 0)
+		    { underflows++; mem[TM(m)] = cell_mask+1; profile[pgm[p]*3 + 2]++; }
+	    } else {
+		if(mem[TM(m)] == INT_MIN)
+		    { underflows++; mem[TM(m)] = cell_mask+1; profile[pgm[p]*3 + 2]++; }
+	    }
+
+	    mem[TM(m)]--;
 	    break;
 	case 5:
 	    if ((mem[TM(m)] & cell_mask) == 0 && (mem[TM(m)] & ~cell_mask) != 0) {
@@ -219,10 +222,8 @@ static intmax_t overflows, underflows;
 
 	if (overflows || underflows) {
 	    fprintf(stderr, "Range error: ");
-	    if (physical_overflow>1)
+	    if (physical_overflow)
 		fprintf(stderr, "range 0..%d", cell_mask);
-	    else if (physical_overflow)
-		fprintf(stderr, "range %d..%d", -cell_mask/2, cell_mask);
 	    else
 		fprintf(stderr, "value check");
 	    if (overflows)
