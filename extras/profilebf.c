@@ -34,6 +34,7 @@ static intmax_t overflows, underflows;
     int quick_with_counts = 0;
     int hard_wrap = 0;
     int cell_mask = 255;
+    int all_cells = 0;
 
     FILE * f;
     for (;;) {
@@ -57,6 +58,8 @@ static intmax_t overflows, underflows;
 	    quick_summary=1; argc--; argv++;
 	} else if (!strcmp(argv[1], "-Q")) {
 	    quick_summary=1; quick_with_counts=1; argc--; argv++;
+	} else if (!strcmp(argv[1], "-a")) {
+	    all_cells++; argc--; argv++;
 	} else if (argv[1][0] == '-') {
 	    fprintf(stderr, "Unknown option '%s'\n", argv[1]);
 	    exit(1);
@@ -186,13 +189,20 @@ static intmax_t overflows, underflows;
 	{
 	    int cc = 0, pc = 0;
 	    if (tape_min<0) cc+=fprintf(stderr, " !");
-	    for(ch=0; ch<16 && ch<=tape_max-tape_min; ch++) {
-		if (ch+tape_min == 0) cc+=fprintf(stderr, " :");
+	    for(ch=0; (all_cells || ch<16) && ch<=tape_max-tape_min; ch++) {
+		if (((ch+tape_min)&15) == 0) {
+		    if (ch+tape_min != 0) {
+			if (pc) fprintf(stderr, "\n%*s\n", pc, "^");
+			else fprintf(stderr, "\n");
+			cc = pc = 0;
+		    }
+		    cc+=fprintf(stderr, " :");
+		}
 		cc += fprintf(stderr, " %3d", mem[TM(ch+tape_min)] & cell_mask);
-		if (m == ch+tape_min)
+		if (m == ch+tape_min )
 		    pc = cc;
 	    }
-	    if (tape_max-tape_min>=16) fprintf(stderr, " ...");
+	    if (!all_cells && tape_max-tape_min>=16) fprintf(stderr, " ...");
 	    if (pc) fprintf(stderr, "\n%*s\n", pc, "^");
 	    else fprintf(stderr, "\nPointer at: %d\n", m);
 	}
