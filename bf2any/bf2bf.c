@@ -46,6 +46,7 @@
 #define L_UGLYBF        0x15    /* bfugly(token, count); */
 #define L_MALBRAIN      0x16    /* malbrain(token, count); */
 #define L_HANOILOVE     0x17    /* hanoilove(token, count); */
+#define L_EXCON         0x18    /* excon(token, count); */
 
 static const char bf[] = "><+-.,[]";
 static const char * bfout[] = { ">", "<", "+", "-", ".", ",", "[", "]", 0 };
@@ -317,6 +318,9 @@ static const char * bfquadnz[] = {
     0
     };
 
+struct mem { int val; struct mem *next, *prev; };
+struct instruction { int ch; int count; struct instruction * next, *loop; };
+
 static int langclass = L_BF;
 static const char ** lang = bfout;
 static const char ** c = 0;
@@ -329,7 +333,8 @@ static int bf_mov = 0;
 static int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
 
 static int bf_multi = 0, tmp_clean = 1;
-struct instruction { int ch; int count; struct instruction * next; } *pgm = 0, *last = 0;
+static struct instruction *pgm = 0, *last = 0, *jmpstack = 0;
+
 /* Default double and quad to the easiest to prove algorithms. */
 const char ** doubler = doubler_copy;
 const char ** bfquad = bfquadz;
@@ -341,6 +346,7 @@ static void bfxml(int ch, int count);
 static void bfugly(int ch, int count);
 static void malbrain(int ch, int count);
 static void hanoilove(int ch, int count);
+static void excon(int ch, int count);
 static void bftranslate(int ch, int count);
 static void bfreprint(void);
 
@@ -520,6 +526,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-hanoilove") == 0) {
 	lang = 0; langclass = L_HANOILOVE; return 1;
     } else
+    if (strcmp(arg, "-excon") == 0) {
+	lang = 0; langclass = L_EXCON; return 1;
+    } else
     if (strcmp(arg, "-dump") == 0) {
 	lang = 0; langclass = L_TOKENS; return 1;
     } else
@@ -562,6 +571,7 @@ check_arg(const char * arg)
 	"\n\t"  "-cupid  Cupid from http://esolangs.org/wiki/Cupid"
 	"\n\t"  "-malbrain Malbrain translation"
 	"\n\t"  "-hanoilove Hanoi Love translation"
+	"\n\t"  "-excon  EXCON translation -- http://esolangs.org/wiki/EXCON"
 	"\n\t"  "-dc     Convert to dc(1) using the first of below."
 	"\n\t"  "-dc1      Use an array and a pointer variable."
 	"\n\t"  "-dc2      Use an array with the pointer on the stack (not V7)."
@@ -718,6 +728,7 @@ outcmd(int ch, int count)
     case L_UGLYBF:	bfugly(ch, count); break;
     case L_MALBRAIN:	malbrain(ch, count); break;
     case L_HANOILOVE:	hanoilove(ch, count); break;
+    case L_EXCON:       excon(ch, count); break;
     }
 
     if (ch == '~' && (langclass & GEN_HEADER) != 0)
@@ -1142,5 +1153,117 @@ hanoilove(int ch, int count)
 	pc('!');
 	pc(';');
 	break;
+    }
+}
+
+void
+excon(int ch, int count)
+{
+    if (ch != '!' && ch != '~')
+    {
+	struct instruction * n = calloc(1, sizeof*n);
+	if (!n) { perror("calloc"); exit(42); }
+
+	n->ch = ch;
+	n->count = count;
+	if (!last) {
+	    pgm = n;
+	} else {
+	    last->next = n;
+	}
+	last = n;
+
+	if (n->ch == '[') {
+	    n->loop = jmpstack; jmpstack = n;
+	} else if (n->ch == ']') {
+	    n->loop = jmpstack; jmpstack = jmpstack->loop; n->loop->loop = n;
+	}
+    }
+
+    if (ch == '~')
+    {
+	const int msk = (bytecell)?0xFF:-1;
+	struct instruction * n;
+	struct mem *m = calloc(1,sizeof*m);
+	int i, v = 0xDEADBEEF;
+	int outbit = 1, outch = 0;
+
+	setbuf(stdout, 0);
+
+	for(n=pgm; n; n=n->next) switch(n->ch) {
+	    default:
+		fprintf(stderr, "Illegal command in EXCOM() stream: %d\n", n->ch);
+		exit(1);
+
+#ifdef EXCON_OPTIM
+	    case '=': m->val = n->count; break;
+	    case 'B': v = (m->val & msk); break;
+	    case 'm': /* if (v == 0) break; */
+	    case 'M': m->val = m->val + v*n->count; break;
+	    case 'n': /* if (v == 0) break; */
+	    case 'N': m->val = m->val - v*n->count; break;
+	    case 's': /* if (v == 0) break; */
+	    case 'S': m->val = m->val + v; break;
+	    case 'Q': if (v != 0) m->val = n->count; break;
+#endif
+
+	    case '+': m->val = m->val + n->count; break;
+	    case '-': m->val = m->val - n->count; break;
+	    case '<':
+		for(i=0; i<n->count; i++) {
+		    if (m->prev == 0) {
+			if ((m->prev = calloc(1,sizeof*m)) == 0) {
+			    perror("calloc"); exit(1);
+			}
+			m->prev->next = m;
+		    }
+		    m=m->prev;
+		}
+		break;
+	    case '>':
+		for(i=0; i<n->count; i++) {
+		    if (m->next == 0) {
+			if ((m->next = calloc(1,sizeof*m)) == 0) {
+			    perror("calloc"); exit(1);
+			}
+			m->next->prev = m;
+		    }
+		    m=m->next;
+		}
+		break;
+#ifdef EXCON_ASCII
+	    case '.': putchar(m->val & 0xFF); break;
+	    case ',': if((v=getchar()) != EOF) m->val = v; break;
+#else
+	    case '.':
+		v = (m->val & 0xFF);
+		{
+		    int bit = 1;
+		    for(bit = 1; bit < 0x100; bit <<=1) {
+			if ((outch & bit) != (v & bit)) {
+			    if (bit < outbit) {
+				pc(':');
+				outbit = 1;
+				outch = 0;
+				bit = 1;
+			    }
+			}
+			if ((outch & bit) != (v & bit)) {
+			    while (bit > outbit) {
+				outbit <<= 1;
+				pc('<');
+			    }
+			    outch ^= outbit;
+			    pc('^');
+			}
+		    }
+		}
+		pc('!');
+		break;
+	    case ',': break;
+#endif
+	    case '[': if((m->val & msk) == 0) n=n->loop; break;
+	    case ']': if((m->val & msk) != 0) n=n->loop; break;
+	}
     }
 }
