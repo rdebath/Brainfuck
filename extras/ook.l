@@ -11,6 +11,7 @@ static void pc(int);
 static void commentch(int);
 static void pcr(int, int);
 static int countch(char *, int);
+static void pcs(int, int);
 
 static int uncomment_mode = 0;
 
@@ -27,7 +28,7 @@ static int uncomment_mode = 0;
 %s OOK
 %s BLUB
 %s POG
-%s NICE
+%s ALWORD
 %x ZZZ
 %s FK
 %x CCOMMENT
@@ -107,23 +108,46 @@ pock	([ \t\n]*pock!)*
     .		commentch(yytext[0]);
 }
 
-<NICE>{
-    right		pc('>');
-    left		pc('<');
-    up			pc('+');
-    down		pc('-');
-    out			pc('.');
-    in			pc(',');
-    begin		pc('[');
-    end			pc(']');
-}
+<ALWORD>{
+    /* Simple alpha-numeric "words", only one set is active at a time */
 
-    /* Want to make these 'after-lex':
-     * "right", "left", "up", "down", "out", "in", "begin", "end",
-     * "fnord", "pineal", "hail", "eris", "kallisti", "chaos", "23", "5",
-     * "pipi", "pichu", "pi", "ka", "pikachu", "pikapi", "pika", "chu",
-     * "once", "there", "was", "a", "fish", "dead", "named", "Fred",
-     */
+    right		pcs('>', 0);
+    left		pcs('<', 0);
+    up			pcs('+', 0);
+    down		pcs('-', 0);
+    out			pcs('.', 0);
+    in			pcs(',', 0);
+    begin		pcs('[', 0);
+    end			pcs(']', 0);
+
+    fnord		pcs('>', 1);
+    pineal		pcs('<', 1);
+    hail		pcs('+', 1);
+    eris		pcs('-', 1);
+    kallisti		pcs('.', 1);
+    chaos		pcs(',', 1);
+    23			pcs('[', 1);
+    5			pcs(']', 1);
+
+    pipi		pcs('>', 2);
+    pichu		pcs('<', 2);
+    pi			pcs('+', 2);
+    ka			pcs('-', 2);
+    pikachu		pcs('.', 2);
+    pikapi		pcs(',', 2);
+    pika		pcs('[', 2);
+    chu			pcs(']', 2);
+
+    once		pcs('>', 3);
+    there		pcs('<', 3);
+    was			pcs('+', 3);
+    a			pcs('-', 3);
+    fish		pcs('.', 3);
+    dead		pcs(',', 3);
+    named		pcs('[', 3);
+    fred		pcs(']', 3);
+
+}
 
 <CHI>{
     右		pc('>');
@@ -149,6 +173,7 @@ int jmp = -1, cp = -1, pp = -1;
 int on_eof = 1, runit = 0, debug = 0;
 
 int col = 0, ccol = 0;
+int alset = 0;
 
 int main(int argc, char ** argv)
 {
@@ -169,10 +194,14 @@ int main(int argc, char ** argv)
 	    else if (!strcmp(argv[1], "-ook")) mode = OOK;
 	    else if (!strcmp(argv[1], "-blub")) mode = BLUB;
 	    else if (!strcmp(argv[1], "-pog")) mode = POG;
-	    else if (!strcmp(argv[1], "-nice")) mode = NICE;
 	    else if (!strcmp(argv[1], "-fk")) mode = FK;
 	    else if (!strcmp(argv[1], "-zzz")) mode = ZZZ;
 	    else if (!strcmp(argv[1], "-chi")) mode = CHI;
+
+	    else if (!strcmp(argv[1], "-nice")) { mode = ALWORD; alset = 0; }
+	    else if (!strcmp(argv[1], "-eris")) { mode = ALWORD; alset = 1; }
+	    else if (!strcmp(argv[1], "-pika")) { mode = ALWORD; alset = 2; }
+	    else if (!strcmp(argv[1], "-fish")) { mode = ALWORD; alset = 3; }
 
 	    else {
 		fprintf(stderr, "Unknown option %s\n", argv[1]);
@@ -208,6 +237,18 @@ int main(int argc, char ** argv)
 	run();
     }
     return 0;
+}
+
+static void
+pcs(int ch, int inset)
+{
+    if (inset != alset)
+    {
+	int i;
+	for(i=0; i<yyleng; i++)
+	    commentch(yytext[i]);
+    } else
+	pc(ch);
 }
 
 static void
