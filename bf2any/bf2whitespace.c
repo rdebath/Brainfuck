@@ -11,11 +11,15 @@
 int ind = 0;
 int loopid = 1;
 int embed_tokens = 0;
+int signed_label_bug = 0;
 
 struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
 static void print_string(void);
 static void prttok(char *, char *);
+static void putsnum(long val);
+static void putunum(unsigned long num);
+static void putlabel(unsigned long num);
 
 #ifndef BF2SEMI
 
@@ -77,7 +81,7 @@ static void prttok(char *, char *);
 
 #define AFTER_END \
 	printf(CMD_LABEL); \
-	putnum(0); /* End the program with a newline */
+	putlabel(0); /* End the program with a newline */
 
 #endif
 
@@ -96,55 +100,11 @@ check_arg(const char * arg)
 	embed_tokens = 1;
 	return 1;
     }
+    if (strcmp(arg, "-signbug") == 0) {
+	signed_label_bug = 1;
+	return 1;
+    }
     return 0;
-}
-
-static void
-putnum(unsigned long num)
-{
-    unsigned long v, max;
-
-    if (embed_tokens)
-	printf("(%ld:", num);
-
-    max = 1; v = num;
-    for(;;) {
-	v /= 2;
-	if (v == 0) break;
-	max *= 2;
-    }
-    for(;;) {
-	v = num / max;
-	num = num % max;
-	if (v == 0) printf(BIT_ZERO); else printf(BIT_ONE);
-	if (max == 1) break;
-	max /= 2;
-    }
-
-    if (embed_tokens)
-	printf(")");
-
-    printf(END_NUM);
-}
-
-static void
-putsnum(long val)
-{
-    if (val >= 0) {
-	prttok("(pos)", BIT_ZERO);
-	putnum(val);
-    } else {
-	prttok("(neg)", BIT_ONE);
-	putnum(-val);
-    }
-}
-
-static void
-prttok(char * comment, char * token)
-{
-    if (embed_tokens)
-	printf("%s", comment);
-    printf("%s", token);
 }
 
 #define BYTEWRAP()	\
@@ -168,7 +128,7 @@ do_bytewrap(void)
     BYTEWRAP();
 #else
     PRTTOK(CALL);
-    putnum(bytewrap_label);
+    putlabel(bytewrap_label);
 #endif
 }
 
@@ -217,18 +177,18 @@ outcmd(int ch, int count)
 	       use them; do this here */
 
 	    PRTTOK(PUSH); putsnum(0);
-	    PRTTOK(LABEL); putnum(loopid);
+	    PRTTOK(LABEL); putlabel(loopid);
 	    PRTTOK(DUP);
 	    PRTTOK(PUSH); putsnum(tapesz+4);
 	    PRTTOK(SUB);
-	    PRTTOK(JZ); putnum(loopid+1);
+	    PRTTOK(JZ); putlabel(loopid+1);
 	    PRTTOK(DUP);
 	    PRTTOK(PUSH); putsnum(0);
 	    PRTTOK(STORE);
 	    PRTTOK(PUSH); putsnum(1);
 	    PRTTOK(ADD);
-	    PRTTOK(JMP); putnum(loopid);
-	    PRTTOK(LABEL); putnum(loopid+1);
+	    PRTTOK(JMP); putlabel(loopid);
+	    PRTTOK(LABEL); putlabel(loopid+1);
 	    PRTTOK(DROP);
 	    loopid += 2;
 	}
@@ -237,13 +197,13 @@ outcmd(int ch, int count)
 #if defined(CMD_CALL)
 	if(bytecell) {
 	    PRTTOK(JMP);
-	    putnum(loopid+1);
+	    putlabel(loopid+1);
 	    PRTTOK(LABEL);
-	    putnum(loopid);
+	    putlabel(loopid);
 	    BYTEWRAP();
 	    PRTTOK(RET);
 	    PRTTOK(LABEL);
-	    putnum(loopid+1);
+	    putlabel(loopid+1);
 	    bytewrap_label = loopid;
 	    loopid += 2;
 	}
@@ -299,7 +259,7 @@ outcmd(int ch, int count)
 	putsnum(0);
 	PRTTOK(FETCH);
 	PRTTOK(JZ);
-	putnum(loopid);
+	putlabel(loopid);
 
 	PRTTOK(DUP);
 	PRTTOK(PUSH);
@@ -307,7 +267,7 @@ outcmd(int ch, int count)
 	PRTTOK(STORE);
 
 	PRTTOK(LABEL);
-	putnum(loopid);
+	putlabel(loopid);
 	loopid++;
 	break;
 
@@ -316,7 +276,7 @@ outcmd(int ch, int count)
 	putsnum(0);
 	PRTTOK(FETCH);
 	PRTTOK(JZ);
-	putnum(loopid);
+	putlabel(loopid);
 
 	PRTTOK(DUP);
 	PRTTOK(DUP);
@@ -333,7 +293,7 @@ outcmd(int ch, int count)
 	PRTTOK(STORE);
 
 	PRTTOK(LABEL);
-	putnum(loopid);
+	putlabel(loopid);
 	loopid++;
 	break;
 
@@ -383,12 +343,12 @@ outcmd(int ch, int count)
 	    ind++;
 
 	    PRTTOK(LABEL);
-	    putnum(n->id);
+	    putlabel(n->id);
 	    PRTTOK(DUP);
 	    PRTTOK(FETCH);
 
 	    PRTTOK(JZ);
-	    putnum(n->id+1);
+	    putlabel(n->id+1);
         }
         break;
 
@@ -401,9 +361,9 @@ outcmd(int ch, int count)
 	    ind--;
 
 	    PRTTOK(JMP);
-	    putnum(n->id);
+	    putlabel(n->id);
 	    PRTTOK(LABEL);
-	    putnum(n->id+1);
+	    putlabel(n->id+1);
             free(n);
         }
         break;
@@ -440,4 +400,61 @@ print_string(void)
 	}
 	PRTTOK(OUTCHAR);
     }
+}
+
+static void
+prttok(char * comment, char * token)
+{
+    if (embed_tokens)
+	printf("%s", comment);
+    printf("%s", token);
+}
+
+static void
+putlabel(unsigned long num)
+{
+    if (signed_label_bug)
+	putsnum(num);
+    else
+	putunum(num);
+}
+
+static void
+putsnum(long val)
+{
+    if (val >= 0) {
+	prttok("(pos)", BIT_ZERO);
+	putunum(val);
+    } else {
+	prttok("(neg)", BIT_ONE);
+	putunum(-val);
+    }
+}
+
+static void
+putunum(unsigned long num)
+{
+    unsigned long v, max;
+
+    if (embed_tokens)
+	printf("(%ld:", num);
+
+    max = 1; v = num;
+    for(;;) {
+	v /= 2;
+	if (v == 0) break;
+	max *= 2;
+    }
+    for(;;) {
+	v = num / max;
+	num = num % max;
+	if (v == 0) printf(BIT_ZERO); else printf(BIT_ONE);
+	if (max == 1) break;
+	max /= 2;
+    }
+
+    if (embed_tokens)
+	printf(")");
+
+    printf(END_NUM);
 }
