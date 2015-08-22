@@ -14,5 +14,10 @@ int check_arg(const char * arg);
 
 char * get_string(void);
 
+/* Add default so that code is valid without special compile options */
+#ifndef BOFF
+#define BOFF 256
+#endif
+
 #define tapeinit (enable_optim?BOFF:0)
 #define tapesz   (tapelen+tapeinit)
