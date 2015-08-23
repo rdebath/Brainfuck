@@ -28,14 +28,14 @@ int main(int argc, char **argv)
 	 exit(1);
       } else break;
    }
-   ifd = argc>1&&strcmp(argv[1],"-")?fopen(argv[1],"r"):stdin;
+   ifd = argc>1 && strcmp(argv[1], "-") ? fopen(argv[1], "r") : stdin;
    if(!ifd) perror(argv[1]); else {
       while((ch = getc(ifd)) != EOF && (ifd!=stdin || ch != '!' || j>=0)) {
 	 int r = (ch == '<' || ch == '>' || ch == '+' || ch == '-');
 	 if (r || (debug && ch == '#') || (ch == ']' && j>=0) ||
 	       ch == '[' || ch == ',' || ch == '.') {
-	    if (ch == '<') {ch = '>'; r = -r;}
-	    if (ch == '-') {ch = '+'; r = -r;}
+	    if (ch == '<') { ch = '>'; r = -r; }
+	    if (ch == '-') { ch = '+'; r = -r; }
 	    if (r && p>=0 && pgm[p].cmd == ch) { pgm[p].arg += r; continue; }
 	    if (p>=0 && pgm[p].cmd == '=' && ch == '+')
 		{ pgm[p].arg += r; continue; }
@@ -47,9 +47,9 @@ int main(int argc, char **argv)
 	       pgm[n].mov = 0;
 	    }
 	    pgm[n].cmd = ch; pgm[n].arg = r; p = n;
-	    if (pgm[n].cmd == '[') { pgm[n].arg=j; j = n; }
+	    if (pgm[n].cmd == '[') { pgm[n].cmd=' '; pgm[n].arg=j; j = n; }
 	    else if (pgm[n].cmd == ']') {
-	       pgm[n].arg = j; j = pgm[j].arg; pgm[pgm[n].arg].arg = n;
+	       pgm[n].arg=j; j=pgm[r=j].arg; pgm[r].arg=n; pgm[r].cmd='[';
 	       if (  pgm[n].mov == 0 && pgm[n-1].mov == 0 &&
 		     pgm[n-1].cmd == '+' && (pgm[n-1].arg&1) == 1 &&
 		     pgm[n-2].cmd == '[') {
@@ -60,7 +60,6 @@ int main(int argc, char **argv)
 	    }
 	 }
       }
-      while(j>=0) { p=j; j=pgm[j].arg; pgm[p].arg=0; pgm[p].cmd = '+'; }
       if (ifd!=stdin) fclose(ifd);
       setbuf(stdout, NULL);
       if (pgm) { pgm[n+1].cmd = 0; run(); }
