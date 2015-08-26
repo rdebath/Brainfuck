@@ -4,8 +4,8 @@ extern int tapelen;
 extern int enable_optim;
 extern int enable_be_optim;
 extern int enable_bf_optim;
+extern int enable_mov_optim;
 extern int enable_debug;
-extern int keep_dead_code;
 extern const char * current_file;
 
 void outcmd(int ch, int count);

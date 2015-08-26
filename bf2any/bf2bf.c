@@ -611,7 +611,7 @@ static int disable_optimisation(void)
 static void
 pc(int ch)
 {
-    if (L_BASE == L_BF && !keep_dead_code) {
+    if (L_BASE == L_BF && enable_mov_optim) {
 	if (ch == '>') bf_mov++;
 	else if (ch == '<') bf_mov--;
 	else {

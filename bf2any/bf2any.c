@@ -11,8 +11,7 @@ int opt_optim = 0;
 int enable_optim = 0;
 int enable_be_optim = 0;
 int enable_bf_optim = 0;
-int enable_mov_optim = 0;
-int keep_dead_code = 0;
+int enable_mov_optim = 1;
 int enable_debug;
 const char * current_file;
 
@@ -52,7 +51,8 @@ static int madd_inc[32];
 static int madd_zmode[32];
 static int madd_count = 0;
 
-static int simple_mov_count = 0;
+static int simple_rle_cmd = 0;
+static int simple_rle_count = 0;
 
 static void
 outtxn(int ch, int repcnt)
@@ -275,15 +275,30 @@ static int zstate = 0;
 	outopt(ch, count);
 
     } else if (enable_mov_optim) {
-	/* This is a very simple optimisation of pointer movements, it's
+	/* This is a very simple optimisation of reversing commands, it's
 	 * normally not needed as it's a side effect of the other types
 	 * of optimisation.
 	 */
-	if (ch == '>') { simple_mov_count += count; return; }
-	if (ch == '<') { simple_mov_count -= count; return; }
-	if (simple_mov_count > 0) outcmd('>', simple_mov_count);
-	if (simple_mov_count < 0) outcmd('<', -simple_mov_count);
-	simple_mov_count = 0;
+	if (ch == '<') { ch = '>'; count = -count; }
+	if (ch == '-') { ch = '+'; count = -count; }
+	if (simple_rle_cmd == ch) {
+	    simple_rle_count += count;
+	    return;
+	}
+	if (simple_rle_count) {
+	    if (simple_rle_count < 0) {
+		if (simple_rle_cmd == '>') simple_rle_cmd = '<';
+		if (simple_rle_cmd == '+') simple_rle_cmd = '-';
+		simple_rle_count = -simple_rle_count;
+	    }
+	    outcmd(simple_rle_cmd, simple_rle_count);
+	    simple_rle_count = simple_rle_cmd = 0;
+	}
+	if (ch == '>' || ch == '+') {
+	    simple_rle_cmd = ch;
+	    simple_rle_count = count;
+	    return;
+	}
 	outcmd(ch, count);
 	return;
 
@@ -319,15 +334,15 @@ check_argv(const char * arg)
     } else if (strcmp(arg, "-m") == 0) {
 	check_arg(arg);
 	enable_optim = enable_be_optim = enable_bf_optim = enable_mov_optim = 0;
-	opt_optim = keep_dead_code = 1;
+	opt_optim = 1;
     } else if (strcmp(arg, "-O") == 0) {
-	enable_be_optim = enable_bf_optim = enable_mov_optim = 0;
-	opt_optim = enable_optim = enable_be_optim = 1;
+	enable_bf_optim = 0;
+	opt_optim = enable_optim = enable_be_optim = enable_mov_optim = 1;
     } else if (strcmp(arg, "-Obf") == 0) {
-	enable_optim = enable_be_optim = enable_bf_optim = enable_mov_optim = 0;
-	opt_optim = enable_be_optim = enable_bf_optim = 1;
+	enable_optim = enable_bf_optim = 0;
+	opt_optim = enable_be_optim = enable_bf_optim = enable_mov_optim = 1;
     } else if (strcmp(arg, "-Omov") == 0) {
-	enable_optim = enable_be_optim = enable_bf_optim = enable_mov_optim = 0;
+	enable_optim = enable_be_optim = enable_bf_optim = 0;
 	opt_optim = enable_be_optim = enable_mov_optim = 1;
 
     } else if (strcmp(arg, "-#") == 0 && check_arg(arg)) {
@@ -476,7 +491,7 @@ main(int argc, char ** argv)
 		(ch != '#' || !enable_debug) &&
 		((ch != '"' && ch != '=') || !enable_rle)) continue;
 	    /* Check for loop comments; ie: ][ comment ] */
-	    if (lc || (ch=='[' && lastch==']' && !keep_dead_code)) {
+	    if (lc || (ch=='[' && lastch==']' && enable_mov_optim)) {
 		lc += (ch=='[') - (ch==']'); continue;
 	    }
 	    if (lc) continue;

@@ -193,7 +193,7 @@ void outopt(int ch, int count)
 	if (ch == ']') deadloop--;
 	return;
     }
-    if (ch == '[' && !keep_dead_code) {
+    if (ch == '[' && enable_mov_optim) {
 	if (tape->is_set && tape->v == 0) {
 	    deadloop++;
 	    return;
