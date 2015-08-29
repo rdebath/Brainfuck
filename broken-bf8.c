@@ -1,37 +1,40 @@
-#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
-int main (int argc, char *argv[]) {
-    char *b=0, *p, t[65536]={0};
-    unsigned short m=0;
-    int i=0;
-    FILE *fp=argc>1?fopen(argv[1], "r"):stdin;
-    size_t r=0;
-    char * stk_p[1000];
-    short stk_m[1000];
-    int sp = 0;
-    setbuf(stdout,0);
+#include <string.h>
+int jmpstk[200], sp = 0;
 
-    if(!fp || getdelim(&b,&r,argc>1?'\0':'!',fp)<0)
-	perror(argv[1]);
-    else if(b&&r>0)for(p=b;*p;p++)switch(*p) {
-	case '>': m++;break;
-	case '<': m--;break;
-	case '+': t[m]++;break;
-	case '-': t[m]--;break;
-	case '.': putchar(t[m]);break;
-	case ',': {int c=getchar();if(c!=EOF)t[m]=c;}break;
-	case '[':
-	    stk_p[sp] = p;
-	    stk_m[sp] = m;
-	    sp++;
-	    break;
+main(int argc, char **argv){
+    static char pgm[BUFSIZ*1024];
+    static unsigned char mem[65536];
+    unsigned short m;
+    int p=0, ch;
+    FILE * f = fopen(argv[1],"r");
+    while((ch=getc(f)) != EOF) if(strchr("+-<>[].,",ch)) pgm[p++] = ch;
+    pgm[p++] = 0;
+    fclose(f);
+    setbuf(stdout,0);
+    for(p=0;pgm[p];p++) {
+	switch(pgm[p]) {
+	case '+': mem[m]++; break;
+	case '-': mem[m]--; break;
+	case '>': m++; break;
+	case '<': m--; break;
+	case '.': putchar(mem[m]); break;
+	case ',': {int a=getchar(); if(a!=EOF) mem[m]=a;} break;
 	case ']':
-	    if (t[m]) {
-		sp--;
-		p = stk_p[sp]-1;
-		m = stk_m[sp];
+	    if (mem[m] == 0) {
+		if(sp) sp--;
+	    } else {
+		if(sp) { sp--; p=jmpstk[sp]-1; } else p = -1;
 	    }
 	    break;
+	case '[':
+	    if(mem[m] == 0) {
+		while(pgm[p] && pgm[p] != ']') p++;
+		if (pgm[p] == 0) p--;
+	    } else {
+		jmpstk[sp++] = p;
+	    }
+	    break;
+	}
     }
-    return 0;
 }
