@@ -56,7 +56,7 @@ void gen_twoflower(char * buf);
 void gen_twobyte(char * buf);
 void gen_trislipnest(char * buf);
 
-int runbf(char * prog, int m);
+int runbf(char * prog, int longrun);
 
 #define MAX_CELLS 256
 
@@ -139,6 +139,21 @@ char * hello_world_byte[] = {
     "+[------->->->+++<<<]",
     ">+++++[<++++>-]<[++>+++++>+++>---->+<<<<]",
     ">++++[<++++>-]<[++>+++>+++>---->+<<<<]",
+
+    "+[+>+>->>-[<-]<]",
+    "+[->>++>+[<]<-]",
+    "+[->[+>]-[++<]>+]",
+    "+[>+>->>-[<-]<+]",
+    "+[>>-->->-[<]<+]",
+    "+[[->]+[----<]>-]",
+    "+[[->]+[--<]>--]",
+    "-[+[+<]>>>>->+>+]",
+    "-[[+>]+[+++<]>+]",
+    "-[[+>]+[+++<]>-]",
+    ">+[++>++[<]>>->+]",
+    ">+[[+>]+[+++<]>-]",
+    ">-[-[>]+[+++<]>]",
+    ">-[[--->]++[<]>-]",
 
     0 };
 
@@ -570,7 +585,7 @@ check_if_best(char * buf, char * name)
     if (best_len == -1 || best_len > str_next || (best_len == str_next && str_cells_used < best_cells)) {
 
 	memset(cells, 0, sizeof(cells));
-	runbf(str_start, 0);
+	runbf(str_start, 1);
 	if (strncmp(buf, bf_print_buf, sizeof(bf_print_buf)) != 0) {
 	    fprintf(stderr, "ERROR: Consistancy check for generated BF code FAILED.\n");
 	    fprintf(stderr, "Code: '%s'\n", str_start);
@@ -1952,10 +1967,10 @@ struct bfi { int mov; int cmd; int arg; } *pgm = 0;
 int pgmlen = 0;
 
 int
-runbf(char * prog, int m)
+runbf(char * prog, int longrun)
 {
-    int p= -1, n= -1, j= -1, ch;
-    int maxcell = 0, countdown = 10000;
+    int m= 0, p= -1, n= -1, j= -1, ch;
+    int maxcell = 0, countdown = (longrun?1000000:10000);
     while((ch = *prog++)) {
 	int r = (ch == '<' || ch == '>' || ch == '+' || ch == '-');
 	if (r || (ch == ']' && j>=0) || ch == '[' || ch == '.') {
