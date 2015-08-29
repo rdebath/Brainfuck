@@ -129,7 +129,7 @@ ook	B?[Oo]ok
 }
 
 <ALWORD>{
-    /* Simple "words". These set don't interfere with each-other. */
+    /* Simple "words". These sets don't interfere with each-other. */
 
     right		pcs('>', 0);
     left		pcs('<', 0);
