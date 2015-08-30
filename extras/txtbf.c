@@ -1524,6 +1524,7 @@ gen_unzoned_nola(char * buf)
 
 	diff = c - cells[currcell];
 	if (bytewrap) diff = (signed char)diff;
+	if (c>=0 && diff<0 && c+3<-diff) { add_str("[-]"); cells[currcell]=0; diff=c; }
 	while(diff>0) { add_chr('+'); cells[currcell]++; diff--; }
 	while(diff<0) { add_chr('-'); cells[currcell]--; diff++; }
 	if (bytewrap) cells[currcell] &= 255;
