@@ -44,7 +44,7 @@
 
 void find_best_conversion(char * linebuf);
 
-void gen_unzoned(char * buf);
+void gen_print(char * buf);
 void check_if_best(char * buf, char * name);
 
 void gen_subrange(char * buf, int subrange, int flg_zoned, int flg_nonl);
@@ -194,6 +194,7 @@ int enable_special1 = 1;
 int enable_special2 = 1;
 
 int flg_lookahead = 0;
+int flg_zoned = 0;
 
 int verbose = 0;
 int bytewrap = 0;
@@ -279,6 +280,9 @@ main(int argc, char ** argv)
 	} else if (strcmp(argv[1], "-lookahead") == 0) {
 	    flg_lookahead = 1;
 	    argc--; argv++;
+	} else if (strcmp(argv[1], "-zoned") == 0) {
+	    flg_zoned = 1;
+	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-max") == 0) {
 	    wipe_config();
@@ -333,7 +337,7 @@ main(int argc, char ** argv)
 	} else if (strcmp(argv[1], "-b") == 0) {
 	    bytewrap = !bytewrap;
 	    argc--; argv++;
-	} else if (strcmp(argv[1], "-z") == 0) {
+	} else if (strcmp(argv[1], "-rtz") == 0) {
 	    flg_rtz = !flg_rtz;
 	    argc--; argv++;
 
@@ -429,7 +433,7 @@ main(int argc, char ** argv)
 	    fprintf(stderr, "\n");
 	    fprintf(stderr, "-i      Add/remove cell init strings and return to cell zero\n");
 	    fprintf(stderr, "-c      Add/remove cell clear strings and return to cell zero\n");
-	    fprintf(stderr, "-z      Set/clear Return to cell zero\n");
+	    fprintf(stderr, "-rtz    Set/clear Return to cell zero\n");
 	    fprintf(stderr, "-sc/-uc Assume chars are signed/unsigned\n");
 	    fprintf(stderr, "-b      Assume cells are bytes\n");
 	    fprintf(stderr, "\n");
@@ -564,10 +568,8 @@ find_best_conversion(char * linebuf)
 	if (enable_subrange) {
 	    if (verbose>2) fprintf(stderr, "Trying subrange routines.\n");
 	    subrange_count=10;
-	    {
-		reinit_state();
-		gen_subrange(linebuf,subrange_count,1,0);
-	    }
+	    reinit_state();
+	    gen_subrange(linebuf,subrange_count,1,0);
 
 	    for(subrange_count = 2; subrange_count<33; subrange_count++)
 		if (subrange_count!=10) {
@@ -575,14 +577,16 @@ find_best_conversion(char * linebuf)
 		    gen_subrange(linebuf,subrange_count,1,0);
 		}
 
-	    for(subrange_count = 2; subrange_count<33; subrange_count++) {
-		reinit_state();
-		gen_subrange(linebuf,subrange_count,0,0);
-	    }
+	    if (!flg_zoned) {
+		for(subrange_count = 2; subrange_count<33; subrange_count++) {
+		    reinit_state();
+		    gen_subrange(linebuf,subrange_count,0,0);
+		}
 
-	    for(subrange_count = 2; subrange_count<33; subrange_count++) {
-		reinit_state();
-		gen_subrange(linebuf,subrange_count,0,1);
+		for(subrange_count = 2; subrange_count<33; subrange_count++) {
+		    reinit_state();
+		    gen_subrange(linebuf,subrange_count,0,1);
+		}
 	    }
 	}
 
@@ -667,12 +671,12 @@ check_if_best(char * buf, char * name)
 
     if (best_len == str_next && str_cells_used == best_cells) {
 	/* Note this also shows strings of same length */
-	if (verbose>2)
+	if (verbose>2 || str_next < 63)
 	    fprintf(stderr, "Found '%s' len=%d, cells=%d, '%s'\n",
 		    name, str_next, str_cells_used, str_start);
 	else if (verbose>1)
-	    fprintf(stderr, "Found '%s' len=%d, cells=%d\n",
-		    name, str_next, str_cells_used);
+	    fprintf(stderr, "Found '%s' len=%d, cells=%d, '%.60s'...\n",
+		    name, str_next, str_cells_used, str_start);
     }
 }
 
@@ -771,7 +775,7 @@ clear_tape(int currcell)
  */
 
 void
-gen_subrange(char * buf, int subrange, int flg_zoned, int flg_nonl)
+gen_subrange(char * buf, int subrange, int flg_subzone, int flg_nonl)
 {
     int counts[256] = {};
     int txn[256] = {};
@@ -783,7 +787,7 @@ gen_subrange(char * buf, int subrange, int flg_zoned, int flg_nonl)
     char name[256];
 
     sprintf(name, "Subrange %d, %s%s", subrange,
-	    flg_zoned?"zoned":"unzoned",flg_nonl?", nonl":"");
+	    flg_subzone?"zoned":"unzoned",flg_nonl?", nonl":"");
 
     /* Count up a frequency table */
     for(p=buf; *p;) {
@@ -891,8 +895,8 @@ gen_subrange(char * buf, int subrange, int flg_zoned, int flg_nonl)
      * whatever is best right now, or stick with the ranges we chose above.
      * Either could end up better by the end of the string.
      */
-    if (!flg_zoned) {
-	gen_unzoned(buf);
+    if (!flg_subzone) {
+	gen_print(buf);
     } else {
 	/* Print each character */
 	for(p=buf; *p;) {
@@ -1028,7 +1032,7 @@ return_to_top:
 	if (verbose>3)
 	    fprintf(stderr, "Trying multiply: %s\n", str_start);
 
-	gen_unzoned(buf);
+	gen_print(buf);
 
 	check_if_best(buf, "multiply loop");
     }
@@ -1183,7 +1187,7 @@ static int loopcnt[256][256];
 	    cells[i-1] = (0xFF & ( cellincs2[i] * cnt )) ;
 	}
 
-	gen_unzoned(buf);
+	gen_print(buf);
 
 	check_if_best(buf, "byte multiply loop");
     }
@@ -1299,7 +1303,7 @@ return_to_top:
 	if (verbose>3)
 	    fprintf(stderr, "Counting nestloop\n");
 
-	gen_unzoned(buf);
+	gen_print(buf);
 
 	check_if_best(buf, "nested loop");
     }
@@ -1373,7 +1377,7 @@ return_to_top:
 	if (verbose>3)
 	    fprintf(stderr, "Counting sliploop\n");
 
-	gen_unzoned(buf);
+	gen_print(buf);
 
 	check_if_best(buf, "slipping loop");
     }
@@ -1466,7 +1470,7 @@ gen_special(char * buf, char * initcode, char * name, int failquiet)
 
     if (best_len>0 && str_next > best_len) return;	/* Too big already */
 
-    gen_unzoned(buf);
+    gen_print(buf);
 
     check_if_best(buf, name);
 }
@@ -1481,7 +1485,7 @@ gen_special(char * buf, char * initcode, char * name, int failquiet)
  * to accept a poor early choice for better results later.
  */
 void
-gen_unzoned_nola(char * buf)
+gen_unzoned(char * buf)
 {
     char * p;
     int i;
@@ -1543,7 +1547,7 @@ gen_unzoned_nola(char * buf)
  * result at the end.
  */
 void
-gen_unzoned_lookahead(char * buf)
+gen_lookahead(char * buf)
 {
     char * p;
     int i;
@@ -1635,13 +1639,76 @@ gen_unzoned_lookahead(char * buf)
     currcell = clear_tape(currcell);
 }
 
+/*******************************************************************************
+ * Given a set of cells and a string to generate them already in the buffer
+ * this routine uses those cells to make the string.
+ *
+ * This method uses the cell that was closest when at the start of the run.
+ * The result is that the character set is divided into zones and each is
+ * assigned to a cell.
+ */
 void
-gen_unzoned(char * buf)
+gen_zoned(char * buf)
 {
-    if (flg_lookahead)
-	gen_unzoned_lookahead(buf);
+    char * p;
+    int i, st = -1;
+    int currcell = 0;
+    int cells2[MAX_CELLS];
+
+    if (str_cells_used <= 0) str_cells_used=1;
+
+    for(i=0; i<str_cells_used; i++) {
+	cells2[i] = cells[i];
+	if (cells[i] && st<0) st = i;
+    }
+    if (st<=0) st = 0; else st--;
+
+    /* Print each character */
+    for(p=buf; *p;) {
+	int minrange = 999999;
+	int c = *p++;
+	int usecell = 0, diff;
+
+	if (flg_signed) c = (signed char)c; else c = (unsigned char)c;
+
+	for(i=st; i<str_cells_used; i++) {
+	    int range = c - cells2[i];
+	    if (bytewrap) range = (signed char)range;
+	    range = abs(range);
+
+	    if (range < minrange) {
+		usecell = i;
+		minrange = range;
+	    }
+	}
+
+	while(currcell > usecell) { add_chr('<'); currcell--; }
+	while(currcell < usecell) { add_chr('>'); currcell++; }
+
+	diff = c - cells[currcell];
+	if (bytewrap) diff = (signed char)diff;
+	if (c>=0 && diff<0 && c+3<-diff) { add_str("[-]"); cells[currcell]=0; diff=c; }
+	while(diff>0) { add_chr('+'); cells[currcell]++; diff--; }
+	while(diff<0) { add_chr('-'); cells[currcell]--; diff++; }
+	if (bytewrap) cells[currcell] &= 255;
+
+	add_chr('.');
+
+	if (best_len>0 && str_next > best_len) return;	/* Too big already */
+    }
+
+    currcell = clear_tape(currcell);
+}
+
+void
+gen_print(char * buf)
+{
+    if (flg_zoned)
+	gen_zoned(buf);
+    else if (flg_lookahead)
+	gen_lookahead(buf);
     else
-	gen_unzoned_nola(buf);
+	gen_unzoned(buf);
 }
 
 /*******************************************************************************
@@ -2129,7 +2196,7 @@ return_to_top:
 	if (verbose>3)
 	    fprintf(stderr, "Counting triloop\n");
 
-	gen_unzoned(buf);
+	gen_print(buf);
 
 	check_if_best(buf, "tri sliping loop");
     }
