@@ -42,6 +42,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+void find_best_conversion(char * linebuf);
+
 void gen_unzoned(char * buf);
 void check_if_best(char * buf, char * name);
 
@@ -196,6 +198,7 @@ int flg_lookahead = 0;
 int verbose = 0;
 int bytewrap = 0;
 int maxcol = 72;
+int blocksize = 0;
 
 void reinit_state(void);
 void output_str(char * s);
@@ -253,6 +256,9 @@ main(int argc, char ** argv)
 	    argc--; argv++;
 	} else if (strncmp(argv[1], "-w", 2) == 0 && argv[1][2] >= '0' && argv[1][2] <= '9') {
 	    maxcol = atol(argv[1]+2);
+	    argc--; argv++;
+	} else if (strncmp(argv[1], "-B", 2) == 0 && argv[1][2] >= '0' && argv[1][2] <= '9') {
+	    blocksize = atol(argv[1]+2);
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-binary") == 0) {
@@ -452,7 +458,8 @@ main(int argc, char ** argv)
     else
 	ifd = fopen(argv[1], "r");
     if (ifd == 0) perror(argv[1]);
-    else {
+    else
+    {
 	char * linebuf, * p;
 	int linebuf_size = 0;
 	int c;
@@ -475,131 +482,148 @@ main(int argc, char ** argv)
 		if(!linebuf) { perror("realloc"); exit(1); }
 		p = linebuf+off;
 	    }
+
+	    if (p-linebuf == blocksize) {
+		int t = flg_clear;
+		*p++ = 0;
+		if (!flg_init) flg_clear = 1;
+		find_best_conversion(linebuf);
+		p = linebuf;
+		flg_clear = t;
+	    }
 	}
 	*p++ = 0;
 	if (ifd != stdin) fclose(ifd);
 
-	if (special_init != 0)
-	    gen_special(linebuf, special_init, "cmd special", 0);
+	find_best_conversion(linebuf);
+    }
 
-	if (enable_special1) {
-	    char ** hellos;;
-	    char namebuf[64];
+    return 0;
+}
 
-	    if (verbose>2) fprintf(stderr, "Trying special strings\n");
+void
+find_best_conversion(char * linebuf)
+{
+    best_len = -1;	/* Clear 'best' string */
 
-	    gen_special(linebuf, "", "Bare cells", 0);
+    if (special_init != 0)
+	gen_special(linebuf, special_init, "cmd special", 0);
 
-	    gen_special(linebuf, RUNNERCODE1, "mult English", 0);
-	    gen_special(linebuf, RUNNERCODE2, "mult*32 to 128", 0);
-	    gen_special(linebuf, RUNNERCODE3, "mult*32 to 224", 0);
-	    gen_special(linebuf, RUNNERCODE4, "mult*32 to 128/-96", 0);
+    if (enable_special1) {
+	char ** hellos;;
+	char namebuf[64];
 
-	    for (hellos = hello_world; *hellos; hellos++) {
-		sprintf(namebuf, "Hello world %d", hellos-hello_world);
-		gen_special(linebuf, *hellos, namebuf, 0);
-	    }
+	if (verbose>2) fprintf(stderr, "Trying special strings\n");
+
+	gen_special(linebuf, "", "Bare cells", 0);
+
+	gen_special(linebuf, RUNNERCODE1, "mult English", 0);
+	gen_special(linebuf, RUNNERCODE2, "mult*32 to 128", 0);
+	gen_special(linebuf, RUNNERCODE3, "mult*32 to 224", 0);
+	gen_special(linebuf, RUNNERCODE4, "mult*32 to 128/-96", 0);
+
+	for (hellos = hello_world; *hellos; hellos++) {
+	    sprintf(namebuf, "Hello world %d", hellos-hello_world);
+	    gen_special(linebuf, *hellos, namebuf, 0);
+	}
+    }
+
+    if (enable_special2) {
+	char ** hellos;;
+	char namebuf[64];
+
+	if (verbose>2) fprintf(stderr, "Trying complicated special strings\n");
+
+	gen_special(linebuf, HUGEPREFIX, "big ASCII", 0);
+
+	for (hellos = hello_world2; *hellos; hellos++) {
+	    sprintf(namebuf, "Complex world %d", hellos-hello_world2);
+	    gen_special(linebuf, *hellos, namebuf, 0);
 	}
 
-	if (enable_special2) {
-	    char ** hellos;;
-	    char namebuf[64];
-
-	    if (verbose>2) fprintf(stderr, "Trying complicated special strings\n");
-
-	    gen_special(linebuf, HUGEPREFIX, "big ASCII", 0);
-
-	    for (hellos = hello_world2; *hellos; hellos++) {
-		sprintf(namebuf, "Complex world %d", hellos-hello_world2);
-		gen_special(linebuf, *hellos, namebuf, 0);
-	    }
-
-	    if (bytewrap) for (hellos = hello_world_byte; *hellos; hellos++) {
-		sprintf(namebuf, "Hello bytes %d", hellos-hello_world_byte);
-		gen_special(linebuf, *hellos, namebuf, 0);
-	    }
+	if (bytewrap) for (hellos = hello_world_byte; *hellos; hellos++) {
+	    sprintf(namebuf, "Hello bytes %d", hellos-hello_world_byte);
+	    gen_special(linebuf, *hellos, namebuf, 0);
 	}
+    }
 
-	if (enable_twocell) {
-	    if (verbose>2) fprintf(stderr, "Trying two cell routine.\n");
-	    gen_twoflower(linebuf);
-	    if (bytewrap) {
-		if (verbose>2) fprintf(stderr, "Trying byte two cell routine.\n");
-		gen_twobyte(linebuf);
-	    }
+    if (enable_twocell) {
+	if (verbose>2) fprintf(stderr, "Trying two cell routine.\n");
+	gen_twoflower(linebuf);
+	if (bytewrap) {
+	    if (verbose>2) fprintf(stderr, "Trying byte two cell routine.\n");
+	    gen_twobyte(linebuf);
 	}
+    }
 
-	if (subrange_count > 0) {
-	    reinit_state();
-	    gen_subrange(linebuf,subrange_count,1,0);
-	} else if (subrange_count == 0) {
+    if (subrange_count > 0) {
+	reinit_state();
+	gen_subrange(linebuf,subrange_count,1,0);
+    } else if (subrange_count == 0) {
 
-	    if (enable_subrange) {
-		if (verbose>2) fprintf(stderr, "Trying subrange routines.\n");
-		subrange_count=10;
-		{
+	if (enable_subrange) {
+	    if (verbose>2) fprintf(stderr, "Trying subrange routines.\n");
+	    subrange_count=10;
+	    {
+		reinit_state();
+		gen_subrange(linebuf,subrange_count,1,0);
+	    }
+
+	    for(subrange_count = 2; subrange_count<33; subrange_count++)
+		if (subrange_count!=10) {
 		    reinit_state();
 		    gen_subrange(linebuf,subrange_count,1,0);
 		}
 
-		for(subrange_count = 2; subrange_count<33; subrange_count++)
-		    if (subrange_count!=10) {
-			reinit_state();
-			gen_subrange(linebuf,subrange_count,1,0);
-		    }
-
-		for(subrange_count = 2; subrange_count<33; subrange_count++) {
-		    reinit_state();
-		    gen_subrange(linebuf,subrange_count,0,0);
-		}
-
-		for(subrange_count = 2; subrange_count<33; subrange_count++) {
-		    reinit_state();
-		    gen_subrange(linebuf,subrange_count,0,1);
-		}
+	    for(subrange_count = 2; subrange_count<33; subrange_count++) {
+		reinit_state();
+		gen_subrange(linebuf,subrange_count,0,0);
 	    }
 
-	    subrange_count = 0;
+	    for(subrange_count = 2; subrange_count<33; subrange_count++) {
+		reinit_state();
+		gen_subrange(linebuf,subrange_count,0,1);
+	    }
 	}
 
-	if (enable_trislipnest) {
-	    if (verbose>2) fprintf(stderr, "Trying tri-slip routine.\n");
-	    gen_trislipnest(linebuf);
-	}
-
-	if (enable_multloop) {
-	    if (verbose>2) fprintf(stderr, "Trying multiply loops.\n");
-	    gen_multonly(linebuf);
-	}
-
-	if (enable_multloop && bytewrap) {
-	    if (verbose>2) fprintf(stderr, "Trying byte multiply loops.\n");
-	    gen_multbyte(linebuf);
-	}
-
-	if (enable_sliploop) {
-	    if (verbose>2) fprintf(stderr, "Trying 'slipping loop' routine.\n");
-	    gen_slipnest(linebuf);
-	}
-
-	if(enable_nestloop) {
-	    if (verbose>2) fprintf(stderr, "Trying 'nested loop' routine.\n");
-	    reinit_state();
-	    gen_nestloop(linebuf);
-	}
-
-	if (best_len>=0) {
-	    if (verbose)
-		fprintf(stderr, "BF Size = %d, %.2f bf/char, cells = %d\n",
-		    best_len, best_len * 1.0/ strlen(linebuf), best_cells);
-
-	    output_str(best_str);
-	    free(str_start); str_start = 0; str_max = str_next = 0;
-	}
-	output_str("\n");
+	subrange_count = 0;
     }
 
-    return 0;
+    if (enable_trislipnest) {
+	if (verbose>2) fprintf(stderr, "Trying tri-slip routine.\n");
+	gen_trislipnest(linebuf);
+    }
+
+    if (enable_multloop) {
+	if (verbose>2) fprintf(stderr, "Trying multiply loops.\n");
+	gen_multonly(linebuf);
+    }
+
+    if (enable_multloop && bytewrap) {
+	if (verbose>2) fprintf(stderr, "Trying byte multiply loops.\n");
+	gen_multbyte(linebuf);
+    }
+
+    if (enable_sliploop) {
+	if (verbose>2) fprintf(stderr, "Trying 'slipping loop' routine.\n");
+	gen_slipnest(linebuf);
+    }
+
+    if(enable_nestloop) {
+	if (verbose>2) fprintf(stderr, "Trying 'nested loop' routine.\n");
+	reinit_state();
+	gen_nestloop(linebuf);
+    }
+
+    if (best_len>=0) {
+	if (verbose)
+	    fprintf(stderr, "BF Size = %d, %.2f bf/char, cells = %d\n",
+		best_len, best_len * 1.0/ strlen(linebuf), best_cells);
+
+	output_str(best_str);
+	free(str_start); str_start = 0; str_max = str_next = 0;
+    }
+    output_str("\n");
 }
 
 void
@@ -675,7 +699,7 @@ add_chr(int ch)
     return ;
 }
 
-void
+inline void
 add_str(char * p)
 {
     while(p && *p) add_chr(*p++);
