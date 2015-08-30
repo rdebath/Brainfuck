@@ -16,6 +16,7 @@ static int countch(char *, int);
 static void pcs(int, int);
 
 static int uncomment_mode = 0;
+static int bfcomment = 0;
 
 #define YY_INPUT(buf,result,max_size) result = bf_prefilter(buf,max_size)
 size_t bf_prefilter(char * buf, size_t maxsize);
@@ -31,18 +32,20 @@ size_t bf_prefilter(char * buf, size_t maxsize);
 %option nodefault
 
 %s BFRLE
+%s BFRLE2
 %s OOK
 %s BLUB
 %s POG
 %s ALWORD
 %s FK
 %x CCOMMENT
+%x BFCOMMENT
 %x ZZZ
 %x TRIP
 
 w	[\t ]*
 ws	[\t ]+
-wl	[\t\n ]+
+wl	[\t\n ]*
 num	[0-9]+
 
 twoc	[A-Za-z*][A-Za-z*]
@@ -50,18 +53,39 @@ pock	([ \t\n]*pock!)*
 ook	B?[Oo]ok
 
 %%
-<INITIAL,BFRLE>[]<+,-.>[]	pc(yytext[0]);
+<INITIAL>[]<+,-.>[]		pc(yytext[0]);
 
 <BFRLE>{
+    \[				{
+				    BEGIN(BFCOMMENT);
+				    bfcomment++;
+				    commentch('[');
+				}
+    =				;
+}
+
+<BFRLE2>{
+    \[				pc(yytext[0]);
+    =				{
+				    BEGIN(BFRLE);
+				    pcr('=', 0);
+				}
+}
+
+<BFRLE,BFRLE2>{
+    \]				{ BEGIN(BFRLE); pc(yytext[0]); }
+    [<+,-.>]			{ BEGIN(BFRLE2); pc(yytext[0]); }
+
     {num}{w}[-+><=]		{
 				    int ch=yytext[yyleng-1];
+				    BEGIN(BFRLE2);
 				    yytext[yyleng-1] = 0;
 				    pcr(ch, atoi(yytext));
 				}
-    =				pcr('=', 0);
 
     \"[^"\n\\]*\"		{
 				    int i;
+				    BEGIN(BFRLE2);
 				    for(i=1; i<yyleng-1; i++) {
 					pcr('=', yytext[i]);
 					pc('.');
@@ -70,6 +94,30 @@ ook	B?[Oo]ok
 
     \/\/.*		{int i; for(i=1; i<yyleng; i++) commentch(yytext[i]);}
     "/*"		{ uncomment_mode = YY_START; BEGIN(CCOMMENT); }
+}
+
+<BFCOMMENT>{
+
+    \]		{
+		    commentch(yytext[0]);
+		    bfcomment--;
+		    if (bfcomment == 0) {
+			BEGIN(BFRLE);
+		    }
+		}
+    \[		{
+		    bfcomment++;
+		    commentch(yytext[0]);
+		}
+
+    \/\/.*	{int i; for(i=1; i<yyleng; i++) commentch(yytext[i]);}
+    "/*"	{ uncomment_mode = YY_START; BEGIN(CCOMMENT); }
+
+    [^]\/\n[]+	|
+    \/		|
+    \n		{int i; for(i=0; i<yyleng; i++) commentch(yytext[i]);}
+    <<EOF>>	{   fprintf(stderr, "WARNING: End of file in BF comment\n");
+		    yyterminate(); }
 }
 
 <OOK>{
@@ -368,7 +416,7 @@ pc(int ch)
     }
     if (sof) {
 	while(cln-->0) putchar(']');
-	if (sof == 2) printf("]*/\n");
+	if (sof == 2) printf("\n]");
 	sof = 0;
     }
     if (ccol) putchar('\n'), ccol = col = 0;
@@ -379,7 +427,8 @@ pc(int ch)
 static void commentch(int ch)
 {
     if (runit) return;
-    if (sof == 1) { printf("/*[\n"); sof = 2; }
+    if (sof == 1 && bfcomment) sof = 0;
+    if (sof == 1) { printf("[\n"); sof = 2; }
     if ((ccol == 0) && (ch == '\n' || ch == '\t' || ch == ' ')) return;
 
     /* Only output characters we don't use in BF. Plus a comment loop. */
@@ -389,13 +438,14 @@ static void commentch(int ch)
 	    if (cln > 0) cln--;
 	    else ch = ':';
 	}
-    } else if ((ch == '.' || ch == ',' || ch == '>' || ch == '<' ||
-		ch == '+' || ch == '-' || ch == '#'))
+    } else if (bfcomment == 0 &&
+	       (ch == '+' || ch == '-' || ch == '#' || ch == '[' || ch == ']' ||
+		ch == '.' || ch == ',' || ch == '>' || ch == '<' ))
 	ch = ':';
 
     if (col) putchar('\n'), ccol = col = 0;
     if (ccol <	0) ccol += printf("\n");
-    if (ccol == 0 && !sof) ccol += printf("//%s", (ch=='\t' || ch =='\n') ? "" : " ");
+    if (ccol == 0 && !sof && !bfcomment) ccol += printf("//%s", (ch=='\t' || ch =='\n') ? "" : " ");
     if (ch == '\n') ccol = -1;
     else {
 	ccol++;
