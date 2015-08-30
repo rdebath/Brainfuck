@@ -30,6 +30,7 @@ size_t bf_prefilter(char * buf, size_t maxsize);
 %option noyywrap
 %option nodefault
 
+%s BFRLE
 %s OOK
 %s BLUB
 %s POG
@@ -39,12 +40,37 @@ size_t bf_prefilter(char * buf, size_t maxsize);
 %x ZZZ
 %x TRIP
 
+w	[\t ]*
+ws	[\t ]+
+wl	[\t\n ]+
+num	[0-9]+
+
 twoc	[A-Za-z*][A-Za-z*]
 pock	([ \t\n]*pock!)*
 ook	B?[Oo]ok
 
 %%
-<INITIAL>[]<+,-.>[]	pc(yytext[0]);
+<INITIAL,BFRLE>[]<+,-.>[]	pc(yytext[0]);
+
+<BFRLE>{
+    {num}{w}[-+><=]		{
+				    int ch=yytext[yyleng-1];
+				    yytext[yyleng-1] = 0;
+				    pcr(ch, atoi(yytext));
+				}
+    =				pcr('=', 0);
+
+    \"[^"\n\\]*\"		{
+				    int i;
+				    for(i=1; i<yyleng-1; i++) {
+					pcr('=', yytext[i]);
+					pc('.');
+				    }
+				}
+
+    \/\/.*		{int i; for(i=1; i<yyleng; i++) commentch(yytext[i]);}
+    "/*"		{ uncomment_mode = YY_START; BEGIN(CCOMMENT); }
+}
 
 <OOK>{
     {ook}\.[ \t\n]*{ook}\?	pc('>');
@@ -192,7 +218,7 @@ ook	B?[Oo]ok
 .		commentch(yytext[0]);
 %%
 
-void addcmd(int);
+void addcmd(int, int);
 void run(void);
 struct bfi { int mov; int cmd; int arg; } *pgm = 0;
 int pgmlen = 0;
@@ -236,6 +262,8 @@ int main(int argc, char ** argv)
 	    else if (!strcmp(argv[1], "-cslash")) line_cc = '/';
 	    else if (!strcmp(argv[1], "-csemi")) line_cc = ';';
 	    else if (!strcmp(argv[1], "-nocom")) line_cc = EOF;
+
+	    else if (!strcmp(argv[1], "-bfrle")) { mode = BFRLE; }
 
 	    else if (!strcmp(argv[1], "-ook")) { mode = OOK; line_cc = '/'; }
 	    else if (!strcmp(argv[1], "-blub")) mode = BLUB;
@@ -335,7 +363,7 @@ static void
 pc(int ch)
 {
     if (runit) {
-	addcmd(ch);
+	addcmd(ch, 1);
 	return;
     }
     if (sof) {
@@ -377,7 +405,12 @@ static void commentch(int ch)
 
 static void pcr(int ch, int count)
 {
-    while(count-->0) pc(ch);
+    if (ch == '=') {
+	pc('['); pc('-'); pc(']');
+	ch = '+';
+    }
+    if (runit) addcmd(ch, count);
+    else while(count-->0) pc(ch);
 }
 
 static int countch(char * s, int ch)
@@ -506,40 +539,18 @@ tiny_bf_to_bf(char * buf, size_t max_size)
     return n;
 }
 
-#if 0
-size_t
-tiny_qqq_to_bftok(char * buf, size_t max_size)
-{
-    static int tbf_dir = 0;
-    /* Incomplete -- Gone shopping.
-     */
-    size_t n;
-    int c = 0xDEADBEEF;
-
-    for ( n = 0; n < max_size && (c = getc( yyin )) != EOF;) {
-	if (c == '\'') {
-	    tbf_dir = !tbf_dir;
-	    continue;
-	}
-	if (c == '"' && tbf_dir) c = '\'';
-	if ((p=strchr(convch)))
-	    c = bf[p-convch];
-	else if (strchr(c, bf))
-	    continue;
-	buf[n++] = (char) c;
-    }
-    if ( c == EOF && ferror( yyin ) )
-	YY_FATAL_ERROR( "input in flex scanner failed" );
-    return n;
-}
-#endif
-
 /*****************************************************************************
  * This is the "deadbeef" brainfuck interpreter.
  */
-void addcmd(int ch)
+void addcmd(int ch, int cnt)
 {
     int r = (ch == '<' || ch == '>' || ch == '+' || ch == '-');
+    if (!r && cnt != 1) {
+	while(cnt-->0) addcmd(ch, 1);
+	return;
+    }
+    if (r) r = cnt;
+
     if (r || (debug && ch == '#') || (ch == ']' && jmp>=0) ||
 	ch == '[' || ch == ',' || ch == '.') {
 	if (ch == '<') { ch = '>'; r = -r; }
