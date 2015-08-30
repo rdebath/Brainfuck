@@ -235,6 +235,10 @@ main(int argc, char ** argv)
 	} else if (strcmp(argv[1], "-noclear") == 0) {
 	    flg_clear = 0;
 	    argc--; argv++;
+	} else if (strcmp(argv[1], "-lookahead") == 0) {
+	    flg_lookahead = 1;
+	    argc--; argv++;
+
 	} else if (strcmp(argv[1], "-max") == 0) {
 	    enable_sliploop = 1;
 	    sliploop_maxcell = 8;
@@ -1411,10 +1415,11 @@ gen_special(char * buf, char * initcode, char * name, int failquiet)
  *
  * It adds up the number of '<>' and '+-' needed to get each cell to the next
  * value then chooses the lowest. This is only optimal with repeat counts
- * below about 10.
+ * below about 10 and even then for multiple characters it may be better
+ * to accept a poor early choice for better results later.
  */
 void
-gen_unzoned(char * buf)
+gen_unzoned_nola(char * buf)
 {
     char * p;
     int i;
@@ -1426,20 +1431,22 @@ gen_unzoned(char * buf)
     for(p=buf; *p;) {
 	int minrange = 999999;
 	int c = *p++;
-	int usecell, diff;
+	int usecell = 0, diff;
+
 	if (flg_signed) c = (signed char)c; else c = (unsigned char)c;
-	usecell = 0;
+
 	for(i=0; i<str_cells_used+more_cells; i++) {
 	    int range = c - cells[i];
 	    if (bytewrap) range = (signed char)range;
 	    range = abs(range);
 	    range += abs(currcell-i);
-	    if (range == minrange && i!=str_cells_used) {
+
+	    if (range == minrange) {
 		if (abs(currcell-i) < abs(usecell-i)) {
 		    usecell = i;
 		    minrange = range;
 		}
-	    } else if (range + 3*(i==str_cells_used) < minrange) {
+	    } else if (range < minrange) {
 		usecell = i;
 		minrange = range;
 	    }
@@ -1459,15 +1466,115 @@ gen_unzoned(char * buf)
 	while(diff<0) { add_chr('-'); cells[currcell]--; diff++; }
 	if (bytewrap) cells[currcell] &= 255;
 
-#if 0
-	while(cells[currcell] < c) { add_chr('+'); cells[currcell]++; }
-	while(cells[currcell] > c) { add_chr('-'); cells[currcell]--; }
-#endif
+	if(!add_chr('.')) return;
+    }
+
+    currcell = clear_tape(currcell);
+}
+
+/*******************************************************************************
+ * This is like the normal unzoned except for each choice at this time it
+ * does a lookahead to see if this single 'wrong' choice gives a better
+ * result at the end.
+ */
+void
+gen_unzoned_lookahead(char * buf)
+{
+    char * p;
+    int i;
+    int currcell = 0;
+    int more_cells = 0;
+    if (str_cells_used <= 0) { more_cells=1; str_cells_used=1; }
+
+    /* Print each character, use closest cell. */
+    for(p=buf; *p;) {
+	int minrange = 999999;
+	int c = *p++;
+	int usecell = 0, diff;
+
+	if (flg_signed) c = (signed char)c; else c = (unsigned char)c;
+
+	for(i=0; i<str_cells_used+more_cells; i++) {
+	    int range = c - cells[i];
+	    if (bytewrap) range = (signed char)range;
+	    range = abs(range);
+	    range += abs(currcell-i);
+
+	    {
+		int currcell2 = i;
+		int la, j;
+		int cells2[MAX_CELLS];
+		for(j=0; j<str_cells_used; j++)
+		    cells2[j] = cells[j];
+		cells2[i] = c;
+
+		for(la=0; p[la]; la++)
+		{
+		    int minrange2 = 999999;
+		    int usecell2 = 0;
+		    int c2 = p[la];
+		    if (flg_signed) c2 = (signed char)c2; else c2 = (unsigned char)c2;
+
+		    for(j=0; j<str_cells_used; j++) {
+			int range2 = c2 - cells2[j];
+			if (bytewrap) range2 = (signed char)range2;
+			range2 = abs(range2);
+			range2 += abs(currcell2-j);
+			if (range2 == minrange2) {
+			    if (abs(currcell2-j) < abs(usecell2-j)) {
+				usecell2 = j;
+				minrange2 = range2;
+			    }
+			} else
+			if (range2 < minrange2) {
+			    minrange2 = range2;
+			    usecell2 = j;
+			}
+		    }
+		    range += minrange2;
+		    currcell2 = usecell2;
+		    cells2[usecell2] = c2;
+		}
+	    }
+
+	    if (range == minrange) {
+		if (abs(currcell-i) < abs(usecell-i)) {
+		    usecell = i;
+		    minrange = range;
+		}
+	    } else if (range < minrange) {
+		usecell = i;
+		minrange = range;
+	    }
+	}
+
+	while(currcell > usecell) { add_chr('<'); currcell--; }
+	while(currcell < usecell) { add_chr('>'); currcell++; }
+
+	if (currcell>=str_cells_used) {
+	    str_cells_used++;
+	    if (flg_init) add_str("[-]");
+	}
+
+	diff = c - cells[currcell];
+	if (bytewrap) diff = (signed char)diff;
+	while(diff>0) { add_chr('+'); cells[currcell]++; diff--; }
+	while(diff<0) { add_chr('-'); cells[currcell]--; diff++; }
+	if (bytewrap) cells[currcell] &= 255;
 
 	if(!add_chr('.')) return;
     }
 
     currcell = clear_tape(currcell);
+}
+
+void
+gen_unzoned(char * buf)
+{
+    if (flg_lookahead)
+	gen_unzoned_lookahead(buf);
+    else
+	gen_unzoned_nola(buf);
 }
 
 /*******************************************************************************
