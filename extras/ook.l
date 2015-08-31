@@ -5,6 +5,7 @@
  */
 %{
 #include <stdio.h>
+#include <string.h>
 
 #define STFU(expression) (expression)	/* Make GCC ... */
 
@@ -276,6 +277,8 @@ int on_eof = 1, runit = 0, debug = 0;
 int sof = 1, cln = 0, col = 0, ccol = 0;
 int alset = 0;
 
+int quiet = 0;
+
 char * character_prefilter = 0;
 char * character_conversion = 0;
 int line_cc = EOF;
@@ -305,6 +308,7 @@ int main(int argc, char ** argv)
 	    else if (!strcmp(argv[1], "-z")) on_eof = 0;
 	    else if (!strcmp(argv[1], "-n")) on_eof = 1;
 	    else if (!strcmp(argv[1], "-d")) debug = 1;
+	    else if (!strcmp(argv[1], "-q")) quiet = 1;
 
 	    else if (!strcmp(argv[1], "-chash")) line_cc = '#';
 	    else if (!strcmp(argv[1], "-cslash")) line_cc = '/';
@@ -426,7 +430,7 @@ pc(int ch)
 
 static void commentch(int ch)
 {
-    if (runit) return;
+    if (runit || quiet) return;
     if (sof == 1 && bfcomment) sof = 0;
     if (sof == 1) { printf("[\n"); sof = 2; }
     if ((ccol == 0) && (ch == '\n' || ch == '\t' || ch == ' ')) return;
