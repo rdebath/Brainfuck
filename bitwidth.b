@@ -6,7 +6,7 @@
     and compilers.
 
     It should print one of three slight variations of "Hello world" followed
-    by an exclamation point, the maximum cell value (if it's less than a
+    by an exclamation point then the maximum cell value (if it's less than a
     few thousand) and a newline.
 
     If the interpreter is broken in some way it can print a lot of other
