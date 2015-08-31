@@ -514,7 +514,7 @@ find_best_conversion(char * linebuf)
 	gen_special(linebuf, special_init, "cmd special", 0);
 
     if (enable_special1) {
-	char ** hellos;;
+	char ** hellos;
 	char namebuf[64];
 
 	if (verbose>2) fprintf(stderr, "Trying special strings\n");
@@ -533,7 +533,7 @@ find_best_conversion(char * linebuf)
     }
 
     if (enable_special2) {
-	char ** hellos;;
+	char ** hellos;
 	char namebuf[64];
 
 	if (verbose>2) fprintf(stderr, "Trying complicated special strings\n");
