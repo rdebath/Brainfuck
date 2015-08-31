@@ -202,7 +202,7 @@ static intmax_t overflows, underflows;
 		    cc+=fprintf(stderr, " :");
 		}
 		cc += fprintf(stderr, " %3d", mem[TM(ch+tape_min)] & cell_mask);
-		if (m == ch+tape_min )
+		if (m == ch+tape_min && cell_mask == 255)
 		    pc = cc;
 	    }
 	    if (!all_cells && tape_max-tape_min>=16) fprintf(stderr, " ...");
