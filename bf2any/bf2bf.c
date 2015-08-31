@@ -603,6 +603,7 @@ static int disable_optimisation(void)
     switch(L_BASE) {
     case L_ASCII:
     case L_EXCON:
+    case L_TOKENS:
 	return 0;
     }
     return 1;
