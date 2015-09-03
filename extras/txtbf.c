@@ -1764,7 +1764,7 @@ gen_twoflower(char * buf)
 	int a,b,c = *p++;
 	if (flg_signed) c = (signed char)c; else c = (unsigned char)c;
 
-	cdiff = c - cells[0];
+	cdiff = c - cells[currcell];
 	t = bestfactor[abs(cdiff)]; a =(t&0xF); t = !!(t&0x10);
 	b = abs(cdiff)/a+t;
 
@@ -1784,26 +1784,28 @@ gen_twoflower(char * buf)
 		a = da;
 		b = db;
 		cdiff = ddiff;
-		if(cells[0]>0) add_str("[-]");
-		if(cells[0]<0) add_str("[+]");
-		cells[0] = 0;
+		if(cells[currcell]>0) add_str("[-]");
+		if(cells[currcell]<0) add_str("[+]");
+		cells[currcell] = 0;
 	    }
 	}
 
 	if (a>1) {
 	    if (cdiff<0) a= -a;
 
-	    add_chr('>');
+	    if (cells[currcell] == cells[!currcell]) currcell = !currcell;
+	    else if (currcell) add_chr('<'); else add_chr('>');
+
 	    for(i=0; i<b; i++) add_chr('+');
 
-	    add_str("[<");
-	    while(a > 0) { add_chr('+'); a--; cells[0] += b; }
-	    while(a < 0) { add_chr('-'); a++; cells[0] -= b; }
-	    add_str(">-]<");
+	    if (currcell) add_str("[>"); else add_str("[<");
+	    while(a > 0) { add_chr('+'); a--; cells[currcell] += b; }
+	    while(a < 0) { add_chr('-'); a++; cells[currcell] -= b; }
+	    if (currcell) add_str("<-]>"); else add_str(">-]<");
 	}
 
-	while(cells[0] < c) { add_chr('+'); cells[0]++; }
-	while(cells[0] > c) { add_chr('-'); cells[0]--; }
+	while(cells[currcell] < c) { add_chr('+'); cells[currcell]++; }
+	while(cells[currcell] > c) { add_chr('-'); cells[currcell]--; }
 
 	add_chr('.');
 	if (best_len>0 && str_next > best_len) return;	/* Too big already */
