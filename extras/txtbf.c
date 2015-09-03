@@ -44,7 +44,7 @@
 
 void find_best_conversion(char * linebuf);
 
-void gen_print(char * buf);
+void gen_print(char * buf, int init_offset);
 void check_if_best(char * buf, char * name);
 
 void gen_subrange(char * buf, int subrange, int flg_zoned, int flg_nonl);
@@ -136,33 +136,34 @@ char * hello_world_byte[] = {
     "+[+>+>->>-[<-]<]",		/* 2 */
     "+[>+>->>-[<-]<+]",		/* 3 */
     "+[>>-->->-[<]<+]",		/* 4 */
-    "+[[->]+[--<]>--]",		/* 5 */
-    "-[[+>]+[+++<]>+]",		/* 6 */
-    "-[[+>]+[+++<]>-]",		/* 7 */
-    ">-[-[>]+[+++<]>]",		/* 8 */
+    "+[>>>+++<[-<]<+]",		/* 5 */
+    "+[[->]+[--<]>--]",		/* 6 */
+    "-[[+>]+[+++<]>+]",		/* 7 */
+    "-[[+>]+[+++<]>-]",		/* 8 */
+    ">-[-[>]+[+++<]>]",		/* 9 */
 
-    "+[->[+>]-[++<]>+]",	/* 9 */
-    "+[[->]+[----<]>-]",	/* 10 */
-    "+[[->]+[---<]>--]",	/* 11 */
-    "-[+[+<]>>>>->+>+]",	/* 12 */
-    ">+[++>++[<]>>->+]",	/* 13 */
-    ">+[[+>]+[+++<]>-]",	/* 14 */
-    ">+[[--->]+[--<]>]",	/* 15 */
-    ">-[-[+>]+[+++<]>]",	/* 16 */
-    ">-[[--->]++[<]>-]",	/* 17 */
+    "+[->[+>]-[++<]>+]",	/* 10 */
+    "+[[->]+[----<]>-]",	/* 11 */
+    "+[[->]+[---<]>--]",	/* 12 */
+    "-[+[+<]>>>>->+>+]",	/* 13 */
+    ">+[++>++[<]>>->+]",	/* 14 */
+    ">+[[+>]+[+++<]>-]",	/* 15 */
+    ">+[[--->]+[--<]>]",	/* 16 */
+    ">-[-[+>]+[+++<]>]",	/* 17 */
+    ">-[[--->]++[<]>-]",	/* 18 */
 
-    "+[------->->->+++<<<]",					/* 18 */
-    "++[+++++++>++++>->->->++>-<<<<<<]",			/* 19 */
-    "++[+++++++>++++>->->->--->++<<<<<<]",			/* 20 */
-    "++++[------->-->--->--->->++++<<<<<]",			/* 21 */
-    "++[--------------->-->--->->+++++<<<<]",			/* 22 */
-    ">++++[<++++>-]<[++>+++>+++>---->+<<<<]",			/* 23 */
-    "++++++[+++++++>->++>++>---->+++>-<<<<<<]",			/* 24 */
-    ">+++++[<++++>-]<[++>+++++>+++>---->+<<<<]",		/* 25 */
-    "+++++++++++++[+++++++>++>++>----->---->+++<<<<<]",		/* 26 */
-    "+++++++++++++[------->-->-->+++++>--->++++<<<<<]",		/* 27 */
-    "+++++++++++++[+++++++>->++>++>----->---->+++<<<<<<]",	/* 28 */
-    "+++++++++++++[------->+>-->-->+++++>--->++++<<<<<<]",	/* 28 */
+    "+[------->->->+++<<<]",					/* 19 */
+    "++[+++++++>++++>->->->++>-<<<<<<]",			/* 20 */
+    "++[+++++++>++++>->->->--->++<<<<<<]",			/* 21 */
+    "++++[------->-->--->--->->++++<<<<<]",			/* 22 */
+    "++[--------------->-->--->->+++++<<<<]",			/* 23 */
+    ">++++[<++++>-]<[++>+++>+++>---->+<<<<]",			/* 24 */
+    "++++++[+++++++>->++>++>---->+++>-<<<<<<]",			/* 25 */
+    ">+++++[<++++>-]<[++>+++++>+++>---->+<<<<]",		/* 26 */
+    "+++++++++++++[+++++++>++>++>----->---->+++<<<<<]",		/* 27 */
+    "+++++++++++++[------->-->-->+++++>--->++++<<<<<]",		/* 28 */
+    "+++++++++++++[+++++++>->++>++>----->---->+++<<<<<<]",	/* 29 */
+    "+++++++++++++[------->+>-->-->+++++>--->++++<<<<<<]",	/* 30 */
 
     0 };
 
@@ -896,7 +897,7 @@ gen_subrange(char * buf, int subrange, int flg_subzone, int flg_nonl)
      * Either could end up better by the end of the string.
      */
     if (!flg_subzone) {
-	gen_print(buf);
+	gen_print(buf, 0);
     } else {
 	/* Print each character */
 	for(p=buf; *p;) {
@@ -1032,7 +1033,7 @@ return_to_top:
 	if (verbose>3)
 	    fprintf(stderr, "Trying multiply: %s\n", str_start);
 
-	gen_print(buf);
+	gen_print(buf, 0);
 
 	check_if_best(buf, "multiply loop");
     }
@@ -1187,7 +1188,7 @@ static int loopcnt[256][256];
 	    cells[i-1] = (0xFF & ( cellincs2[i] * cnt )) ;
 	}
 
-	gen_print(buf);
+	gen_print(buf, 0);
 
 	check_if_best(buf, "byte multiply loop");
     }
@@ -1303,7 +1304,7 @@ return_to_top:
 	if (verbose>3)
 	    fprintf(stderr, "Counting nestloop\n");
 
-	gen_print(buf);
+	gen_print(buf, 0);
 
 	check_if_best(buf, "nested loop");
     }
@@ -1377,7 +1378,7 @@ return_to_top:
 	if (verbose>3)
 	    fprintf(stderr, "Counting sliploop\n");
 
-	gen_print(buf);
+	gen_print(buf, 0);
 
 	check_if_best(buf, "slipping loop");
     }
@@ -1465,12 +1466,10 @@ gen_special(char * buf, char * initcode, char * name, int failquiet)
     }
 
     add_str(initcode);
-    while(remaining_offset<0) { add_chr('>'); remaining_offset++; }
-    while(remaining_offset>0) { add_chr('<'); remaining_offset--; }
 
     if (best_len>0 && str_next > best_len) return;	/* Too big already */
 
-    gen_print(buf);
+    gen_print(buf, remaining_offset);
 
     check_if_best(buf, name);
 }
@@ -1485,11 +1484,11 @@ gen_special(char * buf, char * initcode, char * name, int failquiet)
  * to accept a poor early choice for better results later.
  */
 void
-gen_unzoned(char * buf)
+gen_unzoned(char * buf, int init_offset)
 {
     char * p;
     int i;
-    int currcell = 0;
+    int currcell = init_offset;
     int more_cells = 0;
     if (str_cells_used <= 0) { more_cells=1; str_cells_used=1; }
 
@@ -1547,11 +1546,11 @@ gen_unzoned(char * buf)
  * result at the end.
  */
 void
-gen_lookahead(char * buf)
+gen_lookahead(char * buf, int init_cell)
 {
     char * p;
     int i;
-    int currcell = 0;
+    int currcell = init_cell;
     int more_cells = 0;
     if (str_cells_used <= 0) { more_cells=1; str_cells_used=1; }
 
@@ -1648,11 +1647,11 @@ gen_lookahead(char * buf)
  * assigned to a cell.
  */
 void
-gen_zoned(char * buf)
+gen_zoned(char * buf, int init_cell)
 {
     char * p;
     int i, st = -1;
-    int currcell = 0;
+    int currcell = init_cell;
     int cells2[MAX_CELLS];
 
     if (str_cells_used <= 0) str_cells_used=1;
@@ -1701,14 +1700,14 @@ gen_zoned(char * buf)
 }
 
 void
-gen_print(char * buf)
+gen_print(char * buf, int init_offset)
 {
     if (flg_zoned)
-	gen_zoned(buf);
+	gen_zoned(buf, init_offset);
     else if (flg_lookahead)
-	gen_lookahead(buf);
+	gen_lookahead(buf, init_offset);
     else
-	gen_unzoned(buf);
+	gen_unzoned(buf, init_offset);
 }
 
 /*******************************************************************************
@@ -2196,7 +2195,7 @@ return_to_top:
 	if (verbose>3)
 	    fprintf(stderr, "Counting triloop\n");
 
-	gen_print(buf);
+	gen_print(buf, 0);
 
 	check_if_best(buf, "tri sliping loop");
     }
