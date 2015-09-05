@@ -28,6 +28,7 @@
 
 int ind = 0;
 int use_unistd = 0;
+int use_mmove = 0;
 enum { no_run, run_libtcc, run_dll } runmode = run_libtcc;
 FILE * ofd;
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
@@ -71,6 +72,8 @@ check_arg(const char * arg)
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-d      Dump code"
+	"\t"    "-mmove  Use move merging translation."
+	"\t"    "-unix   Use \"unistd.h\" for read/write."
 #ifndef DISABLE_LIBTCC
 	"\n\t"  "-ltcc   Use libtcc to run code."
 #endif
@@ -98,6 +101,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-d") == 0) {
 	runmode = no_run; return 1;
     } else
+    if (strcmp(arg, "-mmove") == 0) {
+	use_mmove = 1; return 1;
+    } else
     if (strcmp(arg, "-unix") == 0) {
 	use_unistd = 1; return 1;
     } else
@@ -120,34 +126,34 @@ outcmd(int ch, int count)
     if (imov && ch != '>' && ch != '<') {
 	int mov = imov;
 
-#ifdef MERGEMOVE
-	imov = 0;
+	if (use_mmove) {
+	    imov = 0;
 
-	switch(ch) {
-	case '=': prv2("*(m+=%d) = %d;", mov, count); return;
-	case '+': prv2("*(m+=%d) +=%d;", mov, count); return;
-	case '-': prv2("*(m+=%d) -=%d;", mov, count); return;
-	case 'B': prv("v= *(m+=%d);", mov); return;
-	case 'M': prv2("*(m+=%d) += v*%d;", mov, count); return;
-	case 'N': prv2("*(m+=%d) -= v*%d;", mov, count); return;
-	case 'S': prv("*(m+=%d) += v;", mov); return;
+	    switch(ch) {
+	    case '=': prv2("*(m+=%d) = %d;", mov, count); return;
+	    case '+': prv2("*(m+=%d) +=%d;", mov, count); return;
+	    case '-': prv2("*(m+=%d) -=%d;", mov, count); return;
+	    case 'B': prv("v= *(m+=%d);", mov); return;
+	    case 'M': prv2("*(m+=%d) += v*%d;", mov, count); return;
+	    case 'N': prv2("*(m+=%d) -= v*%d;", mov, count); return;
+	    case 'S': prv("*(m+=%d) += v;", mov); return;
+	    }
+	} else {
+	    switch(ch) {
+	    case '=': prv2("m[%d] = %d;", mov, count); return;
+	    case 'B': prv("v= m[%d];", mov); return;
+	    case 'M': prv2("m[%d] += v*%d;", mov, count); return;
+	    case 'N': prv2("m[%d] -= v*%d;", mov, count); return;
+	    case 'S': prv("m[%d] += v;", mov); return;
+	    case 'Q': prv2("if(v) m[%d] = %d;", mov, count); return;
+	    case 'm': prv2("if(v) m[%d] += v*%d;", mov, count); return;
+	    case 'n': prv2("if(v) m[%d] -= v*%d;", mov, count); return;
+	    case 's': prv("if(v) m[%d] += v;", mov); return;
+	    case '+': prv2("m[%d] +=%d;", mov, count); return;
+	    case '-': prv2("m[%d] -=%d;", mov, count); return;
+	    case '.': prv("PUTC(m[%d]);", mov); return;
+	    }
 	}
-#else /* else use offsets */
-	switch(ch) {
-	case '=': prv2("m[%d] = %d;", mov, count); return;
-	case 'B': prv("v= m[%d];", mov); return;
-	case 'M': prv2("m[%d] += v*%d;", mov, count); return;
-	case 'N': prv2("m[%d] -= v*%d;", mov, count); return;
-	case 'S': prv("m[%d] += v;", mov); return;
-	case 'Q': prv2("if(v) m[%d] = %d;", mov, count); return;
-	case 'm': prv2("if(v) m[%d] += v*%d;", mov, count); return;
-	case 'n': prv2("if(v) m[%d] -= v*%d;", mov, count); return;
-	case 's': prv("if(v) m[%d] += v;", mov); return;
-	case '+': prv2("m[%d] +=%d;", mov, count); return;
-	case '-': prv2("m[%d] -=%d;", mov, count); return;
-	case '.': prv("PUTC(m[%d]);", mov); return;
-	}
-#endif
 
 	imov = 0;
 	if (mov > 0)

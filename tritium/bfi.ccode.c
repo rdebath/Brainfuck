@@ -1,15 +1,7 @@
 #ifdef __STRICT_ANSI__
 #ifndef DISABLE_TCCLIB
-
-#ifdef __GNUC__
-#if __GNUC__<4 || ( __GNUC__==4 && __GNUC_MINOR__<7 )
-#error "This GNUC version doesn't work properly with libtcc and -std=c99 turned on."
-#endif
-#endif
-
-/* Required for open_memstream */
+/* Required for open_memstream in glibc */
 #define _XOPEN_SOURCE 700
-
 #endif
 #endif
 
@@ -37,7 +29,8 @@
 #include "bfi.ccode.h"
 
 static const char * putname = "putch";
-static int add_mask = 0;
+static int fixed_mask = 0;
+static int mask_defined = 1;
 static int use_direct_getchar = 0;
 static int use_dynmem = 0;
 static int libtcc_specials = 0;
@@ -60,6 +53,7 @@ void run_gccode(void);
 #endif
 
 static void pt(FILE* ofd, int indent, struct bfi * n);
+static char * pcell(int offset);
 static void print_c_header(FILE * ofd);
 
 int
@@ -123,18 +117,30 @@ pt(FILE* ofd, int indent, struct bfi * n)
     }
 }
 
+char *
+pcell(int offset)
+{
+static char namebuf[64];
+
+    if (mask_defined) {
+	if (offset)
+	    sprintf(namebuf, "M(m[%d])", offset);
+	else
+	    strcpy(namebuf, "M(*m)");
+    } else {
+	if (offset)
+	    sprintf(namebuf, "m[%d]", offset);
+	else
+	    strcpy(namebuf, "*m");
+    }
+    return namebuf;
+}
+
 void
 print_c_header(FILE * ofd)
 {
     int memoffset = 0;
     int l_iostyle = iostyle;
-
-    if (!do_run && node_type_counts[T_INP] != 0 && l_iostyle == 3) {
-	fprintf(stderr, "Standalone C code for integer input not implemented.\n");
-	exit(1);
-    }
-
-    fprintf(ofd, "/* Code generated from %s */\n\n", bfname);
 
     if (cell_mask > 0 && cell_size < 8 && l_iostyle == 1) l_iostyle = 0;
 
@@ -160,13 +166,19 @@ print_c_header(FILE * ofd)
 	if (ascii_only) l_iostyle = 0;
 
 	if (okay) {
-	    fprintf(ofd, "#include <stdio.h>\n\n");
-	    fprintf(ofd, "int main(void)\n{\n");
+	    fprintf(ofd, "#include <stdio.h>\n");
+	    fprintf(ofd, "int main() {\n");
 	    putname = "putchar";
 	    return ;
 	}
     }
 
+    if (!do_run && node_type_counts[T_INP] != 0 && l_iostyle == 3) {
+	fprintf(stderr, "Standalone C code for integer input not implemented.\n");
+	exit(1);
+    }
+
+    fprintf(ofd, "/* Code generated from %s */\n\n", bfname);
     fprintf(ofd, "#include <stdio.h>\n");
     fprintf(ofd, "#include <stdlib.h>\n");
     fprintf(ofd, "#include <string.h>\n");
@@ -185,10 +197,10 @@ print_c_header(FILE * ofd)
 	fprintf(ofd, "# define M(v) v\n");
 	fprintf(ofd, "# endif\n\n");
 
-    } else if(add_mask>0)
-	fprintf(ofd, "#define M(v) ((v) & 0x%x)\n\n", add_mask);
+    } else if(fixed_mask>0)
+	fprintf(ofd, "#define M(v) ((v) & 0x%x)\n\n", fixed_mask);
     else
-	fprintf(ofd, "#define M(v) v\n\n");
+	mask_defined = 0;
 
     if (do_run) {
 	if (use_dlopen) {
@@ -423,7 +435,7 @@ print_ccode(FILE * ofd)
 	cell_size != sizeof(int)*CHAR_BIT &&
 	cell_size != sizeof(short)*CHAR_BIT &&
 	cell_size != sizeof(char)*CHAR_BIT)
-	add_mask = cell_mask;
+	fixed_mask = cell_mask;
 
     if (verbose)
 	fprintf(stderr, "Generating C Code.\n");
@@ -589,10 +601,7 @@ print_ccode(FILE * ofd)
 
 	case T_PRT:
 	    if (!disable_indent) pt(ofd, indent,n);
-	    if (n->offset == 0)
-		fprintf(ofd, "%s(M(*m));\n", putname);
-	    else
-		fprintf(ofd, "%s(M(m[%d]));\n", putname, n->offset);
+	    fprintf(ofd, "%s(%s);\n", putname, pcell(n->offset));
 	    break;
 
 	case T_CHR:
@@ -675,8 +684,9 @@ print_ccode(FILE * ofd)
 
 	case T_IF:
 	    pt(ofd, indent,n);
-	    if (n->next->next && n->next->next->jmp == n && !enable_trace) {
 #ifdef TRY_BRANCHLESS
+	    if (n->next->next && n->next->next->jmp == n &&
+		    !enable_trace && !mask_defined) {
 		if (n->next->type == T_SET) {
 		    fprintf(ofd, "m[%d] -= (m[%d] - %d) * !!m[%d];\n",
 			n->next->offset, n->next->offset, n->next->count, n->offset);
@@ -693,11 +703,13 @@ print_ccode(FILE * ofd)
 		    n=n->jmp;
 		    break;
 		}
+	    }
 #endif
-		fprintf(ofd, "if(M(m[%d])) ", n->offset);
+	    fprintf(ofd, "if(%s) ", pcell(n->offset));
+
+	    if (n->next->next && n->next->next->jmp == n && !enable_trace) {
 		disable_indent = 1;
 	    } else {
-		fprintf(ofd, "if(M(m[%d])) ", n->offset);
 		fprintf(ofd, "{\n");
 	    }
 	    break;
@@ -712,8 +724,8 @@ print_ccode(FILE * ofd)
 
 	    if (found_rail_runner && !do_run && use_dynmem && n->next->count>0) {
 		pt(ofd, indent,n);
-		fprintf(ofd, "while(M(m[%d])) m += %d;\n",
-		    n->offset, n->next->count);
+		fprintf(ofd, "while(%s) m += %d;\n",
+			pcell(n->offset), n->next->count);
 		pt(ofd, indent,n);
 		fprintf(ofd, "m = move_ptr(m,0);\n");
 		n=n->jmp;
@@ -770,7 +782,7 @@ print_ccode(FILE * ofd)
 	     * function call overhead is horrible.
 	     */
 	    if (found_rail_runner && cell_size == CHAR_BIT && libtcc_specials &&
-		add_mask <= 0 && n->next->count == 1) {
+		fixed_mask == 0 && n->next->count == 1) {
 		pt(ofd, indent,n);
 		fprintf(ofd, "if(m[%d]) {\n", n->offset);
 		pt(ofd, indent+1,n);
@@ -795,10 +807,7 @@ print_ccode(FILE * ofd)
 	case T_CMULT:
 	case T_MULT:
 	    pt(ofd, indent,n);
-	    if (n->offset)
-		fprintf(ofd, "while(M(m[%d])) ", n->offset);
-	    else
-		fprintf(ofd, "while(M(*m)) ");
+	    fprintf(ofd, "while(%s) ", pcell(n->offset));
 	    if (n->next->next && n->next->next->jmp == n && !enable_trace)
 		disable_indent = 1;
 	    else
@@ -1256,4 +1265,14 @@ loaddll(const char * dlname)
     return 0;
 }
 
+#endif
+
+#ifdef __STRICT_ANSI__
+#ifndef DISABLE_TCCLIB
+#ifdef __GNUC__
+#if __GNUC__<4 || ( __GNUC__==4 && __GNUC_MINOR__<7 )
+#error "This GNUC version doesn't work properly with libtcc and -std=c99 turned on."
+#endif
+#endif
+#endif
 #endif
