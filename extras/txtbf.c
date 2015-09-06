@@ -1506,12 +1506,7 @@ gen_unzoned(char * buf, int init_offset)
 	    range = abs(range);
 	    range += abs(currcell-i);
 
-	    if (range == minrange) {
-		if (abs(currcell-i) < abs(usecell-i)) {
-		    usecell = i;
-		    minrange = range;
-		}
-	    } else if (range < minrange) {
+	    if (range < minrange) {
 		usecell = i;
 		minrange = range;
 	    }
@@ -1605,12 +1600,7 @@ gen_lookahead(char * buf, int init_cell)
 		}
 	    }
 
-	    if (range == minrange) {
-		if (abs(currcell-i) < abs(usecell-i)) {
-		    usecell = i;
-		    minrange = range;
-		}
-	    } else if (range < minrange) {
+	    if (range < minrange) {
 		usecell = i;
 		minrange = range;
 	    }
