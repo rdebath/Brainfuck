@@ -11,7 +11,9 @@
 #define PRIdMAX  "ld"
 #endif
 
+#ifndef TAPELEN
 #define TAPELEN		(2<<16)
+#endif
 #define TM(x)		((x)&(TAPELEN-1))
 
 int main(int argc, char **argv) {
@@ -186,7 +188,13 @@ static intmax_t overflows, underflows;
     {
 	if (nonl) fprintf(stderr, "\n\\ no newline at end of output.\n");
 
-	fprintf(stderr, "Program length %d\n", program_len);
+	if (program_len <= 60) {
+	    fprintf(stderr, "Program size %d : ", program_len);
+	    for(p=0;pgm[p];p++)
+		fprintf(stderr, "%c", pgm[p][" ><+-][.,#"]);
+	    fprintf(stderr, "\n");
+	} else
+	    fprintf(stderr, "Program size %d\n", program_len);
 	fprintf(stderr, "Final tape contents:\n");
 
 	{
@@ -263,7 +271,7 @@ static intmax_t overflows, underflows;
     }
     else
     {
-	if (tape_min < -42 || tape_max > 127) {
+	if (tape_min < -16 || tape_max > TAPELEN/2) {
 	    fprintf(stderr, "ERROR ");
 	    for(p=0;pgm[p];p++)
 		fprintf(stderr, "%c", pgm[p][" ><+-][.,#"]);
