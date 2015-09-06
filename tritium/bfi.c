@@ -1839,16 +1839,36 @@ trim_trailing_sets(void)
     struct bfi * n = bfprog, *lastn = 0;
     int min_offset = 0, max_offset = 0;
     int node_changed, i;
+    int search_back = 1;
     while(n)
     {
-	if (n->type == T_MOV) return;
+	if (n->type == T_MOV) search_back = 0; /* Why was this now ? */
 
 	if (min_offset > n->offset) min_offset = n->offset;
 	if (max_offset < n->offset) max_offset = n->offset;
 	lastn = n;
 	n=n->next;
     }
-    if (max_offset - min_offset > 32) return;
+
+    /* Remove obvious deletions. */
+    while(lastn) {
+	if (lastn->type == T_SET ||
+	    lastn->type == T_ADD ||
+	    lastn->type == T_CALC) {
+
+	    n = lastn;
+	    lastn = lastn->prev;
+	    if(lastn) lastn->next = 0;
+
+	    if (n->prev) n->prev->next = 0; else bfprog = 0;
+	    n->type = T_NOP;
+	    free(n);
+	} else
+	    break;
+    }
+
+    /* Try for some less obvious ones */
+    if (!search_back || max_offset - min_offset > 32) return;
     if (verbose>2)
 	fprintf(stderr, "Running trailing set scan for %d..%d\n",
 			min_offset, max_offset);
