@@ -83,10 +83,17 @@ outcmd(int ch, int count)
 	ind--; I; printf("end\n");
 	curtapeoff = safetapeoff = 0;
 	break;
-    case '.': I; printf("print (m[p]&255).chr\n"); break;
-    /* See also:	 print m[p].chr(Encoding::UTF_8) */
     case '"': print_cstring(); break;
-    case ',': I; printf("(c = $stdin.getc) != nil && m[p] = c.ord\n"); break;
+    case '.':
+	I;
+	if(bytecell) printf("putc m[p]\n");
+	else         printf("begin print ''<<m[p] rescue putc m[p] end\n");
+	break;
+    case ',':
+	I;
+	if (bytecell) printf("m[p] = $stdin.getbyte if !$stdin.eof\n");
+	else          printf("m[p] = $stdin.getc.ord if !$stdin.eof\n");
+	break;
     }
 }
 
