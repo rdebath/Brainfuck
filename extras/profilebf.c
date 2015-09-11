@@ -32,11 +32,14 @@ static intmax_t overflows, underflows;
     int maxp=0, p=0, ch;
     int on_eof = 1, debug = 0;
     int physical_overflow = 0;
+    int physical_min = 0;
+    int physical_max = 255;
     int quick_summary = 0;
     int quick_with_counts = 0;
     int hard_wrap = 0;
     int cell_mask = 255;
     int all_cells = 0;
+    int pw = 3;
 
     FILE * f;
     for (;;) {
@@ -50,8 +53,6 @@ static intmax_t overflows, underflows;
 	    on_eof = 1; argc--; argv++;
 	} else if (!strcmp(argv[1], "-d")) {
 	    debug = 1; argc--; argv++;
-	} else if (!strcmp(argv[1], "-w")) {
-	    cell_mask=65535; argc--; argv++;
 	} else if (!strcmp(argv[1], "-p")) {
 	    physical_overflow=1; argc--; argv++;
 	} else if (!strcmp(argv[1], "-q")) {
@@ -60,6 +61,17 @@ static intmax_t overflows, underflows;
 	    quick_summary=1; quick_with_counts=1; argc--; argv++;
 	} else if (!strcmp(argv[1], "-a")) {
 	    all_cells++; argc--; argv++;
+	} else if (!strcmp(argv[1], "-w")) {
+	    cell_mask=65535;
+	    physical_min = 0;
+	    physical_max = 65535;
+	    argc--; argv++;
+	} else if (!strcmp(argv[1], "-sc")) {
+	    cell_mask = -1;
+	    physical_overflow=1;
+	    physical_min = -128;
+	    physical_max = 127;
+	    argc--; argv++;
 	} else if (argv[1][0] == '-') {
 	    fprintf(stderr, "Unknown option '%s'\n", argv[1]);
 	    exit(1);
@@ -87,42 +99,72 @@ static intmax_t overflows, underflows;
     if(!jmp) { perror(argv[0]); exit(1); }
     setbuf(stdout, 0);
 
+    {
+	char buf[64];
+	int i;
+	i = sprintf(buf, "%d", physical_min);
+	if (i>pw) pw = i;
+	i = sprintf(buf, "%d", physical_max);
+	if (i>pw) pw = i;
+    }
+
     for(p=0;pgm[p];p++) {
 	profile[pgm[p]*3 + !!mem[TM(m)]]++;
 	switch(pgm[p]) {
 	case 1: m++; if(tape_max<m) tape_max = m; break;
 	case 2: m--; if(tape_min>m) tape_min = m; break;
 	case 3:
-	    if (mem[TM(m)] == cell_mask) hard_wrap = 1;
 	    if(m<0) neg_array = 1;
 
 	    if(physical_overflow) {
-		if (mem[TM(m)] == cell_mask)
-		    { overflows++; mem[TM(m)] = -1; profile[pgm[p]*3 + 2]++; }
+		if (mem[TM(m)] == physical_max) {
+		    overflows++;
+		    mem[TM(m)] = physical_min;
+		    profile[pgm[p]*3 + 2]++;
+		    break;
+		}
 	    } else {
-		/* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
-		if(mem[TM(m)] == INT_MAX)
-		    { overflows++; mem[TM(m)] = -1; profile[pgm[p]*3 + 2]++; }
+		if(mem[TM(m)] == cell_mask) hard_wrap = 1;
+
+		if(mem[TM(m)] == INT_MAX) {
+		    /* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
+		    overflows++;
+		    mem[TM(m)] = 0;
+		    profile[pgm[p]*3 + 2]++;
+		    break;
+		}
 	    }
 
 	    mem[TM(m)]++;
 	    break;
 	case 4:
-	    if (mem[TM(m)] == 0) hard_wrap = 1;
 	    if(m<0) neg_array = 1;
 
 	    if(physical_overflow) {
-		if (mem[TM(m)] == 0)
-		    { underflows++; mem[TM(m)] = cell_mask+1; profile[pgm[p]*3 + 2]++; }
+		if (mem[TM(m)] == physical_min) {
+		    underflows++;
+		    mem[TM(m)] = physical_max;
+		    profile[pgm[p]*3 + 2]++;
+		    break;
+		}
 	    } else {
-		if(mem[TM(m)] == INT_MIN)
-		    { underflows++; mem[TM(m)] = cell_mask+1; profile[pgm[p]*3 + 2]++; }
+		if(mem[TM(m)] == 0) hard_wrap = 1;
+
+		if(mem[TM(m)] == INT_MIN) {
+		    underflows++;
+		    mem[TM(m)] = cell_mask;
+		    profile[pgm[p]*3 + 2]++;
+		    break;
+		}
 	    }
 
 	    mem[TM(m)]--;
 	    break;
 	case 5:
-	    if ((mem[TM(m)] & cell_mask) == 0 && (mem[TM(m)] & ~cell_mask) != 0) {
+	    if (  !physical_overflow &&
+		  (mem[TM(m)] & cell_mask) == 0 &&
+		  (mem[TM(m)] & ~cell_mask) != 0) {
+
 		if (mem[TM(m)] > 0) overflows++; else underflows++;
 		mem[TM(m)] = 0;
 		profile[pgm[p]*3 + 2]++;
@@ -132,7 +174,10 @@ static intmax_t overflows, underflows;
 	    if(m<0) neg_array = 1;
 	    break;
 	case 6:
-	    if ((mem[TM(m)] & cell_mask) == 0 && (mem[TM(m)] & ~cell_mask) != 0) {
+	    if (  !physical_overflow &&
+		  (mem[TM(m)] & cell_mask) == 0 &&
+		  (mem[TM(m)] & ~cell_mask) != 0) {
+
 		if (mem[TM(m)] > 0) overflows++; else underflows++;
 		mem[TM(m)] = 0;
 		profile[pgm[p]*3 + 2]++;
@@ -148,10 +193,12 @@ static intmax_t overflows, underflows;
 	    if(m<0) neg_array = 1;
 	    break;
 	case 7:
-	    if (mem[TM(m)] > cell_mask || mem[TM(m)] < 0) {
-		if (mem[TM(m)] > 0) overflows++; else underflows++;
-		mem[TM(m)] &= cell_mask;
-		profile[pgm[p]*3 + 2]++;
+	    if (!physical_overflow) {
+		if (mem[TM(m)] > cell_mask || mem[TM(m)] < 0) {
+		    if (mem[TM(m)] > 0) overflows++; else underflows++;
+		    mem[TM(m)] &= cell_mask;
+		    profile[pgm[p]*3 + 2]++;
+		}
 	    }
 
 	    {	int a=(mem[TM(m)] & 0xFF);
@@ -161,10 +208,12 @@ static intmax_t overflows, underflows;
 	    if(m<0) neg_array = 1;
 	    break;
 	case 8:
-	    if (mem[TM(m)] > cell_mask || mem[TM(m)] < 0) {
-		if (mem[TM(m)] > 0) overflows++; else underflows++;
-		mem[TM(m)] &= cell_mask;
-		profile[pgm[p]*3 + 2]++;
+	    if (!physical_overflow) {
+		if (mem[TM(m)] > cell_mask || mem[TM(m)] < 0) {
+		    if (mem[TM(m)] > 0) overflows++; else underflows++;
+		    mem[TM(m)] &= cell_mask;
+		    profile[pgm[p]*3 + 2]++;
+		}
 	    }
 
 	    {   int a=getchar();
@@ -209,8 +258,9 @@ static intmax_t overflows, underflows;
 		    }
 		    cc+=fprintf(stderr, " :");
 		}
-		cc += fprintf(stderr, " %3d", mem[TM(ch+tape_min)] & cell_mask);
-		if (m == ch+tape_min && cell_mask == 255)
+		cc += fprintf(stderr, " %*d",
+				pw, mem[TM(ch+tape_min)] & cell_mask);
+		if (m == ch+tape_min)
 		    pc = cc;
 	    }
 	    if (!all_cells && tape_max-tape_min>=16) fprintf(stderr, " ...");
@@ -231,7 +281,7 @@ static intmax_t overflows, underflows;
 	if (overflows || underflows) {
 	    fprintf(stderr, "Range error: ");
 	    if (physical_overflow)
-		fprintf(stderr, "range 0..%d", cell_mask);
+		fprintf(stderr, "range %d..%d", physical_min, physical_max);
 	    else
 		fprintf(stderr, "value check");
 	    if (overflows)
@@ -239,7 +289,7 @@ static intmax_t overflows, underflows;
 	    if (underflows)
 		fprintf(stderr, ", underflows: %"PRIdMAX"", underflows);
 	    fprintf(stderr, "\n");
-	} else if (hard_wrap)
+	} else if (hard_wrap && !physical_overflow)
 	    fprintf(stderr, "Hard wrapping would occur.\n");
 
 	fprintf(stderr, "%-5s %9s %12s %12s %12s\n",
