@@ -17,16 +17,16 @@ int main(int argc, char **argv)
    int ch;
    int p= -1, n= -1, j= -1;
    for (;;) {
-      if (argc < 2 || argv[1][0] != '-' || argv[1][1] == '\0') {
-	 break;
-      } else if (!strcmp(argv[1], "-e")) { argc--; argv++; on_eof = -1;
-      } else if (!strcmp(argv[1], "-z")) { argc--; argv++; on_eof = 0;
-      } else if (!strcmp(argv[1], "-n")) { argc--; argv++; on_eof = 1;
-      } else if (!strcmp(argv[1], "-d")) { argc--; argv++; debug = 1;
-      } else if (argv[1][0] == '-') {
+      if (argc < 2 || argv[1][0] != '-' || argv[1][1] == '\0') break;
+      else if (!strcmp(argv[1], "-e")) { argc--; argv++; on_eof = -1; }
+      else if (!strcmp(argv[1], "-z")) { argc--; argv++; on_eof = 0; }
+      else if (!strcmp(argv[1], "-n")) { argc--; argv++; on_eof = 1; }
+      else if (!strcmp(argv[1], "-d")) { argc--; argv++; debug = 1; }
+      else if (argv[1][0] == '-') {
 	 fprintf(stderr, "Unknown option '%s'\n", argv[1]);
 	 exit(1);
-      } else break;
+      }
+      else break;
    }
    ifd = argc>1 && strcmp(argv[1], "-") ? fopen(argv[1], "r") : stdin;
    if(!ifd) perror(argv[1]); else {
