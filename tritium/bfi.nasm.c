@@ -736,7 +736,7 @@ static void
 print_hello_world(void)
 {
     struct bfi * n = bfprog;
-    int i;
+    int i, bytecount = 0;;
 
     print_asm_header();
 
@@ -746,10 +746,17 @@ print_hello_world(void)
     for(i=0, n = bfprog; n; n=n->next) {
 	if (i == 0) printf("\tdb\t"); else printf(", ");
 	printf("0x%02x", n->count & 0xFF);
+	bytecount ++;
 	i = ((i+1) & 7);
 	if (i == 0|| n->next == 0) printf("\n");
     }
     printf("msgend:\n");
+    printf("%%ifdef __YASM_MAJOR__\n");
+    printf("%%define msgsz\t%d\n", bytecount);
+    printf("%%else\n");
+    printf("%%define msgsz\tmsgend-msg\n");
+    printf("%%endif\n");
+
     printf("\tsection .text\n");
     printf("_start:\n");
 
@@ -762,10 +769,10 @@ print_hello_world(void)
 	printf("\tmov\tal,4\t\t; syscall 4, write\n");
 	printf("\tinc\tebx\n");
 	printf("\tmov\tecx,msg\n");
-	printf("%%if msgend-msg < 128\n");
-	    printf("\tmov\tdl,msgend-msg\n");
+	printf("%%if msgsz < 128\n");
+	    printf("\tmov\tdl,msgsz\n");
 	printf("%%else\n");
-	    printf("\tmov\tedx,msgend-msg\n");
+	    printf("\tmov\tedx,msgsz\n");
 	printf("%%endif\n");
 	printf("\tint\t0x80\t\t; write(ebx, ecx, edx);\n");
 	printf("\txor\teax,eax\n");
