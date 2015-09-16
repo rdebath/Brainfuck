@@ -197,7 +197,7 @@ loutcmd(int ch, int count, struct instruction *n)
 	break;
     case '.': I; printf("print(char(m[p]))\n"); break;
     case '"': print_cstring(n->cstr); break;
-    case ',': I; printf("m[p] = read(STDIN, Char)\n"); break;
+    case ',': I; printf("if !eof(STDIN) ; m[p] = read(STDIN, Char) ; end\n"); break;
     }
 }
 
