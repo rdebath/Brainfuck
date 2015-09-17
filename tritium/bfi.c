@@ -300,9 +300,8 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("   -O1      Only enable pointer motion optimisation.\n");
     printf("   -O2      Allow a few simple optimisations.\n");
     printf("   -O3      Maximum normal level, default.\n");
-    printf("   -O-1     Turn off all optimisation, disable RLE too.\n");
     printf("   -Orun    When generating code run the interpreter over it first.\n");
-    printf("   -m   Minimal processing; same as -O0\n");
+    printf("   -m   Turn off all optimisation and RLE.\n");
     printf("\n");
     printf("   -b   Use 8 bit cells.\n");
     printf("   -b16 Use 16 bit cells.\n");
@@ -468,7 +467,7 @@ checkarg(char * opt, char * arg)
 #define XX 3
 #include "bfi.be.def"
 #endif
-	case 'm': opt_level=0; break;
+	case 'm': opt_level= -1; break;
 	case 'T': enable_trace=1; break;
 
 	case 'a': iostyle=0; default_io=0; break;
@@ -604,17 +603,21 @@ main(int argc, char ** argv)
     {
 	int x, flg = sizeof(int) * 8;
 	for(x=1;x+2>=x && --flg;x=(x|(x<<1))); /* -fwrapv must be enabled */
-	if (!flg) {
+	if (!flg) insane_ints =1;
+    }
+
 #if defined(__GNUC__) \
     && (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ > 3)
+    {
+	int x, flg = sizeof(int) * 8;
+	for(x=1;x+1>x && --flg;x=(x|(x<<1)));
+	if (!flg) {
 	    fprintf(stderr, "Compile failure, we need sane integers\n");
 	    fprintf(stderr, "Please use the -fwrapv option when compiling.\n");
 	    exit(255);
-#else
-	    insane_ints =1;
-#endif
 	}
     }
+#endif
 
     filelist = calloc(argc, sizeof*filelist);
 
@@ -768,7 +771,7 @@ static int dld;
 	}
 	if (ch != T_NOP) {
 #ifndef NO_PREOPT   /* Simple syntax optimisation */
-	    if (opt_level>=1) {
+	    if (opt_level>=0) {
 		/* Comment loops, can never be run */
 		/* This BF code isn't just dead it's been buried in soft peat
 		 * for three months and recycled as firelighters. */
