@@ -66,6 +66,8 @@ static void putlabel(unsigned long num);
 #define CMD_JMP		" ⁏ "
 #define CMD_JZ		" ⁏;"
 #define CMD_LABEL	" ;;"
+/* Semicolon has arguments to MOD, DIV and SUB swapped relative to WS and Forth
+ * (the additive operations may also be swapped but it's impossible to tell) */
 #define CMD_MOD		CMD_SWAP "⁏  "
 #define CMD_MUL		"⁏⁏;"
 #define CMD_OUTCHAR	"⁏ ;;"
@@ -164,6 +166,9 @@ outcmd(int ch, int count)
 
 #if TAPE_PREALLOC_QUICK
 	if (tapelen) {
+	    /* The Haskell interpreter needs us to poke the highest cell we
+	     * want to use before we read any before that cell.
+	     */
 	    PRTTOK(PUSH);
 	    putsnum(tapesz+2);
 	    PRTTOK(PUSH);
@@ -172,10 +177,9 @@ outcmd(int ch, int count)
 	}
 #elif TAPE_PREALLOC
 	if (tapelen) {
-
-	    /* Some WS interpreters need EVERY cell clear manually before we
-	       use them; do this here */
-
+	    /* Some WS interpreters need EVERY cell cleared manually before we
+	     * use them.
+	     */
 	    PRTTOK(PUSH); putsnum(0);
 	    PRTTOK(LABEL); putlabel(loopid);
 	    PRTTOK(DUP);
@@ -196,6 +200,9 @@ outcmd(int ch, int count)
 
 #if defined(CMD_CALL)
 	if(bytecell) {
+	    /* The Semicolon language doesn't have a working call instruction
+	     * without it the %256 for byte cells takes up a lot of space.
+	     */
 	    PRTTOK(JMP);
 	    putlabel(loopid+1);
 	    PRTTOK(LABEL);
