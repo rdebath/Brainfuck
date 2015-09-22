@@ -196,10 +196,11 @@ Multiply by 256 again to get 65536
 	+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>-[+<-]
 
-	Check there are enough cells; This takes 18569597 steps
-	It's a bit long but it should be okay for most interpreters
-	>++++++[<+++>-]<+[>+++++++++<-]>+[[->+>+<<]>>
-	[-<<+>>]<[<[->>+<<]+>[->>+<<]+[>]<-]<-]<[-<]
+	[ Check there are enough cells. This takes 18569597 steps. ]
+	[
+	    >++++++[<+++>-]<+[>+++++++++<-]>+[[->+>+<<]>>
+	    [-<<+>>]<[<[->>+<<]+>[->>+<<]+[>]<-]<-]<[-<]
+	]
 
 	One last thing: an exclamation point is not a valid BF instruction!
 
