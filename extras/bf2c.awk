@@ -23,8 +23,9 @@ BEGIN {
 	print "  -c         Don't run the program, send it to stdout."
 	print "  -O -O3     Pass this option to 'cc'."
 	print "  -O0        Disable peephole optimisations."
-	print "  -#         Dump final memory and when a # is seen."
+	print "  -d         Dump final memory and when a # is seen."
 	print "  -i         Enable counting of BF instructions."
+	print "  -#         Turn on both -d and -i"
 	print "  -M65536    Specify amount of memory to allocate."
 	print "  -Tunsigned Type for the tape cells."
 	print "  -Ctcc      Use the specified C compiler rather than 'cc'."
@@ -46,7 +47,8 @@ BEGIN {
 	arg = ARGV[i];
 	if (substr(arg,1,1) == "+") arg = "-" substr(arg,2);
 	if (arg == "-c") { ARGV[i] = ""; norun=1 }
-	if (arg == "-#") { ARGV[i] = ""; debug=1 }
+	if (arg == "-#") { ARGV[i] = ""; debug=1; icount=1; }
+	if (arg == "-d") { ARGV[i] = ""; debug=1; }
 	if (arg == "-i") { ARGV[i] = ""; icount=1 }
 	if (arg == "-O0") { ARGV[i] = ""; noopt=1 }
 	if (substr(arg,1,2) == "-M") { memory = substr(ARGV[i], 3) + memoff; ARGV[i] = "";}
