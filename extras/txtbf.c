@@ -53,7 +53,7 @@ void gen_multonly(char * buf);
 void gen_multbyte(char * buf);
 void gen_nestloop(char * buf);
 void gen_slipnest(char * buf);
-void gen_special(char * buf, char * initcode, char * name, int failquiet);
+void gen_special(char * buf, char * initcode, char * name, int usercode);
 void gen_twoflower(char * buf);
 void gen_twobyte(char * buf);
 void gen_trislipnest(char * buf);
@@ -142,38 +142,40 @@ char * hello_world_byte[] = {
     "+[>+>->>-[<-]<+]",		/* 6 */
     "+[>>-->->-[<]<+]",		/* 7 */
     "+[>>>+++<[-<]<+]",		/* 8 */
-    "+[[->]+[--<]>--]",		/* 9 */
-    "-[[+>]+[+++<]>+]",		/* 10 */
-    "-[[+>]+[+++<]>-]",		/* 11 */
-    ">-[-[>]+[+++<]>]",		/* 12 */
+    "+[[->]+[----<]>]",		/* 9 */
+    "+[[->]+[--<]>--]",		/* 10 */
+    "-[[+>]+[+++<]>+]",		/* 11 */
+    "-[[+>]+[+++<]>-]",		/* 12 */
+    ">-[-[>]+[+++<]>]",		/* 13 */
 
-    "++[-[->]-[---<]>]",	/* 13 */
-    "+[->[+>]-[++<]>+]",	/* 14 */
-    "+[[->]+[----<]>-]",	/* 15 */
-    "+[[->]+[---<]>--]",	/* 16 */
-    "+[[->]-[-<]>++>-]",	/* 17 */
-    "-[+>+++>++[-<]>>]",	/* 18 */
-    "-[+[+<]>>>>->+>+]",	/* 19 */
-    ">+[++>++[<]>>->+]",	/* 20 */
-    ">+[++[<]>->->+>+]",	/* 21 */
-    ">+[[+>]+[+++<]>-]",	/* 22 */
-    ">+[[--->]+[--<]>]",	/* 23 */
-    ">-[-[+>]+[+++<]>]",	/* 24 */
-    ">-[[--->]++[<]>-]",	/* 25 */
-    ">-[[>]+[+++<]>++]",	/* 26 */
+    "++[-[->]-[---<]>]",	/* 14 */
+    "+[->[+>]-[++<]>+]",	/* 15 */
+    "+[[->]+[----<]>-]",	/* 16 */
+    "+[[->]+[---<]>--]",	/* 17 */
+    "+[[->]-[-<]>++>-]",	/* 18 */
+    "-[+>+++>++[-<]>>]",	/* 19 */
+    "-[+[+<]>>>>->+>+]",	/* 20 */
+    ">+[++>++[<]>>->+]",	/* 21 */
+    ">+[++[<]>->->+>+]",	/* 22 */
+    ">+[[+>]+[+++<]>-]",	/* 23 */
+    ">+[[--->]+[--<]>]",	/* 24 */
+    ">-[-[+>]+[+++<]>]",	/* 25 */
+    ">-[[--->]++[<]>-]",	/* 26 */
+    ">-[[>]+[+++<]>++]",	/* 27 */
+    ">-[[>]+[---<]>>-]",	/* 28 */
 
-    "+[------->->->+++<<<]",					/* 27 */
-    "++[+++++++>++++>->->->++>-<<<<<<]",			/* 28 */
-    "++[+++++++>++++>->->->--->++<<<<<<]",			/* 29 */
-    "++++[------->-->--->--->->++++<<<<<]",			/* 30 */
-    "++[--------------->-->--->->+++++<<<<]",			/* 31 */
-    ">++++[<++++>-]<[++>+++>+++>---->+<<<<]",			/* 32 */
-    "++++++[+++++++>->++>++>---->+++>-<<<<<<]",			/* 33 */
-    ">+++++[<++++>-]<[++>+++++>+++>---->+<<<<]",		/* 34 */
-    "+++++++++++++[+++++++>++>++>----->---->+++<<<<<]",		/* 35 */
-    "+++++++++++++[------->-->-->+++++>--->++++<<<<<]",		/* 36 */
-    "+++++++++++++[+++++++>->++>++>----->---->+++<<<<<<]",	/* 37 */
-    "+++++++++++++[------->+>-->-->+++++>--->++++<<<<<<]",	/* 38 */
+    "+[------->->->+++<<<]",					/* 29 */
+    "++[+++++++>++++>->->->++>-<<<<<<]",			/* 30 */
+    "++[+++++++>++++>->->->--->++<<<<<<]",			/* 31 */
+    "++++[------->-->--->--->->++++<<<<<]",			/* 32 */
+    "++[--------------->-->--->->+++++<<<<]",			/* 33 */
+    ">++++[<++++>-]<[++>+++>+++>---->+<<<<]",			/* 34 */
+    "++++++[+++++++>->++>++>---->+++>-<<<<<<]",			/* 35 */
+    ">+++++[<++++>-]<[++>+++++>+++>---->+<<<<]",		/* 36 */
+    "+++++++++++++[+++++++>++>++>----->---->+++<<<<<]",		/* 37 */
+    "+++++++++++++[------->-->-->+++++>--->++++<<<<<]",		/* 38 */
+    "+++++++++++++[+++++++>->++>++>----->---->+++<<<<<<]",	/* 39 */
+    "+++++++++++++[------->+>-->-->+++++>--->++++<<<<<<]",	/* 40 */
 
     0 };
 
@@ -227,6 +229,7 @@ int bf_print_off = 0;
 char * best_str = 0;
 int best_len = -1;
 int best_cells = 1;
+char * best_name = 0;
 
 char * special_init = 0;
 
@@ -271,6 +274,9 @@ main(int argc, char ** argv)
 	    argc--; argv++;
 	} else if (strncmp(argv[1], "-B", 2) == 0 && argv[1][2] >= '0' && argv[1][2] <= '9') {
 	    blocksize = atol(argv[1]+2);
+	    argc--; argv++;
+	} else if (strcmp(argv[1], "-B") == 0) {
+	    blocksize = 8192;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-binary") == 0) {
@@ -328,6 +334,17 @@ main(int argc, char ** argv)
 	} else if (strcmp(argv[1], "-O") == 0) {
 	    wipe_config();
 	    enable_multloop = 1;
+	    enable_subrange = 1;
+	    enable_twocell = 1;
+	    enable_special1 = 1;
+	    argc--; argv++;
+
+	} else if (strcmp(argv[1], "-O2") == 0) {
+	    wipe_config();
+	    enable_multloop = 1;
+	    multloop_maxcell = 7;
+	    multloop_maxloop = 32;
+	    multloop_maxinc = 12;
 	    enable_subrange = 1;
 	    enable_twocell = 1;
 	    enable_special1 = 1;
@@ -460,6 +477,8 @@ main(int argc, char ** argv)
 	    fprintf(stderr, "-M+99   Specify multiply loop max increment\n");
 	    fprintf(stderr, "-M*99   Specify multiply loop max loops\n");
 	    fprintf(stderr, "-M=99   Specify multiply loop max cells\n");
+	    fprintf(stderr, "-zoned  Use zones to pick cell to use.\n");
+	    fprintf(stderr, "-lookahead Use lookahead when picking cells.\n");
 	    exit(0);
 	} else {
 	    fprintf(stderr, "Unknown option '%s'\n", argv[1]);
@@ -499,12 +518,10 @@ main(int argc, char ** argv)
 	    }
 
 	    if (p-linebuf == blocksize) {
-		int t = flg_clear;
 		*p++ = 0;
-		if (!flg_init) flg_clear = 1;
+		if (!flg_clear) flg_init = 1;
 		find_best_conversion(linebuf);
 		p = linebuf;
-		flg_clear = t;
 	    }
 	}
 	*p++ = 0;
@@ -522,7 +539,7 @@ find_best_conversion(char * linebuf)
     best_len = -1;	/* Clear 'best' string */
 
     if (special_init != 0)
-	gen_special(linebuf, special_init, "cmd special", 0);
+	gen_special(linebuf, special_init, "from -I option", 1);
 
     if (enable_special1) {
 	char ** hellos;
@@ -573,7 +590,7 @@ find_best_conversion(char * linebuf)
 
     if (subrange_count > 0) {
 	reinit_state();
-	gen_subrange(linebuf,subrange_count,1,0);
+	gen_subrange(linebuf,subrange_count,flg_zoned,0);
     } else if (subrange_count == 0) {
 
 	if (enable_subrange) {
@@ -633,8 +650,9 @@ find_best_conversion(char * linebuf)
 
     if (best_len>=0) {
 	if (verbose)
-	    fprintf(stderr, "BF Size = %d, %.2f bf/char, cells = %d\n",
-		best_len, best_len * 1.0/ strlen(linebuf), best_cells);
+	    fprintf(stderr, "BF Size = %d, %.2f bf/char, cells = %d, '%s'\n",
+		best_len, best_len * 1.0/ strlen(linebuf),
+		best_cells, best_name);
 
 	output_str(best_str);
 	free(str_start); str_start = 0; str_max = str_next = 0;
@@ -668,15 +686,31 @@ check_if_best(char * buf, char * name)
 	memset(cells, 0, sizeof(cells));
 	runbf(str_start, 1);
 	if (strncmp(buf, bf_print_buf, sizeof(bf_print_buf)) != 0) {
+	    int i;
 	    fprintf(stderr, "ERROR: Consistancy check for generated BF code FAILED.\n");
+	    fprintf(stderr, "Name: '%s'\n", name);
 	    fprintf(stderr, "Code: '%s'\n", str_start);
-	    fprintf(stderr, "Problem: \"%s\"\n", buf);
+	    fprintf(stderr, "Output: \"");
+	    for(i=0; buf[i]; i++) {
+		if (i>=' ' && i<='~' && i!='\\' && i!='"')
+		    fprintf(stderr ,"%c", i);
+		else if (i=='\n')
+		    fprintf(stderr ,"\\n");
+		else if (i=='"' || i=='\\')
+		    fprintf(stderr ,"\\%c", i);
+		else
+		    fprintf(stderr ,"\\%3o", i);
+	    }
+	    fprintf(stderr, "\"\n");
 	    exit(99);
 	}
 
 	if (best_str) free(best_str);
 	best_str = malloc(str_next+1);
 	memcpy(best_str, str_start, str_next+1);
+	if (best_name) free(best_name);
+	best_name = malloc(strlen(name)+1);
+	strcpy(best_name, name);
 	best_len = str_next;
 	best_cells = str_cells_used;
     }
@@ -790,7 +824,6 @@ void
 gen_subrange(char * buf, int subrange, int flg_subzone, int flg_nonl)
 {
     int counts[256] = {};
-    int txn[256] = {};
     int rng[256] = {};
     int currcell=0, usecell=0;
     int maxcell = 0;
@@ -817,8 +850,6 @@ gen_subrange(char * buf, int subrange, int flg_subzone, int flg_nonl)
 	counts[usecell] ++;
     }
 
-    for(i=0; i<=maxcell; i++) txn[i] = i;
-
     /* Dumb sort for simplicity */
     for(i=1; i<=maxcell; i++)
 	for(j=i+1; j<=maxcell; j++)
@@ -834,12 +865,16 @@ gen_subrange(char * buf, int subrange, int flg_subzone, int flg_nonl)
 	    }
 	}
 
-    /* Set the translation table */
-    for(i=0; i<=maxcell; i++) txn[rng[i] & 0xFF] = i;
+    str_cells_used = 0;
+    if (maxcell>1)
+	for(i=maxcell; i>=0; i--)
+	    if ((counts[i] || i == 0) && i>str_cells_used)
+		str_cells_used = i;
+    maxcell = str_cells_used++;
 
     if (flg_init) {
 	/* Clear the working cells */
-	for(i=maxcell; i>=0; i--) {
+	for(i=0; i<=maxcell; i++) {
 	    if (counts[i] || i == 0) {
 		while(currcell < i) { add_chr('>'); currcell++; }
 		while(currcell > i) { add_chr('<'); currcell--; }
@@ -849,15 +884,17 @@ gen_subrange(char * buf, int subrange, int flg_subzone, int flg_nonl)
 	}
     }
 
-    str_cells_used = 0;
-    if (maxcell>1)
-	for(i=maxcell; i>=0; i--)
-	    if ((counts[i] || i == 0) && i>str_cells_used)
-		str_cells_used = i;
-    str_cells_used++;
-
     /* Generate the init strings */
     if (maxcell > 1) {
+	int f = 0, loopcell = 0;
+	if (currcell == maxcell && !flg_subzone) {
+	    f = 2;
+	    loopcell = maxcell;
+	}
+
+	while(currcell > loopcell) { add_chr('<'); currcell--; }
+	while(currcell < loopcell) { add_chr('>'); currcell++; }
+
 	if (subrange>15 && !multloop_no_prefix) {
 	    char best_factor[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,
@@ -869,12 +906,12 @@ gen_subrange(char * buf, int subrange, int flg_subzone, int flg_nonl)
 		l = best_factor[subrange];
 	    else l = 10;
 	    r = subrange/l;
-	    if(r>1) add_chr('>');
+	    if(r>1) add_chr('>'^f);
 	    for(i=0; i<l; i++) add_chr('+');
 	    if(r>1) {
-		add_str("[<");
+		add_chr('['); add_chr('<'^f);
 		for(i=0; i<r; i++) add_chr('+');
-		add_str(">-]<");
+		add_chr('>'^f); add_chr('-'); add_chr(']'); add_chr('<'^f);
 	    }
 	    for(i=l*r; i<subrange; i++) add_chr('+');
 	} else {
@@ -884,19 +921,22 @@ gen_subrange(char * buf, int subrange, int flg_subzone, int flg_nonl)
 	add_chr('[');
 	for(i=1; i<=maxcell; i++)
 	{
-	    if (counts[i] || i == 0) {
-		while(currcell < i) { add_chr('>'); currcell++; }
-		cells[currcell] += subrange * rng[i];
+	    int c = i;
+	    if (f) c = maxcell-i;
+	    if (counts[c] || c == 0) {
+		while(currcell < c) { add_chr('>'); currcell++; }
+		while(currcell > c) { add_chr('<'); currcell--; }
+		cells[currcell] += subrange * rng[c];
 		if(bytewrap) cells[currcell] &= 255;
-		for(j=0; j<rng[i]; j++) add_chr('+');
-		for(j=0; j<-rng[i]; j++) add_chr('-');
+		for(j=0; j<rng[c]; j++) add_chr('+');
+		for(j=0; j<-rng[c]; j++) add_chr('-');
 	    }
 	}
-	while(currcell > 0) { add_chr('<'); currcell--; }
+	while(currcell > loopcell) { add_chr('<'); currcell--; }
+	while(currcell < loopcell) { add_chr('>'); currcell++; }
 	add_chr('-');
 	add_chr(']');
     }
-    while(currcell > 0) { add_chr('<'); currcell--; }
 
     if (best_len>0 && str_next > best_len) return;	/* Too big already */
 
@@ -908,8 +948,12 @@ gen_subrange(char * buf, int subrange, int flg_subzone, int flg_nonl)
      * Either could end up better by the end of the string.
      */
     if (!flg_subzone) {
-	gen_print(buf, 0);
+	gen_print(buf, currcell);
     } else {
+	/* Set the translation table */
+	int txn[256] = {};
+	for(i=0; i<=maxcell; i++) txn[rng[i] & 0xFF] = i;
+
 	/* Print each character */
 	for(p=buf; *p;) {
 	    int c = *p++;
@@ -1409,62 +1453,69 @@ return_to_top:
  */
 
 void
-gen_special(char * buf, char * initcode, char * name, int failquiet)
+gen_special(char * buf, char * initcode, char * name, int usercode)
 {
     int maxcell = 0;
     int currcell=0;
     int remaining_offset = 0;
     int i;
+    int bytewrap_override = 0;
 
     reinit_state();
 
     if (verbose>3)
-	fprintf(stderr, "Running '%s' code: %s\n", name, initcode);
+	fprintf(stderr, "Running '%s': %s\n", name, initcode);
 
     /* Work out what the 'special' code does to the cell array ... How?
      *
      * By running it of course!
-     * Use a local interpreter so we can increase the counter and give a better
-     * error message.
+     * Use a local interpreter so we can give a better error message.
      */
-    if(0) {
-	remaining_offset = runbf(initcode, 0);
+    if(!usercode) {
+	remaining_offset = runbf(initcode, 1);
 	if (remaining_offset<0) {
 	    fprintf(stderr, "Code '%s' failed '%s'\n", name, initcode);
 	    return;
 	}
     } else {
-	char *codeptr, *b;
+	char *p, *b;
 	int m=0, nestlvl=0;
-	int countdown = 100000;
-	if (!failquiet) countdown = 1000000;
+	int countdown = 1000000;
 
 	maxcell = -1;
 	str_cells_used = maxcell+1;
 
-	for(codeptr=b=initcode;*codeptr;codeptr++) {
-	    switch(*codeptr) {
+	for(p=b=initcode;*p;p++) {
+	    switch(*p) {
 		case '>': m++;break;
 		case '<': m--;break;
 		case '+': cells[m]++;break;
 		case '-': cells[m]--;break;
-		case '[': if(cells[m]==0)while((nestlvl+=(*codeptr=='[')-(*codeptr==']'))&&codeptr[1])codeptr++;break;
-		case ']': if(cells[m]!=0)while((nestlvl+=(*codeptr==']')-(*codeptr=='['))&&codeptr>b)codeptr--;break;
+		case '[': if(cells[m]==0)while((nestlvl+=(*p=='[')-(*p==']'))&&p[1])p++;break;
+		case ']': if(cells[m]!=0)while((nestlvl+=(*p==']')-(*p=='['))&&p>b)p--;break;
 	    }
 	    if (m<0 || m>= MAX_CELLS || --countdown == 0) break;
 	    if (m>maxcell) { maxcell = m; str_cells_used = maxcell+1; }
-	    if (bytewrap) cells[m] &= 255;
+	    if (bytewrap || bytewrap_override) cells[m] &= 255;
+	    else if ((cells[m] & 255) == 0 && cells[m] != 0) {
+		bytewrap_override = 1;
+		cells[m] &= 255;
+	    }
 	}
 
 	/* Something went wrong; the code is invalid */
-	if (*codeptr) {
-	    if (!failquiet || verbose>2)
-		fprintf(stderr, "Code '%s' failed to run cellptr=%d countdown=%d iptr=%d '%s'\n",
-			name, m, countdown, (int)(codeptr-initcode), initcode);
+	if (*p) {
+	    fprintf(stderr, "Code '%s' failed to run cellptr=%d countdown=%d iptr=%d '%s'\n",
+		    name, m, countdown, (int)(p-initcode), initcode);
 	    return;
 	}
 	remaining_offset = m;
     }
+
+    if (bytewrap_override)
+	fprintf(stderr,
+		"WARNING: Assuming bytewrapped interpreter for code %s\n",
+		name);
 
     if (flg_init) {
 	/* Clear the working cells */
@@ -1480,9 +1531,11 @@ gen_special(char * buf, char * initcode, char * name, int failquiet)
 
     if (best_len>0 && str_next > best_len) return;	/* Too big already */
 
+    if (bytewrap_override) bytewrap = 1;
     gen_print(buf, remaining_offset);
 
     check_if_best(buf, name);
+    if (bytewrap_override) bytewrap = 0;
 }
 
 /*******************************************************************************
