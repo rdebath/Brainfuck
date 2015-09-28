@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <string.h>
 
+int
 main(int argc, char **argv){
     static char pgm[BUFSIZ*1024];
     static unsigned char mem[65536];
-    unsigned short m;
+    unsigned short m = 0;
     int loopat = -1;
     int p=0, ch;
     FILE * f = fopen(argv[1],"r");

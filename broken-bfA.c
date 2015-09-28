@@ -2,10 +2,11 @@
 #include <string.h>
 int jmpstk[200], sp = 0;
 
+int
 main(int argc, char **argv){
     static char pgm[BUFSIZ*1024];
     static unsigned char mem[65536];
-    unsigned short m;
+    unsigned short m = 0;
     int p=0, ch;
     FILE * f = fopen(argv[1],"r");
     while((ch=getc(f)) != EOF) if(strchr("+-<>[].,",ch)) pgm[p++] = ch;
