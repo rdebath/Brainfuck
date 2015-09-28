@@ -2,19 +2,18 @@
 
 /*
 
-start ==>  {>}m>>+>>+
+ start ==>  {>}m>>+>>+
   >     ==>  >>>>+<<<<<<[>>]>>>>+[-]<<+[<<+>>-]<<-
   <     ==>  +[>>+<<-]>>->>+[<<]>>>>+[-]<<-<<<<
   +     ==>  +[>>+<<-]>>[<+<+>>-]<-<-
   -     ==>  +[>>+<<-]>+>[<-<+>>-]<<-
-  [     ==>  +[>>+<<-]>>[>>+<<<<[<<]{<}d+{>}d>>[>>]>>-]>>-<<<               (save control byte)
-             +[>+[<<+>>-]>>+[<<+>>-]>>+<<<<-<<->]>>>>>[<<<<<+>>>>>-]<<<<<-< (compute new control byte)
-             [                                                              (start actual loop)
+  [     ==>  +[>>+<<-]>>[>>+<<<<<<[<<]{<}d+{>}d>>[>>]>>-]>>-<<<                  (save control byte)
+             +[>+[<<+>>-]>>+[<<+>>-]>>+<<<<-<<->-]>+[-]>>>>[<<<<<+>>>>>-]<<<<<-< (compute new control byte)
+             [                                                                   (start actual loop)
   ]     ==>  +[>>>>+<<<<-]>>>>-<<<
-             +[>+[<<+>>-]>>+[<<+>>-]>>+<<<<-<<->]>>>>>[<<<<<+>>>>>-]<<<<<-< (compute new control byte)
-             ]                                                              (end loop)
-             +[-]+[<<]{<}d[{>}d>>[>>]<<+[<<]{<}d-]{>}d>>[>>]<<--            (restore control byte)
-
+             +[>+[<<+>>-]>>+[<<+>>-]>>+<<<<-<<->-]>+[-]>>>>[<<<<<+>>>>>-]<<<<<-< (compute new control byte)
+             ]                                                                   (end loop)
+             +[<<]{<}d[{>}d>>[>>]<<+[<<]{<}d-]{>}d>>[>>]<<--                     (restore control byte)
 */
 
 int
@@ -31,54 +30,55 @@ main(int argc, char ** argv)
 	switch(ch) {
 	case '+':
 	    printf("+[>>+<<-]>>[<+<+>>-]<-<-\n");
-	    printf("#\n");
+	    printf("# up\n");
 	    break;
 	case '-':
 	    printf("+[>>+<<-]>+>[<-<+>>-]<<-\n");
-	    printf("#\n");
+	    printf("# down\n");
 	    break;
 	case '>':
 	    printf(">>>>+<<<<<<[>>]>>>>+[-]<<+[<<+>>-]<<-\n");
-	    printf("#\n");
+	    printf("# right\n");
 	    break;
 	case '<':
 	    printf("+[>>+<<-]>>->>+[<<]>>>>+[-]<<-<<<<\n");
-	    printf("#\n");
+	    printf("# left\n");
 	    break;
 
 	case '[':
 /*
-  [     ==>  +[>>+<<-]>>[>>+<<<<[<<] {<}d + {>}d >>[>>]>>-]>>-<<<               (save control byte)
-             +[>+[<<+>>-]>>+[<<+>>-]>>+<<<<-<<->]>>>>>[<<<<<+>>>>>-]<<<<<-< (compute new control byte)
-             [                                                              (start actual loop)
+
+  [     ==>  +[>>+<<-]>>[>>+<<<<<<[<<] {<}d + {>}d >>[>>]>>-]>>-<<<                  (save control byte)
+             +[>+[<<+>>-]>>+[<<+>>-]>>+<<<<-<<->-]>+[-]>>>>[<<<<<+>>>>>-]<<<<<-< (compute new control byte)
+             [                                                                   (start actual loop)
 
 */
 	    depth++;
-	    printf("+[>>+<<-]>>[>>+<<<<[<<] ");
+	    printf("+[>>+<<-]>>[>>+<<<<<<[<<] ");
 	    for(ch=0;ch<depth; ch++) putchar('<');
 	    printf(" + ");
 	    for(ch=0;ch<depth; ch++) putchar('>');
 	    printf(" >>[>>]>>-]>>-<<<\n");
-	    printf("+[>+[<<+>>-]>>+[<<+>>-]>>+<<<<-<<->]>>>>>[<<<<<+>>>>>-]<<<<<-<\n");
+	    printf("+[>+[<<+>>-]>>+[<<+>>-]>>+<<<<-<<->-]>+[-]>>>>[<<<<<+>>>>>-]<<<<<-<\n");
 	    printf("[\n");
 
-	    printf("#\n");
+	    printf("# begin\n");
 	    break;
 
 	case ']':
 
 /*
   ]     ==>  +[>>>>+<<<<-]>>>>-<<<
-             +[>+[<<+>>-]>>+[<<+>>-]>>+<<<<-<<->]>>>>>[<<<<<+>>>>>-]<<<<<-< (compute new control byte)
-             ]                                                              (end loop)
-             +[-]+[<<] {<}d [ {>}d >>[>>]<<+[<<] {<}d -] {>}d >>[>>]<<--            (restore control byte)
+             +[>+[<<+>>-]>>+[<<+>>-]>>+<<<<-<<->-]>+[-]>>>>[<<<<<+>>>>>-]<<<<<-< (compute new control byte)
+             ]                                                                   (end loop)
+             +[<<] {<}d [ {>}d >>[>>]<<+[<<] {<}d -] {>}d >>[>>]<<--                     (restore control byte)
 */
 
 	    printf("+[>>>>+<<<<-]>>>>-<<<\n");
-	    printf("+[>+[<<+>>-]>>+[<<+>>-]>>+<<<<-<<->]>>>>>[<<<<<+>>>>>-]<<<<<-< (compute new control byte)\n");
-	    printf("]                                                              (end loop)\n");
+	    printf("+[>+[<<+>>-]>>+[<<+>>-]>>+<<<<-<<->-]>+[-]>>>>[<<<<<+>>>>>-]<<<<<-<\n");
+	    printf("]\n");
 
-	    printf("+[-]+[<<] ");
+	    printf("+[<<] ");
 	    for(ch=0;ch<depth; ch++) putchar('<');
 	    printf(" [ ");
 	    for(ch=0;ch<depth; ch++) putchar('>');
@@ -86,15 +86,19 @@ main(int argc, char ** argv)
 	    for(ch=0;ch<depth; ch++) putchar('<');
 	    printf(" -] ");
 	    for(ch=0;ch<depth; ch++) putchar('>');
-	    printf(" >>[>>]<<--            (restore control byte)\n");
+	    printf(" >>[>>]<<--\n");
 
 	    depth--;
-	    printf("#\n");
+	    printf("# end\n");
 	    break;
+
 	case '.':
+	    printf("> %c <\n", ch);
+	    printf("# out\n");
+	    break;
 	case ',':
 	    printf("> %c <\n", ch);
-	    printf("#\n");
+	    printf("# in\n");
 	    break;
 	}
     }
