@@ -1384,6 +1384,9 @@ bfdowhile(int ch, int count)
 		    pmc(">.<");
 		    break;
 
+		case '#':
+		    pmc(">#<");
+		    break;
 		}
 	    }
 	}
