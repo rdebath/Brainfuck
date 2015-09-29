@@ -6,12 +6,16 @@ int
 main(int argc, char **argv){
     static char pgm[BUFSIZ*1024];
     static unsigned char mem[65536];
-    unsigned short m=0;
+    unsigned short m = 0;
     int p=0, ch;
-    FILE * f = fopen(argv[1],"r");
+    FILE * f;
+
+    f = argc>1 && strcmp(argv[1], "-") ? fopen(argv[1], "r") : stdin;
+    if(!f) {perror(argv[1]); exit(1); }
     while((ch=getc(f)) != EOF) if(strchr("+-<>[].,#",ch)) pgm[p++] = ch;
     pgm[p++] = 0;
-    fclose(f);
+    if(f!=stdin) fclose(f);
+
     setbuf(stdout,0);
     for(p=0;pgm[p];p++) {
 	switch(pgm[p]) {
@@ -21,8 +25,8 @@ main(int argc, char **argv){
 	case '<': m--; break;
 	case '.': putchar(mem[m]); break;
 	case ',': {int a=getchar(); if(a!=EOF) mem[m]=a;} break;
-	case ']': if (mem[m]) { if(sp) { sp--; p=jmpstk[sp]-1; } else p = -1; } break;
-	case '[': jmpstk[sp++] = p; break;
+	case '[': jmpstk[++sp] = p; break;
+	case ']': if(mem[m]==0) {if(sp>0)sp--;} else p=jmpstk[sp]; break;
 
 	case '#':
             fprintf(stderr,
