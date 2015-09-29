@@ -48,6 +48,7 @@
 #define L_HANOILOVE     0x17    /* hanoilove(token, count); */
 #define L_ASCII         0x18    /* ascii(token, count); */
 #define L_EXCON         0x19    /* ascii(token, count); */
+#define L_DOWHILE       0x1A    /* bfdowhile(token, count); */
 
 static const char bf[] = "><+-.,[]";
 static const char * bfout[] = { ">", "<", "+", "-", ".", ",", "[", "]", 0 };
@@ -330,6 +331,7 @@ static int col = 0;
 static int maxcol = 72;
 static int state = 0;
 static int bf_mov = 0;
+static int enable_bf_mov = 0;
 
 static int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
 
@@ -349,6 +351,7 @@ static void bfugly(int ch, int count);
 static void malbrain(int ch, int count);
 static void hanoilove(int ch, int count);
 static void ascii(int ch, int count);
+static void bfdowhile(int ch, int count);
 static void bftranslate(int ch, int count);
 static void bfreprint(void);
 
@@ -535,6 +538,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-excon") == 0) {
 	lang = 0; langclass = L_EXCON; return 1;
     } else
+    if (strcmp(arg, "-dowhile") == 0) {
+	lang = 0; langclass = L_DOWHILE; return 1;
+    } else
     if (strcmp(arg, "-dump") == 0) {
 	lang = 0; langclass = L_TOKENS; return 1;
     } else
@@ -579,6 +585,7 @@ check_arg(const char * arg)
 	"\n\t"  "-hanoilove Hanoi Love translation"
 	"\n\t"  "-ascii  Convert BF to ASCII"
 	"\n\t"  "-excon  EXCON translation -- http://esolangs.org/wiki/EXCON"
+	"\n\t"  "-dowhile Do while translataion"
 	"\n\t"  "-dc     Convert to dc(1) using the first of below."
 	"\n\t"  "-dc1      Use an array and a pointer variable."
 	"\n\t"  "-dc2      Use an array with the pointer on the stack (not V7)."
@@ -612,16 +619,15 @@ static int disable_optimisation(void)
 static void
 pc(int ch)
 {
-    if (L_BASE == L_BF && enable_mov_optim) {
+    if (enable_bf_mov) {
 	if (ch == '>') bf_mov++;
 	else if (ch == '<') bf_mov--;
 	else {
-	    int tmp = langclass;
-	    langclass = L_CHARS;
+	    enable_bf_mov = 0;
 	    while (bf_mov>0) {bf_mov--; pc('>'); }
 	    while (bf_mov<0) {bf_mov++; pc('<'); }
 	    pc(ch);
-	    langclass = tmp;
+	    enable_bf_mov = 1;
 	}
 	return;
     }
@@ -680,6 +686,11 @@ outcmd(int ch, int count)
 	    if (bytecell) c = cbyte_rle; else c = cint_rle;
 	}
 	if (lang == cbyte) lang = c;
+
+	if (enable_mov_optim) {
+	    if (L_BASE == L_BF) enable_bf_mov = 1;
+	    if (L_BASE == L_DOWHILE) enable_bf_mov = 1;
+	}
     }
 
     if (ch == '!' && (langclass & C_HEADERS) != 0) {
@@ -748,6 +759,7 @@ outcmd(int ch, int count)
     case L_HANOILOVE:	hanoilove(ch, count); break;
     case L_EXCON:
     case L_ASCII:       ascii(ch, count); break;
+    case L_DOWHILE:	bfdowhile(ch, count); break;
     }
 
     if (ch == '~' && (langclass & GEN_HEADER) != 0)
@@ -1282,6 +1294,98 @@ ascii(int ch, int count)
 		    if((v=getchar()) != EOF) m->val = v;
 		}
 		break;
+	}
+    }
+}
+
+static void
+bfdowhile(int ch, int count)
+{
+    char * p;
+
+    if ((p = strchr(bf,ch)) || (enable_debug && ch == '#')) {
+	struct instruction * n = calloc(1, sizeof*n);
+	if (!n) { perror("bf2multi"); exit(42); }
+
+	n->ch = ch;
+	n->count = count;
+	if (!last) pgm = n; else last->next = n;
+	last = n;
+	return;
+    }
+
+    if (ch == '~') {
+	int stack_depth = 0, max_depth = 0;
+	int i;
+	struct instruction * n;
+
+	for(n=pgm; n; n=n->next) {
+	    if (n->ch == '[') {
+		stack_depth++;
+		if (stack_depth > max_depth) max_depth = stack_depth;
+	    }
+	    if (n->ch == ']') stack_depth--;
+	}
+
+	if (stack_depth != 0) fprintf(stderr, "Data structure error\n");
+
+	while(max_depth-->0) pc('>');
+	pmc(">>+>>+");
+
+	for(n=pgm; n; n=n->next) {
+	    int lcount = n->count;
+	    while(lcount-->0) {
+		switch(n->ch) {
+
+		case '+':
+		    pmc("+[>>+<<-]>>[<+<+>>-]<-<-");
+		    break;
+		case '-':
+		    pmc("+[>>+<<-]>+>[<-<+>>-]<<-");
+		    break;
+		case '>':
+		    pmc(">>>>+<<<<<<[>>]>>>>+[-]<<+[<<+>>-]<<-");
+		    break;
+		case '<':
+		    pmc("+[>>+<<-]>>->>+[<<]>>>>+[-]<<-<<<<");
+		    break;
+
+		case '[':
+		    stack_depth++;
+
+		    pmc("+[>>+<<-]>>[>>+<<<<<<[<<]");
+		    for(i=0;i<stack_depth; i++) pc('<');
+		    pc('+');
+		    for(i=0;i<stack_depth; i++) pc('>');
+		    pmc(">>[>>]>>-]>>-<<<");
+		    pmc("+[>+[<<+>>-]>>+[<<+>>-]>>+<<<<-<<->-]>+[-]>>>>[<<<<<+>>>>>-]<<<<<-<");
+		    pmc("[");
+		    break;
+
+		case ']':
+		    pmc("+[>>>>+<<<<-]>>>>-<<<");
+		    pmc("+[>+[<<+>>-]>>+[<<+>>-]>>+<<<<-<<->-]>+[-]>>>>[<<<<<+>>>>>-]<<<<<-<");
+		    pmc("]");
+
+		    pmc("+[<<]");
+		    for(i=0;i<stack_depth; i++) pc('<');
+		    pmc("[");
+		    for(i=0;i<stack_depth; i++) pc('>');
+		    pmc(">>[>>]<<+[<<]");
+		    for(i=0;i<stack_depth; i++) pc('<');
+		    pmc("-]");
+		    for(i=0;i<stack_depth; i++) pc('>');
+		    pmc(">>[>>]<<--");
+
+		    stack_depth--;
+		    break;
+
+		case '.':
+		    pmc(">.<");
+		    break;
+
+		}
+	    }
 	}
     }
 }
