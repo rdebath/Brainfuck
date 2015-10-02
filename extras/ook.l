@@ -43,6 +43,7 @@ size_t bf_prefilter(char * buf, size_t maxsize);
 %x BFCOMMENT
 %x ZZZ
 %x TRIP
+%x PETOOH
 
 w	[\t ]*
 ws	[\t ]+
@@ -203,6 +204,20 @@ ook	B?[Oo]ok
     .		commentch(yytext[0]);
 }
 
+<PETOOH>{
+    (?-i:Kudah)		pc('>');
+    (?-i:kudah)		pc('<');
+    (?-i:Ko)		pc('+');
+    (?-i:kO)		pc('-');
+    (?-i:Kukarek)	pc('.');
+    (?-i:kukarek)	pc(',');
+    (?-i:Kud)		pc('[');
+    (?-i:kud)		pc(']');
+
+    [ \t\n]+	{int i; for(i=0; i<yyleng; i++) commentch(yytext[i]);}
+    .		commentch(yytext[0]);
+}
+
 <ALWORD>{
     /* Simple "words". These sets don't interfere with each-other. */
 
@@ -344,6 +359,10 @@ int main(int argc, char ** argv)
 		mode = INITIAL;
 		character_prefilter = argv[1]+4;
 		character_conversion = bf;
+	    }
+	    else if (!strcmp(argv[1], "-petooh")) {
+		mode = PETOOH;
+		character_prefilter = "adehkKoOru";
 	    }
 
 	    else if (!strcmp(argv[1], "-trip")) {
