@@ -585,7 +585,7 @@ check_arg(const char * arg)
 	"\n\t"  "-hanoilove Hanoi Love translation"
 	"\n\t"  "-ascii  Convert BF to ASCII"
 	"\n\t"  "-excon  EXCON translation -- http://esolangs.org/wiki/EXCON"
-	"\n\t"  "-dowhile Do while translataion"
+	"\n\t"  "-dowhile Do ... while translataion."
 	"\n\t"  "-dc     Convert to dc(1) using the first of below."
 	"\n\t"  "-dc1      Use an array and a pointer variable."
 	"\n\t"  "-dc2      Use an array with the pointer on the stack (not V7)."
@@ -1298,6 +1298,25 @@ ascii(int ch, int count)
     }
 }
 
+/*
+ * This is a translation written by http://esolangs.org/wiki/User:Int-e
+ * here ...
+ * http://esolangs.org/wiki/Talk:Brainfuck#Would_BF_still_be_TC_with_do-while_loops.3F
+ *
+ * This translation takes normal BF with traditional "While" loops and converts
+ * it to run on an interpreter with "DO ...WHILE tape[p]<>0" style loops.
+ * That is loops that run at least once.
+ *
+ * Obviously this doesn't convert I/O, however, the direct conversion is
+ * normally sufficient for most simple programs. The output will print NUL
+ * bytes for all "." commands that are skipped; these can be easily ignored.
+ * And the "," command is sufficient for simple programs like the original
+ * "primes" program.
+ *
+ * The six core commands convert completely which would appear to prove
+ * the Turing completeness of the DoWhile variant.
+ */
+
 static void
 bfdowhile(int ch, int count)
 {
@@ -1305,7 +1324,7 @@ bfdowhile(int ch, int count)
 
     if ((p = strchr(bf,ch)) || (enable_debug && ch == '#')) {
 	struct instruction * n = calloc(1, sizeof*n);
-	if (!n) { perror("bf2multi"); exit(42); }
+	if (!n) { perror("bf2dowhile"); exit(42); }
 
 	n->ch = ch;
 	n->count = count;
@@ -1335,6 +1354,16 @@ bfdowhile(int ch, int count)
 	for(n=pgm; n; n=n->next) {
 	    int lcount = n->count;
 	    while(lcount-->0) {
+		int doloop = 0;
+
+		if (lcount > 0 && (n->ch == '+' || n->ch == '-')) {
+		    int v;
+		    pmc(">>>>");
+		    for(v=0; v<=lcount; v++) pc('+');
+		    pmc("[-<<<<");
+		    doloop = 1;
+		}
+
 		switch(n->ch) {
 
 		case '+':
@@ -1384,8 +1413,17 @@ bfdowhile(int ch, int count)
 		    pmc(">.<");
 		    break;
 
+		case ',':
+		    pmc(">,<");
+		    break;
+
 		case '#':
 		    pmc(">#<");
+		    break;
+		}
+
+		if (doloop) {
+		    pmc(">>>>]<<<<");
 		    break;
 		}
 	    }
