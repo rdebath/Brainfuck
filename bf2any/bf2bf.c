@@ -137,6 +137,10 @@ static const char *k_on_fuck[] =
     { "うんうんうん", "うんうんたん", "うんたんうん", "うんたんたん",
       "たんうんうん", "たんうんたん", "たんたんうん", "たんたんたん", 0 };
 
+/* Language: Petooh; https://github.com/Ky6uk/PETOOH */
+static const char *petooh[] =
+    { "Kudah", "kudah", "Ko", "kO", "Kukarek", "kukarek", "Kud", "kud", 0 };
+
 /* dc(1) using an array and a pointer in another variable */
 static const char *dc1[] =
 {   "lp%d+sp", "lp%d-sp", "lp;a%d+lp:a", "lp;a%d-lp:a",
@@ -540,6 +544,9 @@ check_arg(const char * arg)
     } else
     if (strcmp(arg, "-dowhile") == 0) {
 	lang = 0; langclass = L_DOWHILE; return 1;
+    } else
+    if (strcmp(arg, "-petooh") == 0) {
+	lang = petooh; langclass = L_WORDS; return 1;
     } else
     if (strcmp(arg, "-dump") == 0) {
 	lang = 0; langclass = L_TOKENS; return 1;
