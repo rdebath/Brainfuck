@@ -15,12 +15,15 @@
 # define PRIdMAX  "ld"
 #endif
 
-#ifndef TAPELEN
-# define TAPELEN	(2<<16)
-#endif
-#define TM(x)		((x)&(TAPELEN-1))
-
+#define CELL int
+#define MINOFF (0)
+#define MAXOFF (10)
+#define MINALLOC 1024
 #define SAFE_CELL_MAX	((1<<30) -1)
+
+CELL * mem = 0;
+int memsize = 0;
+int memshift = 0;
 
 void run(void);
 void print_summary(void);
@@ -38,12 +41,9 @@ int cell_mask = 255;
 int all_cells = 0;
 int suppress_io = 0;
 
-int mem[TAPELEN];
-
 int nonl = 0;		/* Last thing printed was not an end of line. */
 int tape_min = 0;	/* The lowest tape cell moved to. */
 int tape_max = 0;	/* The highest tape cell moved to. */
-int neg_array = 0;	/* Was any cell below zero actually accessed. */
 int final_tape_pos = 0;	/* Where the tape pointer finished. */
 
 intmax_t overflows =0;	/* Number of detected overflows. */
@@ -141,150 +141,181 @@ int main(int argc, char **argv)
     return 0;
 }
 
+int
+alloc_ptr(int memoff)
+{
+    int amt, i, off;
+    if (memoff >= 0 && memoff < memsize) return memoff;
+
+    off = 0;
+    if (memoff<0) off = -memoff;
+    else if(memoff>=memsize) off = memoff-memsize;
+    amt = (off / MINALLOC + 1) * MINALLOC;
+    mem = realloc(mem, (memsize+amt)*sizeof(*mem));
+    if (mem == 0) {
+	fprintf(stderr, "memory allocation failure for %d cells\n", memsize+amt);
+	exit(1);
+    }
+    if (memoff<0) {
+        memmove(mem+amt, mem, memsize*sizeof(*mem));
+        for(i=0; i<amt; i++)
+            mem[i] = 0;
+        memoff += amt;
+	memshift += amt;
+    } else {
+        for(i=0; i<amt; i++)
+            mem[memsize+i] = 0;
+    }
+    memsize += amt;
+    return memoff;
+}
+
 void run(void)
 {
     int m = 0;
     int n;
+    m = alloc_ptr(MAXOFF)-MAXOFF;
     for(n = 0;; n++) {
 	switch(pgm[n].cmd)
 	{
 	case 0:
-	    final_tape_pos = m;
+	    final_tape_pos = m-memshift;
 	    return;
 
 	case '>':
 	    profile[pgm[n].cmd*4] += pgm[n].arg;
 	    m += pgm[n].arg;
-	    if(tape_max < m) tape_max = m;
+	    if (m+MAXOFF >= memsize) m = alloc_ptr(m+MAXOFF)-MAXOFF;
+	    if(tape_max < m-memshift) tape_max = m-memshift;
 	    break;
 	case '<':
 	    profile[pgm[n].cmd*4] += pgm[n].arg;
 	    m -= pgm[n].arg;
-	    if(tape_min > m) tape_min = m;
+	    if (m+MINOFF <= 0) m = alloc_ptr(m+MINOFF)-MINOFF;
+	    if(tape_min > m-memshift) {
+		tape_min = m-memshift;
+		if(tape_min < -1000) {
+		    fprintf(stderr, "Tape underflow at pointer %d\n", tape_min);
+		    exit(1);
+		}
+	    }
 	    break;
 
 	case '+':
 	    profile[pgm[n].cmd*4] += pgm[n].arg;
-	    if(m < 0) neg_array = 1;
-	    mem[TM(m)] += pgm[n].arg;
+	    mem[m] += pgm[n].arg;
 
 	    if(physical_overflow) {
-		if (mem[TM(m)] > physical_max) {
+		if (mem[m] > physical_max) {
 		    overflows++;
-		    mem[TM(m)] -= (physical_max-physical_min+1);
+		    mem[m] -= (physical_max-physical_min+1);
 		}
 	    } else {
-		if (mem[TM(m)] > physical_max) hard_wrap = 1;
-		if (mem[TM(m)] > SAFE_CELL_MAX) {
+		if (mem[m] > physical_max) hard_wrap = 1;
+		if (mem[m] > SAFE_CELL_MAX) {
 		    /* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
 		    overflows++;
-		    mem[TM(m)] -= (SAFE_CELL_MAX+1);
+		    mem[m] -= (SAFE_CELL_MAX+1);
 		    profile[pgm[n].cmd*4 + 3]++;
 		}
 	    }
 	    break;
 	case '-':
 	    profile[pgm[n].cmd*4] += pgm[n].arg;
-	    if(m < 0) neg_array = 1;
-	    mem[TM(m)] -= pgm[n].arg;
+	    mem[m] -= pgm[n].arg;
 
 	    if(physical_overflow) {
-		if (mem[TM(m)] < physical_min) {
+		if (mem[m] < physical_min) {
 		    underflows++;
-		    mem[TM(m)] += (physical_max-physical_min+1);
+		    mem[m] += (physical_max-physical_min+1);
 		}
 	    } else {
-		if (mem[TM(m)] < physical_min) hard_wrap = 1;
-		if (mem[TM(m)] < -SAFE_CELL_MAX) {
+		if (mem[m] < physical_min) hard_wrap = 1;
+		if (mem[m] < -SAFE_CELL_MAX) {
 		    /* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
 		    underflows++;
-		    mem[TM(m)] += (SAFE_CELL_MAX+1);
+		    mem[m] += (SAFE_CELL_MAX+1);
 		    profile[pgm[n].cmd*4 + 3]++;
 		}
 	    }
 	    break;
 	case '=':
-	    if(m < 0) neg_array = 1;
 
 	    if(physical_overflow) {
-		if (mem[TM(m)] < 0) underflows++;
+		if (mem[m] < 0) underflows++;
 	    } else {
-		if (mem[TM(m)] < 0) {
+		if (mem[m] < 0) {
 		    underflows++;
 		    // profile[']'*4 + 3]++;
 		}
 	    }
 
-	    if (mem[TM(m)] < 0) {
+	    if (mem[m] < 0) {
 		profile['='*4 + 3]++;
 		profile['='*4] ++;
-	    } else if (mem[TM(m)] > 0)
+	    } else if (mem[m] > 0)
 		profile['='*4 + 2]++;
 	    else
 		profile['='*4 + 1]++;
 
-	    mem[TM(m)] &= cell_mask;
+	    mem[m] &= cell_mask;
 
-	    if (mem[TM(m)]) {
+	    if (mem[m]) {
 		profile['['*4 + 2] ++;
-		profile['-'*4 + 0] += mem[TM(m)];
+		profile['-'*4 + 0] += mem[m];
 		profile[']'*4 + 1] ++;
-		profile[']'*4 + 2] += mem[TM(m)]-1;
+		profile[']'*4 + 2] += mem[m]-1;
 	    } else
 		profile['['*4 + 1]++;
 
-	    mem[TM(m)] = 0;
+	    mem[m] = 0;
 	    break;
 
 	case '[':
 	    if (!physical_overflow) {
-		if ((mem[TM(m)] & cell_mask) == 0 && mem[TM(m)]) {
+		if ((mem[m] & cell_mask) == 0 && mem[m]) {
 		    /* This condition will be different. */
-		    if (mem[TM(m)] < 0) underflows++; else overflows++;
+		    if (mem[m] < 0) underflows++; else overflows++;
 		    profile[pgm[n].cmd*4 + 3]++;
 
-		    mem[TM(m)] &= cell_mask;
-		    if (mem[TM(m)] > physical_max)
-			mem[TM(m)] -= (physical_max-physical_min+1);
+		    mem[m] &= cell_mask;
+		    if (mem[m] > physical_max)
+			mem[m] -= (physical_max-physical_min+1);
 		}
 	    }
 
-	    profile[pgm[n].cmd*4+1 + !!mem[TM(m)]]++;
-	    if(m < 0) neg_array = 1;
-	    if (mem[TM(m)] == 0) n = pgm[n].arg;
+	    profile[pgm[n].cmd*4+1 + !!mem[m]]++;
+	    if (mem[m] == 0) n = pgm[n].arg;
 	    break;
 	case ']':
 	    if (!physical_overflow) {
-		if ((mem[TM(m)] & cell_mask) == 0 && mem[TM(m)]) {
+		if ((mem[m] & cell_mask) == 0 && mem[m]) {
 		    /* This condition will be different. */
-		    if (mem[TM(m)] < 0) underflows++; else overflows++;
+		    if (mem[m] < 0) underflows++; else overflows++;
 		    profile[pgm[n].cmd*4 + 3]++;
 
-		    mem[TM(m)] &= cell_mask;
-		    if (mem[TM(m)] > physical_max)
-			mem[TM(m)] -= (physical_max-physical_min+1);
+		    mem[m] &= cell_mask;
+		    if (mem[m] > physical_max)
+			mem[m] -= (physical_max-physical_min+1);
 		}
 	    }
 
-	    profile[pgm[n].cmd*4+1 + !!mem[TM(m)]]++;
-	    if(m < 0) neg_array = 1;
-	    if (mem[TM(m)] != 0) n = pgm[n].arg;
+	    profile[pgm[n].cmd*4+1 + !!mem[m]]++;
+	    if (mem[m] != 0) n = pgm[n].arg;
 	    break;
 
 	case '.':
 	    profile[pgm[n].cmd*4]++;
-	    if(m < 0) neg_array = 1;
-	    { int a = (mem[TM(m)] & 0xFF);
+	    { int a = (mem[m] & 0xFF);
 	      if (!suppress_io) putchar(a);
 	      if (a != 13) nonl = (a != '\n'); }
 	    break;
 	case ',':
-	    profile[pgm[n].cmd*4+1 + !!mem[TM(m)]]++;
-	    if(m < 0) neg_array = 1;
+	    profile[pgm[n].cmd*4+1 + !!mem[m]]++;
 
 	    { int a = suppress_io?EOF:getchar();
-	      if(a != EOF) mem[TM(m)] = a;
-	      else if (on_eof != 1) mem[TM(m)] = on_eof; }
+	      if(a != EOF) mem[m] = a;
+	      else if (on_eof != 1) mem[m] = on_eof; }
 	    break;
 	case '#':
 	{
@@ -373,14 +404,15 @@ print_summary()
 		if (i > pw) pw = i;
 	    }
 
-	    if (tape_min < 0) cc += fprintf(stderr, " !");
-	    if (all_cells && cell_mask == 0xFF) {
+	    if (all_cells && cell_mask == 0xFF && tape_min == 0) {
 		fprintf(stderr, "Pointer at: %d\n", final_tape_pos);
 		for(ch = 0; ch <= tape_max-tape_min; ch++) {
-		    hex_output(stderr, mem[TM(ch+tape_min)] & cell_mask);
+		    hex_output(stderr, mem[ch+memshift] & cell_mask);
 		}
 		hex_output(stderr, EOF);
 	    } else {
+		if (tape_min < 0) cc += fprintf(stderr, " !");
+
 		for(ch = 0; (all_cells || ch < 16) && ch <= tape_max-tape_min; ch++) {
 		    if (((ch+tape_min)&15) == 0) {
 			if (ch+tape_min != 0) {
@@ -391,7 +423,7 @@ print_summary()
 			cc += fprintf(stderr, " :");
 		    }
 		    cc += fprintf(stderr, " %*d",
-				  pw, mem[TM(ch+tape_min)] & cell_mask);
+				  pw, mem[ch+memshift+tape_min] & cell_mask);
 		    if (final_tape_pos == ch+tape_min)
 			pc = cc;
 		}
@@ -401,17 +433,9 @@ print_summary()
 	    }
 	}
 
-	if (tape_min < 0) {
-	    if (neg_array)
-		fprintf(stderr, "WARNING: Tape pointer minimum %d, segfault.\n", tape_min);
-	    else
-		fprintf(stderr, "WARNING: Tape pointer minimum %d, pointer only.\n",
-			tape_min);
-	}
+	if (tape_min < 0)
+	    fprintf(stderr, "WARNING: Tape pointer minimum %d, segfault.\n", tape_min);
 	fprintf(stderr, "Tape pointer maximum %d\n", tape_max);
-	if (tape_max >= TAPELEN+tape_min)
-	    fprintf(stderr, "WARNING: Invalid result, pointer has wrapped on %d cells.\n",
-		    TAPELEN);
 
 	if (overflows || underflows) {
 	    fprintf(stderr, "Range error: ");
@@ -463,16 +487,16 @@ print_summary()
     }
     else
     {
-	if (tape_min < -16 || tape_max > TAPELEN/2) {
+	if (tape_min < -16) {
 	    fprintf(stderr, "ERROR ");
 	    print_pgm();
 	    fprintf(stderr, "\n");
 	} else {
 	    int ch, nonwrap =
 		(overflows == 0 && underflows == 0 &&
-		 (mem[TM(final_tape_pos)] & ~cell_mask) == 0);
+		 (mem[final_tape_pos+memshift] & ~cell_mask) == 0);
 
-	    fprintf(stderr, "%d ", (mem[TM(final_tape_pos)] & cell_mask) );
+	    fprintf(stderr, "%d ", (mem[final_tape_pos+memshift] & cell_mask) );
 	    fprintf(stderr, "%d ", program_len-tape_min);
 	    fprintf(stderr, "%d ", tape_max-tape_min+1);
 	    fprintf(stderr, "%"PRIdMAX" ", total_count);
