@@ -358,6 +358,7 @@ static void ascii(int ch, int count);
 static void bfdowhile(int ch, int count);
 static void bftranslate(int ch, int count);
 static void bfreprint(void);
+static void bfpackprint(void);
 
 int
 check_arg(const char * arg)
@@ -381,6 +382,14 @@ check_arg(const char * arg)
     if (strcmp(arg, "-quad") == 0) {
 	bf_multi |= 4;
 	lang = bfquad; langclass = L_BF; return 1;
+    } else
+    if (strcmp(arg, "-multi") == 0) {
+	bf_multi |= 7;
+	lang = bfout; langclass = L_BF; return 1;
+    } else
+    if (strcmp(arg, "-dbr") == 0) {
+	bf_multi |= 2 + 8;
+	lang = doubler = doubler_12; langclass = L_BF; return 1;
     } else
     if (strcmp(arg, "-quadnz") == 0) {
 	bf_multi |= 4;
@@ -836,7 +845,7 @@ bftranslate(int ch, int count)
 	 * The tests can be reordered and the compacted lump in the first
 	 * section can be manually replaced by the original code if wanted.
 	 */
-	if ((bf_multi & 7) == 7) {
+	if ((bf_multi & 6) == 6) {
 	    /* This generates 65536 to check for larger than 16bit cells. */
 	    pc(0); puts("// This generates 65536 to check for larger than 16bit cells");
 	    pmc(">[-]<[-]++[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]+>[");
@@ -857,7 +866,8 @@ bftranslate(int ch, int count)
 	    pmc(">");
 	    pmc("\n\n");
 
-	    lang = doubler; bfreprint();
+	    lang = doubler;
+	    if (bf_multi & 8) bfpackprint(); else bfreprint();
 
 	    pmc("\n\n");
 	    pmc("<[-]]<");
@@ -872,6 +882,8 @@ bftranslate(int ch, int count)
 
 	    pmc("\n\n");
 	    pmc("<[-]]<");
+	} else if ((bf_multi & 0xF) == 10) {
+	    bfpackprint();
 	} else if ((bf_multi & 7) != 5) {
 	    /* The two cell size checks here are independent, they can be
 	     * reordered or used on their own.
@@ -881,8 +893,7 @@ bftranslate(int ch, int count)
 	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]");
 	    pmc("<[" ">>\n\n");
 
-	    if ((bf_multi&1) == 0) lang = doubler; else lang = bfout;
-	    bfreprint();
+	    lang = bfout; bfreprint();
 
 	    pmc("\n\n<<[-]]\n\n");
 
@@ -892,9 +903,12 @@ bftranslate(int ch, int count)
 
 	    pmc("\n\n");
 
-	    if(bf_multi&4) lang = bfquad;
-	    else if (bf_multi&2) lang = doubler;
-	    bfreprint();
+	    if(bf_multi&8) bfpackprint();
+	    else {
+		if(bf_multi&4) lang = bfquad;
+		else if (bf_multi&2) lang = doubler;
+		bfreprint();
+	    }
 
 	    pmc("\n\n");
 	    pmc("<[-]]<");
@@ -940,6 +954,70 @@ bfreprint(void)
 		pmc(lang[8]); tmp_clean = 1;
 	    }
 	    while(count-->0) pmc(lang[p-bf]);
+	} else {
+	    if (ch == '#') pc('\n');
+	    pc(ch);
+	    if (ch == '#') pc('\n');
+	}
+    }
+}
+
+static void
+bfpackprint(void)
+{
+    static char bestfactor[] = {
+	 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	 4, 4, 3, 3, 4, 3, 3,20, 4, 5, 5, 3, 4, 4, 5, 5,
+	 4, 4,21, 5, 6, 6, 6,21, 5, 5, 6, 6, 4, 5, 5,22,
+	 6, 7, 5, 5, 4,22, 6, 5, 7, 7, 7,22, 6, 6,23, 7,
+	 8, 8, 6, 6, 6,23, 7, 7, 8, 8, 8, 5,23, 7, 6,24,
+	 8, 9, 9,23, 7, 7, 7,24, 8, 8, 9, 7, 7, 7,24,24,
+	 8, 8, 7, 9,10,10,10,24, 8, 7, 7,25, 9, 9,10,10,
+	 8, 8, 8,25,25, 9, 9,26,10,11,11,11,25,25, 9, 9,
+	 8,26,10,10,11,11,25, 9, 8, 8,26,26,10,10,27,11,
+	12,12,12,12,26,26,10,10, 8, 9,11,11,12,12,12,26,
+	10,10, 9, 9,27,11,11,28,12,13,10, 9, 9, 9,27,27,
+	11,11,11,28,12,12,13,13,13,27,27,11,11, 9,10,28,
+	12,12,29,13,14,14,11,11,10,10,28,28,12,12,12,29,
+	13,11,14,14,14,14,28,28,12,12,12,27,11,13,13,30,
+	14,15,15,28,12,12,10,11,11,29,13,13,13,30,14,14,
+	15,15,11,11,11,29,29,13,13,13,30,30,14,14,31,15};
+
+    struct instruction * n = pgm;
+
+    for(; n; n=n->next) {
+	int ch = n->ch;
+	int count = n->count;
+	char * p;
+	if ((p = strchr(bf,ch))) {
+	    if (count>1 && (ch == '+' || ch == '-')) {
+		while(count) {
+		    int cnt = count;
+		    if (cnt>255) cnt = 255;
+		    count-=cnt;
+		    pmc(">>>>>");
+		    if (bestfactor[cnt] == 1) {
+			while(cnt-->0) pc('+');
+		    } else {
+			int a,b,t,i;
+			t = bestfactor[cnt]; a = (0xF&t); t = !!(t&0x10);
+			b = cnt/a+t;
+			pc('>');
+			for(i=0;i<a;i++) pc('+');
+			pmc("[-<");
+			for(i=0;i<b;i++) pc('+');
+			pmc(">]<");
+			t = cnt - a*b;
+
+			for(i=0;i<t;i++) pc('+');
+			for(i=0;i<-t;i++) pc('-');
+		    }
+		    pmc("[-<<<<<");
+		    pmc(doubler_12[p-bf]);
+		    pmc(">>>>>]<<<<<");
+		}
+	    } else
+		while(count-->0) pmc(doubler_12[p-bf]);
 	} else {
 	    if (ch == '#') pc('\n');
 	    pc(ch);
