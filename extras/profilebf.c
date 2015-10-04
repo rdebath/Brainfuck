@@ -58,10 +58,16 @@ int main(int argc, char **argv)
     FILE * ifd;
     int ch;
     int p = -1, n = -1, j = -1;
+    char * progname = argv[0];
+    char * datafile = 0;
 
-    for (;;) {
-	if (argc < 2 || argv[1][0] != '-' || argv[1][1] == '\0') {
-	    break;
+    while (argc>1) {
+	if (argv[1][0] != '-' || !strcmp(argv[1], "-")) {
+	    if (datafile) {
+		fprintf(stderr, "Only one file allowed\n");
+		exit(1);
+	    }
+	    datafile = argv[1]; argc--; argv++;
 	} else if (!strcmp(argv[1], "-e")) {
 	    on_eof = -1; argc--; argv++;
 	} else if (!strcmp(argv[1], "-z")) {
@@ -95,19 +101,60 @@ int main(int argc, char **argv)
 	    physical_min = 0;
 	    physical_max = cell_mask;
 	    argc--; argv++;
-	} else if (argv[1][0] == '-') {
+	} else if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")) {
+	    printf("Usage: %s [options] [file]\n", progname);
+	    puts("    Runs the brainfuck program provided.");
+	    puts("    Multiple statistics are output once the program completes.");
+
+	    puts(   "    Default operation uses 8 bit cells and no change on EOF."
+	    "\n"    "    The stats will display the number of logical overflows,"
+	    "\n"    "    these are overflows that alter the flow of control."
+	    "\n"
+	    "\n"    "Options:"
+	    "\n"    "    -e  Return EOF (-1) on end of file."
+	    "\n"    "    -z  Return zero on end of file."
+	    "\n"    "    -n  Do not change the current cell on end of file (Default)."
+	    "\n"    "    -N  Disable ALL I/O from the BF program; just output the stats."
+	    "\n"    "    -d  Use the '#' command to output the current tape."
+	    "\n"    "    -p  Count physical overflows not logical ones."
+	    "\n"    "    -q  Output a quick summary of the run."
+	    "\n"    "    -Q  Output a quick summary of the run (variant)."
+	    "\n"    "    -a  Output all calls that have been used."
+	    "\n"    "    -w  Use 'WORD' (16bit) cells instead of 8 bit."
+	    "\n"    "    -sc Use 'signed character' (8bit) cells.");
+
+	    exit(1);
+	} else {
 	    fprintf(stderr, "Unknown option '%s'\n", argv[1]);
 	    exit(1);
-	} else break;
+	}
     }
 
-    ifd = argc > 1 && strcmp(argv[1], "-") ? fopen(argv[1], "r") : stdin;
+    ifd = datafile && strcmp(datafile, "-") ? fopen(datafile, "r") : stdin;
     if(!ifd) {
-	perror(argv[1]);
+	perror(datafile);
 	return 1;
     }
 
-    while((ch = getc(ifd)) != EOF && (ifd != stdin || ch != '!' || j >= 0)) {
+    /*
+     *	For each character, if it's a valid BF command add it onto the
+     *	end of the program. If the input is stdin use the '!' character
+     *	to mark the end of the program and the start of the data, but
+     *	only if we have a complete program.  The 'j' variable points
+     *	at the list of currently open '[' commands, one is matched off
+     *	by each ']'.  A ']' without a matching '[' is not a legal BF
+     *	command and so is ignored.  If there are any '[' commands left
+     *	over at the end they are not valid BF commands and so are ignored.
+     *
+     *  A run of any of the commands "<>+-" is converted into a single
+     *  entry in the pgm array. This run is limited to 128 items of the
+     *  same type so the counts will be correct.
+     *
+     *  The sequence "[-]" is detected and converted into a single token.
+     *  If the debug flag is set the '#' command is also included.
+     */
+
+    while((ch = getc(ifd)) != EOF && (ifd != stdin || ch != '!' || j >= 0 || !pgm)) {
 	int r = (ch == '<' || ch == '>' || ch == '+' || ch == '-');
 	if (r || (debug && ch == '#') || (ch == ']' && j >= 0) ||
 	    ch == '[' || ch == ',' || ch == '.') {
@@ -117,7 +164,7 @@ int main(int argc, char **argv)
 	    if (n >= pgmlen-2) pgm = realloc(pgm, (pgmlen = n+99)*sizeof *pgm);
 	    if (!pgm) { perror("realloc"); exit(1); }
 	    pgm[n].cmd = ch; pgm[n].arg = r; p = n;
-	    if (pgm[n].cmd == '[') { pgm[n].cmd = 0; pgm[n].arg = j; j = n; }
+	    if (pgm[n].cmd == '[') { pgm[n].cmd = ' '; pgm[n].arg = j; j = n; }
 	    else if (pgm[n].cmd == ']') {
 		pgm[n].arg = j; j = pgm[r = j].arg; pgm[r].arg = n; pgm[r].cmd = '[';
 		if (pgm[n-1].cmd == '-' && pgm[n-1].arg == 1 &&
@@ -343,7 +390,7 @@ print_pgm()
 		fprintf(stderr, "%c", pgm[n].cmd);
 	} else if (pgm[n].cmd == '=')
 	    fprintf(stderr, "[-]");
-	else
+	else if(pgm[n].cmd != ' ')
 	    fprintf(stderr, "%c", pgm[n].cmd);
     }
 }
@@ -371,7 +418,7 @@ print_summary()
 		program_len += pgm[n].arg;
 	    } else if (pgm[n].cmd == '=')
 		program_len += 3;
-	    else
+	    else if(pgm[n].cmd != ' ')
 		program_len++;
 	}
     }
