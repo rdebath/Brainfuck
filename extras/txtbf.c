@@ -569,7 +569,7 @@ find_best_conversion(char * linebuf)
 
 	if (verbose>2) fprintf(stderr, "Trying complicated special strings\n");
 
-	gen_special(linebuf, HUGEPREFIX, "big ASCII", 0);
+	gen_special(linebuf, HUGEPREFIX, "big ASCII", 1);
 
 	for (hellos = hello_world2; *hellos; hellos++) {
 	    sprintf(namebuf, "Complex world %d", hellos-hello_world2);
@@ -1569,6 +1569,28 @@ gen_unzoned(char * buf, int init_offset)
 	    if (range < minrange) {
 		usecell = i;
 		minrange = range;
+	    }
+	}
+
+	if (currcell > usecell && currcell-3 > usecell) {
+	    int tcell = currcell;
+	    while(tcell>0) {if (cells[tcell] == 0) break; tcell--;}
+	    if (cells[tcell] == 0 && abs(usecell-tcell)+3 < currcell-usecell) {
+		currcell = tcell;
+		add_chr('[');
+		add_chr('<');
+		add_chr(']');
+	    }
+	}
+
+	if (currcell < usecell && currcell+3 < usecell) {
+	    int tcell = currcell;
+	    while(tcell<str_cells_used-1) {if (cells[tcell] == 0) break; tcell++;}
+	    if (cells[tcell] == 0 && abs(usecell-tcell)+3 < usecell-currcell) {
+		currcell = tcell;
+		add_chr('[');
+		add_chr('>');
+		add_chr(']');
 	    }
 	}
 
