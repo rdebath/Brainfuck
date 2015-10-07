@@ -28,6 +28,7 @@ int memshift = 0;
 void run(void);
 void print_summary(void);
 void hex_output(FILE * ofd, int ch);
+int hex_bracket = -1;
 
 struct bfi { int cmd; int arg; } *pgm = 0;
 int pgmlen = 0, on_eof = 1, debug = 0;
@@ -291,10 +292,7 @@ void run(void)
 	    if(physical_overflow) {
 		if (mem[m] < 0) underflows++;
 	    } else {
-		if (mem[m] < 0) {
-		    underflows++;
-		    // profile[']'*4 + 3]++;
-		}
+		if (mem[m] < 0) underflows++;
 	    }
 
 	    if (mem[m] < 0) {
@@ -365,14 +363,22 @@ void run(void)
 	      else if (on_eof != 1) mem[m] = on_eof; }
 	    break;
 	case '#':
-	{
-	    fprintf(stderr, "%2d %2d %2d %2d %2d %2d %2d %2d %2d %2d\n",
-		    mem[0], mem[1], mem[2], mem[3], mem[4], mem[5],
-		    mem[6], mem[7], mem[8], mem[9]);
-
-	    if (m >= 0 && m < 10) fprintf(stderr, "%*s\n", 3*m+2, "^");
-	}
-	break;
+	    if (all_cells && cell_mask == 0xFF) {
+		int a;
+		fprintf(stderr, "Debug dump ->\n");
+		hex_bracket = m;
+		for(a = 0; a <= tape_max-tape_min; a++) {
+		    hex_output(stderr, mem[a] & cell_mask);
+		}
+		hex_output(stderr, EOF);
+		fprintf(stderr, "\n");
+	    } else {
+		int a;
+		for (a=0; a<10; a++)
+		    fprintf(stderr, "%c%-5d", a==m?'>':' ', mem[a]);
+		fprintf(stderr, "\n");
+	    }
+	    break;
 	}
     }
 }
@@ -453,6 +459,7 @@ print_summary()
 
 	    if (all_cells && cell_mask == 0xFF && tape_min == 0) {
 		fprintf(stderr, "Pointer at: %d\n", final_tape_pos);
+		hex_bracket = final_tape_pos;
 		for(ch = 0; ch <= tape_max-tape_min; ch++) {
 		    hex_output(stderr, mem[ch+memshift] & cell_mask);
 		}
@@ -576,29 +583,35 @@ hex_output(FILE * ofd, int ch)
 
     if( ch == EOF ) {
 	if(pos)
-	    fprintf(ofd, "%06x:  %.66s\n", addr, linebuf);
+	    fprintf(ofd, "%06x: %.67s\n", addr, linebuf);
 	pos = 0;
 	addr = 0;
 	*lastbuf = 0;
 	lastmode = 0;
+	hex_bracket = -1;
     } else {
 	if(!pos)
 	    memset(linebuf, ' ', sizeof(linebuf));
 	sprintf(buf, "%02x", ch&0xFF);
-	memcpy(linebuf+pos*3+(pos > 7), buf, 2);
+	memcpy(linebuf+pos*3+(pos > 7)+1, buf, 2);
+	if (addr+pos == hex_bracket) {
+	    linebuf[pos*3+(pos > 7)] = '(';
+	    linebuf[pos*3+(pos > 7)+3] = ')';
+	    hex_bracket = 0;
+	}
 
 	if( ch > ' ' && ch <= '~' )
-	    linebuf[50+pos] = ch;
-	else linebuf[50+pos] = '.';
+	    linebuf[51+pos] = ch;
+	else linebuf[51+pos] = '.';
 	pos = ((pos+1) & 0xF);
 	if( pos == 0 ) {
-	    linebuf[66] = 0;
+	    linebuf[67] = 0;
 	    if (*lastbuf && strcmp(linebuf, lastbuf) == 0) {
 		if (!lastmode)
 		    fprintf(ofd, "*\n");
 		lastmode = 1;
 	    } else {
-		fprintf(ofd, "%06x:  %.66s\n", addr, linebuf);
+		fprintf(ofd, "%06x: %.67s\n", addr, linebuf);
 		strcpy(lastbuf, linebuf);
 	    }
 	    addr += 16;
