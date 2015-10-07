@@ -1,7 +1,9 @@
 /* This is a "jit" interpreter for a "Do While" variant of Brainfuck.
  * Unexpectedly, it appears to be Turing complete.
  *
+#ifndef BRAINFUCK
  * THIS IS NOT AN INTERPRETER FOR THE brainfuck LANGUAGE!
+#endif
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -194,12 +196,12 @@ outcmd(int ch, int count)
 	} else {
 	    pr("#include <stdio.h>");
 	    pr("#define GETC(x) { int v=getchar(); if(v!=EOF) (x)=v; }");
-	    pr("#define PUTC(x) { char v=(x); if(v) putchar(v); }");
+	    pr("#define PUTC(x) { int v=(x); if(v) putchar(v); }");
 	}
 	pr("int brainfuck(void){");
 	ind++;
-	prv("static char mem[%d];", tapelen);
-	pr("register char *m = mem;");
+	prv("static unsigned char mem[%d];", tapelen);
+	pr("register unsigned char *m = mem;");
 	break;
 
     case 'X':
@@ -215,8 +217,13 @@ outcmd(int ch, int count)
     case '<': prv("m -= %d;", count); break;
     case '.': pr("PUTC(*m);"); break;
     case ',': pr("GETC(*m);"); break;
+#ifdef BRAINFUCK
+    case '[': pr("while(*m) {"); ind++; break;
+    case ']': ind--; pr("}"); break;
+#else
     case '[': pr("do {"); ind++; break;
     case ']': ind--; pr("} while(*m);"); break;
+#endif
     }
 
     if (ch != '~') return;
