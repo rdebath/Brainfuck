@@ -273,6 +273,15 @@ ook	B?[Oo]ok
     里			pcs(',', 5);
     始			pcs('[', 5);
     末			pcs(']', 5);
+
+    "(("		pcs('>', 6);
+    "))"		pcs('<', 6);
+    "()("		pcs('+', 6);
+    "())"		pcs('-', 6);
+    ")())"		pcs('.', 6);
+    ")((("		pcs(',', 6);
+    ")()("		pcs('[', 6);
+    ")(()"		pcs(']', 6);
 }
 
 \001.*		{int i; for(i=1; i<yyleng; i++) commentch(yytext[i]);}
@@ -344,6 +353,7 @@ int main(int argc, char ** argv)
 	    else if (!strcmp(argv[1], "-fish")) { mode = ALWORD; alset = 3; }
 	    else if (!strcmp(argv[1], "-bewbs")) { mode = ALWORD; alset = 4; }
 	    else if (!strcmp(argv[1], "-chi")) { mode = ALWORD; alset = 5; }
+	    else if (!strcmp(argv[1], "-lisp")) { mode = ALWORD; alset = 6; character_prefilter="()"; }
 
 	    else if (!strcmp(argv[1], "-mini")) {
 		mode = INITIAL;
@@ -377,6 +387,7 @@ int main(int argc, char ** argv)
 
 	    else {
 		fprintf(stderr, "Unknown option %s\n", argv[1]);
+		exit(1);
 	    }
 	    argv++, argc--;
 	    continue;
