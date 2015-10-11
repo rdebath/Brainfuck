@@ -776,6 +776,32 @@ reinit_state(void)
 int
 clear_tape(int currcell)
 {
+    if (flg_clear && cells[0] == 0) {
+	int usefn = 1;
+	int cc = currcell, i, cval = 0;
+
+	while (cells[cc] && cc<str_cells_used) cc++;
+/*	if (cc>=str_cells_used) usefn = 0;	* Don't expand the array */
+	if (usefn)
+	    for(i=cc; i<str_cells_used; i++)
+		if (cells[i]) {usefn = 0; break;}
+	if (usefn) {
+	    cc--;
+	    while(cc>0) {
+		if (!bytewrap && cells[cc] < 0) break;
+		if (cells[cc] == 0) break;
+		cc--; cval+=5;
+	    }
+	    if (cc<0 || cells[cc]) usefn = 0;
+	}
+	if (usefn && cval > 10) {
+	    add_str("[>]<[[-]<]");
+	    currcell = cc;
+	    for(i=cc; i<str_cells_used;i++)
+		cells[i] = 0;
+	}
+    }
+
     if (flg_clear) {
 	int i;
 
@@ -2312,7 +2338,6 @@ runbf(char * prog, int longrun)
 	m += pgm[n].mov;
 	if (m<0 || m>=MAX_CELLS || --countdown == 0) return -1;
 	if (m>maxcell) maxcell = m;
-	if (bytewrap) cells[m] &= 255;
 
         switch(pgm[n].cmd)
         {
@@ -2327,5 +2352,7 @@ runbf(char * prog, int longrun)
 		    bf_print_buf[bf_print_off++] = cells[m];
 		break;
         }
+
+	if (bytewrap) cells[m] &= 255;
     }
 }
