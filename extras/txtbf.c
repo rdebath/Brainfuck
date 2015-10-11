@@ -60,7 +60,7 @@ void gen_trislipnest(char * buf);
 
 int runbf(char * prog, int longrun);
 
-#define MAX_CELLS 256
+#define MAX_CELLS 512
 
 /* These setup strings have, on occasion, given good results */
 
@@ -272,6 +272,9 @@ main(int argc, char ** argv)
 	} else if (strncmp(argv[1], "-w", 2) == 0 && argv[1][2] >= '0' && argv[1][2] <= '9') {
 	    maxcol = atol(argv[1]+2);
 	    argc--; argv++;
+	} else if (strcmp(argv[1], "-w") == 0) {
+	    maxcol = 0;
+	    argc--; argv++;
 	} else if (strncmp(argv[1], "-B", 2) == 0 && argv[1][2] >= '0' && argv[1][2] <= '9') {
 	    blocksize = atol(argv[1]+2);
 	    argc--; argv++;
@@ -472,7 +475,7 @@ main(int argc, char ** argv)
 	    fprintf(stderr, "-slip   Search short slip loops\n");
 	    fprintf(stderr, "-slip2  Search long slip loops\n");
 	    fprintf(stderr, "-N      Search nested loops v.long\n");
-	    fprintf(stderr, "-tri    Search trislip loops\n");
+	    fprintf(stderr, "-tri    Search nested and tri-slip/nest loops\n");
 	    fprintf(stderr, "-s10    Try just one subrange multiply size\n");
 	    fprintf(stderr, "-M+99   Specify multiply loop max increment\n");
 	    fprintf(stderr, "-M*99   Specify multiply loop max loops\n");
@@ -767,12 +770,12 @@ reinit_state(void)
 int
 clear_tape(int currcell)
 {
-    if (flg_clear || flg_init) {
+    if (flg_clear) {
 	int i;
 
 	/* Clear the working cells */
 	for(i=MAX_CELLS-1; i>=0; i--) {
-	    if ((cells[i] != 0 && flg_clear) || (!bytewrap && cells[i] <0) ) {
+	    if (cells[i] != 0) {
 		while(currcell < i) { add_chr('>'); currcell++; }
 		while(currcell > i) { add_chr('<'); currcell--; }
 		if (cells[i] > 0)
@@ -782,11 +785,11 @@ clear_tape(int currcell)
 		cells[i] = 0;
 	    }
 	}
-	while(currcell > 0) { add_chr('<'); currcell--; }
     }
 
     /* Put the pointer back to the zero cell */
-    if (flg_rtz) while(currcell > 0) { add_chr('<'); currcell--; }
+    if (flg_clear || flg_rtz || flg_init)
+	while(currcell > 0) { add_chr('<'); currcell--; }
 
     return currcell;
 }
@@ -809,14 +812,6 @@ clear_tape(int currcell)
     usually allows an optimiser to convert this code back to a printf()
     but it takes a little space. It can also clear the cells after use,
     this isn't so useful.
-
-    Non-ASCII characters can be printed using the negative aliases of
-    the bytes: ie: chars are signed. However, if it's set negative a
-    cell will be zeroed at the end of the fragment so [-] is safe even
-    with bignum cells.
-
-    The reason negatives would be used is to be compatible with interpreters
-    that use -1 as the EOF indicator. NB: This byte is illegal for UTF-8.
 
  */
 
@@ -1477,6 +1472,7 @@ gen_special(char * buf, char * initcode, char * name, int usercode)
 	    fprintf(stderr, "Code '%s' failed '%s'\n", name, initcode);
 	    return;
 	}
+	maxcell = str_cells_used-1;
     } else {
 	char *p, *b;
 	int m=0, nestlvl=0;
