@@ -781,7 +781,7 @@ clear_tape(int currcell)
 	int cc = currcell, i, cval = 0;
 
 	while (cells[cc] && cc<str_cells_used) cc++;
-/*	if (cc>=str_cells_used) usefn = 0;	* Don't expand the array */
+	if (cc>=str_cells_used && flg_init) usefn = 0;	/* Don't expand the array */
 	if (usefn)
 	    for(i=cc; i<str_cells_used; i++)
 		if (cells[i]) {usefn = 0; break;}
