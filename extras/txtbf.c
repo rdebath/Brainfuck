@@ -226,6 +226,7 @@ int enable_special2 = 1;
 
 int flg_lookahead = 0;
 int flg_zoned = 0;
+int flg_optimisable = 0;
 
 int verbose = 0;
 int bytewrap = 0;
@@ -358,6 +359,7 @@ main(int argc, char ** argv)
 	    enable_subrange = 1;
 	    enable_twocell = 1;
 	    enable_special1 = 1;
+	    flg_optimisable = 1;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-O2") == 0) {
@@ -796,7 +798,7 @@ reinit_state(void)
 int
 clear_tape(int currcell)
 {
-    if (flg_clear && cells[0] == 0) {
+    if (!flg_optimisable && flg_clear && cells[0] == 0) {
 	int usefn = 1;
 	int cc = currcell, i, cval = 0;
 
@@ -1624,7 +1626,7 @@ gen_unzoned(char * buf, int init_offset)
 	    }
 	}
 
-	if (currcell > usecell && currcell-3 > usecell) {
+	if (!flg_optimisable && currcell > usecell && currcell-3 > usecell) {
 	    int tcell = currcell;
 	    while(tcell>0) {if (cells[tcell] == 0) break; tcell--;}
 	    if (cells[tcell] == 0 && abs(usecell-tcell)+3 < currcell-usecell) {
@@ -1635,7 +1637,7 @@ gen_unzoned(char * buf, int init_offset)
 	    }
 	}
 
-	if (currcell < usecell && currcell+3 < usecell) {
+	if (!flg_optimisable && currcell < usecell && currcell+3 < usecell) {
 	    int tcell = currcell;
 	    while(tcell<str_cells_used-1) {if (cells[tcell] == 0) break; tcell++;}
 	    if (cells[tcell] == 0 && abs(usecell-tcell)+3 < usecell-currcell) {
