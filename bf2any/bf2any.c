@@ -11,7 +11,8 @@ int opt_optim = 0;
 int enable_optim = 0;
 int enable_be_optim = 0;
 int enable_bf_optim = 0;
-int enable_mov_optim = 1;
+int enable_mov_optim = 0;
+int disable_init_optim = 0;
 int enable_debug;
 const char * current_file;
 
@@ -333,17 +334,17 @@ check_argv(const char * arg)
 
     } else if (strcmp(arg, "-m") == 0) {
 	check_arg(arg);
-	enable_optim = enable_be_optim = enable_bf_optim = enable_mov_optim = 0;
-	opt_optim = 1;
+	opt_optim = disable_init_optim = 1;
     } else if (strcmp(arg, "-O") == 0) {
-	enable_bf_optim = 0;
-	opt_optim = enable_optim = enable_be_optim = enable_mov_optim = 1;
+	opt_optim = enable_mov_optim = 1;
+	enable_optim = 1;
     } else if (strcmp(arg, "-Obf") == 0) {
-	enable_optim = enable_bf_optim = 0;
-	opt_optim = enable_be_optim = enable_bf_optim = enable_mov_optim = 1;
+	opt_optim = enable_mov_optim = 1;
+	enable_bf_optim = 1;
     } else if (strcmp(arg, "-Omov") == 0) {
-	enable_optim = enable_be_optim = enable_bf_optim = 0;
-	opt_optim = enable_be_optim = enable_mov_optim = 1;
+	opt_optim = enable_mov_optim = 1;
+    } else if (strcmp(arg, "-p") == 0) {
+	disable_init_optim = 1;
 
     } else if (strcmp(arg, "-#") == 0 && check_arg(arg)) {
 	enable_debug++;
@@ -402,6 +403,7 @@ main(int argc, char ** argv)
 	    "\n\t"  "-#      Turn on trace code."
 	    "\n\t"  "-R      Decode rle on '+-<>', quoted strings and '='."
 	    "\n\t"  "-m      Disable optimisation (including dead loop removal)"
+	    "\n\t"  "-p      This is a part of a program, don't top and tail"
 	    "\n\t"  "-O      Enable full optimisation"
 	    "\n\t"  "-Obf    Enable simple optimisation suitable for BF output"
 	    "\n\t"  "-Omov   Enable only movement optimisation"
@@ -437,11 +439,16 @@ main(int argc, char ** argv)
     if (!opt_cellsize)
 	bytecell = (check_arg("-b") && !check_arg("-no-byte"));
 
-    if (!opt_optim)
-	enable_be_optim = enable_optim = !check_arg("-no-default-opt");
+    if (!opt_optim) {
+	opt_optim = enable_mov_optim = 1;
+	enable_optim = !check_arg("-no-default-opt");
+    }
 
-    if (enable_be_optim)
+    if (enable_mov_optim)
 	enable_be_optim = check_arg("-O");
+
+    if (disable_init_optim)
+	lastch = 0;
 
     if (filecount == 0)
 	filelist[filecount++] = "-";

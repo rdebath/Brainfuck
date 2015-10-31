@@ -207,8 +207,8 @@ void outopt(int ch, int count)
 	    enable_prt = check_arg("-savestring");
 	    cells_are_ints = check_arg("-intcells");
 	    flush_tape(1,0);
-	    tape->cleaned = tape->is_set = first_run = 1;
-	} else if (ch == '~' && enable_optim)
+	    tape->cleaned = tape->is_set = first_run = !disable_init_optim;
+	} else if (ch == '~' && enable_optim && !disable_init_optim)
 	    flush_tape(1,0);
 	else
 	    flush_tape(0,0);
