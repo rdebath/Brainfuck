@@ -72,8 +72,8 @@ check_arg(const char * arg)
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-d      Dump code"
-	"\t"    "-mmove  Use move merging translation."
-	"\t"    "-unix   Use \"unistd.h\" for read/write."
+	"\n\t"  "-mmove  Use move merging translation."
+	"\n\t"  "-unix   Use \"unistd.h\" for read/write."
 #ifndef DISABLE_LIBTCC
 	"\n\t"  "-ltcc   Use libtcc to run code."
 #endif
