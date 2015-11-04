@@ -176,7 +176,9 @@ char * hello_world_byte[] = {
     ">+[++[<]>->->+>+]",
     ">+[[+>]+[+++<]>-]",
     ">+[[--->]+[--<]>]",
+    ">+[[>]++<[---<]>]",
     ">-[-[+>]+[+++<]>]",
+    ">-[>[-->]-<[-<]>]",
     ">-[[--->]++[<]>-]",
     ">-[[>]+[+++<]>++]",
     ">-[[>]+[---<]>>-]",
@@ -351,6 +353,14 @@ main(int argc, char ** argv)
 	} else if (strncmp(argv[1], "-I", 2) == 0) {
 	    wipe_config();
 	    special_init = argv[1]+2;
+	    argc--; argv++;
+
+	} else if (strcmp(argv[1], "-O0") == 0) {
+	    wipe_config();
+	    enable_subrange = 1;
+	    enable_twocell = 1;
+	    enable_special1 = 1;
+	    flg_optimisable = 1;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-O") == 0) {
@@ -1604,6 +1614,8 @@ gen_unzoned(char * buf, int init_offset)
     int i;
     int currcell = init_offset;
     int more_cells = 0;
+
+    if (!flg_init && !flg_optimisable && str_cells_used > 0) str_cells_used++;
     if (str_cells_used <= 0) { more_cells=1; str_cells_used=1; }
 
     /* Print each character, use closest cell. */
