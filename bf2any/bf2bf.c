@@ -37,6 +37,7 @@
 #define L_JNWORD        1       /* Words NO spaces */
 #define L_CHARS         2       /* Add strings char by char. */
 #define L_BF            3       /* Generated code is BF. */
+#define L_BFCHARS       4       /* Generated code is sort of like BF. */
 
 #define L_TOKENS        0x10    /* Print the tokens one per line. */
 #define L_RISBF         0x11    /* risbf(token, count); */
@@ -185,6 +186,17 @@ static const char * cupid[] = { "->", "<-", "><", "<>", "<<", ">>", "-<", ">-", 
 /* Language pikalang -- https://github.com/skj3gg/pikalang */
 static const char * pikalang[] =
     {"pipi", "pichu", "pi", "ka", "pikachu", "pikapi", "pika", "chu", 0 };
+
+/* Language brainbool: http://esolangs.org/wiki/Brainbool */
+static const char * brainbool[] =
+    {">>>>>>>>>", "<<<<<<<<<",
+     ">[>]+<[+<]>>>>>>>>>[+]<<<<<<<<<",
+     ">>>>>>>>>+<<<<<<<<+[>+]<[<]>>>>>>>>>[+]<<<<<<<<<",
+     ">.>.>.>.>.>.>.>.<<<<<<<<",
+     ">,>,>,>,>,>,>,>,<<<<<<<<",
+     ">>>>>>>>>+<<<<<<<<+[>+]<[<]>>>>>>>>>[+<<<<<<<<[>]+<[+<]",
+     ">>>>>>>>>+<<<<<<<<+[>+]<[<]>>>>>>>>>]<[+<]",
+     0 };
 
 /* BF Doubler doubles the cell size. */
 /* 12 cost, cells in LXXH order, with tmpzero */
@@ -520,6 +532,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-pika") == 0) {
 	lang = pikalang; langclass = L_CDWORDS; return 1;
     } else
+    if (strcmp(arg, "-brainbool") == 0) {
+	lang = brainbool; langclass = L_BFCHARS; return 1;
+    } else
     if (strcmp(arg, "-dc1") == 0 || strcmp(arg, "-dc") == 0) {
 	lang = dc1; langclass = L_JNWORD+GEN_HEADER+C_NUMRLE; return 1;
     } else
@@ -704,7 +719,9 @@ outcmd(int ch, int count)
 	if (lang == cbyte) lang = c;
 
 	if (enable_mov_optim) {
+	    /* This emables BF style optimisation of '<' and '>' on OUTPUT */
 	    if (L_BASE == L_BF) enable_bf_mov = 1;
+	    if (L_BASE == L_BFCHARS) enable_bf_mov = 1;
 	    if (L_BASE == L_DOWHILE) enable_bf_mov = 1;
 	}
     }
@@ -760,6 +777,7 @@ outcmd(int ch, int count)
 	break;
 
     case L_CHARS:
+    case L_BFCHARS:
 	if (!(p = strchr(bf,ch))) break;
 	while(count-->0) pmc(lang[p-bf]);
 	break;
