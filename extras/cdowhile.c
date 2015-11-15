@@ -32,6 +32,7 @@ int check_argv(const char * arg);
 void outcmd(int ch, int count);
 
 static int verbose = 0;
+static int use_int = 0;
 
 #define BFBASE "bfpgm"
 static const char * cc_cmd = 0;
@@ -65,6 +66,7 @@ main(int argc, char ** argv)
 	    fprintf(stderr, "%s: [options] [File]\n", pgm);
 	    fprintf(stderr, "%s\n",
 	    "\t"    "-h      This message"
+	    "\n\t"  "-w      Use words not bytes"
 	    "\n\t"  "-M30000 Set length of tape."
 	    "\n\t"  "-unix   Use \"unistd.h\" for read/write."
 	    "\n\t"  "-Cclang Choose a different C compiler"
@@ -171,6 +173,9 @@ check_argv(const char * arg)
     if (strcmp(arg, "-unix") == 0) {
 	use_unistd = 1; return 1;
     } else
+    if (strcmp(arg, "-w") == 0) {
+	use_int = 1; return 1;
+    } else
 	return 0;
     return 1;
 }
@@ -200,8 +205,13 @@ outcmd(int ch, int count)
 	}
 	pr("int brainfuck(void){");
 	ind++;
-	prv("static unsigned char mem[%d];", tapelen);
-	pr("register unsigned char *m = mem;");
+	if (use_int) {
+	    prv("static unsigned int mem[%d];", tapelen);
+	    pr("register unsigned int *m = mem;");
+	} else {
+	    prv("static unsigned char mem[%d];", tapelen);
+	    pr("register unsigned char *m = mem;");
+	}
 	break;
 
     case 'X':
