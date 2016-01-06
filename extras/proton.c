@@ -23,7 +23,7 @@
  *  of the type specified. If the CELLBITS is not specified the base type
  *  is used unmasked.
  *
- *  If CELLBITS is 6 a conversion is done on I/O.
+ *  If CELLBITS less than 7 only decimal output is implemented.
  *
  *  The default memory size may be defined with the MEMSIZE define.
  *
