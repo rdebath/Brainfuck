@@ -102,6 +102,11 @@ int main(int argc, char **argv)
 	    physical_min = 0;
 	    physical_max = cell_mask;
 	    argc--; argv++;
+	} else if (!strcmp(argv[1], "-7")) {
+	    cell_mask = (1<<7)-1;
+	    physical_min = 0;
+	    physical_max = cell_mask;
+	    argc--; argv++;
 	} else if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")) {
 	    printf("Usage: %s [options] [file]\n", progname);
 	    puts("    Runs the brainfuck program provided.");
@@ -121,8 +126,11 @@ int main(int argc, char **argv)
 	    "\n"    "    -q  Output a quick summary of the run."
 	    "\n"    "    -Q  Output a quick summary of the run (variant)."
 	    "\n"    "    -a  Output all calls that have been used."
+	    "\n"    "    -sc Use 'signed character' (8bit) cells."
 	    "\n"    "    -w  Use 'WORD' (16bit) cells instead of 8 bit."
-	    "\n"    "    -sc Use 'signed character' (8bit) cells.");
+	    "\n"    "    -12 Use 12bit cells instead of 8 bit."
+	    "\n"    "    -7  Use 7bit cells instead of 8 bit."
+	    );
 
 	    exit(1);
 	} else {
@@ -351,7 +359,7 @@ void run(void)
 
 	case '.':
 	    profile[pgm[n].cmd*4]++;
-	    { int a = (mem[m] & 0xFF);
+	    { int a = (mem[m] & 0xFF & cell_mask);
 	      if (!suppress_io) putchar(a);
 	      if (a != 13) nonl = (a != '\n'); }
 	    break;
