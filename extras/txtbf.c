@@ -37,10 +37,12 @@
  *      ++>+++>+>+++++>+++++++++++>-<[<<<<++++>++++++++>++
  *      ++>++++++++>->++++<],[[>.<-]<<<<[.>],]++++++++++.
  *
+ * TODO: Add loop using nearest cell that's a null.
  */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 void find_best_conversion(char * linebuf);
 
@@ -256,6 +258,8 @@ char * special_init = 0;
 
 static int cells[MAX_CELLS];
 
+intmax_t patterns_searched = 0;
+
 void
 wipe_config()
 {
@@ -404,7 +408,7 @@ main(int argc, char ** argv)
 
 	} else if (strcmp(argv[1], "-slip") == 0) {
 	    wipe_config();
-	    enable_sliploop = 1;
+	    enable_sliploop = !enable_sliploop;
 	    sliploop_maxcell = 7;
 	    sliploop_maxind = 6;
 	    argc--; argv++;
@@ -418,7 +422,7 @@ main(int argc, char ** argv)
 
 	} else if (strcmp(argv[1], "-mult") == 0) {
 	    wipe_config();
-	    enable_multloop = 1;
+	    enable_multloop = !enable_multloop;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-mult2") == 0) {
@@ -435,17 +439,17 @@ main(int argc, char ** argv)
 
 	} else if (strcmp(argv[1], "-q") == 0) {
 	    wipe_config();
-	    enable_twocell = 1;
+	    enable_twocell = !enable_twocell;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-X") == 0) {
 	    wipe_config();
-	    enable_special1 = enable_special2 = 1;
+	    enable_special1 = enable_special2 = !enable_special1;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-S") == 0) {
 	    wipe_config();
-	    enable_subrange = 1;
+	    enable_subrange = !enable_subrange;
 	    argc--; argv++;
 
 	} else if (strncmp(argv[1], "-s", 2) == 0 && argv[1][2] >= '0' && argv[1][2] <= '9') {
@@ -472,7 +476,7 @@ main(int argc, char ** argv)
 
 	} else if (strcmp(argv[1], "-N") == 0) {
 	    wipe_config();
-	    enable_nestloop = 1;
+	    enable_nestloop = !enable_nestloop;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-tri") == 0) {
@@ -485,12 +489,12 @@ main(int argc, char ** argv)
 	    fprintf(stderr, "txtbf [options] [file]\n");
 	    fprintf(stderr, "-v      Verbose\n");
 	    fprintf(stderr, "\n");
-	    fprintf(stderr, "-std    Leave stuff that's enabled by default on.\n");
+	    fprintf(stderr, "-std    Enable the stuff that's enabled by default.\n");
 	    fprintf(stderr, "-max    Enable everything -- very slow\n");
 	    fprintf(stderr, "-I><    Enable one special string.\n");
 	    fprintf(stderr, "-O      Enable easy to optimise codes.\n");
-	    fprintf(stderr, "-S      Enable subrange multiply method\n");
-	    fprintf(stderr, "-X      Enable builtin special strings\n");
+	    fprintf(stderr, "-S      Toggle subrange multiply method\n");
+	    fprintf(stderr, "-X      Toggle builtin special strings\n");
 	    fprintf(stderr, "\n");
 	    fprintf(stderr, "-i      Add/remove cell init strings and return to cell zero\n");
 	    fprintf(stderr, "-c      Add/remove cell clear strings and return to cell zero\n");
@@ -498,13 +502,13 @@ main(int argc, char ** argv)
 	    fprintf(stderr, "-sc/-uc Assume chars are signed/unsigned\n");
 	    fprintf(stderr, "-b      Assume cells are bytes\n");
 	    fprintf(stderr, "\n");
-	    fprintf(stderr, "-q      Enable two cells method\n");
+	    fprintf(stderr, "-q      Toggle two cells method\n");
 	    fprintf(stderr, "\n");
-	    fprintf(stderr, "-mult   Search short multiply loops\n");
+	    fprintf(stderr, "-mult   Toggle multiply loops\n");
 	    fprintf(stderr, "-mult2  Search long multiply loops\n");
-	    fprintf(stderr, "-slip   Search short slip loops\n");
+	    fprintf(stderr, "-slip   Toggle short slip loops\n");
 	    fprintf(stderr, "-slip2  Search long slip loops\n");
-	    fprintf(stderr, "-N      Search nested loops v.long\n");
+	    fprintf(stderr, "-N      Toggle nested loops (slow)\n");
 	    fprintf(stderr, "-tri    Search nested and tri-slip/nest loops\n");
 	    fprintf(stderr, "-s10    Try just one subrange multiply size\n");
 	    fprintf(stderr, "-M+99   Specify multiply loop max increment\n");
@@ -635,7 +639,8 @@ find_best_conversion(char * linebuf)
     } else if (subrange_count == 0) {
 
 	if (enable_subrange) {
-	    if (verbose>2) fprintf(stderr, "Trying subrange routines.\n");
+	    if (verbose>2)
+		fprintf(stderr, "Trying subrange routines @%"PRIdMAX".\n", patterns_searched);
 
 	    if (!flg_zoned) {
 		subrange_count=10;
@@ -663,31 +668,33 @@ find_best_conversion(char * linebuf)
 	subrange_count = 0;
     }
 
+    if (enable_sliploop) {
+	if (verbose>2) fprintf(stderr, "Trying 'slipping loop' routine @%"PRIdMAX".\n", patterns_searched);
+	gen_slipnest(linebuf);
+    }
+
     if (enable_trislipnest) {
-	if (verbose>2) fprintf(stderr, "Trying tri-slip routine.\n");
+	if (verbose>2) fprintf(stderr, "Trying tri-slip routine @%"PRIdMAX".\n", patterns_searched);
 	gen_trislipnest(linebuf);
     }
 
     if (enable_multloop) {
-	if (verbose>2) fprintf(stderr, "Trying multiply loops.\n");
+	if (verbose>2) fprintf(stderr, "Trying multiply loops @%"PRIdMAX".\n", patterns_searched);
 	gen_multonly(linebuf);
     }
 
     if (enable_multloop && bytewrap) {
-	if (verbose>2) fprintf(stderr, "Trying byte multiply loops.\n");
+	if (verbose>2) fprintf(stderr, "Trying byte multiply loops @%"PRIdMAX".\n", patterns_searched);
 	gen_multbyte(linebuf);
     }
 
-    if (enable_sliploop) {
-	if (verbose>2) fprintf(stderr, "Trying 'slipping loop' routine.\n");
-	gen_slipnest(linebuf);
-    }
-
     if(enable_nestloop) {
-	if (verbose>2) fprintf(stderr, "Trying 'nested loop' routine.\n");
+	if (verbose>2) fprintf(stderr, "Trying 'nested loop' routine @%"PRIdMAX".\n", patterns_searched);
 	reinit_state();
 	gen_nestloop(linebuf);
     }
+
+    if (verbose>2) fprintf(stderr, "Total of %"PRIdMAX" patterns searched.\n", patterns_searched);
 
     if (best_len>=0) {
 	if (verbose)
@@ -893,6 +900,8 @@ gen_subrange(char * buf, int subrange, int flg_subzone, int flg_nonl)
     sprintf(name, "Subrange %d, %s%s", subrange,
 	    flg_subzone?"zoned":"unzoned",flg_nonl?", nonl":"");
 
+    patterns_searched++;
+
     /* Count up a frequency table */
     for(p=buf; *p;) {
 	int c = *p++;
@@ -1079,6 +1088,8 @@ return_to_top:
 	    if (toohigh || maxcell == 0) goto return_to_top;
 	}
 
+	patterns_searched++;
+
 	reinit_state();
 	if (flg_init) {
 	    /* Clear the working cells */
@@ -1206,6 +1217,8 @@ static int loopcnt[256][256];
 	hasneg |= (cellincs2[0]<0 || cellincs2[1] != -1);
 	if (!hasneg) continue;
 
+	patterns_searched++;
+
 	/* How many times will this go round. */
 	if ((cnt = loopcnt[cellincs2[0] & 0xFF][cellincs2[1] & 0xFF]) == 0)
 	{
@@ -1316,6 +1329,8 @@ static int loopcnt[256][256];
    The configurations are are in the defines below for the moment.
 
    The text is then generated using a closest next function.
+
+   This currently searches 1891142967 patterns, this is far too many.
  */
 #define ADDINDEX 3
 #define MAXCELLINCS 7
@@ -1343,6 +1358,8 @@ return_to_top:
 
 	    maxcell--; currcell=0;
 	}
+
+	patterns_searched++;
 
 	reinit_state();
 	if (flg_init) {
@@ -1454,6 +1471,8 @@ return_to_top:
 	    currcell=0;
 	}
 
+	patterns_searched++;
+
 	reinit_state();
 	if (flg_init) {
 	    /* Clear the working cells */
@@ -1524,6 +1543,8 @@ gen_special(char * buf, char * initcode, char * name, int usercode)
 
     if (verbose>3)
 	fprintf(stderr, "Running '%s': %s\n", name, initcode);
+
+    patterns_searched++;
 
     /* Work out what the 'special' code does to the cell array ... How?
      *
@@ -1885,6 +1906,7 @@ gen_twoflower(char * buf)
     char * p;
 
     reinit_state();
+    patterns_searched++;
 
     /* Clear the working cells */
     if (flg_init) add_str(">[-]<[-]");
@@ -2228,6 +2250,7 @@ static char * convbyte[] = {
     char * p;
 
     reinit_state();
+    patterns_searched++;
 
     /* Clear the working cells */
     if (flg_init) add_str(">[-]<[-]");
@@ -2286,6 +2309,7 @@ return_to_top:
 	    currcell=0;
 	}
 
+	patterns_searched++;
 	reinit_state();
 	if (flg_init) {
 	    /* Clear the working cells */
