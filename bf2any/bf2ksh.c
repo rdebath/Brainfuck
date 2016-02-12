@@ -40,11 +40,24 @@ outcmd(int ch, int count)
 {
     switch(ch) {
     case '!':
-	if (select_bash) {
+	if (select_bash)
 	    pr("#!/bin/bash");
-	    pr("set -f +B");
-	} else
+	else
 	    pr("#!/bin/ksh");
+
+	pr("if ( eval 'typeset -i M P && M[1]=3 && ((M[2]+=1)) &&");
+	pr("     ((M[1]+=1)) &&  [[ ${M[1]} -eq 4 && ${M[2]} -eq 1 ]]' ) 2>/dev/null");
+	pr("then eval 'typeset -i M P' 2>/dev/null");
+	pr("elif ( eval 'M[1]=3 && ((M[2]+=1))");
+	pr("     ((M[1]+=1)) &&  [[ ${M[1]} -eq 4 && ${M[2]} -eq 1 ]]' ) 2>/dev/null");
+	pr("then :");
+	pr("else");
+	pr("    echo 'ERROR: The shell must be Ksh compatible' >&2");
+	pr("    exit 1");
+	pr("fi");
+
+	if (select_bash) 
+	    pr("eval 'set -f +B' 2>/dev/null");
 
 	pr("export LC_ALL=C");
 	pr("brainfuck() {");
