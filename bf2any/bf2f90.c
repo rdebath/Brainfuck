@@ -9,7 +9,8 @@
  */
 
 int ind = 0;
-#define I printf("%*s", ind*2, "")
+/* NB: f90 has a maximum line length */
+#define I printf("%*s", (ind>40?40:ind)*2, "")
 
 static void print_cstring(void);
 
