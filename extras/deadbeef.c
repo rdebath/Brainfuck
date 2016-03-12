@@ -55,7 +55,7 @@ int main(int argc, char **argv)
 		     pgm[n-2].cmd == '[') {
 		  n -= 2; pgm[p=n].cmd = '='; pgm[n].arg = 0;
 	       } else if (pgm[n-1].cmd == '[') {
-		  n--; pgm[p=n].cmd = '?'; pgm[n].arg = pgm[n+1].mov;
+		  n--; pgm[p=n].cmd = (pgm[n].arg = pgm[n+1].mov)?'?':'!';
 	       }
 	    }
 	 }
@@ -87,6 +87,7 @@ static unsigned char t[(sizeof(int)>sizeof(short))+USHRT_MAX];
 	 case ',':  if((ch=getchar())!=EOF) t[m]=ch;
 		    else if (on_eof != 1) t[m]=on_eof;
 		    break;
+	 case '!':  if(t[m]) return; break;
 	 case '#':
 	    fprintf(stderr, "\n%3d %3d %3d %3d %3d %3d %3d %3d %3d %3d\n%*s\n",
 	       t[0],t[1],t[2],t[3],t[4],t[5],t[6],t[7],t[8],t[9],4*m+3,"^");
