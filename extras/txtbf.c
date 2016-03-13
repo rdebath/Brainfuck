@@ -1672,7 +1672,7 @@ gen_unzoned(char * buf, int init_offset)
 
 	if (!flg_optimisable && currcell < usecell && currcell+3 < usecell) {
 	    int tcell = currcell;
-	    while(tcell<str_cells_used-1) {if (cells[tcell] == 0) break; tcell++;}
+	    while(tcell<str_cells_used) {if (cells[tcell] == 0) break; tcell++;}
 	    if (cells[tcell] == 0 && abs(usecell-tcell)+3 < usecell-currcell) {
 		currcell = tcell;
 		add_chr('[');
@@ -1882,7 +1882,7 @@ gen_twoflower(char * buf)
      * for all the values upto 255. It was created with a simple brute force
      * search.
      */
-    char bestfactor[] = {
+static char bestfactor[] = {
 	 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 	 4, 4, 3, 3, 4, 3, 3,20, 4, 5, 5, 3, 4, 4, 5, 5,
 	 4, 4,21, 5, 6, 6, 6,21, 5, 5, 6, 6, 4, 5, 5,22,
@@ -1909,7 +1909,7 @@ gen_twoflower(char * buf)
     patterns_searched++;
 
     /* Clear the working cells */
-    if (flg_init) add_str(">[-]<[-]");
+    if (flg_init) { add_str("[-]>[-]"); currcell=!currcell; }
 
     str_cells_used = maxcell+1;
 
