@@ -71,6 +71,8 @@ syn region bfCommentLoop    start="\["  end="]" contained contains=bfCommentChar
 syn match bfComment    "\(]\_[^[\]\-+<>.,]*\)\@<=\_[^[\]\-+<>.,]*\[" contains=bfCommentLoop,bfSPError
 syn match bfComment    "\(\%^\_[^[\]\-+<>.,]*\)\@<=\_[^[\]\-+<>.,]*\[" contains=bfCommentLoop,bfSPError
 
+syn match bfCommentLoop	"\]\@<=[^\-<>[\].,{#/]\+\[\-]" contains=bfCommentChar
+
 if version >= 508 || !exists("did_brainfuck_syn_inits")
   if version < 508
     let did_brainfuck_syn_inits = 1
