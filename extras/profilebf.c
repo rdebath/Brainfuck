@@ -167,8 +167,10 @@ int main(int argc, char **argv)
 	int r = (ch == '<' || ch == '>' || ch == '+' || ch == '-');
 	if (r || (debug && ch == '#') || (ch == ']' && j >= 0) ||
 	    ch == '[' || ch == ',' || ch == '.') {
-	    if (r && p >= 0 && pgm[p].cmd == ch && pgm[p].arg < 128)
-		{ pgm[p].arg += r; continue; }
+	    if (r && p >= 0 && pgm[p].cmd == ch) {
+		if (pgm[p].arg < 128 || ch == '<' || ch == '>')
+		    { pgm[p].arg += r; continue; }
+	    }
 	    n++;
 	    if (n >= pgmlen-2) pgm = realloc(pgm, (pgmlen = n+99)*sizeof *pgm);
 	    if (!pgm) { perror("realloc"); exit(1); }
@@ -619,6 +621,7 @@ hex_output(FILE * ofd, int ch)
 		    fprintf(ofd, "*\n");
 		lastmode = 1;
 	    } else {
+		lastmode = 0;
 		fprintf(ofd, "%06x: %.67s\n", addr, linebuf);
 		strcpy(lastbuf, linebuf);
 	    }
