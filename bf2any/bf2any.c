@@ -2,11 +2,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef TAPELEN
+#define TAPELEN 0x100000
+#endif
+
 #include "bf2any.h"
 
 int opt_cellsize = 0;
 int bytecell = 0;
-int tapelen = 30000;
+int tapelen = TAPELEN;
 int opt_optim = 0;
 int enable_optim = 0;
 int enable_be_optim = 0;
@@ -355,7 +359,7 @@ check_argv(const char * arg)
 	return 0;
     } else if (strncmp(arg, "-M", 2) == 0 && arg[2] != 0) {
 	tapelen = strtoul(arg+2, 0, 10);
-	if (tapelen < 1) tapelen = 30000;
+	if (tapelen < 1) tapelen = TAPELEN;
 	return 1;
     } else if (check_arg(arg)) {
 	;
@@ -397,17 +401,18 @@ main(int argc, char ** argv)
 	} else if (strcmp(argv[ar], "-h") == 0) {
 
 	    fprintf(stderr, "%s: [options] [File]\n", pgm);
-	    fprintf(stderr, "%s\n",
+	    fprintf(stderr, "%s%d%s\n",
 	    "\t"    "-h      This message"
 	    "\n\t"  "-b      Force byte cells"
 	    "\n\t"  "-#      Turn on trace code."
 	    "\n\t"  "-R      Decode rle on '+-<>', quoted strings and '='."
 	    "\n\t"  "-m      Disable optimisation (including dead loop removal)"
-	    "\n\t"  "-p      This is a part of a program, don't top and tail"
+	    "\n\t"  "-p      This is a part of a BF program"
 	    "\n\t"  "-O      Enable full optimisation"
 	    "\n\t"  "-Obf    Enable simple optimisation suitable for BF output"
 	    "\n\t"  "-Omov   Enable only movement optimisation"
-	    "\n\t"  "-M30000 Set length of tape, -M for dynamic if available."
+	    "\n\t"  "-M<num> Set length of tape, default is ", TAPELEN,
+	    "\n\t"  "-M      Set the tape to dynamic"
 	    );
 
 	    check_arg(argv[ar]);

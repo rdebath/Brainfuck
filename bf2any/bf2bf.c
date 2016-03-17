@@ -851,6 +851,7 @@ bftranslate(int ch, int count)
     }
 
     if (ch == '!') {
+	if (disable_init_optim) tmp_clean = 0;
 	if (bf_multi == 1 || bf_multi == 2 || bf_multi == 4)
 	    bf_multi = 0;
     }
