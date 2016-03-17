@@ -110,6 +110,7 @@ flush_tape(int no_output, int keep_knowns)
 	    if (bytecell) p->v %= 256; /* Note: preserves sign but limits range. */
 
 	    if ((p->v || p->is_set) &&
+		    (curroff != 0 || (tapeoff != 0 || flipcount == 0)) &&
 		    (!keep_knowns || p == tape || !enable_be_optim)) {
 		if (p->cleaned && p->cleaned_val == p->v && p->is_set) {
 		    if (!keep_knowns) clear_cell(p);
