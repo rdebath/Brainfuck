@@ -129,7 +129,7 @@ static const char * filename = "a.out";
 
 /* Stack for holding addresses of while loops.
  */
-static size_t  stack[256];
+static size_t  stack[1024];
 static size_t *st;
 
 int
@@ -174,7 +174,9 @@ outcmd(int ch, int count)
 
     case '[':
 	if (st - stack > (int)(sizeof stack / sizeof *stack)) {
-	    fprintf(stderr, "too many levels of nested loops");
+	    fprintf(stderr,
+		    "too many levels of nested loops (%d configured)\n",
+		    (int)(sizeof stack / sizeof *stack));
 	    exit(1);
 	}
 	emitobj(jump);
