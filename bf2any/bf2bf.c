@@ -679,23 +679,30 @@ pc(int ch)
 static void
 ps(const char * s)
 {
-    if (L_BASE == L_WORDS && col != 0) pc(' '); else pc(0);
-
+    const char * p = s;
+    int l = 0;
     while (*s) {
-	if (*s == ' ') {
-	    if (L_BASE == L_WORDS && col != 0) pc(' '); else pc(0);
-	} else {
-	    putchar(*s);
-	    /* Count UTF-8 codepoints. This is easy, but actually wrong */
-	    if ((*s&0xC0) != 0x80) {
-		col++;
-		/* So we add a tiny fix to make Chinese characters double width.
-		 * It's still not right, but no longer quite as wrong */
-		if ((*s&0xFF) >= 0xE3 && (*s&0xFF) <= 0xEA)
-		    col++;
+	if (*p == ' ' && p == s) {
+	    s = ++p; l = 0;
+	} else if (*p == ' ' || *p == 0) {
+	    int sp = (L_BASE == L_WORDS && col != 0);
+	    if (col+l+sp > maxcol && maxcol) {
+		pc('\n');
+		sp = 0;
 	    }
+	    if (sp) pc(' ');
+	    printf("%.*s", p-s, s);
+	    if (*p) p++;
+	    col += l; s = p; l = 0;
+	} else if ((*p&0xC0) != 0x80) {
+	    /* Count UTF-8 codepoints. This is easy, but actually wrong */
+	    l++;
+	    /* So we add a tiny fix to make Chinese characters double width.
+	     * It's still not right, but no longer quite as wrong */
+	    if ((*p&0xFF) >= 0xE3 && (*p&0xFF) <= 0xEA)
+		l++;
+	    p++;
 	}
-	s++;
     }
 }
 
@@ -1083,7 +1090,7 @@ headsecks(int ch, int count)
     int rset;
     static int rnd = 1;
 
-    if (ch == '!') linefix=';';
+    if (ch == '!') { linefix=';'; if(maxcol>1) maxcol--; }
     if (! (p = strchr(bf,ch))) return;
 
     while(count-->0) {
@@ -1105,12 +1112,13 @@ static void
 bfrle(int ch, int count)
 {
     char * p;
+    char buf[64];
 
     if (! (p = strchr(bf,ch))) return;
 
     if (count > 2 && (p-bf) < 4) {
-	pc(0);
-	col += printf("%d%c", count, ch);
+	sprintf(buf, "%d%c", count, ch);
+	ps(buf);
     } else while (count-- > 0)
 	pc(ch);
 }
@@ -1266,13 +1274,11 @@ hanoilove(int ch, int count)
 	   isn't documented.
 	 */
 	while(state == 3) {state = (state+1)%4; pc('.');}
-	if (col+2>maxcol && maxcol) pc('\n');
-	pc('"'); pc('\'');
+	ps("\"'");
 	break;
     case ',':
 	while(state == 3) {state = (state+1)%4; pc('.');}
-	if (col+2>maxcol && maxcol) pc('\n');
-	pc('"'); pc(',');
+	ps("\",");
 	break;
     case '[':
 	while(state != 3) {state = (state+1)%4; pc('.');}
