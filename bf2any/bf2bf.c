@@ -916,14 +916,18 @@ bftranslate(int ch, int count)
 	     */
 
 	    /* This generates 256 to check for larger than byte cells. */
+	    pc(0); puts("// This generates 256 to check for larger than byte cells");
 	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]");
 	    pmc("<[" ">>\n\n");
 
+	    pc(0); puts("// This code may be replaced by the original source");
 	    lang = bfout; bfreprint();
+	    pc('\n'); puts("// to here");
 
-	    pmc("\n\n<<[-]]\n\n");
+	    pmc("\n<<[-]]\n\n");
 
 	    /* This generates 256 to check for cells upto 8 bits */
+	    pc(0); puts("// This code runs on byte sized cells");
 	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]");
 	    pmc("+<[>-<[-]]>[>");
 
@@ -943,6 +947,7 @@ bftranslate(int ch, int count)
 	    /* This condition is a bit more difficult to optimise and a bit
 	     * smaller than the simple multiply list above.
 	     * It checks for binary cells of 16bits or less. */
+	    pc(0); puts("// This generates 65536 to check for larger than 16bit cells");
 	    pmc("++>>+++++[-<<[->++++++++<]>[-<+>]>]<");
 	    pmc("+<[[-]>>");
 	    pmc("\n\n");
@@ -952,6 +957,7 @@ bftranslate(int ch, int count)
 
 	    /* This is an "else" condition, the code cannot be resequenced */
 	    pmc("\n\n");
+	    pc(0); puts("// This is an else condition linked to the start of the file");
 	    pmc("<[-]<[-]]>[>");
 	    pmc("\n\n");
 
