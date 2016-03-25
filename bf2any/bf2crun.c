@@ -67,6 +67,7 @@ int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
+    if (strcmp(arg, "-#") == 0) return 1;
     if (strcmp(arg, "-savestring") == 0) return 1;
     if (strcmp(arg, "-intcells") == 0) return 1;
     if (strcmp("-h", arg) ==0) {
@@ -261,6 +262,7 @@ outcmd(int ch, int count)
     case '.': pr("PUTC(*m);"); break;
     case '"': print_cstring(); break;
     case ',': pr("GETC(*m);"); break;
+    case '#': if (runmode == no_run) pr("do_dump();"); break;
 
     case '[': pr("while(*m) {"); ind++; break;
     case ']': ind--; pr("}"); break;

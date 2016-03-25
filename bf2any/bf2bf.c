@@ -359,6 +359,7 @@ const char ** doubler = doubler_copy;
 const char ** bfquad = bfquadz;
 
 static int disable_optimisation(void);
+static void tokdump(int ch, int count);
 static void risbf(int ch, int count);
 static void headsecks(int ch, int count);
 static void bfrle(int ch, int count);
@@ -630,6 +631,7 @@ check_arg(const char * arg)
 	"\n\t"  "        There are also several different variations ..."
 	"\n\t"  "-dbl12 -dbl12nz -dbl17a -dbl17b -dblcpnz -dblcopy -dblcp12"
 	"\n\t"  "-dbleso -quadz -quadnz"
+	"\n\t"  "-dbr    Like -dbl12nz with RLE of '+' and '-'."
 	);
 	return 1;
     } else
@@ -789,7 +791,7 @@ outcmd(int ch, int count)
 	while(count-->0) pmc(lang[p-bf]);
 	break;
 
-    case L_TOKENS:	printf("%c %d\n", ch, count); col = 0; break;
+    case L_TOKENS:	tokdump(ch, count); break;
     case L_RISBF:	risbf(ch, count); break;
     case L_HEADSECKS:	headsecks(ch, count); break;
     case L_BF:		bftranslate(ch, count); break;
@@ -1545,4 +1547,73 @@ bfdowhile(int ch, int count)
 	    }
 	}
     }
+}
+
+void
+tokdump(int ch, int count)
+{
+static int imov = 0, ind = 0;
+    if (ch == '!' || ch == '~') { col=0; return; }
+
+    if (imov && ch != '>' && ch != '<') {
+        int mov = imov;
+
+	switch(ch) {
+	case '=': case 'B': case 'M': case 'N': case 'S': case 'Q':
+	case 'm': case 'n': case 's': case '+': case '-':
+
+	    printf("%c %3d: %*s", ch, count, ind*2, "");
+	    switch(ch) {
+	    case '=': printf("m[%d] = %d\n", mov, count); return;
+	    case 'B': printf("v = m[%d]\n", mov); return;
+	    case 'M': printf("m[%d] += v*%d\n", mov, count); return;
+	    case 'N': printf("m[%d] -= v*%d\n", mov, count); return;
+	    case 'S': printf("m[%d] += v\n", mov); return;
+	    case 'Q': printf("if(v!=0) m[%d] = %d\n", mov, count); return;
+	    case 'm': printf("if(v!=0) m[%d] += v*%d\n", mov, count); return;
+	    case 'n': printf("if(v!=0) m[%d] -= v*%d\n", mov, count); return;
+	    case 's': printf("if(v!=0) m[%d] += v\n", mov); return;
+	    case '+': printf("m[%d] +=%d\n", mov, count); return;
+	    case '-': printf("m[%d] -=%d\n", mov, count); return;
+	    }
+	}
+
+	if (mov) {
+	    imov = 0;
+	    if (mov > 0)
+		printf("> %3d: %*sm += %d\n", mov, ind*2, "", mov);
+	    else if (mov < 0)
+		printf("< %3d: %*sm -= %d\n", -mov, ind*2, "", -mov);
+	}
+    }
+
+    switch(ch) {
+    case '>': imov += count; return;
+    case '<': imov -= count; return;
+    }
+    if (ch == ']') ind--;
+
+    printf("%c %3d: %*s", ch, count, ind*2, "");
+    switch(ch) {
+    case '=': printf("*m = %d\n", count); break;
+    case 'B': printf("v = *m\n"); break;
+    case 'M': printf("*m += v*%d\n", count); break;
+    case 'N': printf("*m -= v*%d\n", count); break;
+    case 'S': printf("*m += v\n"); break;
+    case 'Q': printf("if(v!=0) *m = %d\n", count); break;
+    case 'm': printf("if(v!=0) *m += v*%d\n", count); break;
+    case 'n': printf("if(v!=0) *m -= v*%d\n", count); break;
+    case 's': printf("if(v!=0) *m += v\n"); break;
+
+    case '+': printf("*m +=%d\n", count); break;
+    case '-': printf("*m -=%d\n", count); break;
+
+    case '[': printf("while v!=0\n"); break;
+    case ']': printf("endwhile\n"); break;
+
+    default:
+	printf("\n");
+	break;
+    }
+    if (ch == '[') ind++;
 }

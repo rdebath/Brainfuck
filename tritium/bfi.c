@@ -3389,13 +3389,23 @@ print_codedump(void)
     }
 
     if (!noheader && !disable_c_header) {
-	printf("%s%s%s%s%s%s%s\n",
-	"#ifndef bf_start"
-"\n"	"#include <unistd.h>",
-	(cell_length <= sizeof(int)*CHAR_BIT?"":"\n#include <stdint.h>"),
-"\n"	"#define bf_start(msz,moff) ",cell_type," mem[msz];"
-	"int main(void){register ",cell_type,"*p=mem+moff;"
-"\n"	"#define bf_end() return 0;}");
+	printf("%s%s%s\n",
+	    "#ifndef bf_start" "\n"
+	    "#include <unistd.h>",
+	    (cell_length <= sizeof(int)*CHAR_BIT?"":"\n#include <stdint.h>"),
+	    "\n#define bf_end() return 0;}");
+
+	printf("%s%s%s\n",
+	    "#define bf_start(msz,moff,bits) ",cell_type," mem[msz+moff]; \\");
+
+	if (node_type_counts[T_CHR] || node_type_counts[T_PRT])
+	    puts("  void putch(int c) {char s=c; write(1,&s,1);} \\");
+
+	if (node_type_counts[T_CHR])
+	    puts("  void putstr(char *s) {char *p=s; while(*p)p++; write(1,s,p-s);}\\");
+
+	printf("%s%s%s\n",
+	    "  int main(void){register ",cell_type,"*p=mem+moff;");
 
 	if (enable_trace)
 	    puts("#define posn(l,c) /* Line l Column c */");
@@ -3423,14 +3433,14 @@ print_codedump(void)
 
 	if(node_type_counts[T_MULT] || node_type_counts[T_CMULT]
 	    || node_type_counts[T_WHL]) {
-	    puts("#define lp_start(x,y,z,c) while(p[x]) { /* if(p[x]==0) goto y; z: */");
-	    puts("#define lp_end(x,y,z) } /* if(p[x]) goto y; z: */");
+	    puts("#define lp_start(x,y,c) if(p[x]==0) goto E##y; S##y:");
+	    puts("#define lp_end(x,y) if(p[x]) goto S##y; E##y:");
 	}
 
 	/* See:  opt_no_endif */
 	if (node_type_counts[T_IF]) {
-	    puts("#define if_start(x,y) if(p[x]) { /* if(p[x]==0) goto y; */");
-	    puts("#define if_end(x) } /* x: */");
+	    puts("#define if_start(x,y) if(p[x]==0) goto E##y;");
+	    puts("#define if_end(x) E##x:");
 	}
 
 	if (node_type_counts[T_STOP])
@@ -3439,13 +3449,9 @@ print_codedump(void)
 	if (node_type_counts[T_DUMP])
 	    puts("#define bf_dump(l,c) /* Hmmm */");
 
-	if (node_type_counts[T_CHR] || node_type_counts[T_PRT]) {
-	    puts("void putch(int c) {char s=c; write(1,&s,1);}");
-	}
 	if (node_type_counts[T_CHR]) {
 	    printf("%s\n",
 		"#define outchar(x) putch(x);"
-	"\n"	"void putstr(char *s) {char *p=s; while(*p)p++; write(1,s,p-s);}"
 	"\n"	"#define outstr(x) putstr(x);");
 	}
 	if (node_type_counts[T_PRT]) {
@@ -3483,7 +3489,7 @@ print_codedump(void)
 	puts("#endif");
     }
 
-    printf("bf_start(%d,%d)\n", memsize, -most_neg_maad_loop);
+    printf("bf_start(%d,%d,%d)\n", memsize, -most_neg_maad_loop, cell_size);
     while(n)
     {
 	if (enable_trace)
@@ -3584,22 +3590,22 @@ print_codedump(void)
 	    break;
 
 	case T_IF:
-	    printf("if_start(%d,lbl_%d)\n", n->offset, n->count);
+	    printf("if_start(%d,%d)\n", n->offset, n->count);
 	    break;
 
 	case T_ENDIF:
-	    printf("if_end(lbl_%d)\n", n->jmp->count);
+	    printf("if_end(%d)\n", n->jmp->count);
 	    break;
 
 	case T_MULT: case T_CMULT:
 	case T_WHL:
-	    printf("lp_start(%d,lbl_%d,loop_%d,%s)\n",
-		    n->offset, n->count, n->count, tokennames[n->type]);
+	    printf("lp_start(%d,%d,%s)\n",
+		    n->offset, n->count, tokennames[n->type]);
 	    break;
 
 	case T_END:
-	    printf("lp_end(%d,loop_%d,lbl_%d)\n",
-		    n->jmp->offset, n->jmp->count, n->jmp->count);
+	    printf("lp_end(%d,%d)\n",
+		    n->jmp->offset, n->jmp->count);
 	    break;
 
 	case T_STOP:
