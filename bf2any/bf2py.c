@@ -24,7 +24,9 @@ int ind = 0;
 #define I fprintf(ofd, "%*s", ind*4, "")
 
 int do_dump = 0;
-int use_syslib = 1;
+int use_oslib = 0;
+int use_putcell = 0;
+int use_getcell = 0;
 
 FILE * ofd;
 char * pycode = 0;
@@ -49,7 +51,7 @@ check_arg(const char * arg)
     } else
 #endif
     if (strcmp(arg, "-oslib") == 0) {
-	use_syslib = 0;
+	use_oslib = 1;
 	return 1;
     } else
     return 0;
@@ -72,19 +74,107 @@ outcmd(int ch, int count)
 	    ofd = stdout;
 
 	fprintf(ofd, "#!/usr/bin/python\n");
-	if (use_syslib)
-	    fprintf(ofd, "import sys\n");
-	else
-	    fprintf(ofd, "import os\n");
+	fprintf(ofd, "import sys\n");
+
+	if (use_oslib)
+	    fprintf(ofd, "import os,platform\n");
+
+	if (tapelen <= 0)
+	    fprintf(ofd, "from collections import defaultdict\n");
+
+	fprintf(ofd, "\ndef brainfuck(argv):\n");
+	ind++;
 
 	if (tapelen > 0) {
-	    fprintf(ofd, "m = [0] * %d\n", tapesz);
+	    I; fprintf(ofd, "m = [0] * %d\n", tapesz);
 	} else {
 	    /* Dynamic arrays are 20% slower! */
-	    fprintf(ofd, "from collections import defaultdict\n");
-	    fprintf(ofd, "m = defaultdict(int)\n");
+	    I; fprintf(ofd, "m = defaultdict(int)\n");
 	}
-	fprintf(ofd, "p = %d\n", tapeinit);
+	I; fprintf(ofd, "p = %d\n", tapeinit);
+	break;
+
+    case '~':
+	I; fprintf(ofd, "return 0\n\n");
+	ind--;
+
+	if (use_putcell) {
+	    if (use_oslib) {
+		I; fprintf(ofd, "if (platform.python_implementation() == 'PyPy'):\n");
+		ind++;
+		I; fprintf(ofd, "def putcell(v):\n");
+		ind++;
+		I; fprintf(ofd, "os.write(1, chr(v %% 255))\n");
+		ind--;
+		ind--;
+		I; fprintf(ofd, "else:\n"); ind++;
+	    }
+
+	    I; fprintf(ofd, "def putcell(v):\n");
+	    ind++;
+	    I; fprintf(ofd, "try:\n");
+	    ind++;
+	    if (!use_oslib) {
+		I; fprintf(ofd, "sys.stdout.write(chr(v))\n");
+		I; fprintf(ofd, "sys.stdout.flush()\n");
+	    } else {
+		I; fprintf(ofd, "os.write(1, chr(v).encode('ascii'))\n");
+	    }
+	    ind--;
+	    I; fprintf(ofd, "except:\n");
+	    ind++;
+	    I; fprintf(ofd, "pass\n");
+	    ind--;
+	    ind--;
+	    if (use_oslib) ind--;
+	    fprintf(ofd, "\n");
+	}
+
+	if (use_getcell) {
+	    I; fprintf(ofd, "if (platform.python_implementation() == 'PyPy'):\n");
+	    ind++;
+	    I; fprintf(ofd, "def getcell(v):\n");
+	    ind++;
+	    I; fprintf(ofd, "return ord(os.read(0, 1)[0])\n");
+	    ind--;
+	    ind--;
+	    I; fprintf(ofd, "else:\n");
+	    ind++;
+	    I; fprintf(ofd, "def getcell(v):\n");
+	    ind++;
+	    I; fprintf(ofd, "try:\n");
+	    ind++;
+
+	    I; fprintf(ofd, "c = os.read(0, 1);\n");
+	    I; fprintf(ofd, "if c != '' :\n");
+	    ind++;
+	    I; fprintf(ofd, "v = ord(c)\n");
+	    ind--;
+	    ind--;
+	    I; fprintf(ofd, "except:\n");
+	    ind++;
+	    I; fprintf(ofd, "pass\n");
+	    ind--;
+	    I; fprintf(ofd, "return v\n");
+
+	    ind--;
+	    ind--;
+	    fprintf(ofd, "\n");
+	}
+
+	if (!do_dump) {
+	    I; fprintf(ofd, "brainfuck(None)\n");
+	    break;
+	}
+
+	I; fprintf(ofd, "if __name__ == \"__main__\":\n"); ind++;
+	I; fprintf(ofd, "brainfuck(sys.argv)\n"); ind--;
+
+	if (use_oslib && tapelen>0) {
+	    fprintf(ofd, "\n");
+	    I; fprintf(ofd, "def target(*args):\n"); ind++;
+	    I; fprintf(ofd, "return brainfuck, None\n"); ind--;
+	}
 	break;
 
     case '=': I; fprintf(ofd, "m[p] = %d\n", count); break;
@@ -117,30 +207,18 @@ outcmd(int ch, int count)
 	break;
 
     case '.':
-	I; fprintf(ofd, "try:\n");
-	ind++;
-	if (use_syslib) {
-	    I; fprintf(ofd, "sys.stdout.write(chr(m[p]))\n");
-	    I; fprintf(ofd, "sys.stdout.flush()\n");
-	} else {
-	    I; fprintf(ofd, "os.write(1, chr(m[p]).encode('ascii'))\n");
-	}
-	ind--;
-	I; fprintf(ofd, "except:\n");
-	ind++;
-	I; fprintf(ofd, "pass\n");
-	ind--;
+	I; fprintf(ofd, "putcell(m[p])\n");
+	use_putcell = 1;
 	break;
 
     case ',':
-	if (use_syslib) {
+	if (!use_oslib) {
 	    I; fprintf(ofd, "c = sys.stdin.read(1);\n");
 	    I; fprintf(ofd, "if c != '' :\n");
 	    ind++; I; ind--; fprintf(ofd, "m[p] = ord(c)\n");
 	} else {
-	    I; fprintf(ofd, "c = os.read(0, 1);\n");
-	    I; fprintf(ofd, "if c != '' :\n");
-	    ind++; I; ind--; fprintf(ofd, "m[p] = ord(c)\n");
+	    I; fprintf(ofd, "m[p] = getcell(m[p])\n");
+	    use_getcell = 1;
 	}
 	break;
     }
