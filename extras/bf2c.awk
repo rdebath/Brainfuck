@@ -1,4 +1,6 @@
 #!/bin/sh -
+# vim: set filetype=awk:
+#
 # BF to C converter, compiler and runner.
 #
 # This converts BF to peephole optimised C then compiles it with the system C
@@ -6,18 +8,16 @@
 #
 # This script works with most versions of awk including the one described in
 # the book "The AWK Programming Language", by Al Aho, Brian Kernighan,
-# and Peter Weinberger. BUT for versions that don't accept -Wexec any
-# options must use '+' instead of '-' or add a "--" option after the script
-# name and before those options.
+# and Peter Weinberger.
 #
 # The 'mawk' version is the quickest followed by "original-awk" with the big
 # fat GNU version rolling up eventually.
 #
 # Use the shell to fix the lack of -Wexec on some awks.
-true , /; exec awk -f "$0" -- "$@" ; exit; / {}
-#
+true , /^; exec awk -f "$0" -- "$@" ; exit #/ {}
+
 BEGIN {
-    if (ARGC == 1) {
+    if (ARGC == 1 || (ARGC==2 && ARGV[1]== "-h")) {
 	print "Usage: bf2c [options] files..."
 	print " Options:"
 	print "  -c         Don't run the program, send it to stdout."
@@ -320,4 +320,3 @@ function optim()
 	str = substr(str, 1, RSTART-1) "L(" RLENGTH/2 ")" substr(str, RSTART+RLENGTH)
     }
 }
-# vim: set filetype=awk:
