@@ -51,7 +51,7 @@
 /* And here's the CPUs those OSs were running on */
 #if defined(__x86_64__) || defined(__amd64__) || defined(_M_AMD64)
 #define PROCESSOR	"x64"
-#ifdef __ELF__
+#if defined(__ELF__) || defined(__APPLE__)
 #define BFI_FOUND_CPU_X86_64
 #endif
 #elif defined(__i386__) || defined(_M_IX86)

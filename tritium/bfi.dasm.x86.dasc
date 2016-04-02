@@ -595,6 +595,7 @@ run_dynasm(void)
 	| push REG_A
 	| call &putch
 	| pop eax
+	| ret
 	|.else
 #ifndef _WIN32
 	| mov PRM_D, REG_A
@@ -606,9 +607,8 @@ run_dynasm(void)
 #else
 	| mov64 rax, (uintptr_t) putch
 #endif
-	| call  rax
+	| jmp  rax
 	|.endif
-	| ret
     }
 
     link_and_run(Dst);

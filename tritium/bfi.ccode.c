@@ -1109,7 +1109,7 @@ run_gccode(void)
 #define CC "clang -m64 -fwrapv"
 #elif defined(__PCC__)
 #define CC "pcc"
-#elif defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
+#elif defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=1))
 #if defined(__x86_64__)
 #if defined(__ILP32__)
 #define CC "gcc -mx32 -fwrapv"
