@@ -17,7 +17,11 @@ static int link_main = 0;
 #else
 static int link_main = 1;
 #endif
+#ifdef __ELF__
 static int ulines = 0;
+#else
+static int ulines = 1;
+#endif
 static int outp_line;
 
 static int hello_world = 0;
@@ -38,6 +42,8 @@ checkarg_nasm(char * opt, char * arg UNUSED)
     if (!strcmp(opt, "-flinux")) { intel_gas = 0; link_main = 0; return 1; }
     if (!strcmp(opt, "-fwin32")) { intel_gas = 1; link_main = 1; ulines = 1; return 1; }
     if (!strcmp(opt, "-fwin32n")) { intel_gas = 0; link_main = 1; ulines = 1; return 1; }
+    if (!strcmp(opt, "-fuline")) { ulines = 1; return 1; }
+    if (!strcmp(opt, "-fno-uline")) { ulines = 0; return 1; }
     return 0;
 }
 
