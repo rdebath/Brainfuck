@@ -766,7 +766,6 @@ static int dld;
 	    break;
 	case '#':
 	    if(debug_mode) ch = T_DUMP; else ch = T_NOP;
-	    bfi_num--;
 	    break;
 	default:  ch = T_NOP; break;
 	}

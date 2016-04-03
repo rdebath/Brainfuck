@@ -33,6 +33,7 @@ static int fixed_mask = 0;
 static int mask_defined = 1;
 static int use_direct_getchar = 0;
 static int use_dynmem = 0;
+static int use_goto = 0;
 static int libtcc_specials = 0;
 #if defined(DISABLE_DLOPEN)
 static const int use_dlopen = 0;
@@ -96,6 +97,7 @@ checkarg_ccode(char * opt, char * arg)
 	if (opt_regen_mov == -1) opt_regen_mov = 0;
 	return 1;
     }
+    if (!strcmp(opt, "-fgoto")) { use_goto = 1; return 1; }
     return 0;
 }
 
@@ -714,12 +716,16 @@ print_ccode(FILE * ofd)
 		}
 	    }
 #endif
-	    fprintf(ofd, "if(%s) ", pcell(n->offset));
 
 	    if (n->next->next && n->next->next->jmp == n && !enable_trace) {
+		fprintf(ofd, "if(%s) ", pcell(n->offset));
 		disable_indent = 1;
-	    } else {
+	    } else if (!use_goto) {
+		fprintf(ofd, "if(%s) ", pcell(n->offset));
 		fprintf(ofd, "{\n");
+	    } else {
+		fprintf(ofd, "if(%s == 0) ", pcell(n->offset));
+		fprintf(ofd, "goto E%d;\n", n->count);
 	    }
 	    break;
 
@@ -815,12 +821,26 @@ print_ccode(FILE * ofd)
 
 	case T_CMULT:
 	case T_MULT:
-	    pt(ofd, indent,n);
-	    fprintf(ofd, "while(%s) ", pcell(n->offset));
-	    if (n->next->next && n->next->next->jmp == n && !enable_trace)
-		disable_indent = 1;
-	    else
-		fprintf(ofd, "{\n");
+	    if (!use_goto) {
+		pt(ofd, indent,n);
+		fprintf(ofd, "while(%s) ", pcell(n->offset));
+		if (n->next->next && n->next->next->jmp == n && !enable_trace)
+		    disable_indent = 1;
+		else
+		    fprintf(ofd, "{\n");
+	    } else {
+		if (n->next->next && n->next->next->jmp == n && !enable_trace) {
+		    disable_indent = 1;
+		    pt(ofd, indent,n);
+		    fprintf(ofd, "while(%s) ", pcell(n->offset));
+		    break;
+		}
+		pt(ofd, indent,n);
+		fprintf(ofd, "if(%s == 0) ", pcell(n->offset));
+		fprintf(ofd, "goto E%d;\n", n->count);
+		pt(ofd, indent,0);
+		fprintf(ofd, "L%d:;\n", n->count);
+	    }
 	    break;
 
 	case T_END:
@@ -829,8 +849,19 @@ print_ccode(FILE * ofd)
 		disable_indent = 0;
 		break;
 	    }
-	    pt(ofd, indent,n);
-	    fprintf(ofd, "}\n");
+	    if (!use_goto) {
+		pt(ofd, indent,n);
+		fprintf(ofd, "}\n");
+	    } else {
+		if (n->type == T_END) {
+		    pt(ofd, indent,n);
+		    fprintf(ofd, "if(%s != 0) ", pcell(n->jmp->offset));
+		    fprintf(ofd, "goto L%d;\n", n->jmp->count);
+		    pt(ofd, indent,0);
+		} else
+		    pt(ofd, indent,n);
+		fprintf(ofd, "E%d:;\n", n->jmp->count);
+	    }
 	    break;
 
 	case T_STOP:
