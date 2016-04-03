@@ -167,6 +167,7 @@ struct bfi *opt_run_start, *opt_run_end;
 double run_time = 0, io_time = 0;
 int loaded_nodes = 0;
 int total_nodes = 0;
+int max_indent = 0;
 int node_type_counts[TCOUNT+1];
 int node_profile_counts[TCOUNT+1];
 int min_pointer = 0, max_pointer = 0;
@@ -1145,6 +1146,7 @@ calculate_stats(void)
 {
     struct bfi * n = bfprog;
     int i;
+    int indent = 0;
 
     total_nodes = 0;
     min_pointer = 0;
@@ -1152,6 +1154,7 @@ calculate_stats(void)
     most_negative_mov = 0;
     most_positive_mov = 0;
     profile_hits = 0;
+    max_indent = 0;
 
     for(i=0; i<TCOUNT+1; i++)
 	node_type_counts[i] = 0;
@@ -1175,6 +1178,10 @@ calculate_stats(void)
 	}
 	if (n->profile)
 	    profile_hits += n->profile;
+
+	if (indent>0 && n->orgtype == T_END) indent--;
+	if (indent>max_indent) max_indent = indent;
+	if (n->orgtype == T_WHL) indent++;
 
 	n=n->next;
     }

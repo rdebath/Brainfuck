@@ -70,6 +70,7 @@ extern struct bfi *bfprog;
 extern const char* tokennames[];
 extern int node_type_counts[TCOUNT+1];
 extern int total_nodes;
+extern int max_indent;
 
 /* How far to search for constants. */
 #define SEARCHDEPTH     10
