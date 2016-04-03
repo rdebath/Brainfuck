@@ -786,7 +786,6 @@ static int dld;
 		 * passes, but it's cheaper to do it here. */
 		if (c && p && ch == p->type){
 		    p->count += c;
-		    bfi_num ++;
 		    continue;
 		}
 	    }
@@ -3267,6 +3266,7 @@ try_opt_runner(void)
     if (verbose>5) printtree();
 
     opt_run_start = opt_run_end = tcalloc(1, sizeof*bfprog);
+    opt_run_start->inum = bfi_num++;
     opt_run_start->type = T_NOP;
     if (verbose>3)
 	fprintf(stderr, "Running trial run optimise\n");

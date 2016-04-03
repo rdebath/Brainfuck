@@ -31,10 +31,14 @@
 static const char * putname = "putch";
 static int fixed_mask = 0;
 static int mask_defined = 1;
+static int indent = 0, disable_indent = 0;
+
 static int use_direct_getchar = 0;
 static int use_dynmem = 0;
 static int use_goto = 0;
+static int use_functions = -1;
 static int libtcc_specials = 0;
+
 #if defined(DISABLE_DLOPEN)
 static const int use_dlopen = 0;
 #else
@@ -98,16 +102,20 @@ checkarg_ccode(char * opt, char * arg)
 	return 1;
     }
     if (!strcmp(opt, "-fgoto")) { use_goto = 1; return 1; }
+    if (!strcmp(opt, "-ffunct")) { use_functions = 1; return 1; }
+    if (!strcmp(opt, "-fno-funct")) { use_functions = 0; return 1; }
     return 0;
 }
 
 void
-pt(FILE* ofd, int indent, struct bfi * n)
+pt(FILE* ofd, int indent_to, struct bfi * n)
 {
     int i, j;
     for(j=(n==0 || !enable_trace); j<2; j++) {
 	if (max_indent > 16) {
-	    int k = indent+2;
+	    int k = indent_to;
+	    if (max_indent < 64) k *= 2;
+	    k += 2;
 	    if (k>128) k = 128;
 	    for(i=0; i+7<k; ) {
 		fprintf(ofd, "\t");
@@ -115,9 +123,9 @@ pt(FILE* ofd, int indent, struct bfi * n)
 	    }
 	    for(; i<k; i++)
 		fprintf(ofd, " ");
-	} else if (indent == 0)
+	} else if (indent_to == 0)
 	    fprintf(ofd, "  ");
-	else for(i=0; i<indent; i++)
+	else for(i=0; i<indent_to; i++)
 	    fprintf(ofd, "\t");
 
 	if (j == 0) {
@@ -436,25 +444,9 @@ print_c_header(FILE * ofd)
 }
 
 void
-print_ccode(FILE * ofd)
+print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 {
-    int indent = 0, disable_indent = 0;
-    struct bfi * n = bfprog;
-    int found_rail_runner;
-
-    if (cell_size > 0 &&
-	cell_size != sizeof(int)*CHAR_BIT &&
-	cell_size != sizeof(short)*CHAR_BIT &&
-	cell_size != sizeof(char)*CHAR_BIT)
-	fixed_mask = cell_mask;
-
-    if (verbose)
-	fprintf(stderr, "Generating C Code.\n");
-
-    if (!noheader) print_c_header(ofd);
-
-    n = bfprog;
-    while(n)
+    while(n != e)
     {
 	if (n->orgtype == T_END) indent--;
 	switch(n->type)
@@ -730,8 +722,9 @@ print_ccode(FILE * ofd)
 	    break;
 
 	case T_WHL:
+	{
+	    int found_rail_runner = 0;
 
-	    found_rail_runner = 0;
 	    if (n->next->type == T_MOV &&
 		n->next->next && n->next->next->jmp == n) {
 		found_rail_runner = 1;
@@ -818,6 +811,7 @@ print_ccode(FILE * ofd)
 		n=n->jmp;
 		break;
 	    }
+	}
 
 	case T_CMULT:
 	case T_MULT:
@@ -866,7 +860,10 @@ print_ccode(FILE * ofd)
 
 	case T_STOP:
 	    if (!disable_indent) pt(ofd, indent,n);
-	    fprintf(ofd, "return 1;\n");
+	    if (e)
+		fprintf(ofd, "exit(1);\n");
+	    else
+		fprintf(ofd, "return 1;\n");
 	    break;
 
 	case T_NOP:
@@ -875,6 +872,12 @@ print_ccode(FILE * ofd)
 		   "%s node: ptr+%d, cnt=%d, @(%d,%d).\n",
 		    tokennames[n->type],
 		    n->offset, n->count, n->line, n->col);
+	    break;
+
+	case T_CALL:
+	    if (!disable_indent) pt(ofd, indent,n);
+	    fprintf(ofd, "m = bf%d(m);\n", n->count);
+	    n=n->jmp;
 	    break;
 
 	default:
@@ -890,9 +893,70 @@ print_ccode(FILE * ofd)
 	if (n->orgtype == T_WHL) indent++;
 	n=n->next;
     }
+}
 
-    if (!noheader)
+void
+print_ccode(FILE * ofd)
+{
+    struct bfi * n;
+    int ipos = 0;
+
+    if (cell_size > 0 &&
+	cell_size != sizeof(int)*CHAR_BIT &&
+	cell_size != sizeof(short)*CHAR_BIT &&
+	cell_size != sizeof(char)*CHAR_BIT)
+	fixed_mask = cell_mask;
+
+    if (verbose)
+	fprintf(stderr, "Generating C Code.\n");
+
+    indent = 0;
+    disable_indent = 0;
+
+    if (!noheader) print_c_header(ofd);
+
+    if (use_functions != 1 && (total_nodes < 4000 || use_functions == 0))
+    {
+	print_c_body(ofd, bfprog, (struct bfi *)0);
+
+	if (!noheader)
+	    fprintf(ofd, "  return 0;\n}\n");
+	return;
+    }
+
+    if (!noheader) {
+	fprintf(ofd, "  extern void bf(%s*);\n", cell_type);
+	fprintf(ofd, "  bf(m);\n");
 	fprintf(ofd, "  return 0;\n}\n");
+    }
+
+    for(n=bfprog; n; n=n->next) {
+	n->ipos = ++ipos;
+
+	if (n->orgtype == T_END) indent--;
+
+	if (n->type == T_END && n->jmp->type == T_WHL &&
+	    n->ipos-n->jmp->ipos > 5) {
+	    int ti = indent;
+	    indent = 0;
+
+	    fprintf(ofd, "%s * bf%d(%s * m)\n{\n",
+		cell_type, n->jmp->count, cell_type);
+	    print_c_body(ofd, n->jmp, n->next);
+	    fprintf(ofd, "  return m;\n}\n");
+
+	    indent = ti;
+
+	    n->jmp->type = T_CALL;
+	}
+
+	if (n->orgtype == T_WHL) indent++;
+    }
+
+    fprintf(ofd, "void bf(%s * m)\n{\n", cell_type);
+    print_c_body(ofd, bfprog, (struct bfi *)0);
+    fprintf(ofd, "}\n");
+    return;
 }
 
 #if !defined(DISABLE_TCCLIB) || !defined(DISABLE_DLOPEN)
