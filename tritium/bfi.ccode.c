@@ -210,7 +210,7 @@ print_c_header(FILE * ofd)
 	    fprintf(ofd, "# else\n");
 	    fprintf(ofd, "# define C unsigned int\n");
 	    fprintf(ofd, "# endif\n");
-	} else
+	} else if (cell_length != sizeof(long)*CHAR_BIT || sizeof(long) <= sizeof(int))
 	    fprintf(ofd, "#include <stdint.h>\n");
 	fprintf(ofd, "# ifndef M\n");
 	fprintf(ofd, "# define M(v) v\n");

@@ -425,26 +425,25 @@ UsageOptError(char * why)
 void
 UsageInt64(void)
 {
-#if !defined(NO_EXT_BE) && (defined(UINTMAX_MAX) || defined(__SIZEOF_INT128__))
     fprintf(stderr,
 	"Directly available cell sizes are 1..%d", (int)(sizeof(int)*CHAR_BIT));
+#if !defined(NO_EXT_BE)
+    if (sizeof(long) > sizeof(int))
+	fprintf(stderr, ",%d", (int)sizeof(long)*CHAR_BIT);
+#if (defined(UINTMAX_MAX) || defined(__SIZEOF_INT128__))
 #if defined(UINTMAX_MAX)
-    if (sizeof(uintmax_t) > sizeof(int))
+    if (sizeof(uintmax_t) > sizeof(long))
 	fprintf(stderr, ",%d", (int)sizeof(uintmax_t)*CHAR_BIT);
 #endif
 #if defined(__SIZEOF_INT128__)
     fprintf(stderr, ",%d", (int)sizeof(__int128)*CHAR_BIT);
 #endif
+#endif
+#endif
     fprintf(stderr, " bits.\n"
 	"The generated C can be configured to use other types "
 	"using the 'C' #define.\n");
-#else
-    fprintf(stderr,
-	"You can only specify cell sizes 1..%d bits on this machine.\n"
-	"Compiled C code can use larger cells using -DC=intmax_t, but beware the\n"
-	"optimiser may make changes that are unsafe for this code.\n",
-	(int)(sizeof(int)*CHAR_BIT));
-#endif
+
     exit(1);
 }
 
@@ -3736,6 +3735,19 @@ putch(int ch)
 void
 set_cell_size(int cell_bits)
 {
+#if !defined(NO_EXT_BE)
+    if (cell_bits == (int)sizeof(long)*CHAR_BIT && sizeof(long) > sizeof(int)) {
+	cell_length = cell_bits;
+	cell_size = 0;
+	cell_mask = ~0;
+	cell_smask = 0;
+	cell_type = "unsigned long";
+
+	if (verbose>5) fprintf(stderr, "Cell type is %s\n", cell_type);
+	return;
+    } else
+#endif
+
 #if !defined(NO_EXT_BE) && defined(UINTMAX_MAX)
     if (cell_bits == (int)sizeof(uintmax_t)*CHAR_BIT) {
 	cell_length = cell_bits;
