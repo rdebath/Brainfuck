@@ -45,7 +45,7 @@ static const int use_dlopen = 0;
 static int use_dlopen = 0;
 static int choose_runner = -1;
 static char * cc_cmd = 0;
-static char pic_opt[8] = " -fpic";
+static int pic_opt = -1;
 static int in_one = 0;
 static int leave_temps = 0;
 #endif
@@ -81,9 +81,9 @@ checkarg_ccode(char * opt, char * arg)
 	choose_runner = 1;
 	return 2;
     }
-    if (!strcmp(opt, "-fPIC")) { strcpy(pic_opt, " -fPIC"); return 1; }
-    if (!strcmp(opt, "-fpic")) { strcpy(pic_opt, " -fpic"); return 1; }
-    if (!strcmp(opt, "-fno-pic")) { *pic_opt = 0; return 1; }
+    if (!strcmp(opt, "-fPIC")) { pic_opt = 2; return 1; }
+    if (!strcmp(opt, "-fpic")) { pic_opt = 1; return 1; }
+    if (!strcmp(opt, "-fno-pic")) { pic_opt = 0; return 1; }
     if (!strcmp(opt, "-fonecall")) { in_one = 1; return 1; }
     if (!strcmp(opt, "-fleave-temps")) { leave_temps = 1; return 1; }
 #if defined(DISABLE_TCCLIB)
@@ -1231,6 +1231,9 @@ run_gccode(void)
 #define CC "gcc"
 #elif defined(__TINYC__)
 #define CC "tcc"
+#endif
+#ifdef CC
+#define DEFAULT_PIC 1
 #else
 #define CC "cc"
 #endif
@@ -1251,34 +1254,44 @@ compile_and_run(void)
     int ret;
     const char * cc = CC;
     const char * copt = "";
+    const char * pic_cmd = "";
     if (opt_level >= 3)
 	copt = " -O3";
 
     if (cc_cmd) cc = cc_cmd;
 
+#ifdef DEFAULT_PIC
+    if (pic_opt<0) pic_opt = DEFAULT_PIC;
+#endif
+    switch(pic_opt) {
+    case 0: pic_cmd = ""; break;
+    case 1: pic_cmd = " -fpic"; break;
+    case 2: pic_cmd = " -fPIC"; break;
+    }
+
     if (in_one) {
 	if (verbose)
 	    fprintf(stderr,
 		"Running C Code using \"%s%s%s -shared\" and dlopen().\n",
-		cc,pic_opt,copt);
+		cc,pic_cmd,copt);
 
 	sprintf(cmdbuf, "%s%s%s -shared -o %s %s",
-		    cc, pic_opt, copt, dl_name, ccode_name);
+		    cc, pic_cmd, copt, dl_name, ccode_name);
 	ret = system(cmdbuf);
     } else {
 	if (verbose)
 	    fprintf(stderr,
 		"Running C Code using \"%s%s%s\", link -shared and dlopen().\n",
-		cc,pic_opt,copt);
+		cc,pic_cmd,copt);
 
 	/* Like this so that ccache has a good path and distinct compile. */
 	sprintf(cmdbuf, "cd %s; %s%s%s -c -o %s %s",
-		tmpdir, cc, pic_opt, copt, BFBASE".o", BFBASE".c");
+		tmpdir, cc, pic_cmd, copt, BFBASE".o", BFBASE".c");
 	ret = system(cmdbuf);
 
 	if (ret != -1) {
 	    sprintf(cmdbuf, "cd %s; %s%s -shared -o %s %s",
-		    tmpdir, cc, pic_opt, dl_name, BFBASE".o");
+		    tmpdir, cc, pic_cmd, dl_name, BFBASE".o");
 	    ret = system(cmdbuf);
 	}
     }

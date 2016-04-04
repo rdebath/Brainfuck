@@ -112,7 +112,7 @@ X(ccode,CCODE,
     case c_ccode: print_ccode(stdout); break;			    ,
     case c_ccode: run_ccode(); break;                               )
 
-#if XX == 4
+#if (XX == 4) && !defined(DISABLE_RUNC)
     if (do_run == -1 && do_codestyle == c_default && verbose<3 && !debug_mode) {
 	do_run = 1;
 	do_codestyle = c_ccode;
