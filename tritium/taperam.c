@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <limits.h>
-#if _POSIX_MAPPED_FILES
+#if defined(_POSIX_MAPPED_FILES) && ((_POSIX_MAPPED_FILES -0) > 0)
 #include <sys/mman.h>
 #include <signal.h>
 #endif
