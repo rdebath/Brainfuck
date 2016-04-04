@@ -83,7 +83,7 @@
 #define PROCESSOR	"SuperH-4"
 #elif defined(__ia64__)
 #define PROCESSOR	"ia64"
-#elif defined(__alpha__)
+#elif defined(__alpha__) || defined(__alpha)
 #define PROCESSOR	"DEC Alpha"
 #elif defined(__vax__)
 #define PROCESSOR	"VAX"
