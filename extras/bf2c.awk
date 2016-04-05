@@ -21,6 +21,7 @@ BEGIN {
 	print "Usage: bf2c [options] files..."
 	print " Options:"
 	print "  -c         Don't run the program, send it to stdout."
+	print "  -oFILE     Don't run the program, write it to FILE."
 	print "  -O -O3     Pass this option to 'cc'."
 	print "  -O0        Disable peephole optimisations."
 	print "  -d         Dump final memory and when a # is seen."
@@ -38,7 +39,7 @@ BEGIN {
 
     memory = 65536;
     memoff = 1000;
-    outs = "";
+    outfile = "";
     CC = "cc";
     noopt = 0
     ll = 78;
@@ -55,6 +56,7 @@ BEGIN {
 	if (substr(arg,1,2) == "-T") { cell = substr(ARGV[i], 3); ARGV[i] = "";}
 	if (substr(arg,1,2) == "-C") { CC = substr(ARGV[i], 3); ARGV[i] = "";}
 	if (substr(arg,1,2) == "-O") { optflag = " -O" substr(ARGV[i], 3); ARGV[i] = "";}
+	if (substr(arg,1,2) == "-o") { norun=1; outfile = substr(ARGV[i], 3); ARGV[i] = "";}
     }
 
     header();
@@ -117,14 +119,18 @@ END {
 	}
 	if (rv != 0)
 	    system("rm -f " ef);
-    }
+    } else if (outfile != "")
+	close(of);
 }
 
 function header() {
-    if (norun) of = "/dev/stdout"; else {
+    if (!norun) {
 	ef="/tmp/ap" rand();
 	of = ef ".c"
-    }
+    } else if (outfile != "") {
+	of = outfile;
+    } else
+	of = "/dev/stdout";
 
     if (cell != "") tcell=cell; else tcell="unsigned char";
 
