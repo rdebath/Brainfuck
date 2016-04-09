@@ -86,28 +86,31 @@ static jit_state_t *_jit;
 
 int gnulightning_ok = JITLIBOK;
 
-static int tape_step = sizeof(int);
-
 static void (*codeptr)(void);
 static int acc_loaded = 0;
 static int acc_offset = 0;
 static int acc_dirty = 0;
 static int acc_hi_dirty = 0;
+static int tape_step = sizeof(int);
+static int acc_const = 0;
+static int acc_const_val = 0;
 
 static void
 clean_acc(void)
 {
     if (acc_loaded && acc_dirty) {
 	if (tape_step > 1) {
-	    if (acc_offset)
+	    if (acc_offset) {
 		jit_stxi_i(acc_offset * tape_step, REG_P, REG_ACC);
-	    else
+	    } else {
 		jit_str_i(REG_P, REG_ACC);
+	    }
 	} else {
-	    if (acc_offset)
+	    if (acc_offset) {
 		jit_stxi_uc(acc_offset, REG_P, REG_ACC);
-	    else
+	    } else {
 		jit_str_uc(REG_P, REG_ACC);
+	    }
 	}
 
 	acc_dirty = 0;
@@ -124,11 +127,14 @@ set_acc_offset(int offset)
     acc_loaded = 1;
     acc_dirty = 1;
     acc_hi_dirty = 1;
+    acc_const = 0;
 }
 
 static void
 load_acc_offset(int offset)
 {
+    acc_const = 0;
+
     if (acc_loaded) {
 	if (acc_offset == offset) return;
 	if (acc_dirty)
@@ -137,15 +143,17 @@ load_acc_offset(int offset)
 
     acc_offset = offset;
     if (tape_step > 1) {
-	if (acc_offset)
+	if (acc_offset) {
 	    jit_ldxi_i(REG_ACC, REG_P, acc_offset * tape_step);
-	else
+	} else {
 	    jit_ldr_i(REG_ACC, REG_P);
+	}
     } else {
-	if (acc_offset)
+	if (acc_offset) {
 	    jit_ldxi_uc(REG_ACC, REG_P, acc_offset);
-	else
+	} else {
 	    jit_ldr_uc(REG_ACC, REG_P);
+	}
     }
 
     acc_loaded = 1;
@@ -199,8 +207,8 @@ run_gnulightning(void)
     jit_node_t** loopstack = 0;
 #endif
 
-    if (cell_size == 8)
-	tape_step = 1;
+    if (cell_size == 8) tape_step = 1; else
+    tape_step = sizeof(int);
 
     tape_memory = map_hugeram();
 
@@ -255,8 +263,18 @@ run_gnulightning(void)
 
 	case T_SET:
 	    set_acc_offset(n->offset);
-	    jit_movi(REG_ACC, n->count);
-	    break;
+	    if (acc_const && acc_const_val == n->count) {
+		;
+	    } else if (acc_const && acc_const_val+1 == n->count) {
+		jit_addi(REG_ACC, REG_ACC, 1);
+            } else if (acc_const && acc_const_val-1 == n->count) {
+		jit_addi(REG_ACC, REG_ACC, -1);
+            } else {
+		jit_movi(REG_ACC, n->count);
+            }
+            acc_const = 1;
+            acc_const_val = n->count;
+            break;
 
 	case T_CALC:
 	    if (n->offset == n->offset2 && n->count2 == 1) {
@@ -308,6 +326,7 @@ run_gnulightning(void)
 	case T_WHL:
 	    load_acc_offset(n->offset);
 	    clean_acc();
+	    acc_const = acc_loaded = 0;
 
 	    if (stackptr >= maxstack) {
 		loopstack = realloc(loopstack,
@@ -369,7 +388,7 @@ run_gnulightning(void)
 
 	case T_ENDIF:
 	    clean_acc();
-	    acc_loaded = 0;
+	    acc_const = acc_loaded = 0;
 
 	    stackptr -= 2;
 	    if (stackptr < 0) {
@@ -398,7 +417,7 @@ run_gnulightning(void)
 
 	case T_CHR:
 	    clean_acc();
-	    acc_loaded = 0;
+	    acc_const = acc_loaded = 0;
 
 	    if (n->count <= 0 || (n->count >= 127 && iostyle == 1) ||
 		    !n->next || n->next->type != T_CHR) {
