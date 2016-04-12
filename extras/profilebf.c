@@ -26,6 +26,7 @@ int memsize = 0;
 int memshift = 0;
 
 void run(void);
+void optimise(void);
 void print_summary(void);
 void hex_output(FILE * ofd, int ch);
 int hex_bracket = -1;
@@ -50,9 +51,11 @@ int final_tape_pos = 0;	/* Where the tape pointer finished. */
 intmax_t overflows =0;	/* Number of detected overflows. */
 intmax_t underflows =0;	/* Number of detected underflows. */
 int hard_wrap = 0;	/* Have cell values gone outside 0..255 ? */
+int do_optimise = 1;
 
 char bf[] = "+-><[].,";
 intmax_t profile[256*4];
+int program_len;	/* Number of BF command characters */
 
 int main(int argc, char **argv)
 {
@@ -87,6 +90,8 @@ int main(int argc, char **argv)
 	    quick_summary=1; quick_with_counts=1; argc--; argv++;
 	} else if (!strcmp(argv[1], "-a")) {
 	    all_cells++; argc--; argv++;
+	} else if (!strcmp(argv[1], "-Z")) {
+	    do_optimise=0; argc--; argv++;
 	} else if (!strcmp(argv[1], "-w")) {
 	    cell_mask = (1<<16)-1;
 	    physical_min = 0;
@@ -193,6 +198,22 @@ int main(int argc, char **argv)
     }
 
     pgm[n+1].cmd = 0;
+
+    {
+	int i;
+	for(program_len = i = 0; pgm[i].cmd; i++) {
+	    if (pgm[i].cmd == '>' || pgm[i].cmd == '<' ||
+		pgm[i].cmd == '+' || pgm[i].cmd == '-' ) {
+		program_len += pgm[i].arg;
+	    } else if (pgm[i].cmd == '=')
+		program_len += 3;
+	    else if(pgm[i].cmd != ' ')
+		program_len++;
+	}
+    }
+
+    if (do_optimise) optimise();
+
     run();
 
     print_summary();
@@ -231,7 +252,7 @@ alloc_ptr(int memoff)
 void run(void)
 {
     int m = 0;
-    int n;
+    int n, v = 1;
     m = alloc_ptr(MAXOFF)-MAXOFF;
     for(n = 0;; n++) {
 	switch(pgm[n].cmd)
@@ -297,13 +318,9 @@ void run(void)
 		}
 	    }
 	    break;
-	case '=':
 
-	    if(physical_overflow) {
-		if (mem[m] < 0) underflows++;
-	    } else {
-		if (mem[m] < 0) underflows++;
-	    }
+	case '=':
+	    if (mem[m] < 0) underflows++;
 
 	    if (mem[m] < 0) {
 		profile['='*4 + 3]++;
@@ -389,7 +406,135 @@ void run(void)
 		fprintf(stderr, "\n");
 	    }
 	    break;
+
+	case 'B':
+	    if (!physical_overflow) {
+		if ((mem[m] & cell_mask) == 0 && mem[m]) {
+		    /* This condition will be different. */
+		    if (mem[m] < 0) underflows++; else overflows++;
+		    profile['['*4 + 3]++;
+
+		    mem[m] &= cell_mask;
+		    if (mem[m] > physical_max)
+			mem[m] -= (physical_max-physical_min+1);
+		}
+	    }
+
+	    profile['['*4+1 + !!mem[m]]++;
+	    if (mem[m] == 0){
+		n = pgm[n].arg;
+		v = 1;
+	    } else
+		v = (mem[m] & cell_mask);
+	    break;
+
+	case 'E':
+	    profile[']'*4 + 1] ++;
+	    profile[']'*4 + 2] += v-1;
+	    v = 1;
+	    break;
+
+	case 'M':
+	    profile['+'*4] += pgm[n].arg*v;
+	    mem[m] += pgm[n].arg*v;
+
+	    if(physical_overflow) {
+		while (mem[m] > physical_max) {
+		    overflows++;
+		    mem[m] -= (physical_max-physical_min+1);
+		}
+	    } else {
+		if (mem[m] > physical_max) hard_wrap = 1;
+		if (mem[m] > SAFE_CELL_MAX) {
+		    /* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
+		    overflows++;
+		    mem[m] -= (SAFE_CELL_MAX+1);
+		    profile[pgm[n].cmd*4 + 3]++;
+		}
+	    }
+	    break;
+	case 'N':
+	    profile['-'*4] += pgm[n].arg*v;
+	    mem[m] -= pgm[n].arg*v;
+
+	    if(physical_overflow) {
+		while (mem[m] < physical_min) {
+		    underflows++;
+		    mem[m] += (physical_max-physical_min+1);
+		}
+	    } else {
+		if (mem[m] < physical_min) hard_wrap = 1;
+		if (mem[m] < -SAFE_CELL_MAX) {
+		    /* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
+		    underflows++;
+		    mem[m] += (SAFE_CELL_MAX+1);
+		    profile[pgm[n].cmd*4 + 3]++;
+		}
+	    }
+	    break;
+
+	case 'R':
+	    profile['>'*4] += pgm[n].arg*v;
+	    m += pgm[n].arg;
+	    if (m+MAXOFF >= memsize) m = alloc_ptr(m+MAXOFF)-MAXOFF;
+	    if(tape_max < m-memshift) tape_max = m-memshift;
+	    break;
+	case 'L':
+	    profile['<'*4] += pgm[n].arg*v;
+	    m -= pgm[n].arg;
+	    if (m+MINOFF <= 0) m = alloc_ptr(m+MINOFF)-MINOFF;
+	    if(tape_min > m-memshift) {
+		tape_min = m-memshift;
+		if(tape_min < -1000) {
+		    fprintf(stderr, "Tape underflow at pointer %d\n", tape_min);
+		    exit(1);
+		}
+	    }
+	    break;
+
 	}
+    }
+}
+
+void optimise(void)
+{
+    // +++++ [  -  >  +++  >  ++++  <<  ]
+    // 5+    [ 1- 1>  3+  1>  4+    2<  ]
+    // 5+    B    1>  3M  1>  4M    2<  Z
+    // 5i    1    1*B 3*B 1*B 4*B   2*B 2*B
+
+    int n, lastopen = 0, balance = 0, decfound = 0;
+
+    for(n = 0; pgm[n].cmd; n++) {
+	// > < + - = [ ] . , #
+	if (pgm[n].cmd == '[') {
+	    lastopen = n;
+	    decfound = balance = 0;
+	} else if (pgm[n].cmd == '>') {
+	    balance += pgm[n].arg;
+	} else if (pgm[n].cmd == '<') {
+	    balance -= pgm[n].arg;
+	} else if (pgm[n].cmd == '+' || pgm[n].cmd == '-') {
+	    if (balance == 0) {
+		if (pgm[n].cmd == '-' && pgm[n].arg == 1) {
+			if (decfound) lastopen = 0;
+			else decfound = 1;
+		} else
+		    lastopen = 0;
+	    }
+	} else if (pgm[n].cmd == ']' && lastopen && balance == 0 && decfound) {
+	    /* We have a balanced loop with simple contents */
+	    int i;
+	    for(i=lastopen; i<n; i++) {
+		if (pgm[i].cmd == '[') pgm[i].cmd = 'B';
+		else if (pgm[i].cmd == '+') pgm[i].cmd = 'M';
+		else if (pgm[i].cmd == '-') pgm[i].cmd = 'N';
+		else if (pgm[i].cmd == '>') pgm[i].cmd = 'R';
+		else if (pgm[i].cmd == '<') pgm[i].cmd = 'L';
+	    }
+	    pgm[n].cmd = 'E';
+	} else
+	    lastopen = 0;
     }
 }
 
@@ -406,15 +551,25 @@ print_pgm()
 		fprintf(stderr, "%c", pgm[n].cmd);
 	} else if (pgm[n].cmd == '=')
 	    fprintf(stderr, "[-]");
-	else if(pgm[n].cmd != ' ')
-	    fprintf(stderr, "%c", pgm[n].cmd);
+	else if (pgm[n].cmd == 'M' || pgm[n].cmd == 'N' ||
+	         pgm[n].cmd == 'R' || pgm[n].cmd == 'L') {
+	    int i;
+	    for(i = 0; i < pgm[n].arg; i++)
+		fprintf(stderr, "%c",
+			pgm[n].cmd=='M'?'+':
+			pgm[n].cmd=='M'?'-':
+			pgm[n].cmd=='R'?'>':
+			'<');
+	}
+	else if (pgm[n].cmd == 'B') fprintf(stderr, "[");
+	else if (pgm[n].cmd == 'E') fprintf(stderr, "]");
+	else if (pgm[n].cmd != ' ') fprintf(stderr, "%c", pgm[n].cmd);
     }
 }
 
 void
 print_summary()
 {
-    int program_len;			/* Number of BF command characters */
     intmax_t total_count = 0;
 
     {
@@ -423,19 +578,6 @@ print_summary()
 	    total_count += profile[bf[i]*4]
 			+  profile[bf[i]*4+1]
 			+  profile[bf[i]*4+2];
-	}
-    }
-
-    {
-	int n;
-	for(program_len = n = 0; pgm[n].cmd; n++) {
-	    if (pgm[n].cmd == '>' || pgm[n].cmd == '<' ||
-		pgm[n].cmd == '+' || pgm[n].cmd == '-' ) {
-		program_len += pgm[n].arg;
-	    } else if (pgm[n].cmd == '=')
-		program_len += 3;
-	    else if(pgm[n].cmd != ' ')
-		program_len++;
 	}
     }
 
