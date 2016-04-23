@@ -112,6 +112,7 @@ sigsegv_report(int signo UNUSED, siginfo_t * siginfo, void * ptr UNUSED)
 }
 
 static struct sigaction saved_segv;
+static int saved_segv_valid = 0;
 
 static void
 trap_sigsegv(void)
@@ -124,11 +125,15 @@ trap_sigsegv(void)
 
     if(0 > sigaction(SIGSEGV, &saSegf, &saved_segv))
 	perror("Error trapping SIGSEGV, ignoring");
+    else
+	saved_segv_valid = 1;
 }
 
 static void
 restore_sigsegv(void)
 {
+    if (!saved_segv_valid) return;
+    saved_segv_valid = 0;
     if(0 > sigaction(SIGSEGV, &saved_segv, NULL))
 	perror("Restoring SIGSEGV handler, ignoring");
 }
@@ -158,6 +163,16 @@ map_hugeram(void)
 	    break;
 
 	if (tapelength < 2*MEMGUARD) {
+	    /* last chance, no guards. */
+	    cell_array_alloc_len = tapelength + (hard_left_limit<0?MEMSKIP:0);
+
+	    mp = mmap(0, cell_array_alloc_len,
+			PROT_READ+PROT_WRITE,
+			MAP_PRIVATE+MAP_ANONYMOUS+MAP_NORESERVE, -1, 0);
+
+	    if (mp != MAP_FAILED)
+		break;
+
 	    perror("Cannot map memory for cell array");
 	    exit(1);
 	}
@@ -179,7 +194,7 @@ map_hugeram(void)
 	    perror("madvise() on tape returned error");
 #endif
 
-    if (MEMGUARD > 0) {
+    if (MEMGUARD > 0 && cell_array_alloc_len >= 2*MEMGUARD) {
 	/*
 	 * Now, unmap the guard regions ... NO we must disable
 	 * access to the guard regions, otherwise they may get remapped. ...
@@ -188,13 +203,14 @@ map_hugeram(void)
 	mprotect(mp, MEMGUARD, PROT_NONE);
 	mp += MEMGUARD;
 	mprotect(mp+cell_array_alloc_len-2*MEMGUARD, MEMGUARD, PROT_NONE);
+
+	/* Give a nice message if the program run into the guard regions */
+	trap_sigsegv();
     }
 
     cell_array_pointer = mp;
     if (hard_left_limit<0)
 	cell_array_pointer += MEMSKIP;
-
-    trap_sigsegv();
 
     return cell_array_pointer;
 }
