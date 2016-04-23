@@ -15,7 +15,7 @@ int main(int argc, char **argv)
 {
    FILE * ifd;
    int ch;
-   int p= -1, n= -1, j= -1;
+   int p= -1, n= -1, j= -1, i = 0;
    for (;;) {
       if (argc < 2 || argv[1][0] != '-' || argv[1][1] == '\0') break;
       else if (!strcmp(argv[1], "-e")) { argc--; argv++; on_eof = -1; }
@@ -30,7 +30,7 @@ int main(int argc, char **argv)
    }
    ifd = argc>1 && strcmp(argv[1], "-") ? fopen(argv[1], "r") : stdin;
    if(!ifd) perror(argv[1]); else {
-      while((ch = getc(ifd)) != EOF && (ifd!=stdin || ch != '!' || j>=0)) {
+      while((ch=getc(ifd)) != EOF && (ifd!=stdin || ch != '!' || j>=0 || !i)) {
 	 int r = (ch == '<' || ch == '>' || ch == '+' || ch == '-');
 	 if (r || (debug && ch == '#') || (ch == ']' && j>=0) ||
 	       ch == '[' || ch == ',' || ch == '.') {
@@ -57,7 +57,7 @@ int main(int argc, char **argv)
 	       } else if (pgm[n-1].cmd == '[') {
 		  n--; pgm[p=n].cmd = (pgm[n].arg = pgm[n+1].mov)?'?':'!';
 	       }
-	    }
+	    } else if (pgm[n].cmd == ',') i = 1;
 	 }
       }
       if (ifd!=stdin) fclose(ifd);
