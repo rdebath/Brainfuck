@@ -54,6 +54,14 @@
 static const char bf[] = "><+-.,[]";
 static const char * bfout[] = { ">", "<", "+", "-", ".", ",", "[", "]", 0 };
 
+/*  Ρ″
+    Corrado Böhm. On a family of Turing machines and
+    the related programming language. International
+    Computation Centre Bulletin, 3:187-94, July 1964.
+*/
+static const char *rhoprime[] =
+    { "r′λ", "R", "λR", "r′", "Ρ″", "Ιⁿ", "(", ")" };
+
 /* Language "C" */
 static const char * cbyte[] = { "m+=1;", "m-=1;", "++*m;", "--*m;",
 		   "write(1,m,1);", "read(0,m,1);", "while(*m) {", "}", 0 };
@@ -120,10 +128,6 @@ static const char * moo[] = {"moO", "mOo", "MoO", "MOo",
 /* Some random Chinese words */
 static const char *chinese[] =
     { "右", "左", "上", "下", "出", "里", "始", "末" };
-
-/* Ρ″ */
-static const char *rhoprime[] =
-    { "r′λ", "R", "λR", "r′", "Ρ″", "Ιⁿ", "(", ")" };
 
 /* https://github.com/mescam/zerolang */
 static const char *zero[] =
