@@ -150,6 +150,7 @@ int cell_size = 0;  /* Number of bits in cell IF they fit in an int. */
 int cell_mask = ~0; /* Mask using & with this. */
 int cell_smask = 0; /* Xor and subtract this; normally MSB of the mask. */
 char const * cell_type = "C";
+int cell_type_iso = 0;
 
 const char * bfname = "brainfuck";
 int curr_line = 0, curr_col = 0;
@@ -3735,44 +3736,40 @@ putch(int ch)
 void
 set_cell_size(int cell_bits)
 {
+    /* First try for an, oversized, exact C cell type */
 #if !defined(NO_EXT_BE)
     if (cell_bits == (int)sizeof(long)*CHAR_BIT && sizeof(long) > sizeof(int)) {
-	cell_length = cell_bits;
-	cell_size = 0;
-	cell_mask = ~0;
-	cell_smask = 0;
 	cell_type = "unsigned long";
-
-	if (verbose>5) fprintf(stderr, "Cell type is %s\n", cell_type);
-	return;
     } else
 #endif
-
+#if !defined(NO_EXT_BE) && defined(UINT64_MAX)
+    if (cell_bits == (int)sizeof(uint64_t)*CHAR_BIT) {
+	cell_type = "uint64_t";
+	cell_type_iso = 1;
+    } else
+#endif
 #if !defined(NO_EXT_BE) && defined(UINTMAX_MAX)
     if (cell_bits == (int)sizeof(uintmax_t)*CHAR_BIT) {
-	cell_length = cell_bits;
-	cell_size = 0;
-	cell_mask = ~0;
-	cell_smask = 0;
 	cell_type = "uintmax_t";
-
-	if (verbose>5) fprintf(stderr, "Cell type is %s\n", cell_type);
-	return;
+	cell_type_iso = 1;
     } else
 #endif
-
 #if !defined(NO_EXT_BE) && defined(__SIZEOF_INT128__)
     if (cell_bits == (int)sizeof(__int128)*CHAR_BIT) {
+	cell_type = "__int128";
+    } else
+#endif
+	cell_type = 0;
+
+    if (cell_type != 0) {
 	cell_length = cell_bits;
 	cell_size = 0;
 	cell_mask = ~0;
 	cell_smask = 0;
-	cell_type = "__int128";
 
 	if (verbose>5) fprintf(stderr, "Cell type is %s\n", cell_type);
 	return;
     } else
-#endif
 
     if (cell_bits >= (int)sizeof(int)*CHAR_BIT || cell_bits <= 0) {
 	if (cell_bits == -1 && opt_bytedefault) {
