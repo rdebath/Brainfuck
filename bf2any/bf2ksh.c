@@ -151,7 +151,7 @@ outcmd(int ch, int count)
 	if (do_input) {
 	    pr("");
 	    pr("getch() {");
-	    pr("    [ \"$goteof\" == \"y\" ] && return;");
+	    pr("    [ \"$goteof\" = \"y\" ] && return;");
 	    pr("    [ \"$gotline\" != \"y\" ] && {");
 	    pr("        if read -r line");
 	    pr("        then");
