@@ -1,24 +1,26 @@
 
 /* Make printf work correctly for the C standards */
 #if (defined(_WIN32) && defined(__MINGW32__) ) && !defined(__USE_MINGW_ANSI_STDIO)
-/* #define printf __mingw_printf */
+/*# define printf __mingw_printf */
 #define __USE_MINGW_ANSI_STDIO 1
 #endif
 
-#ifdef __STRICT_ANSI__
-#ifndef __STDC_VERSION__
+#if defined(__STRICT_ANSI__) || !defined(__STDC__) || !defined(__STDC_VERSION__)
 #define inline
-#endif
 #endif
 
 #include <stdio.h>
+#include <time.h>
+
+#ifdef __STDC__
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
+
 #include <float.h>
-#include <time.h>
 #if _POSIX_VERSION >= 199506L || defined(LLONG_MAX)
 #include <inttypes.h>
+#endif
 #endif
 
 #ifndef PRIdLLONG
@@ -37,7 +39,7 @@
 #endif
 
 /*
-    #include <inttypes.h>
+   # include <inttypes.h>
 
     intmax_t strtoimax(const char *nptr, char **endptr, int base);
     uintmax_t strtoumax(const char *nptr, char **endptr, int base);
@@ -49,12 +51,19 @@
 
 */
 
-struct byteonly {
-    char bytes[64+1];
-};
+/* Guess alignment of structures */
+struct alignchar { char a; char b;};
+struct alignshort { short a; char b; };
+struct alignint { int a; char b; };
+struct alignlong { long a; char b; };
+struct aligndouble { double a; char b; };
 
+#ifdef __STDC__
 static inline int
 is_big_endian(void)
+#else
+int is_big_endian()
+#endif
 {
     union {
 	long int l;
@@ -73,17 +82,46 @@ is_big_endian(void)
 	return 3;
 }
 
+#ifdef __STDC__
 int
 #ifdef BROKEN_MAIN
 main(int argc, char ** argv)
 #else
 main(void)
 #endif
+
+#else
+main()
+#endif
 {
     int e = is_big_endian();
     int known_weird = 0;
 #if !defined(CHAR_BIT) || !defined(CHAR_MIN) || !defined(CHAR_MAX)
     int char_bit, char_min = 0, char_max = 0;
+
+#if !defined(CHAR_BIT)
+#define CHAR_BIT    char_bit
+#endif
+#if !defined(CHAR_MIN)
+#define CHAR_MIN    char_min
+#endif
+#if !defined(CHAR_MAX)
+#define CHAR_MAX    char_max
+#endif
+
+    {
+	char x1 = 0, x2 = 0, x3 = 1;
+	for (char_bit=0; char_bit<256; char_bit++) {
+	    x1 = x2;
+	    x2 = x2 * 2 + 1;
+	    x3 = (x3<<1);
+	    if (x2 == x1 || (x2+1) == x2) break;
+
+	    if (char_min > x2) char_min = x2;
+	    if (char_min > x3) char_min = x3;
+	    if (char_max < x2) char_max = x2;
+	}
+    }
 #endif
 
     if (e == 2)
@@ -95,9 +133,14 @@ main(void)
     else
 	printf("LITTLE ENDIAN");
 
-    printf(" C%d:S%d:I%d:L%d P%d Struct-%d\n",
+    printf(" C%d:S%d:I%d:L%d P%d Struct-[%d,%d,%d,%d,%d]\n",
 	(int)sizeof(char), (int)sizeof(short), (int)sizeof(int),
-	(int)sizeof(long), (int)sizeof(char*), (int)sizeof(struct byteonly)-64);
+	(int)sizeof(long), (int)sizeof(char*),
+	(int)(sizeof(struct alignchar)-sizeof(char)),
+	(int)(sizeof(struct alignshort)-sizeof(short)),
+	(int)(sizeof(struct alignint)-sizeof(int)),
+	(int)(sizeof(struct alignlong)-sizeof(long)),
+	(int)(sizeof(struct aligndouble)-sizeof(double)) );
 
     if ( !(~1==-2) )
 	printf("WARNING: This is not a twos-complement machine\n\n");
@@ -145,15 +188,62 @@ main(void)
     }
 
 #ifdef __STDC_VERSION__
-    printf("Macro __STDC_VERSION__     %ldL\n", (long) __STDC_VERSION__);
+# if __STDC_VERSION__ == 199409L
+    printf("Macro __STDC_VERSION__     %ldL C89/C90 ISO/IEC 9899:1990\n", (long) __STDC_VERSION__);
+    printf("%34s Plus amendment 1 ISO/IEC 9899-1:1994\n","");
+# elif __STDC_VERSION__ == 199901L
+    printf("Macro __STDC_VERSION__     %ldL C99 ISO/IEC 9899:1999\n", (long) __STDC_VERSION__);
+# elif __STDC_VERSION__ == 201112L
+    printf("Macro __STDC_VERSION__     %ldL C11 ISO/IEC 9899:2011\n", (long) __STDC_VERSION__);
+# elif __STDC_VERSION__ > 201112L
+    printf("Macro __STDC_VERSION__     %ldL recent version\n", (long) __STDC_VERSION__);
+# else
+    printf("Macro __STDC_VERSION__     %ldL C89/C90 ISO/IEC 9899:1990\n", (long) __STDC_VERSION__);
+# endif
 #else
-#ifndef __STDC__
-    printf("__STDC__ NOT defined\n");
+#ifdef __STDC__
+    printf("Macro __STDC__             %6ldL C89/C90 ANSI X3.159-1989\n", (long) __STDC__);
+#else
+    printf("__STDC__ NOT defined       NOT ANSI C\n");
 #endif
 #endif
 
+#if defined(__STDC__) && defined(__STRICT_ANSI__)
+    printf("Macro __STRICT_ANSI__      %-6d  This may turn off items in libc\n", (int) __STRICT_ANSI__);
+#endif
+
+#ifdef __cplusplus
+# if __cplusplus == 199711L
+    printf("Macro __cplusplus          %dL C++ ISO/IEC 14882:1998\n", (int) __cplusplus);
+# elif __cplusplus == 201103L
+    printf("Macro __cplusplus          %dL C++ ISO/IEC 14882:2011\n", (int) __cplusplus);
+# elif __cplusplus == 201402L
+    printf("Macro __cplusplus          %dL C++ ISO/IEC 14882:2014\n", (int) __cplusplus);
+# elif __cplusplus/100*100 == __cplusplus
+    printf("Macro __cplusplus          %dL C++ Draft implementation\n", (int) __cplusplus);
+# else
+    printf("Macro __cplusplus          %dL C++\n", (int) __cplusplus);
+# endif
+#endif
+
 #ifdef _POSIX_VERSION
-    printf("Macro _POSIX_VERSION       %ld\n", (unsigned long) _POSIX_VERSION);
+# if _POSIX_VERSION == 198808L
+    printf("Macro _POSIX_VERSION       %ldL POSIX.1-1988 (first release)\n", (unsigned long) _POSIX_VERSION);
+# elif _POSIX_VERSION == 199009L
+    printf("Macro _POSIX_VERSION       %ldL POSIX.1-1990\n", (unsigned long) _POSIX_VERSION);
+# elif _POSIX_VERSION == 199309L
+    printf("Macro _POSIX_VERSION       %ldL POSIX.1b-1993\n", (unsigned long) _POSIX_VERSION);
+# elif _POSIX_VERSION == 199506L
+    printf("Macro _POSIX_VERSION       %ldL POSIX.1c-1996\n", (unsigned long) _POSIX_VERSION);
+# elif _POSIX_VERSION == 200112L
+    printf("Macro _POSIX_VERSION       %ldL POSIX.1-2001 (OG Issue 6)\n", (unsigned long) _POSIX_VERSION);
+# elif _POSIX_VERSION == 200809L
+    printf("Macro _POSIX_VERSION       %ldL POSIX.1-2008 (OG Issue 7)\n", (unsigned long) _POSIX_VERSION);
+# elif _POSIX_VERSION > 200809L
+    printf("Macro _POSIX_VERSION       %ldL recent version\n", (unsigned long) _POSIX_VERSION);
+# else
+    printf("Macro _POSIX_VERSION       %ldL BAD VALUE\n", (unsigned long) _POSIX_VERSION);
+# endif
 #else
     printf("Macro _POSIX_VERSION not defined!\n");
 #endif
@@ -163,7 +253,25 @@ main(void)
 #endif
 
 #ifdef _XOPEN_VERSION
-    printf("Macro _XOPEN_VERSION       %ld\n", (unsigned long) _XOPEN_VERSION);
+# if _XOPEN_VERSION == 3
+    printf("Macro _XOPEN_VERSION       %6ld  X/Open Portability Guide 3 (1989)\n", (unsigned long) _XOPEN_VERSION);
+# elif _XOPEN_VERSION == 4
+#  ifndef _XOPEN_SOURCE_EXTENDED
+    printf("Macro _XOPEN_VERSION       %6ld  X/Open Portability Guide 4 (1992)\n", (unsigned long) _XOPEN_VERSION);
+#  else
+    printf("Macro _XOPEN_VERSION/EXT   %6ld  X/Open Single UNIX Specification (1995)\n", (unsigned long) _XOPEN_VERSION);
+#  endif
+# elif _XOPEN_VERSION == 500
+    printf("Macro _XOPEN_VERSION       %6ld  SUS Version 2 1997\n", (unsigned long) _XOPEN_VERSION);
+# elif _XOPEN_VERSION == 600
+    printf("Macro _XOPEN_VERSION       %6ld  POSIX.1-2001 (OG Issue 6)\n", (unsigned long) _XOPEN_VERSION);
+# elif _XOPEN_VERSION == 700
+    printf("Macro _XOPEN_VERSION       %6ld  POSIX.1-2008 (OG Issue 7)\n", (unsigned long) _XOPEN_VERSION);
+# else
+    printf("Macro _XOPEN_VERSION       %6ld\n", (unsigned long) _XOPEN_VERSION);
+# endif
+#else
+    printf("Macro _XOPEN_VERSION not defined!\n");
 #endif
 
     if (sizeof(void *) == sizeof(int)) {
@@ -185,31 +293,6 @@ main(void)
     printf("Bytes SZ%2d, sizeof()\n", (int)sizeof(sizeof(int)));
     printf("\n");
 
-#if !defined(CHAR_BIT) || !defined(CHAR_MIN) || !defined(CHAR_MAX)
-#if !defined(CHAR_BIT)
-#define CHAR_BIT    char_bit
-#endif
-#if !defined(CHAR_MIN)
-#define CHAR_MIN    char_min
-#endif
-#if !defined(CHAR_MAX)
-#define CHAR_MAX    char_max
-#endif
-    {
-	char x1 = 0, x2 = 0, x3 = 1;
-	for (char_bit=0; char_bit<256; char_bit++) {
-	    x1 = x2;
-	    x2 = x2 * 2 + 1;
-	    x3 = (x3<<1);
-	    if (x2 == x1 || (x2+1) == x2) break;
-
-	    if (char_min > x2) char_min = x2;
-	    if (char_min > x3) char_min = x3;
-	    if (char_max < x2) char_max = x2;
-	}
-    }
-#endif
-
 #if defined(CHAR_BIT) && defined(CHAR_MIN) && defined(CHAR_MAX)
     if (CHAR_BIT == 8 && ((unsigned char)(3<<7)==0x80)) {
 	printf("Bytes C %2d, char           %d..%d in eight bits\n",
@@ -220,7 +303,7 @@ main(void)
     }
 #endif
 
-#if defined(SCHAR_MIN) && defined(SCHAR_MAX)
+#if defined(SCHAR_MIN) && defined(SCHAR_MAX) && defined(__STDC__)
     printf("Bytes SC%2d, signed char    %d..%d\n",
 	    (int)sizeof(signed char), (int)SCHAR_MIN, (int)SCHAR_MAX);
 #endif
@@ -232,7 +315,7 @@ main(void)
     printf("Bytes UC%2d, unsigned char  %d..%d\n",
 	    (int)sizeof(unsigned char), 0, (int)UCHAR_MAX);
 #ifdef CHAR_BIT
-    if (UCHAR_MAX != (1U<<CHAR_BIT)-1)
+    if (UCHAR_MAX != (((unsigned int)1)<<CHAR_BIT)-1)
 	printf("***********> NON CONFORMING IMPLEMENTATION\n");
 #endif
 #endif
@@ -240,6 +323,9 @@ main(void)
 #if defined(SHRT_MAX)
     printf("Bytes SI%2d, short int      %d\n",
 	    (int)sizeof(short int), (int)SHRT_MAX);
+#else
+    printf("Bytes SI%2d, short int      %d\n",
+	    (int)sizeof(int), (int)(((unsigned short)-1)>>1));	/*TWOS*/
 #endif
 #if defined(INT_MAX)
     printf("Bytes I %2d, int            %d\n",
