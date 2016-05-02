@@ -2,6 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if _POSIX_VERSION < 200112L && _XOPEN_VERSION < 500
+#define NO_SNPRINTF
+#endif
+
 #include "bf2any.h"
 
 /*
@@ -777,7 +781,11 @@ outcmd(int ch, int count)
 	    if ((v>=0 && v<2 && (langclass & C_MOVRLE)) ||
 	        (v>=2 && v<4 && (langclass & C_ADDRLE))) {
 		char sbuf[256];
+#ifndef NO_SNPRINTF
 		snprintf(sbuf, sizeof(sbuf), lang[v], count);
+#else
+		sprintf(sbuf, lang[v], count);
+#endif
 		ps(sbuf);
 		break;
 	    }
@@ -1129,7 +1137,11 @@ bfrle(int ch, int count)
     if (! (p = strchr(bf,ch))) return;
 
     if (count > 2 && (p-bf) < 4) {
+#ifndef NO_SNPRINTF
+	snprintf(buf, sizeof(buf), "%d%c", count, ch);
+#else
 	sprintf(buf, "%d%c", count, ch);
+#endif
 	ps(buf);
     } else while (count-- > 0)
 	pc(ch);

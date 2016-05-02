@@ -3,6 +3,10 @@
 #include <string.h>
 #include <signal.h>
 
+#if _POSIX_VERSION < 200112L && _XOPEN_VERSION < 500
+#define NO_SNPRINTF
+#endif
+
 #include "bf2any.h"
 
 /*
@@ -82,7 +86,11 @@ static char *
 dc_ltoa(long val)
 {
     static char buf[64];
+#ifndef NO_SNPRINTF
     snprintf(buf, sizeof(buf), "%ld", val);
+#else
+    sprintf(buf, "%ld", val);
+#endif
     if (*buf == '-') *buf = '_';
     return buf;
 }
