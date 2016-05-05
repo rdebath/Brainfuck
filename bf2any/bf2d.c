@@ -31,6 +31,8 @@ outcmd(int ch, int count)
     case '!':
 	ofd = stdout;
 
+	pr("module fuck;");	/* Required to prevent really stupid error messages. */
+
 	pr("import std.stdio;");
 	pr("void main(){");
 	ind++;
