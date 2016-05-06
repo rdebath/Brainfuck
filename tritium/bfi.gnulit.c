@@ -86,7 +86,9 @@ static jit_state_t *_jit;
 
 int gnulightning_ok = JITLIBOK;
 
-static void (*codeptr)(void);
+typedef void (*codeptr_t)(void*);
+static codeptr_t codeptr;
+
 static int acc_loaded = 0;
 static int acc_offset = 0;
 static int acc_dirty = 0;
@@ -194,23 +196,22 @@ run_gnulightning(void)
 {
     struct bfi * n = bfprog;
     int maxstack = 0, stackptr = 0;
-    void * tape_memory = 0;
     char *strbuf = 0;
     size_t maxstrlen = 0;
 #ifdef GNULIGHTv1
     jit_insn** loopstack = 0;
     jit_insn *codeBuffer;
     void * startptr;
+    int argp;
 #endif
 #ifdef GNULIGHTv2
     jit_node_t    *start, *end;	    /* For size of code */
     jit_node_t** loopstack = 0;
+    jit_node_t    *argp;
 #endif
 
     if (cell_size == 8) tape_step = 1; else
     tape_step = sizeof(int);
-
-    tape_memory = map_hugeram();
 
 #ifdef GNULIGHTv1
     /* TODO: Use mmap for allocating memory, the x86 execute protection
@@ -225,12 +226,13 @@ run_gnulightning(void)
 	codeBuffer = malloc(16 * total_nodes);
     save_ptr_for_free(codeBuffer);
 
-    codeptr = jit_set_ip(codeBuffer).vptr;
+    codeptr = (codeptr_t) jit_set_ip(codeBuffer).vptr;
     startptr = jit_get_ip().ptr;
     /* Function call prolog */
-    jit_prolog(0);
+    jit_prolog(1);
     /* Get the data area pointer */
-    jit_movi_p(REG_P, tape_memory);
+    argp = jit_arg_p();
+    jit_getarg_p(REG_P, argp);
 #endif
 
 #ifdef GNULIGHTv2
@@ -240,7 +242,8 @@ run_gnulightning(void)
     jit_prolog();
 
     /* Get the data area pointer */
-    jit_movi(REG_P, (jit_word_t) tape_memory);
+    argp = jit_arg();
+    jit_getarg(REG_P, argp);
 #endif
 
     while(n)
@@ -455,6 +458,10 @@ run_gnulightning(void)
 		}
 		strbuf[i] = 0;
 		s = strdup(strbuf);
+		if (!s) {
+		    fprintf(stderr, "Save of string failed\n");
+		    exit(43);
+		}
 		save_ptr_for_free(s);
 
 #ifdef GNULIGHTv1
@@ -545,6 +552,8 @@ run_gnulightning(void)
 
     if (strbuf) { maxstrlen = 0; free(strbuf); strbuf = 0; }
 
+    delete_tree();
+
 #ifdef GNULIGHTv1
     jit_flush_code(startptr, jit_get_ip().ptr);
 
@@ -553,7 +562,7 @@ run_gnulightning(void)
 		(int)(jit_get_ip().ptr - (char*)startptr));
 
     start_runclock();
-    codeptr();
+    codeptr(map_hugeram());
     finish_runclock(&run_time, &io_time);
 #endif
 
@@ -570,7 +579,7 @@ run_gnulightning(void)
     // jit_disassemble();
 
     start_runclock();
-    codeptr();
+    codeptr(map_hugeram());
     finish_runclock(&run_time, &io_time);
 #endif
 

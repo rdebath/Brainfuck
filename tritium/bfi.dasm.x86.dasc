@@ -688,6 +688,7 @@ link_and_run(dasm_State ** state)
 
     dasm_encode(state, codeptr);
     dasm_free(state);
+    delete_tree();
 
 #if !defined(LEGACYOS) && !defined(_WIN32) && !defined(NO_MPROTECT)
     if (mprotect(codeptr, size, PROT_EXEC | PROT_READ) != 0) {

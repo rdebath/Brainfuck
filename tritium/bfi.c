@@ -186,7 +186,6 @@ void process_file(void);
 void print_tree_stats(void);
 void printtreecell(FILE * efd, int indent, struct bfi * n);
 void printtree(void);
-void delete_tree(void);
 void calculate_stats(void);
 void pointer_scan(void);
 void pointer_regen(void);
