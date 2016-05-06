@@ -1,3 +1,9 @@
+#ifndef CNF
+#define DISABLE_GNULIGHTNING
+#define DISABLE_TCCLIB
+#define DISABLE_DLOPEN
+#define DISABLE_DYNASM
+#endif
 
 #if defined(__GNUC__) \
     && (__GNUC__ > 2) || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)

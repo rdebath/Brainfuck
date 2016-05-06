@@ -1,10 +1,17 @@
 
 #include <stdio.h>
 
+#ifdef CNF
+#ifndef VERSION
 #include "bfi.version.h"
+#endif
+#else
+#define VERSION "Manual build"
+#endif
 
 #define VS_Q(x) #x
 #define VS_S(x) VS_Q(x)
+#ifndef VERSION
 #define VS(x) VS_S(VERSION_ ## x)
 #ifdef GITHASH
 #ifdef GITDECO
@@ -19,6 +26,7 @@
 #endif
 #else
 #define VERSION "v" VS(MAJOR) "." VS(MINOR) "." VS(BUILD) VERSION_SUFFIX
+#endif
 #endif
 
 /* This list of Operating systems is all those I've actually tried it on. */
