@@ -34,6 +34,7 @@ int ind = 0;
 
 static void print_cstring(void);
 static int use_macro = 0;
+static int bpc = 0;
 
 int
 check_arg(const char * arg)
@@ -43,6 +44,12 @@ check_arg(const char * arg)
     if (strcmp(arg, "-mac") == 0) {
 	use_macro = 1;
 	return 1;
+    }
+    if (strncmp(arg, "-b", 2) == 0 && arg[2] ) {
+        bpc = strtol(arg+2, 0, 10);
+	if (bpc < 8)
+	    return 0;
+        return 1;
     }
     return 0;
 }
@@ -66,6 +73,12 @@ outcmd(int ch, int count)
 	printf("mpz_t * mem = 0;\n");
 	printf("int memsize = 0;\n");
 	printf("#define MINALLOC 16\n");
+	puts("");
+
+	printf("#ifndef BPC\n");
+	printf("#define BPC %d\n", bpc);
+	printf("#endif\n");
+	printf("static mpz_t cell_and;\n");
 	puts("");
 
 	printf("%s",
@@ -131,6 +144,11 @@ outcmd(int ch, int count)
 	} else {
 	    I; printf("mpz_t v;\n");
 	    I; printf("mpz_init(v);\n");
+	       printf("#if BPC > 0\n");
+	    I; printf("mpz_init(cell_and);\n");
+	    I; printf("mpz_ui_pow_ui(cell_and, 2, BPC);\n");
+	    I; printf("mpz_sub_ui(cell_and, cell_and, 1);\n");
+	       printf("#endif\n");
 	}
 	I; printf("setbuf(stdout, 0);\n");
 	I; printf("p = move_ptr(mem,0);\n");
@@ -147,11 +165,15 @@ outcmd(int ch, int count)
 	    printf("mpz_set_si(*p, %d);\n", count);
 	break;
 
-    case 'B': I;
-	if (bytecell)
-	    printf("v = *p;\n");
-	else
-	    printf("mpz_set(v, *p);\n");
+    case 'B':
+	if (bytecell) {
+	    I; printf("v = *p;\n");
+	} else {
+	       printf("#if BPC > 0\n");
+	    I; printf("mpz_and(*p, *p, cell_and);\n");
+	       printf("#endif\n");
+	    I; printf("mpz_set(v, *p);\n");
+	}
 	break;
 
     case 'm':
@@ -210,16 +232,23 @@ outcmd(int ch, int count)
 	break;
 
     case '[':
-	I;
-	if(bytecell)
-	    printf("while(*p){\n");
-	else
-	    printf("while(mpz_cmp_ui(*p, 0)){\n");
+	if(bytecell) {
+	    I; printf("while(*p){\n");
+	} else {
+	       printf("#if BPC > 0\n");
+	    I; printf("mpz_and(*p, *p, cell_and);\n");
+	       printf("#endif\n");
+	    I; printf("while(mpz_cmp_ui(*p, 0)){\n");
+	}
 	ind++;
 	break;
 
     case ']':
-	ind--; I; printf("}\n");
+	   printf("#if BPC > 0\n");
+	I; printf("mpz_and(*p, *p, cell_and);\n");
+	   printf("#endif\n");
+	ind--;
+	I; printf("}\n");
 	break;
 
     case '.': I;
