@@ -574,7 +574,7 @@ print_summary()
 
     {
 	int i;
-	for (i = 0; i < sizeof(bf); i++) {
+	for (i = 0; i < (int)sizeof(bf); i++) {
 	    total_count += profile[bf[i]*4]
 			+  profile[bf[i]*4+1]
 			+  profile[bf[i]*4+2];
@@ -599,14 +599,14 @@ print_summary()
 	fprintf(stderr, "Final tape contents:\n");
 
 	{
-	    int pw = 0, cc = 0, pc = 0;
+	    int pw = 3, cc = 0, pc = 0;
 	    {
 		char buf[64];
 		int i;
 		i = sprintf(buf, "%d", physical_min);
-		if (i > pw) pw = i;
+		if (i > pw && i < (int)sizeof(buf)) pw = i;
 		i = sprintf(buf, "%d", physical_max);
-		if (i > pw) pw = i;
+		if (i > pw && i < (int)sizeof(buf)) pw = i;
 	    }
 
 	    if (all_cells && cell_mask == 0xFF && tape_min == 0) {
@@ -677,7 +677,7 @@ print_summary()
 	    fprintf(stderr, "Skipped loops (zero on '['): %"PRIdMAX"\n",
 		profile['['*4+1]);
 
-	for(n = 0; n < sizeof(bf)-1; n++) {
+	for(n = 0; n < (int)sizeof(bf)-1; n++) {
 	    ch = bf[n];
 
 	    if (n==0 || n==4)
