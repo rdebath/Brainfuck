@@ -5,17 +5,17 @@
 #include "bf2any.h"
 
 /*
- * Ksh translation from BF, runs at about 750,000 instructions per second.
- * Bash translation from BF, runs at about 340,000 instructions per second.
- *
- * This has special optimisations for the BASH shell, it's still slower than
- * all the other modern shells I can find easily.
+ * Ksh translation from BF, runs at about 3,400,000 instructions per second.
+ * Bash translation from BF, runs at about 420,000 instructions per second.
  */
 
 int do_input = 0;
+int do_output = 0;
 int ind = 0;
-int select_bash = 0;
-int select_ksh = 0;
+int in_arith = 0;
+int curr_offset = -1;
+
+static void print_string(void);
 
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
@@ -24,128 +24,121 @@ int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
-    if (strcmp(arg, "-ksh") == 0) { select_ksh = 1; return 1; }
-    if (strcmp(arg, "-bash") == 0) { select_bash = 1; return 1; }
-    if (strcmp("-h", arg) ==0) {
-	fprintf(stderr, "%s\n",
-	"\t"    "-bash   Generate special bash code."
-	"\n\t"  "-ksh    Allow for bash or ksh.");
-	return 1;
-    } else
+    if (strcmp(arg, "-savestring") == 0) return 1;
     return 0;
+}
+
+static void
+shcode() {
+    if (!in_arith) return;
+    in_arith = 0;
+    pr("1))");
+}
+
+static void
+arith() {
+    if (in_arith) return;
+    in_arith = 1;
+    pr("((");
 }
 
 void
 outcmd(int ch, int count)
 {
+    if (curr_offset >= 0) {
+	if (ch == '>') { curr_offset += count; return; }
+	if (ch == '<' && curr_offset > count) { curr_offset -= count; return; }
+	if (ch != '"' && ch != '~') {
+	    pr("typeset -i M P V");
+	    prv("P=%d", curr_offset);
+	    curr_offset = -1;
+	}
+    }
+
     switch(ch) {
     case '!':
-	if (select_bash)
-	    pr("#!/bin/bash");
-	else
-	    pr("#!/bin/ksh");
-
-	pr("if ( eval 'typeset -i M P && M[1]=3 && ((M[2]+=1)) &&");
-	pr("     ((M[1]+=1)) &&  [[ ${M[1]} -eq 4 && ${M[2]} -eq 1 ]]' ) 2>/dev/null");
-	pr("then eval 'typeset -i M P' 2>/dev/null");
-	pr("elif ( eval 'M[1]=3 && ((M[2]+=1))");
-	pr("     ((M[1]+=1)) &&  [[ ${M[1]} -eq 4 && ${M[2]} -eq 1 ]]' ) 2>/dev/null");
+	pr("#!/bin/ksh");
+	pr("if (eval 'typeset -i M P V && M[1]=3 && ((M[500]+=1,1)) &&");
+	pr("   ((M[1]+=1)) && [[ ${M[1]} -eq 4 && ${M[500]} -eq 1 ]]' ) 2>/dev/null");
 	pr("then :");
 	pr("else");
-	pr("    echo 'ERROR: The shell must be Ksh compatible' >&2");
+	pr("    echo 'ERROR: The shell must be Ksh93 compatible' >&2");
 	pr("    exit 1");
 	pr("fi");
 
-	if (select_bash) 
-	    pr("eval 'set -f +B' 2>/dev/null");
-
+	pr("");
+	pr("eval 'set -f +B' 2>/dev/null");
 	pr("export LC_ALL=C");
+
+	pr("");
 	pr("brainfuck() {");
 	ind++;
-        prv("((P=%d))", tapeinit); break;
+	curr_offset = tapeinit;
 	break;
 
-    case 'X': pr("echo Infinite Loop 2>&1 ; exit 1"); break;
+    case 'X': shcode(); pr("echo Infinite Loop 2>&1 ; exit 1"); break;
 
-    case '=': prv("((M[P]=%d))", count); break;
+    case '=':
+	if (in_arith)
+	    prv("  M[P]=%d,", count);
+	else
+	    prv("M[P]=%d", count);
+	break;
+
     case 'B':
-	if(bytecell) pr("((M[P]&=255))");
-	pr("((V=M[P]))");
+	arith();
+	if(bytecell) pr("  M[P]&=255,");
+	pr("  V=M[P],");
 	break;
-    case 'M': prv("((M[P]+=V*%d))", count); break;
-    case 'N': prv("((M[P]-=V*%d))", count); break;
-    case 'S': pr("((M[P]+=V))"); break;
-    case 'Q': prv("[[ $V -ne 0 ]] && ((M[P]=%d))", count); break;
-    case 'm': prv("[[ $V -ne 0 ]] && ((M[P]+=V*%d))", count); break;
-    case 'n': prv("[[ $V -ne 0 ]] && ((M[P]-=V*%d))", count); break;
-    case 's': pr("[[ $V -ne 0 ]] && ((M[P]+=V))"); break;
+    case 'M': arith(); prv("  M[P]+=V*%d,", count); break;
+    case 'N': arith(); prv("  M[P]-=V*%d,", count); break;
+    case 'S': arith(); pr("  M[P]+=V,"); break;
 
-    case '+': prv("((M[P]+=%d))", count); break;
-    case '-': prv("((M[P]-=%d))", count); break;
-    case '>': prv("((P+=%d))", count); break;
-    case '<': prv("((P-=%d))", count); break;
-    case '.': pr("o"); break;
-    case ',': pr("getch"); do_input++; break;
+    case 'Q': arith(); prv("  V)) && ((M[P]=%d,", count); shcode(); break;
+    case 'm': arith(); prv("  V)) && ((M[P]+=V*%d,", count); shcode(); break;
+    case 'n': arith(); prv("  V)) && ((M[P]-=V*%d,", count); shcode(); break;
+    case 's': arith(); pr("  V)) && ((M[P]+=V,"); shcode(); break;
+
+    case '+': arith(); prv("  M[P]+=%d,", count); break;
+    case '-': arith(); prv("  M[P]-=%d,", count); break;
+    case '>': arith(); prv("  P+=%d,", count); break;
+    case '<': arith(); prv("  P-=%d,", count); break;
+    case '.': shcode(); pr("o $((M[P]&255))"); do_output++; break;
+    case ',': shcode(); pr("getch"); do_input++; break;
+    case '"': shcode(); print_string(); break;
 
     case '[':
+	shcode();
 	if(bytecell) { pr("while (( (M[P]&=255) != 0)) ; do"); }
 	else { pr("while ((M[P])) ; do"); }
 	ind++;
 	break;
-    case ']': ind--; pr("done"); break;
+    case ']': shcode(); ind--; pr("done"); break;
 
     case '~':
+	shcode();
 	ind--;
 	pr("}");
 
-	if (!select_bash || select_ksh) {
-	    pr("");
-	    pr("if [ .`echo -n` = .-n ]");
-	    pr("then");
-	    pr("    echon() { echo \"$1\\c\"; }");
-	    pr("    echoe() { echo \"$1\\c\"; }");
+	if (do_output) {
+	    pr("echon() { printf \"%%s\" \"$*\" ;}");
+	    pr("if ((BASH_VERSINFO[0]>0)) ; then");
+	    pr("    # Bash works but so slooooow");
+	    pr("    o(){ printf -v C '\\\\%%04o' $1; echo -n -e \"$C\" ; }");
+	    pr("elif ( ( eval ': ${.sh.version}' ) 2>/dev/null >&2 ) ; then");
+	    pr("    # A real Ksh93 has a fast printf");
+	    pr("    o(){ printf \"\\\\x$(printf %%02x $1)\";}");
 	    pr("else");
-	    pr("    echon() { echo -n \"$1\"; }");
-	    pr("    if [ .`echo -e` = .-e ]");
-	    pr("    then echoe() { echo -n \"$1\"; }");
-	    pr("    else if [ .`echo -e '\\070\\c'` = .8 ]");
-	    pr("         then echoe() { echo -e \"$1\\c\"; }");
-	    pr("         else echoe() { echo -n -e \"$1\"; }");
-	    pr("         fi");
-	    pr("    fi");
+	    pr("    # Hopefully the ksh88 version is quick");
+	    pr("    o() { typeset -i8 N ; N=$1; print -n - \\\\0$(print ${N#*#});}");
+	    pr("    echon() { print -n - \"$*\" ;}");
 	    pr("fi");
-	}
 
-	pr("");
-	if (select_bash && select_ksh) {
-	    pr("o(){");
-	    pr("    if printf -v C '\\\\%%04o' $((M[P]&=255)) 2>/dev/null");
-	    pr("    then echo -n -e \"$C\"");
-	    pr("    else");
-	    pr("        o(){ echoe \"`printf '\\\\\\\\%%04o' $((M[P]&255))`\" ; }");
-	    pr("        o");
-	    pr("    fi");
+	    /* Safe fallback */
+	    pr("[ \"`{ o 65;echon A;} 2>/dev/null`\" != AA ] && {");
+	    pr("    o() { echo $1 | awk '{printf \"%%c\",$1;}';}");
+	    pr("    echon() { awk -v S=\"$*\" 'BEGIN{printf \"%%s\",S;}';}");
 	    pr("}");
-	} else if (select_bash)
-	    pr("o(){ printf -v C '\\\\%%04o' $((M[P]&=255)); echo -n -e \"$C\" ; }");
-	else if (select_ksh)
-	    pr("o(){ echoe \"`printf '\\\\\\\\%%04o' $((M[P]&255))`\" ; }");
-	else {
-	    int i;
-
-	    printf("o() {\n");
-	    printf("case $((M[P]+0)) in\n");
-	    for(i=0; i<256; i++) {
-		if (i >= ' ' && i <= '~' && i != '\'' && i != '\\')
-		    printf("%d ) echon '%c' ;;\n", i, i);
-		else if (i == 10 )
-		    printf("%d ) echo ;;\n", i);
-		else if (i < 64)
-		    printf("%d ) echoe '\\%03o' ;;\n", i, i);
-		else
-		    printf("%d ) echoe '\\%04o' ;;\n", i, i);
-	    }
-	    printf("esac\n}\n");
 	}
 
 	if (do_input) {
@@ -166,23 +159,75 @@ outcmd(int ch, int count)
 	    pr("        ((M[P]=10))");
 	    pr("        return");
 	    pr("    }");
-	    if (select_bash) {
-		pr("    c=\"${line:0:1}\"");
-		pr("    line=\"${line:1}\"");
-		pr("");
-		pr("    printf -v C %%d \\'\"$c\"");
-	    } else {
-		pr("    C=\"$line\"");
-		pr("    while [ ${#C} -gt 1 ] ; do C=\"${C%%?}\"; done");
-		pr("    line=\"${line#?}\"");
-		pr("    C=`echon \"$C\" |od -d |awk 'NR==1{print 0+$2;}'`");
-	    }
-	    pr("    ((M[P]=C))");
+
+	    ind++;
+	    pr("if ((BASH_VERSINFO[0]>0)) ; then");
+	    pr("    c=\"${line:0:1}\"");
+	    pr("    line=\"${line:1}\"");
+	    pr("    printf -v C %%d \"'$c\"");
+
+	    pr("");
+	    pr("elif ( line=nnynnn; j=2; [[ \"${line:j:1}\" == y ]] ) 2>/dev/null ; then");
+	    pr("    c=\"${line:0:1}\"");
+	    pr("    line=\"${line:1}\"");
+	    pr("    C=$(printf %%d \"'$c\")");
+
+	    pr("");
+	    pr("else");
+	    pr("    C=\"$line\"");
+	    pr("    while [ ${#C} -gt 1 ] ; do C=\"${C%%?}\"; done");
+	    pr("    line=\"${line#?}\"");
+	    pr("    C=`echo \"$C\" |dd bs=1 count=1 2>/dev/null |od -d |awk 'NR==1{print 0+$2;}'`");
+	    pr("fi");
+	    pr("((M[P]=C))");
+
+	    ind--;
 	    pr("}");
 	}
 
 	pr("");
-	pr("brainfuck ||:");
+	pr("set -e");
+	pr("brainfuck");
 	break;
+    }
+}
+
+static void
+print_string(void)
+{
+    char * str = get_string();
+    char buf[256];
+    int badchar = 0;
+    size_t outlen = 0;
+
+    if (!str) return;
+
+    for(;; str++) {
+	if (outlen && (*str == 0 || badchar || outlen > sizeof(buf)-8))
+	{
+	    buf[outlen] = 0;
+	    if (badchar == '\n') {
+		prv("echo '%s'", buf);
+		badchar = 0;
+	    } else {
+		do_output++;
+		prv("echon '%s'", buf);
+	    }
+	    outlen = 0;
+	}
+	if (badchar) {
+	    prv("o %d", badchar);
+	    badchar = 0;
+	    do_output++;
+	}
+	if (!*str) break;
+
+	if (*str == '-' && outlen == 0) {
+	    badchar = (*str & 0xFF);
+	} else if (*str >= ' ' && *str <= '~' && *str != '\\' && *str != '\'') {
+	    buf[outlen++] = *str;
+	} else {
+	    badchar = (*str & 0xFF);
+	}
     }
 }
