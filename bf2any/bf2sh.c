@@ -5,12 +5,17 @@
 #include "bf2any.h"
 
 /*
- * Bourne shell translation from BF, runs at about 1,100,000 instructions per second.
+ * Bourne shell translation from BF, runs at about 950,000 instructions per second.
  *
  * This is a 'current version' translation to the common Bourne shell
- * language. It runs on ash, bash, dash, ksh, mksh, zsh. Ash/Dash looks
- * like the fastest at the above speed, Bash is the slowest at about a
- * quarter of that speed.
+ * language.
+ *
+ * It runs on ash, bash, dash, ksh, lksh, mksh, pdksh-5.2.12+, yash, zsh.
+ *
+ * It does NOT run on ksh88, pdksh-5.2.3, posh
+ *
+ * Ash/Dash looks like the fastest at the above speed, Bash is the
+ * slowest at about 180,000.
  */
 
 int do_input = 0;
@@ -30,7 +35,16 @@ outcmd(int ch, int count)
 {
     switch(ch) {
     case '!':
-	pr("#!/bin/dash");
+	pr("#!/bin/sh");
+	pr("if (eval 'P=1 && : $((M$P=3)) && Q=500 && : $((M$Q+=1)) &&");
+	pr("   : $((M$P+=1)) && [ $((M$P)) = 4 -a $((M$Q)) = 1 ]' ) 2>/dev/null");
+	pr("then :");
+	pr("else");
+	pr("    echo 'ERROR: The shell must be POSIX compatible' >&2");
+	pr("    exit 1");
+	pr("fi");
+	pr("");
+
 	pr("set -f");
 	pr("");
 
