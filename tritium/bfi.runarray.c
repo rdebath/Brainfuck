@@ -55,6 +55,7 @@ convert_tree_to_runarray(void)
 	return;
     }
 #endif
+    only_uses_putch = 1;
 
     while(n)
     {

@@ -145,6 +145,7 @@ int cell_mask = ~0; /* Mask using & with this. */
 int cell_smask = 0; /* Xor and subtract this; normally MSB of the mask. */
 char const * cell_type = "C";
 int cell_type_iso = 0;
+int only_uses_putch = 0;
 
 const char * bfname = "brainfuck";
 int curr_line = 0, curr_col = 0;
@@ -1103,6 +1104,11 @@ process_file(void)
     }
 #endif
 
+    if (do_run && only_uses_putch == 2 && isatty(STDOUT_FILENO)) {
+	fflush(stdout);
+	fprintf(stderr, "\n");
+    }
+
     if (do_run && verbose && verbose < 3 && run_time>0) {
 	fflush(stdout);
 	fprintf(stderr, "Run time %.6fs, I/O time %.6fs\n", run_time, io_time);
@@ -1212,6 +1218,8 @@ run_tree(void)
 {
     int *p, *oldp;
     struct bfi * n = bfprog;
+
+    if (!opt_runner) only_uses_putch = 1;
 
     oldp = p = map_hugeram();
     start_runclock();
@@ -3703,6 +3711,9 @@ putch(int ch)
     else
 #endif
 	putchar(ch);
+
+    if (only_uses_putch) only_uses_putch = 2-(ch == '\n');
+
     unpause_runclock();
 }
 

@@ -28,6 +28,7 @@ extern int opt_level;
 extern int iostyle, eofcell;
 extern char * input_string;
 extern int opt_regen_mov;
+extern int only_uses_putch;
 
 extern unsigned cell_length;
 extern int cell_size;

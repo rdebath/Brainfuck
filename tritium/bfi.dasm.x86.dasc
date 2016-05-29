@@ -197,6 +197,7 @@ run_dynasm(void)
 
     if (cell_size == 8) tape_step = 1; else
     tape_step = sizeof(int);
+    only_uses_putch = 1;
 
     if (total_nodes > 2000000) {
 	if (verbose)
