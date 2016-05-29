@@ -56,49 +56,43 @@ outcmd(int ch, int count)
     }
 
     switch(ch) {
-    case '+': printf("u\n"); break;
-    case '-': printf("d\n"); break;
-    case '>': printf("r\n"); break;
-    case '<': printf("l\n"); break;
+    case '+': printf("u1\n"); break;
+    case '-': printf("d1\n"); break;
+    case '>': printf("r1\n"); break;
+    case '<': printf("l1\n"); break;
     case '[':
-	printf("f\n");
+	printf("f1\n");
 	printf("while [ \"$A\" != 0 ] ; do\n");
 	ind++;
 	break;
     case ']':
-	printf("f\n");
+	printf("f1\n");
 	ind--; printf("done\n");
 	break;
-    case '.': printf("o\n"); do_output = 1; break;
-    case ',': printf("i\n"); do_input = 1; break;
+    case '.': printf("o1\n"); do_output = 1; break;
+    case ',': printf("i1\n"); do_input = 1; break;
     }
 
     switch(ch) {
     case '!':
 	printf("#!/bin/sh\n");
-	printf("{ unalias -a ;} 2>/dev/null ||: # ksh ('93)\n");
 	printf("bf(){\n");
 	break;
     case '~':
 	printf("}\n");
 
 	if (MAXPRLE>1) {
-	    for (i=3; i<=MAXPRLE; i++) {
-		printf("u%d() { u ; u%d; }\n", i, i-1);
-		printf("d%d() { d ; d%d; }\n", i, i-1);
-		printf("l%d() { l ; l%d; }\n", i, i-1);
-		printf("r%d() { r ; r%d; }\n", i, i-1);
+	    for (i=2; i<=MAXPRLE; i++) {
+		printf("u%d() { u1 ; u%d; }\n", i, i-1);
+		printf("d%d() { d1 ; d%d; }\n", i, i-1);
+		printf("l%d() { l1 ; l%d; }\n", i, i-1);
+		printf("r%d() { r1 ; r%d; }\n", i, i-1);
 	    }
-
-	    printf("u2() { u ; u; }\n");
-	    printf("d2() { d ; d; }\n");
-	    printf("l2() { l ; l; }\n");
-	    printf("r2() { r ; r; }\n");
 	}
 
-	printf("u() { eval \"A=\\$M$P\"; inc; eval \"M$P=$A\" ; }\n");
-	printf("d() { eval \"A=\\$M$P\"; dec; eval \"M$P=$A\" ; }\n");
-	printf("f() { eval \"A=\\$M$P\"; [ .$A = . ] && A=0; }\n");
+	printf("u1() { eval \"A=\\$M$P\"; inc; eval \"M$P=$A\" ; }\n");
+	printf("d1() { eval \"A=\\$M$P\"; dec; eval \"M$P=$A\" ; }\n");
+	printf("f1() { eval \"A=\\$M$P\"; [ .$A = . ] && A=0; }\n");
 
 	printf("\n");
 	printf("inc() {\n");
@@ -121,7 +115,7 @@ outcmd(int ch, int count)
 	printf("\n");
 	printf("%s\n",
 
-"\n"	    "r() {"
+"\n"	    "r1() {"
 "\n"	    "    C=1 ; B= ; P="
 "\n"	    "    for v in $PS"
 "\n"	    "    do"
@@ -147,7 +141,7 @@ outcmd(int ch, int count)
 "\n"	    "    PS=\"$B\""
 "\n"	    "}"
 "\n"	    ""
-"\n"	    "l() {"
+"\n"	    "l1() {"
 "\n"	    "    C=1 ; B= ; P= ; LZ= ; LZP="
 "\n"	    "    for v in $PS"
 "\n"	    "    do"
@@ -180,7 +174,7 @@ outcmd(int ch, int count)
 
 	if(do_output) {
 	    printf("\n");
-	    printf("o() {\n");
+	    printf("o1() {\n");
 	    printf("eval \"A=\\$M$P\"\n");
 	    printf("case \"$A\" in\n");
 	    for(i=0; i<256; i++) {
@@ -212,7 +206,7 @@ outcmd(int ch, int count)
 	if (do_input)
 	    printf("\n%s\n%s\n%s\n%s\n%s\n",
 		"# Use other tools here, input is not needed for TC",
-		"i() {",
+		"i1() {",
 		"A=`dd bs=1 count=1 2>/dev/null | od -t d1 | awk '{print $2;}'`",
 	        "eval \"M$P=$A\"",
 		"}");
