@@ -701,7 +701,7 @@ ps(const char * s)
 		sp = 0;
 	    }
 	    if (sp) pc(' ');
-	    printf("%.*s", p-s, s);
+	    printf("%.*s", (int)(p-s), s);
 	    if (*p) p++;
 	    col += l; s = p; l = 0;
 	} else if ((*p&0xC0) != 0x80) {
