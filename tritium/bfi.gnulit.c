@@ -39,18 +39,6 @@
 
 #if defined(GNULIGHTv1) || defined(GNULIGHTv2)
 
-/* GNU lightning's macros upset GCC a little ... */
-#if (defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=3))) || defined(__clang__)
-#pragma GCC diagnostic ignored "-Wunused-value"
-#pragma GCC diagnostic ignored "-Wcast-align"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wpointer-to-int-cast"
-#pragma GCC diagnostic ignored "-Wsign-conversion"
-#ifdef __clang__
-#pragma GCC diagnostic ignored "-Wused-but-marked-unused"
-#endif
-#endif
-
 #ifdef GNULIGHTv1
 #define jit_addi jit_addi_i
 #define jit_movi jit_movi_i
@@ -60,7 +48,7 @@
 #define jit_andi jit_andi_i
 #define jit_extr_uc jit_extr_uc_i
 
-#if !defined(__x86_64__) && !defined(__amd64__) && !defined(_M_AMD64)
+#if !defined(__x86_64__) && !defined(__amd64__) && !defined(_M_AMD64) && !defined(_WIN32)
 #define JITLIBOK 1
 #else
 #define JITLIBOK 0

@@ -11,7 +11,6 @@
 #
 # Beware: pkg-config doesn't cope with multiarch.
 
-CC := $(shell ( which 2>/dev/null gcc clang pcc ; echo cc ) | head -1 | sed 's:.*/::')
 INSTALL=install -p -s
 INSTALLDIR=/usr/local/bin
 INSTALLEXT=
@@ -25,6 +24,9 @@ ALLEXE=\
 TOOLDIR=../tools
 LDLIBS=
 
+ifneq ($(MAKECMDGOALS),clean)
+# Need this early
+CC := $(shell ( which 2>/dev/null gcc clang pcc ; echo cc ) | head -1 | sed 's:.*/::')
 ifneq ($(wildcard $(TOOLDIR)/dynasm/dynasm),)
 CPUFOUND := $(shell $(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -DDETECT_ONLY \
 		-E -dM -x c bf2jit.x86.dasc | grep DASM_FOUND_CPU )
@@ -32,7 +34,9 @@ endif
 ifneq ($(CPUFOUND),)
 ALLEXE+=bf2jit
 endif
+endif
 
+# .o files here so we build them first.
 all:	bf2any.o bf2const.o $(ALLEXE)
 
 clean:
@@ -41,7 +45,7 @@ clean:
 	-rm -f libtcl.lib-off libtcl.lib-on
 	-rm -f liblua.lib-off liblua.lib-on
 	-rm -f libpy.lib-off libpy.lib-on
-	-rm -f bf2jit.c
+	-rm -f bf2jit.c bf2jit
 	-rm -f *.o
 
 # Install all we can make, but don't fail if some can't be built.
@@ -73,8 +77,10 @@ MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 $(ALLEXE): bf2any.o bf2const.o
 
 #-------------------------------------------------------------------------------
-# Special cases.
+# Special cases and configuration
 #-------------------------------------------------------------------------------
+ifneq ($(MAKECMDGOALS),clean)
+
 PKGCONF=pkg-config$(TARGET_ARCH)
 #-------------------------------------------------------------------------------
 # Clone the two plain assembly variants.
@@ -102,43 +108,6 @@ bf2jit.c: bf2jit.x86.dasc
 	$(TOOLDIR)/dynasm/dynasm -c -D I386 -o bf2jit.c bf2jit.x86.dasc
 endif
 endif
-
-#-------------------------------------------------------------------------------
-# Libraries for running C code in process.
-HAVE_DL=$(wildcard /usr/include/dlfcn.h)
-ifeq ($(HAVE_DL),)
-LIBDL=
-LIBDLFLAG=-DDISABLE_DLOPEN
-else
-ifneq ($(findstring Linux,$(shell uname -s)),)
-LIBDL=-ldl
-endif
-endif
-
-HAVE_TCC=$(wildcard /usr/include/libtcc.h)
-ifeq ($(HAVE_TCC),)
-TCCFLAG=-DDISABLE_LIBTCC
-TCCLIBS=
-TCCDEP=libtcc.lib-off
-else
-TCCFLAG=
-TCCLIBS=-ltcc
-TCCDEP=libtcc.lib-on
-endif
-
-bf2crun: bf2crun.o bf2any.o bf2const.o
-	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(TCCLIBS) $(LIBDL)
-
-bf2crun.o: bf2crun.c $(TCCDEP)
-	$(CC) $(CFLAGS) $(TCCFLAG) $(LIBDLFLAG) -c -o $@ bf2crun.c $(TARGET_ARCH)
-
-libtcc.lib-on:
-	-@rm -f libtcc.lib-off
-	@touch libtcc.lib-on
-
-libtcc.lib-off:
-	-@rm -f libtcc.lib-on
-	@touch libtcc.lib-off
 
 #-------------------------------------------------------------------------------
 # TCL doesn't use pkg-config and so is usually installed sanely, but this may
@@ -238,3 +207,68 @@ liblua.lib-off:
 	@touch liblua.lib-off
 
 #-------------------------------------------------------------------------------
+# Libraries for running C code in process.
+HAVE_DL=$(wildcard /usr/include/dlfcn.h)
+ifeq ($(HAVE_DL),)
+LIBDL=
+LIBDLFLAG=-DDISABLE_DLOPEN
+else
+ifneq ($(findstring Linux,$(shell uname -s)),)
+LIBDL=-ldl
+endif
+endif
+
+HAVE_TCC=$(wildcard /usr/include/libtcc.h)
+ifeq ($(HAVE_TCC),)
+TCCFLAG=-DDISABLE_LIBTCC
+TCCLIBS=
+TCCDEP=libtcc.lib-off
+else
+LOGDEV=/dev/null
+# We have a libtcc.h, lets see if it works ...
+try-run = $(shell set -e;               \
+        TMP="tmp.$$$$.tmp";             \
+        TMPO="tmp.$$$$.o";              \
+        echo Trying "$(1)" > $(LOGDEV); \
+        if ($(1)) >$(LOGDEV) 2>&1;      \
+        then echo "$(2)";               \
+        else echo "$(3)";               \
+        fi;                             \
+        rm -f "$$TMP" "$$TMPO" )
+
+TRYCC=$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c -x c -
+TRYCC2=$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -x c -
+
+# Do libtcc.h and -ltcc exist ?
+DO_TCC := $(call try-run,\
+        { echo '\#include <libtcc.h>';                  \
+          echo 'int main(){tcc_new();return 0;}';       \
+          } | $(TRYCC2) -o "$$TMP" -ltcc $(LIBDL),1)
+
+ifeq ($(DO_TCC),)
+TCCFLAG=-DDISABLE_LIBTCC
+TCCLIBS=
+TCCDEP=libtcc.lib-off
+else
+TCCFLAG=
+TCCLIBS=-ltcc
+TCCDEP=libtcc.lib-on
+endif
+endif
+
+bf2crun: bf2crun.o bf2any.o bf2const.o
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(TCCLIBS) $(LIBDL)
+
+bf2crun.o: bf2crun.c $(TCCDEP)
+	$(CC) $(CFLAGS) $(TCCFLAG) $(LIBDLFLAG) -c -o $@ bf2crun.c $(TARGET_ARCH)
+
+libtcc.lib-on:
+	-@rm -f libtcc.lib-off
+	@touch libtcc.lib-on
+
+libtcc.lib-off:
+	-@rm -f libtcc.lib-on
+	@touch libtcc.lib-off
+
+#-------------------------------------------------------------------------------
+endif

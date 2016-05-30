@@ -17,6 +17,10 @@ it to the list and fill in it's entry.
 #include "bfi.dasm.h"
 #else
 
+#define Nothing_Here /* TCC-0.9.27 needs a something in a argument of a
+		      * preprocessor macro, as this seems like a likely
+		      * bug for other compilers I've added a macro that
+		      * is something but compiles to nothing. */
 #if XX == 1
 /* The enum */
 #define X(a,b,c,d,e,f) c_ ## a,
@@ -123,7 +127,7 @@ X(ccode,CCODE,
     printf("   -c   Create C code.\n");				    ,
     case 'c': do_codestyle = c_ccode; break;			    ,
     case c_ccode: print_ccode(stdout); break;			    ,
-    /* No direct run */						    )
+    Nothing_Here						    )
 #endif
 #if XX == 9
     {	int f = checkarg_ccode(opt, arg);
@@ -136,7 +140,7 @@ X(nasm,NASM,
     printf("   -s   Create i386 Linux ELF NASM code.\n");           ,
     case 's': do_codestyle = c_nasm; break;                         ,
     case c_nasm: print_nasm(); break;                               ,
-    /* No direct run */						    )
+    Nothing_Here						    )
 #if XX == 4
     if (do_codestyle == c_nasm)
     {
@@ -163,7 +167,7 @@ X(bf,BF,
     printf("   -F   Attempt to regenerate BF code. (This disables a lot of optimisations.)\n");,
     case 'F': do_codestyle = c_bf; hard_left_limit = 0; break;      ,
     case c_bf: print_bf(); break;                                   ,
-    /* No direct run */						    )
+    Nothing_Here						    )
 #if XX == 4
     if (do_codestyle == c_bf) {
 	opt_no_calc = opt_no_endif = opt_no_litprt = 1;
@@ -187,7 +191,7 @@ X(dc,DC,
     printf("   -nov7   Disable Unix V7 dc(1) support.\n");          ,
     case 'D': do_codestyle = c_dc; break;                           ,
     case c_dc: print_dc(); break;                                   ,
-    /* No direct run */						    )
+    Nothing_Here						    )
 #if XX == 4
     if (do_codestyle == c_dc) {
 	if (eofcell == 0 && do_codestyle == c_dc && input_string == 0)

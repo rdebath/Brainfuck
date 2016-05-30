@@ -31,7 +31,7 @@
 
 
 #ifndef __lightning_asm_common_h
-#define __lightning_asm_common_h_
+#define __lightning_asm_common_h
 
 
 #ifndef _ASM_SAFETY

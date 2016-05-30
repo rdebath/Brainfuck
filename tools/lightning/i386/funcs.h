@@ -34,8 +34,8 @@
 #ifndef __lightning_funcs_h
 #define __lightning_funcs_h
 
-#ifdef __linux__
 #include <unistd.h>
+#if defined(_POSIX_MAPPED_FILES) && ((_POSIX_MAPPED_FILES -0) > 0)
 #include <sys/mman.h>
 #endif
 
@@ -51,7 +51,7 @@ jit_flush_code(void *dest, void *end)
      execution of the data and stack segment are becoming more
      and more common (Fedora, for example), so we implement our
      jit_flush_code as an mprotect.  */
-#ifdef __linux__
+#if defined(__linux__) || defined(PROT_EXEC)
   static unsigned long prev_page = 0, prev_length = 0;
   int page, length;
 #ifdef PAGESIZE

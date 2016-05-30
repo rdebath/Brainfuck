@@ -52,17 +52,30 @@ LDLIBS=$(GNUSTK) $(LIBS_LIGHTNING) $(LIBS_TCCLIB) $(GNUDYN) $(LIBS_LIBDL)
 $(TARGETFILE): $(OBJECTS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(TARGETFILE) $(OBJECTS) $(LDLIBS) $(TARGET_ARCH)
 
-pristine: clean
+pristine:
+	$(MAKE) realclean
+
+realclean: clean
+	-rm -f bfi
+ifneq ($(TARGETFILE),bfi)
 	-rm -f $(TARGETFILE)
+endif
+# This is generated BEFORE the rules start, so "realclean all" would fail
+ifeq ($(MAKECMDGOALS),realclean)
+	-rm -f bfi.version.h
+endif
 
 clean:
-	-rm -f *.o bfi.version.h bfi.dasm.c
+	-rm -f *.o bfi.dasm.c
 
 install: $(TARGETFILE)
 	$(INSTALL) $(TARGETFILE) $(INSTALLDIR)/$(TARGETFILE)$(INSTALLEXT)
 
+bfi.dasm.o:	bfi.dasm.c bfi.tree.h bfi.dasm.h bfi.run.h
+	$(CC) $(CFLAGS) -I $(TOOLDIR) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ bfi.dasm.c
+
 bfi.gnulit.o:	bfi.gnulit.c bfi.tree.h bfi.gnulit.h bfi.run.h
-	$(CC) $(CFLAGS) $(GNULGT) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ bfi.gnulit.c
+	$(CC) $(CFLAGS) $(TYPE_LIGHTNING) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ bfi.gnulit.c
 
 bfi.version.o: bfi.version.h
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ bfi.version.c
@@ -80,6 +93,10 @@ taperam.o: bfi.tree.h bfi.run.h
 clock.o: clock.h
 
 ################################################################################
+# Don't configure if we're just cleaning.
+ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(MAKECMDGOALS),realclean)
+################################################################################
 LOGDEV=/dev/null
 MARK := $(shell echo Configuration start >$(LOGDEV))
 #
@@ -90,27 +107,19 @@ CC := $(shell ( which 2>/dev/null gcc clang pcc ; echo cc ) | head -1 | sed 's:.
 
 ifneq ($(CC),cc)
 OPTFLG=-O2
-CFLAGS=$(OPTFLG) -Wall -Wshadow $(FUNSAFE) $(INCLTOOLS) $(DEFS) $(CONF)
+CFLAGS=$(OPTFLG) -Wall -Wshadow $(FUNSAFE) $(DEFS) $(CONF)
 else
 OPTFLG=-O
-CFLAGS=$(OPTFLG) $(INCLTOOLS) $(DEFS) $(CONF)
+CFLAGS=$(OPTFLG) $(DEFS) $(CONF)
 endif
 LDFLAGS=
 
-# The CFLAGS used here does not include FUNSAFE or INCLTOOLS
-CPUFOUND := $(shell $(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -E -dM bfi.version.c | grep BFI_FOUND_CPU )
+# The CFLAGS used here does not include FUNSAFE or TOOLDIR
+CPUFOUND := $(shell $(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -E -dM bfi.version.c 2>$(LOGDEV)| grep BFI_FOUND_CPU )
 
 ifneq ($(CPUFOUND),)
 # The CPUs acceptable to the tools dir are all mentioned in bfi.version.c
 TOOLDIR=../tools
-
-ifneq ($(TOOLDIR),)
-ifeq ($(filter cc tcc,$(CC)),)
-INCLTOOLS=-idirafter $(TOOLDIR)
-else
-INCLTOOLS=-I $(TOOLDIR)
-endif
-endif
 endif
 
 ################################################################################
@@ -118,29 +127,32 @@ endif
 # of and let everyone else pick up the pieces. In addition v4.7 of GCC does
 # it wrong, doing it's 'optimisation' on calculations that are defined by the
 # C standard.
-ifneq ($(CC),cc)
+ifeq ($(CC),cc)
+MARK := $(shell echo Main configuration disabled for cc >$(LOGDEV))
+else
 # Check for GCC options c/o the Linux kernel makefiles
+TMP :=Tmp_ctst
 cc-option = $(shell set -e;               \
-	TMP="tmp.$$$$.tmp";		\
-	TMPO="tmp.$$$$.o";		\
 	echo Checking $(CC) "$(1)" > $(LOGDEV); \
-	if ($(CC) $(1) -c -x c /dev/null -o "$$TMP") >$(LOGDEV) 2>&1;      \
+	if ($(CC) $(1) -c -x c /dev/null -o $(TMP) ) >$(LOGDEV) 2>&1;      \
 	then echo "$(2)";               \
 	else echo "$(3)";               \
 	fi;                             \
-	rm -f "$$TMP" "$$TMPO" )
+	rm -f $(TMP) $(TMP).o $(TMP).c  )
 
 WERROR := $(call cc-option,-Werror,-Werror)
-UNSAFE += $(call cc-option,$(WERROR) -Wextra,-Wextra)
+UNSAFE +=$(call cc-option,$(WERROR) -Wextra,-Wextra)
+UNSAFE +=$(call cc-option,$(WERROR) -fno-delete-null-pointer-checks,-fno-delete-null-pointer-checks)
 
-UNSAFE += $(call cc-option,$(WERROR) -fwrapv,-fwrapv)
+# -fwrapv and -fno-strict-overflow may conflict (clang)
+ifeq ($(call cc-option,$(WERROR) -fwrapv,ok,fail),ok)
+ifeq ($(call cc-option,$(WERROR) -fwrapv -fno-strict-overflow,ok,fail),ok)
+UNSAFE += -fwrapv -fno-strict-overflow
+else
+UNSAFE += -fwrapv
+endif
+else
 UNSAFE += $(call cc-option,$(WERROR) -fno-strict-overflow,-fno-strict-overflow)
-UNSAFE += $(call cc-option,$(WERROR) -fno-delete-null-pointer-checks,-fno-delete-null-pointer-checks)
-
-# Clang doesn't error with unused options then gets noisy.
-# But old GCC's have the same problem with -Qunused-arguments
-ifeq ($(CC),clang)
-UNSAFE += $(call cc-option,$(WERROR) -fno-strict-overflow -Qunused-arguments,-Qunused-arguments)
 endif
 
 # This appears to be an amplifier not itself unsafe.
@@ -149,6 +161,7 @@ endif
 # Try to turn off the warning nicely first.
 GNULGT := $(call cc-option,-Wno-unused-value,-Wno-unused-value,-w)
 GNULGT += $(call cc-option,-fno-strict-aliasing,-fno-strict-aliasing)
+GNULGT += $(call cc-option,-Wno-sign-compare,-Wno-sign-compare,-w)
 
 echo = $(1)
 ifeq ($(call echo,ok),)	# This checks that the above is working (gmake 3.79+)
@@ -164,30 +177,46 @@ endif
 ################################################################################
 
 try-run = $(shell set -e;               \
-        TMP="tmp.$$$$.tmp";             \
-        TMPO="tmp.$$$$.o";              \
-        if ($(1)) >$(LOGDEV) 2>&1;      \
-        then echo "$(2)";               \
-        else echo "$(3)";               \
-        fi;                             \
-        rm -f "$$TMP" "$$TMPO" )
+	echo Trying "$(1)" > $(LOGDEV); \
+	if ($(1)) >$(LOGDEV) 2>&1;      \
+	then echo "$(2)";               \
+	else echo "$(3)";               \
+	fi;                             \
+	rm -f $(TMP) $(TMP).o $(TMP).c  )
 
-TRYCC=$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c -x c -
+TRYCC=$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c $(TMP).c
+TRYCC2=$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) $(TARGET_ARCH) $(TMP).c
 
-# Does libtcc.h exist ?
+# Do libtcc.h and -ltcc exist ?
 DO_TCC := $(call try-run,\
-	echo '\#include <libtcc.h>' | $(TRYCC) -o "$$TMP",1)
+	{ echo '\#include <libtcc.h>';			\
+	  echo 'int main(){tcc_new();return 0;}';	\
+	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -ltcc -ldl,1)
 
 # How about lightning.h ?
 DO_LIGHT := $(call try-run,\
 	{ echo '\#include <lightning.h>'; \
 	  echo '\#ifdef jit_addi'; echo '\#error Not V1'; echo '\#endif'; \
-	  } | $(TRYCC) -o "$$TMP",1)
+	  } > $(TMP).c ; $(TRYCC) -o $(TMP),1)
 
+# Or lightning.h V2 with -llightning
 DO_LIGHT2 := $(call try-run,\
-	{ echo '\#include <lightning.h>'; \
-	  echo '\#ifdef jit_addi_i'; echo '\#error Not V2'; echo '\#endif'; \
-	  } | $(TRYCC) -o "$$TMP",1)
+	{ echo '\#include <lightning.h>'; 				\
+	  echo 'int main(){jit_state_t*_jit=0;jit_emit();return 0;}';	\
+	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -llightning,1)
+
+# And libdl
+ifneq ($(wildcard /usr/include/dlfcn.h),)
+DO_LIBDL1 := $(call try-run,\
+	{ echo '\#include <dlfcn.h>'; \
+	  echo 'int main(){dlerror();}'; \
+	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -ldl,1)
+
+DO_LIBDL2 := $(call try-run,\
+	{ echo '\#include <dlfcn.h>'; \
+	  echo 'int main(){dlerror();}'; \
+	  } > $(TMP).c ; $(TRYCC2) -o $(TMP),1)
+endif
 
 endif
 
@@ -202,17 +231,19 @@ endif
 
 ################################################################################
 # Auto configure
-DO_LIBDL=$(wildcard /usr/include/dlfcn.h)
 
-ifeq ($(DO_LIBDL),)
+ifeq ($(DO_LIBDL1)$(DO_LIBDL2),)
 CONF_LIBDL=-DDISABLE_DLOPEN
 LIBS_LIBDL=
 CONF_TCCLIB=-DDISABLE_TCCLIB
 LIBS_TCCLIB=
 else
+ifeq ($(DO_LIBDL2),)
 CONF_LIBDL=
-ifneq ($(findstring Linux,$(shell uname -s)),)
 LIBS_LIBDL=-ldl
+else
+CONF_LIBDL=
+LIBS_LIBDL=
 endif
 
 ifeq ($(DO_TCC),)
@@ -236,14 +267,19 @@ CONF_LIGHTNING=-DDISABLE_GNULIGHTNING
 LIBS_LIGHTNING=
 else
 ifneq ($(DO_LIGHT2),)
-CONF_LIGHTNING=
 LIBS_LIGHTNING=-llightning
-LIGHTNING_OBJ=bfi.gnulit.o
+TYPE_LIGHTNING=
 else
-CONF_LIGHTNING=-DGNULIGHTv1
 LIBS_LIGHTNING=
-LIGHTNING_OBJ=bfi.gnulit.o
+ifneq ($(DO_LIGHT),)
+TYPE_LIGHTNING=-DGNULIGHTv1 $(GNULGT)
+else
+TYPE_LIGHTNING=-DGNULIGHTv1 $(GNULGT) -I $(TOOLDIR)
 endif
+endif
+
+CONF_LIGHTNING=
+LIGHTNING_OBJ=bfi.gnulit.o
 $(TARGETFILE): $(LIGHTNING_OBJ)
 OBJECTS += $(LIGHTNING_OBJ)
 endif
@@ -256,7 +292,6 @@ DYNASM_OBJ=bfi.dasm.o
 
 OBJECTS += $(DYNASM_OBJ)
 $(TARGETFILE): $(DYNASM_OBJ)
-$(DYNASM_OBJ): bfi.dasm.h bfi.tree.h bfi.run.h
 
 ifneq ($(findstring X86_64,$(CPUFOUND)),)
 bfi.dasm.c: bfi.dasm.x86.dasc
@@ -277,3 +312,6 @@ endif
 
 ################################################################################
 EOFMARK := $(shell echo Configuration complete >$(LOGDEV))
+
+endif
+endif

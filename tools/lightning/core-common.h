@@ -31,7 +31,7 @@
 
 
 #ifndef __lightning_core_common_h
-#define __lightning_core_common_h_
+#define __lightning_core_common_h
 
 typedef struct {
   union {
