@@ -179,6 +179,7 @@ outcmd(int ch, int count)
 		exit(1);
 	    }
 #else
+#warning mkdtemp not used _POSIX_VERSION is too low, using mktemp instead
 	    if (mkdir(mktemp(tmpdir), 0700) < 0) {
 		perror("mkdir(mktemp()");
 		exit(1);
