@@ -151,7 +151,7 @@ main()
 	x = sizeof(int) * CHAR_BIT +3 - flg;
 
 	known_weird = 1;
-        if (x >= sizeof(int) * CHAR_BIT)
+        if (x >= (int)(sizeof(int) * CHAR_BIT))
             printf("WARNING(A): Signed integers are insane (too big for their bit size).\n");
 	else if (x != sizeof(int) * CHAR_BIT -1)
 	    printf("WARNING(A): Signed integers have %d magnitude bits.\n", x);
@@ -165,7 +165,7 @@ main()
 	x = sizeof(int) * CHAR_BIT * 2  - flg;
 
 	known_weird = 1;
-        if (x >= sizeof(int) * CHAR_BIT)
+        if (x >= (int)(sizeof(int) * CHAR_BIT))
             printf("WARNING(B): Signed integers are insane (too big for their bit size).\n");
 	else if (x != sizeof(int) * CHAR_BIT -1)
 	    printf("WARNING(B): Signed integers have %d magnitude bits.\n", x);
@@ -179,7 +179,7 @@ main()
 	x = sizeof(int) * CHAR_BIT +3 - flg;
 
 	known_weird = 1;
-        if (x >= sizeof(int) * CHAR_BIT)
+        if (x >= (int)(sizeof(int) * CHAR_BIT))
             printf("WARNING(C): Signed integers are insane (too big for their bit size).\n");
 	else if (x != sizeof(int) * CHAR_BIT -1)
 	    printf("WARNING(C): Signed integers have %d magnitude bits.\n", x);
