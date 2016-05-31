@@ -75,11 +75,27 @@ outcmd(int ch, int count)
 	printf("#define MINALLOC 16\n");
 	puts("");
 
-	printf("#ifndef BPC\n");
-	printf("#define BPC %d\n", bpc);
-	printf("#endif\n");
-	printf("static mpz_t cell_and;\n");
-	puts("");
+	if (!bytecell) {
+	    printf("#ifndef BPC\n");
+	    printf("#define BPC %d\n", bpc);
+	    printf("#endif\n");
+	    printf("static mpz_t cell_and;\n");
+	    puts("");
+
+	    /* This from mini-gmp */
+	    puts("#if __GNU_MP_VERSION < 4");
+	    puts("static inline void");
+	    puts("mpz_submul_ui (mpz_t r, const mpz_t u, unsigned long int v)");
+	    puts("{");
+	    puts("  mpz_t t;");
+	    puts("  mpz_init (t);");
+	    puts("  mpz_mul_ui (t, u, v);");
+	    puts("  mpz_sub (r, r, t);");
+	    puts("  mpz_clear (t);");
+	    puts("}");
+	    puts("#endif");
+	    puts("");
+	}
 
 	printf("%s",
 	    "static\n"
