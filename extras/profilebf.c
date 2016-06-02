@@ -10,7 +10,9 @@
 #include <limits.h>
 #if _POSIX_VERSION >= 199506L || defined(LLONG_MAX)
 # include <inttypes.h>
-#else
+#endif
+
+#ifndef INTMAX_MAX
 # define intmax_t long
 # define PRIdMAX  "ld"
 #endif
