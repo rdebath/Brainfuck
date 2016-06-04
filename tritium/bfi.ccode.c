@@ -999,7 +999,7 @@ print_ccode(FILE * ofd)
 	cell_size != sizeof(char)*CHAR_BIT)
 	fixed_mask = cell_mask;
 
-    if (do_run || cell_type_iso)
+    if (do_run || cell_type_iso || use_dynmem)
 	knr_c_ok = 0;
 
     if (use_functions<0)
