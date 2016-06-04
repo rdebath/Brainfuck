@@ -1,3 +1,4 @@
+/* First some definitions to fix brain dead defaults */
 
 /* Make printf work correctly for the C standards */
 #if (defined(_WIN32) && defined(__MINGW32__) ) && !defined(__USE_MINGW_ANSI_STDIO)
@@ -5,17 +6,27 @@
 #define __USE_MINGW_ANSI_STDIO 1
 #endif
 
-#if defined(__STRICT_ANSI__) || !defined(__STDC__) || !defined(__STDC_VERSION__)
+/* The mess that is "inline" */
+#if defined(__STRICT_ANSI__) || !defined(__STDC_VERSION__)
 #define inline
 #endif
+
+/* Make glibc expose everything. */
+#define _GNU_SOURCE 1
+
+/******************************************************************************/
 
 #include <stdio.h>
 #include <time.h>
 
+#if defined(__STDC__) || defined(L_cuserid)
+#include <limits.h>
+#endif
+
 #ifdef __STDC__
 #include <stdlib.h>
 #include <unistd.h>
-#include <limits.h>
+#include <string.h>
 
 #include <float.h>
 #if _POSIX_VERSION >= 199506L || defined(LLONG_MAX)
@@ -59,6 +70,10 @@ struct alignlong { long a; char b; };
 struct aligndouble { double a; char b; };
 
 #ifdef __STDC__
+void check_weird(void);
+#endif
+
+#ifdef __STDC__
 static inline int
 is_big_endian(void)
 #else
@@ -95,34 +110,6 @@ main()
 #endif
 {
     int e = is_big_endian();
-    int known_weird = 0;
-#if !defined(CHAR_BIT) || !defined(CHAR_MIN) || !defined(CHAR_MAX)
-    int char_bit, char_min = 0, char_max = 0;
-
-#if !defined(CHAR_BIT)
-#define CHAR_BIT    char_bit
-#endif
-#if !defined(CHAR_MIN)
-#define CHAR_MIN    char_min
-#endif
-#if !defined(CHAR_MAX)
-#define CHAR_MAX    char_max
-#endif
-
-    {
-	char x1 = 0, x2 = 0, x3 = 1;
-	for (char_bit=0; char_bit<256; char_bit++) {
-	    x1 = x2;
-	    x2 = x2 * 2 + 1;
-	    x3 = (x3<<1);
-	    if (x2 == x1 || (x2+1) == x2) break;
-
-	    if (char_min > x2) char_min = x2;
-	    if (char_min > x3) char_min = x3;
-	    if (char_max < x2) char_max = x2;
-	}
-    }
-#endif
 
     if (e == 2)
 	printf("NOT ENDIAN");
@@ -145,47 +132,7 @@ main()
     if ( !(~1==-2) )
 	printf("WARNING: This is not a twos-complement machine\n\n");
 
-    if (!known_weird) {
-        int x, flg = sizeof(int) * CHAR_BIT +2;
-        for(x=1;x+1>x && --flg;x=(x|(x<<1)));
-	x = sizeof(int) * CHAR_BIT +3 - flg;
-
-	known_weird = 1;
-        if (x >= (int)(sizeof(int) * CHAR_BIT))
-            printf("WARNING(A): Signed integers are insane (too big for their bit size).\n");
-	else if (x != sizeof(int) * CHAR_BIT -1)
-	    printf("WARNING(A): Signed integers have %d magnitude bits.\n", x);
-	else
-	    known_weird = 0;
-    }
-
-    if (!known_weird) {
-        int x, y=0, flg = sizeof(int) * CHAR_BIT * 2;
-        for(x=1;x>y && --flg;y=x,x=(x<<1));
-	x = sizeof(int) * CHAR_BIT * 2  - flg;
-
-	known_weird = 1;
-        if (x >= (int)(sizeof(int) * CHAR_BIT))
-            printf("WARNING(B): Signed integers are insane (too big for their bit size).\n");
-	else if (x != sizeof(int) * CHAR_BIT -1)
-	    printf("WARNING(B): Signed integers have %d magnitude bits.\n", x);
-	else
-	    known_weird = 0;
-    }
-
-    if (!known_weird) {
-        int x, flg = sizeof(int) * CHAR_BIT +2;
-        for(x=1;x+2>=x && --flg;x=(x|(x<<1)));
-	x = sizeof(int) * CHAR_BIT +3 - flg;
-
-	known_weird = 1;
-        if (x >= (int)(sizeof(int) * CHAR_BIT))
-            printf("WARNING(C): Signed integers are insane (too big for their bit size).\n");
-	else if (x != sizeof(int) * CHAR_BIT -1)
-	    printf("WARNING(C): Signed integers have %d magnitude bits.\n", x);
-	else
-	    known_weird = 0;
-    }
+    check_weird();
 
 #ifdef __STDC_VERSION__
 # if __STDC_VERSION__ == 199409L
@@ -272,6 +219,31 @@ main()
 # endif
 #else
     printf("Macro _XOPEN_VERSION not defined!\n");
+#endif
+
+#if defined(CHAR_BIT) || defined(WORD_BIT) || defined(LONG_BIT)
+    {
+	char txtbuf[256];
+	txtbuf[0] = 0;
+
+#ifdef CHAR_BIT
+	sprintf(txtbuf+strlen(txtbuf), " %d", CHAR_BIT);
+#else
+	strcat(txtbuf, " N/A");
+#endif
+#ifdef WORD_BIT
+	sprintf(txtbuf+strlen(txtbuf), " %d", WORD_BIT);
+#else
+	strcat(txtbuf, " N/A");
+#endif
+#ifdef LONG_BIT
+	sprintf(txtbuf+strlen(txtbuf), " %d", LONG_BIT);
+#else
+	strcat(txtbuf, " N/A");
+#endif
+	printf("Bits for CHAR/WORD/LONG   %s\n", txtbuf);
+
+    }
 #endif
 
     if (sizeof(void *) == sizeof(int)) {
@@ -443,22 +415,102 @@ main()
     printf("Bytes UM%2d, uintmax_t      %"PRIuMAX"\n", (int)sizeof(uintmax_t), UINTMAX_MAX);
 #endif
 
-#if defined(UINT_MAX)
     printf("\n");
-#endif
 
 #if defined(FLT_MAX)
-    printf("Bytes FL%2d, float         %g\n", (int)sizeof(float), FLT_MAX);
+    printf("Bytes FL%2d, float          %g\n", (int)sizeof(float), FLT_MAX);
+#else
+    printf("Bytes FL%2d, float          ?\n", (int)sizeof(float));
 #endif
 #if defined(DBL_MAX)
-    printf("Bytes DB%2d, double        %g\n", (int)sizeof(double), DBL_MAX);
+    printf("Bytes DB%2d, double         %g\n", (int)sizeof(double), DBL_MAX);
+#else
+    printf("Bytes DB%2d, double         ?\n", (int)sizeof(double));
 #endif
 
 #if !defined(_WIN32) || defined(__MINGW32__)
 #if defined(LDBL_MAX) && defined(LDBL_MAX_EXP) && defined(DBL_MAX_EXP) && LDBL_MAX_EXP != DBL_MAX_EXP
-    printf("Bytes LD%2d, long double   %Lg\n", (int)sizeof(long double), LDBL_MAX);
+    printf("Bytes LD%2d, long double    %Lg\n", (int)sizeof(long double), LDBL_MAX);
 #endif
 #endif
 
     return 0;
+}
+
+#ifdef __STDC__
+void check_weird(void)
+#else
+check_weird()
+#endif
+{
+    int known_weird = 0;
+#if !defined(CHAR_BIT) || !defined(CHAR_MIN) || !defined(CHAR_MAX)
+    int char_bit, char_min = 0, char_max = 0;
+
+#if !defined(CHAR_BIT)
+#define CHAR_BIT    char_bit
+#endif
+#if !defined(CHAR_MIN)
+#define CHAR_MIN    char_min
+#endif
+#if !defined(CHAR_MAX)
+#define CHAR_MAX    char_max
+#endif
+
+    {
+	char x1 = 0, x2 = 0, x3 = 1;
+	for (char_bit=0; char_bit<256; char_bit++) {
+	    x1 = x2;
+	    x2 = x2 * 2 + 1;
+	    x3 = (x3<<1);
+	    if (x2 == x1 || (x2+1) == x2) break;
+
+	    if (char_min > x2) char_min = x2;
+	    if (char_min > x3) char_min = x3;
+	    if (char_max < x2) char_max = x2;
+	}
+    }
+#endif
+
+    if (!known_weird) {
+        int x, flg = sizeof(int) * CHAR_BIT +2;
+        for(x=1;x+1>x && --flg;x=(x|(x<<1)));
+	x = sizeof(int) * CHAR_BIT +3 - flg;
+
+	known_weird = 1;
+        if (x >= (int)(sizeof(int) * CHAR_BIT))
+            printf("WARNING(A): Signed integers are insane (too big for their bit size).\n");
+	else if (x != sizeof(int) * CHAR_BIT -1)
+	    printf("WARNING(A): Signed integers have %d magnitude bits.\n", x);
+	else
+	    known_weird = 0;
+    }
+
+    if (!known_weird) {
+        int x, y=0, flg = sizeof(int) * CHAR_BIT * 2;
+        for(x=1;x>y && --flg;y=x,x=(x<<1));
+	x = sizeof(int) * CHAR_BIT * 2  - flg;
+
+	known_weird = 1;
+        if (x >= (int)(sizeof(int) * CHAR_BIT))
+            printf("WARNING(B): Signed integers are insane (too big for their bit size).\n");
+	else if (x != sizeof(int) * CHAR_BIT -1)
+	    printf("WARNING(B): Signed integers have %d magnitude bits.\n", x);
+	else
+	    known_weird = 0;
+    }
+
+    if (!known_weird) {
+        int x, flg = sizeof(int) * CHAR_BIT +2;
+        for(x=1;x+2>=x && --flg;x=(x|(x<<1)));
+	x = sizeof(int) * CHAR_BIT +3 - flg;
+
+	known_weird = 1;
+        if (x >= (int)(sizeof(int) * CHAR_BIT))
+            printf("WARNING(C): Signed integers are insane (too big for their bit size).\n");
+	else if (x != sizeof(int) * CHAR_BIT -1)
+	    printf("WARNING(C): Signed integers have %d magnitude bits.\n", x);
+	else
+	    known_weird = 0;
+    }
 }
