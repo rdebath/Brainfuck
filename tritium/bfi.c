@@ -810,7 +810,7 @@ tcalloc(size_t nmemb, size_t size)
     m = calloc(nmemb, size);
     if (m) return m;
 
-#if !defined(LEGACYOS) && !defined(_WIN32) && __STDC_VERSION__ >= 199901L
+#if __STDC_VERSION__ >= 199901L && _XOPEN_VERSION >= 600
     fprintf(stderr, "Allocate of %zu*%zu bytes failed, ABORT\n", nmemb, size);
 #else
     fprintf(stderr, "Allocate of %lu*%lu bytes failed, ABORT\n",
