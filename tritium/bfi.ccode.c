@@ -1,7 +1,7 @@
 #ifdef __STRICT_ANSI__
 #ifndef DISABLE_TCCLIB
 /* Required for open_memstream in glibc */
-#define _XOPEN_SOURCE 700
+#define _GNU_SOURCE 1
 #endif
 #endif
 

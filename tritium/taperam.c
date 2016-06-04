@@ -1,3 +1,8 @@
+#ifdef __STRICT_ANSI__
+/* Required to expose the signal handling in glibc */
+#define _GNU_SOURCE 1
+#endif
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -38,9 +43,8 @@ size_t cell_array_alloc_len = 0;
 
 /* This is the fallback; it doesn't trap "end of tape". */
 #ifndef USEHUGERAM
-
 #ifdef __STRICT_ANSI__
-#pragma message "WARNING: Using small memory, use -mem option."
+#pragma message "WARNING: Using small memory due to __STRICT_ANSI__, use -mem option."
 #else
 #warning Using small memory, use -mem option.
 #endif
