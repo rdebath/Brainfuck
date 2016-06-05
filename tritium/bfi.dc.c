@@ -114,8 +114,10 @@ print_dc(void)
 
     if (no_v7) {
 	fprintf(ofd, "#!/usr/bin/dc\n");
-	fprintf(ofd, "# [This program requires a modern dc.]pq\n\n");
-	/* Note: the above comment blocks v7 dc from running */
+	/* fprintf(ofd, "# [This program requires a modern dc.]pq\n\n");
+	 * Note: the above comment blocks v7 dc from running *
+	 * But V7 dc gets stuck on the #! first
+	 */
 	fprintf(ofd, "# Code generated from %s\n\n", bfname);
     } else
 	fprintf(ofd, "[ Code generated from %s ]SF\n\n", bfname);

@@ -121,6 +121,10 @@ X(ccode,CCODE,
 	do_run = 1;
 	do_codestyle = c_ccode;
     }
+    if (do_codestyle == c_ccode && cell_length>0 && cell_size == 0 && !strcmp(cell_type, "mpz_t")) {
+	fprintf(stderr, "The C generator does not support that cell size\n");
+	exit(255);
+    }
 #endif
 #else
 X(ccode,CCODE,

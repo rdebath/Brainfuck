@@ -437,7 +437,8 @@ UsageInt64(void)
 #endif
     fprintf(stderr, " bits.\n"
 	"The generated C can be configured to use other types "
-	"using the 'C' #define.\n");
+	"using the 'C' #define.\n"
+	"The dc(1) generator can have unlimited size cells\n");
 
     exit(1);
 }
@@ -3744,6 +3745,13 @@ set_cell_size(int cell_bits)
     } else
 #endif
 	cell_type = 0;
+
+#ifdef BE_DC
+    if (cell_bits > (int)sizeof(int)*CHAR_BIT && cell_type == 0 &&
+	do_codestyle == c_dc) {
+	cell_type = "mpz_t";
+    }
+#endif
 
     if (cell_type != 0) {
 	cell_length = cell_bits;
