@@ -34,7 +34,7 @@ outcmd(int ch, int count)
 	pr("long V = 0;");
 	break;
 
-    case 'X': pr("echo Infinite Loop 1>&2 ; exit 1"); break;
+    case 'X': pr("throw new System.InvalidOperationException(\"Infinite Loop detected.\");"); break;
 
     case '=': prv("M[P] = %d;", count); break;
     case 'B':
@@ -54,10 +54,7 @@ outcmd(int ch, int count)
     case '>': prv("P += %d;", count); break;
     case '<': prv("P -= %d;", count); break;
     case '.': pr("Console.Write((char)M[P]);"); break;
-    case ',':
-	pr("M[P]=(char)Console.Read();");
-	pr("if(M[P]==65535) M[P] = -1;");
-	break;
+    case ',': pr("M[P]=Console.Read();"); break;
 
     case '[':
 	if(bytecell) pr("M[P] = (M[P] & 255);");
