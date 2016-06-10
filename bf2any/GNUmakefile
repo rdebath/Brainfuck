@@ -36,6 +36,8 @@ ALLEXE+=bf2jit
 endif
 endif
 
+ALLEXE+=bf2java
+
 # .o files here so we build them first.
 all:	bf2any.o bf2const.o $(ALLEXE)
 
