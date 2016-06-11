@@ -736,7 +736,7 @@ outcmd(int ch, int count)
 	if (lang == cbyte) lang = c;
 
 	if (enable_mov_optim) {
-	    /* This emables BF style optimisation of '<' and '>' on OUTPUT */
+	    /* This enables BF style optimisation of '<' and '>' on OUTPUT */
 	    if (L_BASE == L_BF) enable_bf_mov = 1;
 	    if (L_BASE == L_BFCHARS) enable_bf_mov = 1;
 	    if (L_BASE == L_DOWHILE) enable_bf_mov = 1;
@@ -1073,7 +1073,7 @@ bfpackprint(void)
 }
 
 /******************************************************************************/
-/*       Now some other small, but not completely trivial tranlations.        */
+/*       Now some other small, but not completely trivial translations.        */
 /******************************************************************************/
 
 static void
