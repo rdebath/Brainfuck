@@ -13,8 +13,7 @@
  * MOLE-Basic-0.7 (-goto|sort) translation from BF, runs at about 400,000 instructions per second.
  *	WHILE/WEND is broken in MOLE Basic.
  *
- * FreeBasic translation from BF, runs at about 680,000,000 instructions per second.
- * FreeBasic (as integer) translation from BF, runs at about 1,200,000,000 instructions per second.
+ * FreeBasic translation from BF, runs at about 2.800,000,000 instructions per second.
  *
  */
 
@@ -31,10 +30,14 @@ char tapeptr[16]="P";
 char tempcell[16]="V";
 char tapename[16]="M";
 
-enum { loop_wend, loop_endw, loop_while, loop_do, loop_goto } loop_style = loop_do;
-enum { init_none, init_dim, init_global, init_main } init_style = init_dim;
-enum { end_none, end_end, end_system, end_vb } end_style = end_end;
-enum { io_basic, io_bbc, io_vb } io_style = io_basic;
+enum { loop_wend, loop_endw, loop_while, loop_do, loop_goto }
+    loop_style = loop_do;
+enum { init_none, init_dim, init_global, init_main, init_fbas }
+    init_style = init_dim;
+enum { end_none, end_end, end_system, end_vb }
+    end_style = end_end;
+enum { io_basic, io_bbc, io_vb, io_fbas }
+    io_style = io_basic;
 
 struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
@@ -116,10 +119,18 @@ check_arg(const char * arg)
 	io_style = io_basic;
 	return 1;
     } else
+    if (strcmp("-free", arg) ==0) {
+	init_style = init_fbas;
+	loop_style = loop_wend;
+	end_style = end_none;
+	io_style = io_fbas;
+	return 1;
+    } else
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "default is ansi"
 	"\n\t"  "-ansi   ANSI basic (do while style loop)"
+	"\n\t"  "-free   Free BASIC"
 	"\n\t"  "-bbc    BBC Basic"
 	"\n\t"  "-wend   Like ansi but use While ... Wend"
 	"\n\t"  "-goto   Basic using GOTOs and line numbers (may need 'sort -n')"
@@ -159,6 +170,54 @@ outcmd(int ch, int count)
 		I; printf("Dim %s(%d) As Integer\n", tapename, tapesz);
 		I; printf("Dim %s As Integer\n", tapeptr);
 		I; printf("%s = %d\n", tapeptr, tapeinit);
+		break;
+	    case init_fbas:
+		if (bytecell) {
+		    I; printf("Dim %s() As UByte\n", tapename);
+		} else {
+		    I; printf("Dim %s() As Integer\n", tapename);
+		}
+		I; printf("ReDim %s(%d)\n", tapename, tapesz);
+		I; printf("Dim %s As Integer\n", tapeptr);
+		I; printf("Dim %s As Integer\n", tempcell);
+		I; printf("Dim shared InpStr As string\n");
+		I; printf("%s = %d\n", tapeptr, tapeinit);
+		printf("\n");
+		I; printf("Sub PrtCh(ch as integer)\n");
+		ind++;
+		I; printf("IF ch<>10 THEN PRINT CHR$(ch); ELSE PRINT END IF\n");
+		ind--;
+		I; printf("End Sub\n");
+		printf("\n");
+
+		/* This is a hack, and it still doesn't work properly
+		 * It seems FreeBASIC trys to be "smart" with stdin
+		 * but it end up being depressingly stupid AND buggy.
+		 */
+		I; printf("Open Cons For Input As #1\n");
+		if (bytecell) {
+		    I; printf("Sub InpCh(ByRef ch as UByte)\n");
+		} else {
+		    I; printf("Sub InpCh(ByRef ch as integer)\n");
+		}
+		ind++;
+		I; printf("IF InpStr = \"\" THEN\n");
+		ind ++;
+		I; printf("IF EOF(1) THEN\n");
+		ind ++;
+		I; printf("EXIT SUB\n");
+		ind --;
+		I; printf("END IF\n");
+		I; printf("INPUT \"\", InpStr\n");
+		I; printf("InpStr = InpStr + CHR$(10)\n");
+		ind --;
+		I; printf("END IF\n");
+		I; printf("ch = ASC(InpStr)\n");
+		I; printf("InpStr = MID$(InpStr,2)\n");
+
+		ind --;
+		I; printf("End Sub\n");
+		printf("\n");
 		break;
 	}
 	break;
@@ -226,7 +285,9 @@ outcmd(int ch, int count)
 	    open_doloop = 1;
 	}
 
-	if(bytecell) { I; printf("%s=%s MOD 256\n", tapecell, tapecell); }
+	if(bytecell && init_style != init_fbas) {
+	    I; printf("%s=%s MOD 256\n", tapecell, tapecell);
+	}
 	I; printf("%s=%s\n", tempcell, tapecell);
 	break;
     case 'M': I; printf("%s=%s+%s*%d\n", tapecell, tapecell, tempcell, count); break;
@@ -253,6 +314,9 @@ outcmd(int ch, int count)
 	    break;
 	case io_bbc:
 	    I; printf("PROCPRT(%s)\n", tapecell);
+	    break;
+	case io_fbas:
+	    I; printf("PrtCh(%s)\n", tapecell);
 	    break;
 	}
 	break;
@@ -285,6 +349,9 @@ outcmd(int ch, int count)
 	    I; printf("PROCINP\n");
 	    do_input = 1;
 	    break;
+        case io_fbas:
+	    I; printf("InpCh(%s)\n", tapecell);
+            break;
 	}
 	break;
     case '[':
@@ -294,7 +361,9 @@ outcmd(int ch, int count)
 	    open_doloop = 0;
 	}
 
-	if(bytecell) { I; printf("%s=%s MOD 256\n", tapecell, tapecell); }
+	if(bytecell && init_style != init_fbas) {
+	    I; printf("%s=%s MOD 256\n", tapecell, tapecell);
+	}
 	switch(loop_style) {
 	    case loop_goto:
 		{
@@ -327,7 +396,9 @@ outcmd(int ch, int count)
 	    open_doloop = 0;
 	}
 
-	if(bytecell) { I; printf("%s=%s MOD 256\n", tapecell, tapecell); }
+	if(bytecell && init_style != init_fbas) {
+	    I; printf("%s=%s MOD 256\n", tapecell, tapecell);
+	}
 	ind--;
 	switch(loop_style) {
 	    case loop_goto:
