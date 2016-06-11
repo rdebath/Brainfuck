@@ -412,8 +412,11 @@ main(int argc, char ** argv)
 	    "\n\t"  "-Obf    Enable simple optimisation suitable for BF output"
 	    "\n\t"  "-Omov   Enable only movement optimisation"
 	    "\n\t"  "-M<num> Set length of tape, default is ", TAPELEN,
-	    "\n\t"  "-M      Set the tape to dynamic"
+	    ""
 	    );
+
+	    if (check_arg("-M"))
+		printf("\t-M      Set the tape to dynamic\n");
 
 	    check_arg(argv[ar]);
 	    exit(0);
