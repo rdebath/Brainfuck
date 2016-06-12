@@ -385,7 +385,7 @@ int
 main(int argc, char ** argv)
 {
     char * pgm = argv[0];
-    int ch, lastch=']', c=0, m, b=0, lc=0, ar, cf=0;
+    int ch, lastch=']', c=0, m, b=0, lc=0, ar, inp=0;
     FILE * ifd;
     int digits = 0, number = 0, multi = 1;
     int qstring = 0;
@@ -471,7 +471,7 @@ main(int argc, char ** argv)
 	    current_file = filelist[ar];
 
 	while((ch = getc(ifd)) != EOF && (ifd!=stdin || ch != '!' ||
-		qstring || lc || b || (c==0 && cf==0))) {
+		b || !inp || lc || qstring)) {
 	    /* Quoted strings are printed. (And set current cell) */
 	    if (qstring) {
 		if (ch == '"') {
@@ -507,7 +507,6 @@ main(int argc, char ** argv)
 		lc += (ch=='[') - (ch==']'); continue;
 	    }
 	    if (lc) continue;
-	    cf=1;
 	    /* Do the RLE */
 	    if (m && ch == lastch) { c+=multi; continue; }
 	    /* Post the RLE token onward */
@@ -515,6 +514,7 @@ main(int argc, char ** argv)
 	    if (!m) {
 		/* Non RLE tokens here */
 		if (ch == '"') { qstring++; continue; }
+		if (ch == ',') inp = 1;
 		if (ch == '=') {
 		    outrun('[', 1); outrun('-', 1); outrun(']', 1);
 		    lastch = ']';
