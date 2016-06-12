@@ -323,7 +323,7 @@ int
 check_argv(const char * arg)
 {
     if (strcmp(arg, "-b") == 0) {
-	if (check_arg("--no-byte") && !check_arg(arg))
+	if (check_arg("-no-byte") && !check_arg(arg))
 	    return 0;
 
 	bytecell++;

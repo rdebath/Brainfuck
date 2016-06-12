@@ -19,8 +19,6 @@
  * is actually undefined, giving the 'right' result isn't actually wrong and
  * if you want it to crash all you have to do is turn off optimisation.
  *
- * If this is configured with byte cells the gmp library is not called.
- *
  * The tape on this one is unusual because the cells have to be init'd before
  * they are used. To allow this I've used a slower 'realloc' method to store
  * the tape with position checks on pointer movement.
@@ -40,6 +38,7 @@ int
 check_arg(const char * arg)
 {
     if (strcmp(arg, "-O") == 0) return 1;
+    if (strcmp(arg, "-no-byte") == 0) return 1;
     if (strcmp(arg, "-savestring") == 0) return 1;
     if (strcmp(arg, "-mac") == 0) {
 	use_macro = 1;
@@ -47,10 +46,19 @@ check_arg(const char * arg)
     }
     if (strncmp(arg, "-b", 2) == 0 && arg[2] ) {
         bpc = strtol(arg+2, 0, 10);
-	if (bpc < 8)
-	    return 0;
+	if (bpc < 32) {
+	    fprintf(stderr, "Cell size must be a minimum of 32 bits\n");
+	    exit(1);
+	}
         return 1;
     }
+    if (strcmp("-h", arg) ==0) {
+        fprintf(stderr, "%s\n",
+        "\t"    "-b256   Limit to <N> bits per cell (Must be >=32 bits)"
+	);
+	return 1;
+    }
+
     return 0;
 }
 
@@ -61,41 +69,38 @@ outcmd(int ch, int count)
     case '!':
 	printf("#include <stdlib.h>\n"
 	       "#include <stdio.h>\n"
-	       "#include <string.h>\n");
-	if (!bytecell)
-	    printf("#include <gmp.h>\n");
+	       "#include <string.h>\n"
+	       "#include <gmp.h>\n");
 	puts("");
-	if (bytecell) {
-	    printf("typedef unsigned char mpz_t;\n");
-	    printf("#define mpz_init(X) (X) = 0\n");
-	}
-
 	printf("mpz_t * mem = 0;\n");
 	printf("int memsize = 0;\n");
 	printf("#define MINALLOC 16\n");
 	puts("");
 
-	if (!bytecell) {
-	    printf("#ifndef BPC\n");
-	    printf("#define BPC %d\n", bpc);
-	    printf("#endif\n");
-	    printf("static mpz_t cell_and;\n");
-	    puts("");
+	printf("#ifndef BPC\n");
+	printf("#define BPC %d\n", bpc);
+	printf("#endif\n");
+	printf("#if BPC > 0\n");
+	printf("static mpz_t cell_and;\n");
+	printf("#define mpz_and_BPC(c) mpz_and(c, c, cell_and)\n");
+	printf("#else\n");
+	printf("#define mpz_and_BPC(c)\n");
+	printf("#endif\n");
+	puts("");
 
-	    /* This from mini-gmp */
-	    puts("#if __GNU_MP_VERSION < 4");
-	    puts("static inline void");
-	    puts("mpz_submul_ui (mpz_t r, const mpz_t u, unsigned long int v)");
-	    puts("{");
-	    puts("  mpz_t t;");
-	    puts("  mpz_init (t);");
-	    puts("  mpz_mul_ui (t, u, v);");
-	    puts("  mpz_sub (r, r, t);");
-	    puts("  mpz_clear (t);");
-	    puts("}");
-	    puts("#endif");
-	    puts("");
-	}
+	/* This from mini-gmp */
+	puts("#if __GNU_MP_VERSION < 4");
+	puts("static inline void");
+	puts("mpz_submul_ui (mpz_t r, const mpz_t u, unsigned long int v)");
+	puts("{");
+	puts("  mpz_t t;");
+	puts("  mpz_init (t);");
+	puts("  mpz_mul_ui (t, u, v);");
+	puts("  mpz_sub (r, r, t);");
+	puts("  mpz_clear (t);");
+	puts("}");
+	puts("#endif");
+	puts("");
 
 	printf("%s",
 	    "static\n"
@@ -155,135 +160,58 @@ outcmd(int ch, int count)
 	ind ++;
 	I; printf("register mpz_t * p;\n");
 	I; printf("register int c;\n");
-	if (bytecell) {
-	    I; printf("register int v;\n");
-	} else {
-	    I; printf("mpz_t v;\n");
-	    I; printf("mpz_init(v);\n");
-	       printf("#if BPC > 0\n");
-	    I; printf("mpz_init(cell_and);\n");
-	    I; printf("mpz_ui_pow_ui(cell_and, 2, BPC);\n");
-	    I; printf("mpz_sub_ui(cell_and, cell_and, 1);\n");
-	       printf("#endif\n");
-	}
+	I; printf("mpz_t v;\n");
+	I; printf("mpz_init(v);\n");
+	   printf("#if BPC > 0\n");
+	I; printf("mpz_init(cell_and);\n");
+	I; printf("mpz_ui_pow_ui(cell_and, 2, BPC);\n");
+	I; printf("mpz_sub_ui(cell_and, cell_and, 1);\n");
+	   printf("#endif\n");
 	I; printf("setbuf(stdout, 0);\n");
 	I; printf("p = move_ptr(mem,0);\n");
 	break;
 
-    case '~':
-	I; printf("return 0;\n}\n");
-	break;
-
-    case '=': I;
-	if(bytecell)
-	    printf("*p = %d;\n", count);
-	else
-	    printf("mpz_set_si(*p, %d);\n", count);
-	break;
+    case '~': I; printf("return 0;\n}\n"); break;
+    case '=': I; printf("mpz_set_si(*p, %d);\n", count); break;
 
     case 'B':
-	if (bytecell) {
-	    I; printf("v = *p;\n");
-	} else {
-	       printf("#if BPC > 0\n");
-	    I; printf("mpz_and(*p, *p, cell_and);\n");
-	       printf("#endif\n");
-	    I; printf("mpz_set(v, *p);\n");
-	}
+	I; printf("mpz_and_BPC(*p);\n");
+	I; printf("mpz_set(v, *p);\n");
 	break;
 
     case 'm':
-    case 'M': I;
-	if (bytecell)
-	    printf("*p = *p+v*%d;\n", count);
-	else
-	    printf("mpz_addmul_ui(*p, v, %d);\n", count);
-	break;
-
+    case 'M': I; printf("mpz_addmul_ui(*p, v, %d);\n", count); break;
     case 'n':
-    case 'N': I;
-	if (bytecell)
-	    printf("*p = *p-v*%d;\n", count);
-	else
-	    printf("mpz_submul_ui(*p, v, %d);\n", count);
-	break;
-
+    case 'N': I; printf("mpz_submul_ui(*p, v, %d);\n", count); break;
     case 's':
-    case 'S': I;
-	if (bytecell)
-	    printf("*p = *p+v;\n");
-	else
-	    printf("mpz_add(*p, *p, v);\n");
-	break;
-
-    case 'Q': I;
-	if (bytecell)
-	    printf("if(v) *p = %d;\n", count);
-	else
-	    printf("if(mpz_cmp_ui(v, 0)) mpz_set_si(*p, %d);\n", count);
-	break;
-
+    case 'S': I; printf("mpz_add(*p, *p, v);\n"); break;
+    case 'Q': I; printf("if(mpz_cmp_ui(v, 0)) mpz_set_si(*p, %d);\n", count); break;
     case 'X': I; printf("fprintf(stderr, \"Abort: Infinite Loop.\\n\"); exit(1);\n"); break;
-
-    case '+': I;
-	if (bytecell)
-	    printf("*p += %d;\n", count);
-	else
-	    printf("mpz_add_ui(*p, *p, %d);\n", count);
-	break;
-
-    case '-': I;
-	if (bytecell)
-	    printf("*p -= %d;\n", count);
-	else
-	    printf("mpz_sub_ui(*p, *p, %d);\n", count);
-	break;
-
-    case '<':
-	I; printf("p = move_ptr(p, %d);\n", -count);
-	break;
-
-    case '>':
-	I; printf("p = move_ptr(p, %d);\n", count);
-	break;
+    case '+': I; printf("mpz_add_ui(*p, *p, %d);\n", count); break;
+    case '-': I; printf("mpz_sub_ui(*p, *p, %d);\n", count); break;
+    case '<': I; printf("p = move_ptr(p, %d);\n", -count); break;
+    case '>': I; printf("p = move_ptr(p, %d);\n", count); break;
 
     case '[':
-	if(bytecell) {
-	    I; printf("while(*p){\n");
-	} else {
-	       printf("#if BPC > 0\n");
-	    I; printf("mpz_and(*p, *p, cell_and);\n");
-	       printf("#endif\n");
-	    I; printf("while(mpz_cmp_ui(*p, 0)){\n");
-	}
+	I; printf("mpz_and_BPC(*p);\n");
+	I; printf("while(mpz_cmp_ui(*p, 0)){\n");
 	ind++;
 	break;
 
     case ']':
-	   printf("#if BPC > 0\n");
-	I; printf("mpz_and(*p, *p, cell_and);\n");
-	   printf("#endif\n");
+	I; printf("mpz_and_BPC(*p);\n");
 	ind--;
 	I; printf("}\n");
 	break;
 
-    case '.': I;
-	if (bytecell)
-	    printf("putchar(*p);\n");
-	else
-	    printf("putchar(mpz_get_si(*p));\n");
-	break;
-
+    case '.': I; printf("putchar(mpz_get_si(*p));\n"); break;
     case '"': print_cstring(); break;
-
     case ',':
 	I; printf("c = getchar();\n");
 	I; printf("if (c != EOF)\n");
-	ind++; I; ind--;
-	if (bytecell)
-	    printf("*p = c;\n");
-	else
-	    printf("mpz_set_si(*p, (long)c);\n");
+	ind++;
+	I; printf("mpz_set_si(*p, (long)c);\n");
+	ind--;
 	break;
     }
 }
@@ -332,4 +260,3 @@ print_cstring(void)
 	}
     }
 }
-
