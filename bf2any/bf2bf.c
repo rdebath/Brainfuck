@@ -51,9 +51,10 @@
 #define L_UGLYBF        0x15    /* bfugly(token, count); */
 #define L_MALBRAIN      0x16    /* malbrain(token, count); */
 #define L_HANOILOVE     0x17    /* hanoilove(token, count); */
-#define L_ASCII         0x18    /* ascii(token, count); */
-#define L_EXCON         0x19    /* ascii(token, count); */
-#define L_DOWHILE       0x1A    /* bfdowhile(token, count); */
+#define L_DOWHILE       0x18    /* bfdowhile(token, count); */
+#define L_ASCII         0x19    /* ascii(token, count); */
+#define L_EXCON         0x1A    /* ascii(token, count); */
+#define L_ABCD          0x1B    /* ascii(token, count); */
 
 static const char bf[] = "><+-.,[]";
 static const char * bfout[] = { ">", "<", "+", "-", ".", ",", "[", "]", 0 };
@@ -575,6 +576,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-excon") == 0) {
 	lang = 0; langclass = L_EXCON; return 1;
     } else
+    if (strcmp(arg, "-abcd") == 0) {
+	lang = 0; langclass = L_ABCD; return 1;
+    } else
     if (strcmp(arg, "-dowhile") == 0) {
 	lang = 0; langclass = L_DOWHILE; return 1;
     } else
@@ -625,6 +629,7 @@ check_arg(const char * arg)
 	"\n\t"  "-hanoilove Hanoi Love translation"
 	"\n\t"  "-ascii  Convert BF to ASCII"
 	"\n\t"  "-excon  EXCON translation -- http://esolangs.org/wiki/EXCON"
+	"\n\t"  "-abcd   ABCD translation -- http://esolangs.org/wiki/ABCD"
 	"\n\t"  "-dowhile Do ... while translataion."
 	"\n\t"  "-dc     Convert to dc(1) using the first of below."
 	"\n\t"  "-dc1      Use an array and a pointer variable."
@@ -651,6 +656,7 @@ static int disable_optimisation(void)
     switch(L_BASE) {
     case L_ASCII:
     case L_EXCON:
+    case L_ABCD:
     case L_TOKENS:
 	return 0;
     }
@@ -813,6 +819,7 @@ outcmd(int ch, int count)
     case L_MALBRAIN:	malbrain(ch, count); break;
     case L_HANOILOVE:	hanoilove(ch, count); break;
     case L_EXCON:
+    case L_ABCD:
     case L_ASCII:       ascii(ch, count); break;
     case L_DOWHILE:	bfdowhile(ch, count); break;
     }
@@ -1426,6 +1433,14 @@ static int outbit = 1, outch = 0;
 			}
 		    }
 		    pc('!');
+		    break;
+		case L_ABCD:
+		    v = (m->val & 0xFF);
+		    {
+			while(outch<v) {outch++; pc('A');}
+			while(outch>v) {outch--; pc('B');}
+		    }
+		    pc('D');
 		    break;
 		}
 		break;
