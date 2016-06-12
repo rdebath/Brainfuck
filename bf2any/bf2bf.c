@@ -1321,6 +1321,12 @@ hanoilove(int ch, int count)
 void
 ascii(int ch, int count)
 {
+static int msk;
+static struct mem *m;
+static int v = 0xDEADBEEF;
+static int inp = 0;
+static int outbit = 1, outch = 0;
+
     if (ch != '!' && ch != '~')
     {
 	struct instruction * n = calloc(1, sizeof*n);
@@ -1339,18 +1345,19 @@ ascii(int ch, int count)
 	    n->loop = jmpstack; jmpstack = n;
 	} else if (n->ch == ']') {
 	    n->loop = jmpstack; jmpstack = jmpstack->loop; n->loop->loop = n;
-	}
+	} else if (n->ch == ',') inp = 1;
     }
 
-    if (ch == '~')
-    {
-	const int msk = (bytecell)?0xFF:-1;
-	struct instruction * n;
-	struct mem *m = calloc(1,sizeof*m);
-	int i, v = 0xDEADBEEF;
-	int outbit = 1, outch = 0;
-
+    if (ch == '!') {
+	msk = (bytecell)?0xFF:-1;
+	m = calloc(1,sizeof*m);
 	setbuf(stdout, 0);
+    }
+
+    if (pgm && (ch == '~' || (!inp && !jmpstack)))
+    {
+	struct instruction * n;
+	int i;
 
 	for(n=pgm; n; n=n->next) switch(n->ch) {
 
@@ -1428,6 +1435,13 @@ ascii(int ch, int count)
 		    if((v=getchar()) != EOF) m->val = v;
 		}
 		break;
+	}
+
+	for(n=pgm; n; ) {
+	    struct instruction * p = n;
+	    n = n->next;
+	    free(p);
+	    pgm = last = 0;
 	}
     }
 }
