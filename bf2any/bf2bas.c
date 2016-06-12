@@ -13,7 +13,7 @@
  * MOLE-Basic-0.7 (-goto|sort) translation from BF, runs at about 400,000 instructions per second.
  *	WHILE/WEND is broken in MOLE Basic.
  *
- * FreeBasic translation from BF, runs at about 2.800,000,000 instructions per second.
+ * FreeBasic translation from BF, runs at about 2,800,000,000 instructions per second.
  *
  */
 
