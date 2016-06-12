@@ -712,7 +712,7 @@ load_file(FILE * ifd, int is_first, int is_last, char * bfstring)
     struct bfi *p=0, *n=bfprog;
 
 static struct bfi *jst;
-static int dld;
+static int dld, inp;
 
     if (is_first) { jst = 0; dld = 0; }
     if (n) { while(n->next) n=n->next; p = n;}
@@ -721,7 +721,7 @@ static int dld;
 
     while((ifd	? (ch = getc(ifd)) != EOF
 		: (bfstring && *bfstring ? !!(ch= *bfstring++) :0)
-	    ) && (ifd!=stdin || ch != '!' || !n || dld || jst )) {
+	    ) && (ifd!=stdin || ch != '!' || !inp || dld || jst )) {
 	int c = 0;
 	if (ch == '\n') { curr_line++; curr_col=0; }
 	else curr_col ++;
@@ -737,7 +737,7 @@ static int dld;
 	case ',':
 	    if (eofcell == 5) ch = T_NOP;
 	    else if (eofcell == 6) ch = T_STOP;
-	    else ch = T_INP;
+	    else { ch = T_INP; inp = 1; }
 	    break;
 	case '#':
 	    if(debug_mode) ch = T_DUMP; else ch = T_NOP;
