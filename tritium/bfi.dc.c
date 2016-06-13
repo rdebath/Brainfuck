@@ -65,8 +65,10 @@ prt_value(const char * prefix, int count, const char * suffix)
 {
     if (count>=0)
 	fprintf(ofd, "%s%d%s", prefix, count, suffix);
-    else
-	fprintf(ofd, "%s_%d%s", prefix, -count, suffix);
+    else {
+	unsigned int u = -count;
+	fprintf(ofd, "%s_%u%s", prefix, u, suffix);
+    }
 }
 
 int
@@ -205,6 +207,7 @@ print_dc(void)
 
 	case T_PRT:
 	    fetch_cell(n->offset);
+	    if (use_lmx && cell_length<8) fprintf(ofd, "lmx ");
 	    if (no_v7)
 		fprintf(ofd, "aP\n");
 	    else {

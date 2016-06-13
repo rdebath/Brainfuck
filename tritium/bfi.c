@@ -3226,6 +3226,8 @@ try_opt_runner(void)
     struct bfi *v = bfprog, *n = 0;
     int lp = 0;
 
+    if (cell_length > sizeof(int)*CHAR_BIT) return;	/* Oops! */
+
     while(v && v->type != T_INP && v->type != T_STOP) {
 	if (v->orgtype == T_END) lp--;
 	if(!lp && v->orgtype != T_WHL) n=v;
