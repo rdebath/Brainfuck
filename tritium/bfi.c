@@ -71,6 +71,7 @@ characters after your favorite comment marker in a very visible form.
 #include "bfi.be.def"
 
 #include "bfi.runarray.h"
+#include "bfi.runmax.h"
 #endif
 
 #ifndef __STDC_ISO_10646__
@@ -143,8 +144,8 @@ unsigned cell_length = 0;/* Number of bits in cell */
 int cell_size = 0;  /* Number of bits in cell IF they fit in an int. */
 int cell_mask = ~0; /* Mask using & with this. */
 int cell_smask = 0; /* Xor and subtract this; normally MSB of the mask. */
-char const * cell_type = "C";
-int cell_type_iso = 0;
+char const * cell_type = "C";	/* Cell C variable type */
+int cell_type_iso = 0;	/* Using uintmax_t or similar for above. */
 int only_uses_putch = 0;
 
 const char * bfname = "brainfuck";
@@ -302,14 +303,18 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("   -b   Use 8 bit cells.\n");
     printf("   -b16 Use 16 bit cells.\n");
     printf("   -b32 Use 32 bit cells.\n");
-    printf("        Default for running now (-r) is %dbits.\n",
+    printf("        Default for running now (-r/-rc/-j/-q) is %dbits.\n",
 			opt_bytedefault? CHAR_BIT:
 			(int)sizeof(int)*CHAR_BIT);
+#ifdef DISABLE_BN
     printf("        Other bitwidths also work (including 1..32 and maybe 64/128)\n");
+#else
+    printf("        Any other bitwidth will work too (1..2048 tested)\n");
+#endif
     printf("        Full Unicode characters need 21 bits.\n");
 #ifndef NO_EXT_BE
-    printf("        Default for C code is 'unknown', this is set when the C code is\n");
-    printf("        compiled (and can be larger than an int eg: -DC=uintmax_t ).\n");
+    printf("        The default for generated C code is to use the largest type found\n");
+    printf("        when it's compiled. It can be controlled with -DC=uintmax_t.\n");
     printf("        NASM can only be 8bit.\n");
     printf("        The optimiser will be less effective if this is not specified.\n");
 #endif
@@ -365,7 +370,7 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("        Use dlopen() shared libraries to run C code.\n");
     printf("   -fonecall\n");
     printf("        Call C compiler once to both compile and link.\n");
-    printf("        (Normally it done in two parts to support ccache).\n");
+    printf("        (Normally it is done in two parts to support ccache).\n");
     printf("   -fPIC -fpic -fno-pic\n");
     printf("        Control usage of position independed code flag.\n");
     printf("   -fleave-temps\n");
@@ -376,7 +381,7 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("        Use the TCCLIB library to run C code.\n");
 #endif
     printf("\n");
-#ifndef NO_EXT_BE
+#ifdef BE_NASM
     printf("Asm generation options, these adjust the '-s' option.\n");
     printf("   -flinux (default)\n");
     printf("        Code for NASM to directly generate a Linux executable.\n");
@@ -1052,6 +1057,12 @@ process_file(void)
 	    if (verbose>2 || debug_mode || enable_trace
 		|| total_nodes == node_type_counts[T_CHR]) {
 
+		if (cell_size <= 0) {
+		    fprintf(stderr, "ERROR: run_tree() cannot do %dbit cells.\n",
+				    cell_length);
+		    exit(1);
+		}
+
 		if (verbose)
 		    fprintf(stderr, "Starting profiling interpreter\n");
 		run_tree();
@@ -1060,6 +1071,10 @@ process_file(void)
 		    print_tree_stats();
 		    printtree();
 		}
+	    } else if (cell_size <= 0) {
+		if (verbose)
+		    fprintf(stderr, "Starting maxtree interpreter\n");
+		run_maxtree();
 	    } else {
 		if (verbose)
 		    fprintf(stderr, "Starting array interpreter\n");
@@ -2724,8 +2739,8 @@ find_known_calc_state(struct bfi * v)
 		v->next->count3 == 0 &&
 		v->next->offset2 != n2->offset)
 	    )) {
-	/* A simple multiplication from n2 and it's the previous node and the next
-	 * node wipes it. */
+	/* A simple multiplication from n2 and it's the previous node
+	 * and the next node wipes it. */
 	/* This is a BF standard form. */
 
 	if (cell_size<=0 && ov_imul(v->count2, n2->count2) == INT_MIN) {
@@ -3226,7 +3241,7 @@ try_opt_runner(void)
     struct bfi *v = bfprog, *n = 0;
     int lp = 0;
 
-    if (cell_length > sizeof(int)*CHAR_BIT) return;	/* Oops! */
+    if (cell_size <= 0) return;	/* Oops! */
 
     while(v && v->type != T_INP && v->type != T_STOP) {
 	if (v->orgtype == T_END) lp--;
@@ -3743,15 +3758,14 @@ set_cell_size(int cell_bits)
 #endif
 #if !defined(NO_EXT_BE) && defined(__SIZEOF_INT128__)
     if (cell_bits == (int)sizeof(__int128)*CHAR_BIT) {
-	cell_type = "__int128";
+	cell_type = "unsigned __int128";
     } else
 #endif
 	cell_type = 0;
 
 #ifdef BE_DC
-    if (cell_bits > (int)sizeof(int)*CHAR_BIT && cell_type == 0 &&
-	do_codestyle == c_dc) {
-	cell_type = "mpz_t";
+    if (cell_bits > (int)sizeof(int)*CHAR_BIT && cell_type == 0) {
+	cell_type = "C";
     }
 #endif
 
@@ -3763,7 +3777,7 @@ set_cell_size(int cell_bits)
 
 	if (verbose>5) fprintf(stderr, "Cell type is %s\n", cell_type);
 	return;
-    } else
+    }
 
     if (cell_bits >= (int)sizeof(int)*CHAR_BIT || cell_bits <= 0) {
 	if (cell_bits == -1 && opt_bytedefault) {

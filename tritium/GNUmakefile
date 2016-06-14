@@ -19,7 +19,7 @@
 # To manually disable a 'JITter' add one or more of the options below to the
 # make command line.
 #
-# make DO_TCC= DO_LIGHT= DO_MYLIGHT= DO_LIBDL= DO_DYNASM=
+# make DO_TCC= DO_LIGHT= DO_LIGHT2= DO_MYLIGHT= DO_LIBDL1= DO_LIBDL2= DO_DYNASM=
 #
 # The internal GNU lightning and Dynasm can also be removed by deleting the
 # relevent parts of the tools directory.
@@ -44,10 +44,10 @@ MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 	 -Wlarger-than=512 -Wstack-usage=512 -Wunsafe-loop-optimizations
 
 OBJECTS=bfi.o bfi.version.o bfi.ccode.o bfi.nasm.o bfi.bf.o bfi.dc.o \
-	bfi.runarray.o clock.o taperam.o
+	bfi.runarray.o bfi.runmax.o clock.o taperam.o
 
-CONF=-DCNF $(CONF_DYNASM) $(CONF_LIGHTNING) $(CONF_TCCLIB) $(CONF_LIBDL)
-LDLIBS=$(GNUSTK) $(LIBS_LIGHTNING) $(LIBS_TCCLIB) $(GNUDYN) $(LIBS_LIBDL)
+CONF=-DCNF $(CONF_DYNASM) $(CONF_LIGHTNING) $(CONF_TCCLIB) $(CONF_BNLIB) $(CONF_LIBDL)
+LDLIBS=$(GNUSTK) $(LIBS_LIGHTNING) $(LIBS_TCCLIB) $(LIBS_BNLIB) $(GNUDYN) $(LIBS_LIBDL)
 
 $(TARGETFILE): $(OBJECTS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(TARGETFILE) $(OBJECTS) $(LDLIBS) $(TARGET_ARCH)
@@ -82,7 +82,8 @@ bfi.version.o: bfi.version.h
 
 bfi.o: \
     bfi.c bfi.tree.h bfi.run.h bfi.be.def bfi.ccode.h bfi.gnulit.h \
-    bfi.nasm.h bfi.bf.h bfi.dc.h clock.h ov_int.h
+    bfi.nasm.h bfi.bf.h bfi.dc.h clock.h ov_int.h \
+    bfi.runarray.h bfi.runmax.h
 bfi.bf.o: bfi.bf.c bfi.tree.h
 bfi.ccode.o: bfi.ccode.c bfi.tree.h bfi.run.h bfi.ccode.h
 bfi.dc.o: bfi.dc.c bfi.tree.h bfi.run.h
@@ -218,6 +219,12 @@ DO_LIBDL2 := $(call try-run,\
 	  } > $(TMP).c ; $(TRYCC2) -o $(TMP),1)
 endif
 
+# Open SSL big numbers
+DO_BN := $(call try-run,\
+	{ echo '\#include <openssl/bn.h>'; 				\
+	  echo 'int main(){BIGNUM * t2 = BN_new();}';	\
+	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -lcrypto,1)
+
 endif	# CC
 else
 INSTALL=cp
@@ -286,6 +293,14 @@ CONF_LIGHTNING=
 LIGHTNING_OBJ=bfi.gnulit.o
 $(TARGETFILE): $(LIGHTNING_OBJ)
 OBJECTS += $(LIGHTNING_OBJ)
+endif
+
+ifeq ($(DO_BN),)
+CONF_BNLIB=-DDISABLE_BN
+LIBS_BNLIB=
+else
+CONF_BNLIB=
+LIBS_BNLIB=-lcrypto
 endif
 
 ifneq ($(findstring X86,$(CPUFOUND)),)
