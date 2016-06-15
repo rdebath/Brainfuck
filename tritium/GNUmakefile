@@ -70,7 +70,7 @@ ifeq ($(MAKECMDGOALS),realclean)
 endif
 
 clean:
-	-rm -f *.o bfi.dasm.c
+	-rm -f *.o bfi.dasm.c .build-opts.*
 
 install: $(TARGETFILE)
 	$(INSTALL) $(TARGETFILE) $(INSTALLDIR)/$(TARGETFILE)$(INSTALLEXT)
@@ -372,3 +372,11 @@ EOFMARK := $(shell echo Configuration complete >$(LOGDEV))
 
 endif
 endif
+
+################################################################################
+BUILDOPT=$(CC) $(CFLAGS) $(LDFLAGS) $(LDLIBS) $(TARGET_ARCH)
+BUILDFLG :=.build-opts.$(shell echo '$(BUILDOPT)' | sum | tr -d '\040\055' )
+$(OBJECTS) bfi.dasm.c: $(BUILDFLG)
+$(BUILDFLG):
+	-@rm -f .build-opts.*
+	-@echo '$(BUILDOPT)' > $(BUILDFLG)

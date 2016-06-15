@@ -41,6 +41,7 @@ endif
 all:	bf2any.o bf2const.o $(ALLEXE)
 
 clean:
+	-rm -f .build-opts.*
 	-rm -f $(ALLEXE)
 	-rm -f libtcc.lib-off libtcc.lib-on
 	-rm -f libtcl.lib-off libtcl.lib-on
@@ -276,3 +277,14 @@ libtcc.lib-off:
 
 #-------------------------------------------------------------------------------
 endif
+
+################################################################################
+BUILDOPT=$(CC) $(CFLAGS) $(LDFLAGS) $(LDLIBS) $(TARGET_ARCH) \
+    $(TCLFLAG$) $(PYLIBFLAG) $(LUALIBFLAG) $(LIBDLFLAG) $(TCCFLAG) \
+    $(TCLLIBS$) $(PYLIBLIBS) $(LUALIBLIBS) $(LIBDLLIBS) $(TCCLIBS)
+BUILDFLG :=.build-opts.$(shell echo '$(BUILDOPT)' | sum | tr -d '\040\055' )
+$(patsubst %.c,%.o,$(wildcard *.c)): $(BUILDFLG)
+bf2jit.c bf2gas32.o bf2gas64.o: $(BUILDFLG)
+$(BUILDFLG):
+	-@rm -f .build-opts.*
+	-@echo '$(BUILDOPT)' > $(BUILDFLG)
