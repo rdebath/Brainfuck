@@ -122,6 +122,14 @@ ifneq ($(CPUFOUND),)
 TOOLDIR=../tools
 endif
 
+echo = $(1)
+ifeq ($(call echo,ok),)	# This checks that gmake is new enough (gmake 3.79+)
+$(OBJECTS): a_newer_version_of_gnu_make
+else
+CALLOK := yes
+endif
+
+ifeq ($(CALLOK),yes)
 ################################################################################
 # Current GCC policy seems to be to do any unsafe optimisation they can think
 # of and let everyone else pick up the pieces. In addition v4.7 of GCC does
@@ -163,16 +171,8 @@ GNULGT := $(call cc-option,-Wno-unused-value,-Wno-unused-value,-w)
 GNULGT += $(call cc-option,-fno-strict-aliasing,-fno-strict-aliasing)
 GNULGT += $(call cc-option,-Wno-sign-compare,-Wno-sign-compare,-w)
 
-echo = $(1)
-ifeq ($(call echo,ok),)	# This checks that the above is working (gmake 3.79+)
-$(OBJECTS): a_newer_version_of_gnu_make
-
-INSTALL=cp
-GNULGT := -w
-else
 # Only check the flags once.
 FUNSAFE := $(UNSAFE)
-endif
 
 ################################################################################
 
@@ -218,7 +218,11 @@ DO_LIBDL2 := $(call try-run,\
 	  } > $(TMP).c ; $(TRYCC2) -o $(TMP),1)
 endif
 
-endif
+endif	# CC
+else
+INSTALL=cp
+GNULGT := -w
+endif	# CALLOK
 
 ################################################################################
 
