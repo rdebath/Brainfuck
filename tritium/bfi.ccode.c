@@ -254,11 +254,14 @@ print_c_header(FILE * ofd)
 		fprintf(ofd, "#define C uintmax_t\n");
 		fprintf(ofd, "#endif\n\n");
 	    }
-	} else if (cell_type_iso)
-	    fprintf(ofd, "#include <stdint.h>\n\n");
-	fprintf(ofd, "#ifndef M\n");
-	fprintf(ofd, "#define M(v) v\n");
-	fprintf(ofd, "#endif\n\n");
+	    fprintf(ofd, "#ifndef M\n");
+	    fprintf(ofd, "#define M(v) v\n");
+	    fprintf(ofd, "#endif\n\n");
+	} else {
+	    if (cell_type_iso)
+		fprintf(ofd, "#include <stdint.h>\n\n");
+	    mask_defined = 0;
+	}
 
     } else if(fixed_mask>0)
 	fprintf(ofd, "#define M(v) ((v) & 0x%x)\n\n", fixed_mask);
