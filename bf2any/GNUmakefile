@@ -19,7 +19,8 @@ ALLEXE=\
 	bf2cobol bf2crun bf2cs bf2csh bf2d bf2dc bf2elf bf2f90 bf2gas32 \
 	bf2gas64 bf2go bf2java bf2julia bf2ksh bf2ksh88 bf2lua bf2nav \
 	bf2neko bf2oldsh bf2pas bf2perl bf2php bf2ps1 bf2py bf2rb bf2rc \
-	bf2run bf2semi bf2sh bf2slang bf2tcl bf2tomm bf2tsql bf2whitespace
+	bf2run bf2semi bf2sh bf2slang bf2swift bf2tcl bf2tomm bf2tsql \
+	bf2whitespace
 
 TOOLDIR=../tools
 LDLIBS=
