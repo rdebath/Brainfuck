@@ -71,7 +71,7 @@ outcmd(int ch, int count)
 	       "#include <string.h>\n"
 	       "#include <openssl/bn.h>\n");
 	puts("");
-	printf("BIGNUM * mem = 0;\n");
+	printf("BIGNUM ** mem = 0;\n");
 	printf("int memsize = 0;\n");
 	printf("#define MINALLOC 16\n");
 	puts("");
@@ -88,8 +88,8 @@ outcmd(int ch, int count)
 
 	printf("%s",
 	    "static\n"
-	    "BIGNUM *\n"
-	    "alloc_ptr(BIGNUM *p)\n"
+	    "BIGNUM **\n"
+	    "alloc_ptr(BIGNUM **p)\n"
 	    "{\n"
 	    "    int amt, memoff, i, off;\n"
 	    "    if (p >= mem && p < mem+memsize) return p;\n"
@@ -103,11 +103,11 @@ outcmd(int ch, int count)
 	    "    if (memoff<0) {\n"
 	    "        memmove(mem+amt, mem, memsize*sizeof(*mem));\n"
 	    "        for(i=0; i<amt; i++)\n"
-	    "            BN_init(mem+i);\n"
+	    "            mem[i] = BN_new();\n"
 	    "        memoff += amt;\n"
 	    "    } else {\n"
 	    "        for(i=0; i<amt; i++)\n"
-	    "            BN_init(mem+memsize+i);\n"
+	    "            mem[memsize+i] = BN_new();\n"
 	    "    }\n"
 	    "    memsize += amt;\n"
 	    "    return mem+memoff;\n"
@@ -123,8 +123,7 @@ outcmd(int ch, int count)
 	"\n"	"putchar8(BIGNUM * chr)"
 	"\n"	"{"
 	"\n"	"    int input_chr;"
-	"\n"	"    BIGNUM t2[1];"
-	"\n"	"    BN_init(t2);"
+	"\n"	"    BIGNUM * t2 = BN_new();"
 	"\n"	"    input_chr = BN_get_word(chr);"
 	"\n"	"    BN_zero(t2);"
 	"\n"	"    if(BN_cmp(chr,t2) < 0) input_chr = -input_chr;"
@@ -154,8 +153,8 @@ outcmd(int ch, int count)
 	    /* #include rant about different semantics of inline keyword */
 	    printf("%s",
 		"static inline\n"
-		"BIGNUM *\n"
-		"move_ptr(BIGNUM *p, int off) {\n"
+		"BIGNUM **\n"
+		"move_ptr(BIGNUM **p, int off) {\n"
 		"    p += off;\n"
 		"    if ((off>0 || p >= mem) && (off<0 || p < mem+memsize)) return p;\n"
 		"    return alloc_ptr(p);\n"
@@ -177,12 +176,10 @@ outcmd(int ch, int count)
 	       "{\n"
 	    );
 	ind ++;
-	I; printf("register BIGNUM * p;\n");
+	I; printf("register BIGNUM ** p;\n");
 	I; printf("register int c;\n");
-	I; printf("BIGNUM v[1];\n");
-	I; printf("BIGNUM t1[1];\n");
-	I; printf("BN_init(v);\n");
-	I; printf("BN_init(t1);\n");
+	I; printf("BIGNUM *v = BN_new();\n");
+	I; printf("BIGNUM *t1 = BN_new();\n");
 	I; printf("setbuf(stdout, 0);\n");
 	I; printf("p = move_ptr(mem,0);\n");
 	break;
@@ -191,18 +188,18 @@ outcmd(int ch, int count)
 
     case '=':
 	if (count > 0) {
-	    I; printf("BN_set_word(p, %d);\n", count);
+	    I; printf("BN_set_word(*p, %d);\n", count);
 	} else if (count <= 0) {
-	    I; printf("BN_zero(p);\n");
+	    I; printf("BN_zero(*p);\n");
 	    if (count < 0) {
-		I; printf("BN_sub_word(p, %d);\n", -count);
+		I; printf("BN_sub_word(*p, %d);\n", -count);
 	    }
 	}
 	break;
 
     case 'B':
-	I; printf("BN_mask_BPC(p);\n");
-	I; printf("BN_copy(v, p);\n");
+	I; printf("BN_mask_BPC(*p);\n");
+	I; printf("BN_copy(v, *p);\n");
 	break;
 
     case 'm':
@@ -210,9 +207,9 @@ outcmd(int ch, int count)
 	if (count != 1) {
 	    I; printf("BN_copy(t1, v);\n");
 	    I; printf("BN_mul_word(t1, %d);\n", count);
-	    I; printf("BN_add(p, p, t1);\n");
+	    I; printf("BN_add(*p, *p, t1);\n");
 	} else {
-	    I; printf("BN_add(p, p, v);\n");
+	    I; printf("BN_add(*p, *p, v);\n");
 	}
 	break;
 
@@ -221,24 +218,24 @@ outcmd(int ch, int count)
 	if (count != 1) {
 	    I; printf("BN_copy(t1, v);\n");
 	    I; printf("BN_mul_word(t1, %d);\n", count);
-	    I; printf("BN_sub(p, p, t1);\n");
+	    I; printf("BN_sub(*p, *p, t1);\n");
 	} else {
-	    I; printf("BN_sub(p, p, v);\n");
+	    I; printf("BN_sub(*p, *p, v);\n");
 	}
 	break;
 
     case 's':
-    case 'S': I; printf("BN_add(p, p, v);\n"); break;
+    case 'S': I; printf("BN_add(*p, *p, v);\n"); break;
 
     case 'Q':
 	I; printf("if(!BN_is_zero(v)) {\n");
 	ind++;
 	if (count > 0) {
-	    I; printf("BN_set_word(p, %d);\n", count);
+	    I; printf("BN_set_word(*p, %d);\n", count);
 	} else if (count <= 0) {
-	    I; printf("BN_zero(p);\n");
+	    I; printf("BN_zero(*p);\n");
 	    if (count < 0) {
-		I; printf("BN_sub_word(p, %d);\n", -count);
+		I; printf("BN_sub_word(*p, %d);\n", -count);
 	    }
 	}
 	ind--;
@@ -247,31 +244,31 @@ outcmd(int ch, int count)
 
     case 'X': I; printf("fprintf(stderr, \"Abort: Infinite Loop.\\n\"); exit(1);\n"); break;
 
-    case '+': I; printf("BN_add_word(p, %d);\n", count); break;
-    case '-': I; printf("BN_sub_word(p, %d);\n", count); break;
+    case '+': I; printf("BN_add_word(*p, %d);\n", count); break;
+    case '-': I; printf("BN_sub_word(*p, %d);\n", count); break;
     case '<': I; printf("p = move_ptr(p, %d);\n", -count); break;
     case '>': I; printf("p = move_ptr(p, %d);\n", count); break;
 
     case '[':
-	I; printf("BN_mask_BPC(p);\n");
-	I; printf("while(!BN_is_zero(p)){\n");
+	I; printf("BN_mask_BPC(*p);\n");
+	I; printf("while(!BN_is_zero(*p)){\n");
 	ind++;
 	break;
 
     case ']':
-	I; printf("BN_mask_BPC(p);\n");
+	I; printf("BN_mask_BPC(*p);\n");
 	ind--;
 	I; printf("}\n");
 	break;
 
-    case '.': I; printf("putchar8(p);\n"); break;
+    case '.': I; printf("putchar8(*p);\n"); break;
 
     case '"': print_cstring(); break;
     case ',':
 	I; printf("c = getchar();\n");
 	I; printf("if (c != EOF)\n");
 	ind++;
-	I; printf("BN_set_word(p, c);\n");
+	I; printf("BN_set_word(*p, c);\n");
 	ind--;
 	break;
     }
