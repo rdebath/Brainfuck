@@ -235,7 +235,7 @@ print_c_header(FILE * ofd)
 
 		fprintf(ofd, "#ifndef C\n");
 		fprintf(ofd, "#ifdef __SIZEOF_INT128__\n");
-		fprintf(ofd, "#define C __int128\n");
+		fprintf(ofd, "#define C unsigned __int128\n");
 		fprintf(ofd, "#else\n");
 		fprintf(ofd, "#if defined(ULLONG_MAX) || defined(__LONG_LONG_MAX__)\n");
 		fprintf(ofd, "#define C unsigned long long\n");
