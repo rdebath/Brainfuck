@@ -269,7 +269,9 @@ endif
 # 'My' lightning is V1 and the CPUs known by version.c except amd64.
 ifneq ($(CPUFOUND),)
 ifeq ($(findstring X86_64,$(CPUFOUND)),)
+ifeq ($(findstring WINDOWS,$(CPUFOUND)),)
 DO_MYLIGHT=$(wildcard $(TOOLDIR)/lightning.h)
+endif
 endif
 endif
 

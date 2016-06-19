@@ -68,8 +68,11 @@
 #endif
 #elif defined(__i386__) || defined(_M_IX86)
 #define PROCESSOR	"i386"
-#if defined(__ELF__) || defined(_WIN32)
+#if defined(__ELF__)
 #define BFI_FOUND_CPU_X86_32
+#endif
+#if defined(_WIN32)
+#define BFI_FOUND_CPU_X86_32_WINDOWS
 #endif
 #elif defined(__powerpc__) || defined(__PPC__)
 #define PROCESSOR	"PPC"
