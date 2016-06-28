@@ -42,7 +42,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <limits.h>
+#if _POSIX_VERSION >= 199506L || defined(LLONG_MAX)
 #include <inttypes.h>
+#endif
 
 void find_best_conversion(char * linebuf);
 
@@ -236,6 +239,7 @@ int verbose = 0;
 int bytewrap = 0;
 int maxcol = 72;
 int blocksize = 0;
+int cell_limit = MAX_CELLS;
 
 void reinit_state(void);
 void output_str(char * s);
@@ -258,6 +262,12 @@ char * special_init = 0;
 
 static int cells[MAX_CELLS];
 
+/* Simple fake intmax_t, be careful it's not perfect. */
+#ifndef INTMAX_MAX
+#define intmax_t double
+#define INTMAX_MAX	4503599627370496.0
+#define PRIdMAX		".0f"
+#endif
 intmax_t patterns_searched = 0;
 
 void
@@ -305,6 +315,9 @@ main(int argc, char ** argv)
 	    argc--; argv++;
 	} else if (strcmp(argv[1], "-B") == 0) {
 	    blocksize = 8192;
+	    argc--; argv++;
+	} else if (strncmp(argv[1], "-L", 2) == 0 && argv[1][2] >= '0' && argv[1][2] <= '9') {
+	    cell_limit = atol(argv[1]+2);
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-binary") == 0) {
@@ -385,6 +398,7 @@ main(int argc, char ** argv)
 	    enable_subrange = 1;
 	    enable_twocell = 1;
 	    enable_special1 = 1;
+	    flg_optimisable = 1;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-i") == 0) {
@@ -524,6 +538,10 @@ main(int argc, char ** argv)
     }
     flg_rtz = (flg_rtz || flg_init || flg_clear);
     if (bytewrap) flg_signed = 0;
+
+    if (multloop_maxcell > cell_limit) multloop_maxcell = cell_limit;
+    if (sliploop_maxcell > cell_limit) sliploop_maxcell = cell_limit;
+
     if (argc < 2 || strcmp(argv[1], "-") == 0)
 	ifd = stdin;
     else
@@ -729,6 +747,8 @@ static int col = 0;
 void
 check_if_best(char * buf, char * name)
 {
+    if (str_cells_used > cell_limit && cell_limit > 0) return;
+
     if (best_len == -1 || best_len > str_next || (best_len == str_next && str_cells_used < best_cells)) {
 
 	memset(cells, 0, sizeof(cells));
@@ -1638,6 +1658,7 @@ gen_unzoned(char * buf, int init_offset)
 
     if (!flg_init && !flg_optimisable && str_cells_used > 0) str_cells_used++;
     if (str_cells_used <= 0) { more_cells=1; str_cells_used=1; }
+    if (str_cells_used >= cell_limit) more_cells = 0;
 
     /* Print each character, use closest cell. */
     for(p=buf; *p;) {
@@ -1686,6 +1707,7 @@ gen_unzoned(char * buf, int init_offset)
 
 	if (currcell>=str_cells_used) {
 	    str_cells_used++;
+	    if (str_cells_used >= cell_limit) more_cells = 0;
 	    if (flg_init) add_str("[-]");
 	}
 
@@ -2406,7 +2428,7 @@ runbf(char * prog, int longrun)
             case ']':   if (cells[m] != 0) n=pgm[n].arg; break;
             case '>':   m += pgm[n].arg; break;
 	    case '.':
-		if (bf_print_off < sizeof(bf_print_buf))
+		if (bf_print_off < (int)sizeof(bf_print_buf))
 		    bf_print_buf[bf_print_off++] = cells[m];
 		break;
         }
