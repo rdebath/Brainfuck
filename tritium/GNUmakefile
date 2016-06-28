@@ -194,32 +194,52 @@ DO_TCC := $(call try-run,\
 	  echo 'int main(){tcc_new();return 0;}';	\
 	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -ltcc -ldl,1)
 
-# How about lightning.h ?
-DO_LIGHT := $(call try-run,\
-	{ echo '\#include <lightning.h>'; \
-	  echo '\#ifdef jit_addi'; echo '\#error Not V1'; echo '\#endif'; \
-	  } > $(TMP).c ; $(TRYCC) -o $(TMP),1)
-
-# Or lightning.h V2 with -llightning
+# How about lightning.h V2 ?
 DO_LIGHT2 := $(call try-run,\
 	{ echo '\#include <lightning.h>'; 				\
 	  echo 'int main(){jit_state_t*_jit=0;jit_emit();return 0;}';	\
 	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -llightning,1)
 
-# And libdl
+ifeq ($(DO_LIGHT2),)
+# No? How about lightning.h V1 ?
+DO_LIGHT := $(call try-run,\
+	{ echo '\#include <lightning.h>';			\
+	  echo 'int main(){char * startptr[2048];';		\
+	  echo 'jit_flush_code(startptr, jit_get_ip().ptr);';	\
+	  echo 'return 0;}';					\
+	  } > $(TMP).c ; $(TRYCC2) -w -o $(TMP),1)
+
+ifeq ($(DO_LIGHT),)
+# Alright, does my copy compile ?
+ifneq ($(TOOLDIR),)
+DO_MYLIGHT := $(call try-run,\
+	{ echo '\#include <lightning.h>';			\
+	  echo 'int main(){char * startptr[2048];';		\
+	  echo 'jit_flush_code(startptr, jit_get_ip().ptr);';	\
+	  echo 'return 0;}';					\
+	  } > $(TMP).c ; $(TRYCC2) -I $(TOOLDIR) -w -o $(TMP),1)
+endif
+endif
+endif
+
+# And shared libraries ?
 ifneq ($(wildcard /usr/include/dlfcn.h),)
-DO_LIBDL1 := $(call try-run,\
-	{ echo '\#include <dlfcn.h>'; \
-	  echo 'int main(){dlerror();}'; \
-	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -ldl,1)
 
 DO_LIBDL2 := $(call try-run,\
 	{ echo '\#include <dlfcn.h>'; \
-	  echo 'int main(){dlerror();}'; \
+	  echo 'int main(){dlerror();return 0;}'; \
 	  } > $(TMP).c ; $(TRYCC2) -o $(TMP),1)
+
+ifeq ($(DO_LIBDL2),)
+# Maybe it needs -ldl
+DO_LIBDL1 := $(call try-run,\
+	{ echo '\#include <dlfcn.h>'; \
+	  echo 'int main(){dlerror();return 0;}'; \
+	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -ldl,1)
+endif
 endif
 
-# Open SSL big numbers
+# Open SSL big numbers ?
 DO_BN := $(call try-run,\
 	{ echo '\#include <openssl/bn.h>'; 				\
 	  echo 'int main(){BIGNUM t1[1]; BN_init(t1);return(0);}';	\
@@ -263,15 +283,6 @@ LIBS_TCCLIB=
 else
 CONF_TCCLIB=
 LIBS_TCCLIB=-ltcc
-endif
-endif
-
-# 'My' lightning is V1 and the CPUs known by version.c except amd64.
-ifneq ($(CPUFOUND),)
-ifeq ($(findstring X86_64,$(CPUFOUND)),)
-ifeq ($(findstring WINDOWS,$(CPUFOUND)),)
-DO_MYLIGHT=$(wildcard $(TOOLDIR)/lightning.h)
-endif
 endif
 endif
 

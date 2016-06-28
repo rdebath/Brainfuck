@@ -36,27 +36,6 @@
 extern "C" {
 #endif
 
-#ifndef LIGHTNING_DETECT
-
-#include <lightning/asm-common.h>
-
-#ifndef LIGHTNING_DEBUG
-#include <lightning/asm.h>
-#endif
-
-#include <lightning/core.h>
-#include <lightning/core-common.h>
-#include <lightning/funcs.h>
-#include <lightning/funcs-common.h>
-#include <lightning/fp.h>
-#include <lightning/fp-common.h>
-
-#ifndef JIT_R0
-#error GNU lightning does not support the current target
-#endif
-
-#else
-
 #if defined(__i386__) || defined(__i386) || defined(_M_IX86)
 #include <lightning/asm-common.h>
 
@@ -102,6 +81,23 @@ extern "C" {
 #include <lightning/fp-common.h>
 #endif
 
+#if !defined(JIT_R0)
+#include <lightning/asm-common.h>
+
+#ifndef LIGHTNING_DEBUG
+#include <lightning/asm.h>
+#endif
+
+#include <lightning/core.h>
+#include <lightning/core-common.h>
+#include <lightning/funcs.h>
+#include <lightning/funcs-common.h>
+#include <lightning/fp.h>
+#include <lightning/fp-common.h>
+
+#ifndef JIT_R0
+#error GNU lightning does not support the current target
+#endif
 #endif
 
 #ifdef __cplusplus
