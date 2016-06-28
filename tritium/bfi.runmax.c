@@ -66,7 +66,7 @@ run_maxtree(void)
 	mask = ~( ((C)1) << cell_length);
     }
 
-    if (verbose>1)
+    if (verbose)
 	fprintf(stderr, "Maxtree variant: %d byte int/cell\n",
 			(int)sizeof(C));
 
@@ -190,7 +190,7 @@ run_supertree(void)
     BIGNUM_V t1, t2, t3;
     BN_init(t1); BN_init(t2); BN_init(t3);
 
-    if (verbose>1)
+    if (verbose)
 	fprintf(stderr, "Maxtree variant: using OpenSSL Bignums\n");
 
     only_uses_putch = 1;
@@ -570,11 +570,11 @@ run_supertree(void)
     min_int_offset = max_pointer*ints_per_cell;
 
 #ifndef NO_BIG_INT
-    if (verbose>1)
+    if (verbose)
 	fprintf(stderr, "Maxtree variant: %dx%d byte int/cell (hardmult)\n",
 		ints_per_cell, (int)sizeof(uint_cell));
 #else
-    if (verbose>1)
+    if (verbose)
 	fprintf(stderr, "Maxtree variant: %dx%d byte int/cell (softmult)\n",
 		ints_per_cell, (int)sizeof(uint_cell));
 #endif

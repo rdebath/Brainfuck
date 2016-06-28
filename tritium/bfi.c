@@ -1072,7 +1072,7 @@ process_file(void)
 		    printtree();
 		}
 	    } else if (cell_size <= 0) {
-		if (verbose)
+		if (verbose>1)
 		    fprintf(stderr, "Starting maxtree interpreter\n");
 		run_maxtree();
 	    } else {
