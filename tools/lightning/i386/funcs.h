@@ -39,6 +39,10 @@
 #include <sys/mman.h>
 #endif
 
+#ifdef __APPLE__
+#error "Don't bother, the MAC requires a 16 byte stack alignment"
+#endif
+
 static void
 jit_flush_code(void *dest, void *end)
 {

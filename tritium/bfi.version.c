@@ -68,7 +68,7 @@
 #endif
 #elif defined(__i386__) || defined(_M_IX86)
 #define PROCESSOR	"i386"
-#if defined(__ELF__)
+#if defined(__ELF__) || defined(__APPLE__)
 #define BFI_FOUND_CPU_X86_32
 #endif
 #if defined(_WIN32)

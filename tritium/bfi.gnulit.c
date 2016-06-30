@@ -156,7 +156,8 @@ static void puts_without_nl(char * s) { fputs(s, stdout); }
 static void failout(void) __attribute__ ((__noreturn__));
 static void failout(void) { fprintf(stderr, "STOP Command executed.\n"); exit(1); }
 
-struct freecell { struct freecell * next; void * memp; } * saved_pointers = 0;
+static struct freecell { struct freecell * next; void * memp; }
+    * saved_pointers = 0;
 
 static void
 save_ptr_for_free(void * memp)

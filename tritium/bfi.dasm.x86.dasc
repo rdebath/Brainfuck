@@ -68,7 +68,11 @@ checkarg_dynasm(char * opt, char * arg UNUSED)
 ||int dynasm_ok = (CPUCHECK==32);
 |.arch x86
 |.else
+||#ifdef __ILP32__
+||#define CPUID "x86_32"
+||#else
 ||#define CPUID "x86_64"
+||#endif
 ||int dynasm_ok = (CPUCHECK==64);
 |.arch x64
 |.endif
@@ -104,6 +108,10 @@ checkarg_dynasm(char * opt, char * arg UNUSED)
 |.define PRM_D, edi
 |.endif
 
+#if defined(__APPLE__) && defined(__i386__)
+#define APPLE_i386_stackalign	16
+#endif
+
 #define Dst &Dstate
 dasm_State *Dstate;
 void* global_labels[GLOB__MAX];
@@ -111,9 +119,34 @@ int maxpc = 0;
 struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
 static void link_and_run(dasm_State **state);
+static void puts_without_nl(char * s) { fputs(s, stdout); }
 static void failout(void) __attribute__ ((__noreturn__));
 
 static void failout(void) { fprintf(stderr, "STOP Command executed.\n"); exit(1); }
+
+static struct freecell { struct freecell * next; void * memp; }
+    * saved_pointers = 0;
+
+static void
+save_ptr_for_free(void * memp)
+{
+    struct freecell * n = malloc(sizeof*n);
+    if (!n) {perror("malloc"); return; }
+    n->next = saved_pointers;
+    n->memp = memp;
+    saved_pointers = n;
+}
+
+static void
+free_saved_memory(void)
+{
+    while(saved_pointers) {
+        struct freecell * n = saved_pointers;
+        saved_pointers = saved_pointers->next;
+        free(n->memp);
+        free(n);
+    }
+}
 
 static int acc_loaded = 0;
 static int acc_offset = 0;
@@ -194,6 +227,8 @@ run_dynasm(void)
 {
     struct bfi * n = bfprog;
     int used_prtchr = 0;
+    char *strbuf = 0;
+    size_t maxstrlen = 0;
 
     if (cell_size == 8) tape_step = 1; else
     tape_step = sizeof(int);
@@ -217,6 +252,7 @@ run_dynasm(void)
     /* Create Stack frame. */
     | ->start:
     |.if I386
+#ifndef APPLE_i386_stackalign
     | push ebp
     | push edi
     | push esi
@@ -224,6 +260,15 @@ run_dynasm(void)
     | mov  ebp, esp
     |
     | mov  REG_P, dword [ebp+20]
+#else
+    | push ebp
+    | mov  ebp, esp
+    | sub  esp, 24	// Align 16 bytes
+    | mov  dword [ebp-4], edi
+    | mov  dword [ebp-8], esi
+    | mov  dword [ebp-12], ebx
+    | mov  REG_P, dword [ebp+8]
+#endif
     |.else
     | push rbp
     | push r15
@@ -478,9 +523,14 @@ run_dynasm(void)
 	    acc_loaded = 0;
 
 	    |.if I386
+#ifndef APPLE_i386_stackalign
 	    | push REG_A
 	    | call &putch
 	    | pop eax
+#else
+	    | mov dword [esp], REG_A
+	    | call &putch
+#endif
 	    |.else
 #ifndef _WIN32
 	    | mov PRM_D, REG_A
@@ -496,30 +546,100 @@ run_dynasm(void)
 	    |.endif
 	    break;
 
+#ifndef APPLE_i386_stackalign
 	case T_CHR:
 	    clean_acc();
 	    acc_const = acc_loaded = 0;
-	    /* TODO: Strings */
-	    used_prtchr = 1;
 
-	    if (count >= 0 && count < 256) {
-		| mov REG_AL, (count)
-		| call ->prtchr
-		break;
+            if (n->count <= 0 || (n->count >= 127 && iostyle == 1) ||
+                    !n->next || n->next->type != T_CHR) {
+		used_prtchr = 1;
+
+		if (count >= 0 && count < 256) {
+		    | mov REG_AL, (count)
+		    | call ->prtchr
+		    break;
+		}
+
+		| mov REG_A, (count)
+		| call ->prtchrw
+	    } else {
+                unsigned i = 0;
+                struct bfi * v = n;
+                char *s;
+                while(v->next && v->next->type == T_CHR &&
+                        v->next->count > 0 &&
+                            (v->next->count < 127 || iostyle != 1)) {
+
+                    if (i+2 > maxstrlen) {
+                        if (maxstrlen) maxstrlen *= 2; else maxstrlen = 4096;
+                        strbuf = realloc(strbuf, maxstrlen);
+                        if (!strbuf) {
+                            fprintf(stderr, "Reallocate of string buffer failed\n");
+                            exit(42);
+                        }
+                    }
+
+                    strbuf[i++] = (char) /*GCC -Wconversion*/ v->count;
+                    n = v;
+                    v = v->next;
+                }
+                strbuf[i] = 0;
+                s = strdup(strbuf);
+                if (!s) {
+                    fprintf(stderr, "Save of string failed\n");
+                    exit(43);
+                }
+                save_ptr_for_free(s);
+
+		|.if I386
+		| mov REG_A, s
+		| push REG_A
+		| call &puts_without_nl
+		| pop REG_D
+		|.else
+#ifdef __ILP32__
+		| mov eax, (uintptr_t) s
+#else
+		| mov64 rax, (uintptr_t) s
+#endif
+#ifndef _WIN32
+		| mov PRM, rax
+#else
+		| mov REG_CW, rax
+#endif
+#ifdef __code_model_small__
+		| mov   eax, (uintptr_t) puts_without_nl
+#else
+		| mov64 rax, (uintptr_t) puts_without_nl
+#endif
+		| call  rax
+		|.endif
+
 	    }
-
-	    | mov REG_A, (count)
-	    | call ->prtchrw
 	    break;
+#else
+	case T_CHR:
+	    clean_acc();
+	    acc_const = acc_loaded = 0;
+	    | mov dword [esp], (count)
+	    | call &putch
+	    break;
+#endif
 
 	case T_INP:
 	    load_acc_offset(offset);
 	    set_acc_offset(offset);
 
 	    |.if I386
+#ifndef APPLE_i386_stackalign
 	    | push REG_A
 	    | call &getch
 	    | pop REG_D
+#else
+	    | mov dword [esp], REG_A
+	    | call &getch
+#endif
 	    |.else
 #ifndef _WIN32
 	    | mov PRM_D, REG_A
@@ -564,12 +684,21 @@ run_dynasm(void)
 
     |->endcode:
     |.if I386
+#ifndef APPLE_i386_stackalign
     | xor eax, eax
     | mov esp, ebp
     | pop ebx
     | pop esi
     | pop edi
     | pop ebp
+#else
+    | mov edi, dword [ebp-4]
+    | mov esi, dword [ebp-8]
+    | mov ebx, dword [ebp-12]
+    | add esp, 24
+    | pop ebp
+    | ret
+#endif
     |.else
     | xor rax, rax
     | mov rsp, rbp
@@ -583,8 +712,7 @@ run_dynasm(void)
 
     /*
      *	This is a simple print character library routine.
-     *  It make the T_CHR translation a 7 or 10 byte sequence. This is still
-     *  expensive vs a string literal so the nasm routine does a lot better.
+     *  It make the single char T_CHR translation a 7 or 10 byte sequence.
      */
     if (used_prtchr) {
 	| ->prtchr:
@@ -610,7 +738,10 @@ run_dynasm(void)
 	|.endif
     }
 
+    if (strbuf) { maxstrlen = 0; free(strbuf); strbuf = 0; }
+
     link_and_run(Dst);
+    free_saved_memory();
 }
 
 
