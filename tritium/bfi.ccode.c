@@ -1005,8 +1005,13 @@ print_ccode(FILE * ofd)
     if (do_run || cell_type_iso || use_dynmem)
 	knr_c_ok = 0;
 
+#if defined(__GNUC__) && __GNUC__ < 3
+    if (use_functions<0)
+	use_functions = (total_nodes >= 1000);
+#else
     if (use_functions<0)
 	use_functions = (total_nodes >= 3000);
+#endif
 
     if (verbose)
 	fprintf(stderr, "Generating C Code.\n");
