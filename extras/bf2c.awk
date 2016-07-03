@@ -141,10 +141,26 @@ function header() {
 	print "#include <stdio.h>"  > of
     if (cell == "" || !norun)
 	print "#include <unistd.h>" > of
-    if (icount)
+    if (tcell ~ /_/)
 	print "#include <inttypes.h>" > of
-    else if (tcell ~ /_/)
-	print "#include <stdint.h>" > of
+    else if (icount) {
+	print "#ifdef __STDC__" > of
+	print "#include <limits.h>" > of
+	print "#if _POSIX_VERSION >= 199506L || defined(LLONG_MAX)" > of
+	print "#include <inttypes.h>" > of
+	print "#endif" > of
+	print "#endif" > of
+    }
+
+    if (icount) {
+	print "#ifndef UINTMAX_MAX" > of
+	print "typedef unsigned long uintmax_t;" > of
+	print "#define PRIuMAX \"lu\"" > of
+	print "#endif" > of
+	print "#define t icount++;" > of
+	print "#define T(x) icount += (x);" > of
+	print "uintmax_t icount = 0;" > of
+    }
 	
     print "#define r m+=1;" > of
     print "#define l m-=1;" > of
@@ -174,11 +190,6 @@ function header() {
     }
     print "#define C",tcell         > of
     tcell="C"
-    if (icount) {
-	print "#define t icount++;" > of
-	print "#define T(x) icount += (x);" > of
-	print "uintmax_t icount = 0;" > of
-    }
 
     if (cell != "") {
 	print "void putch(int ch) { putchar(ch); }" > of;
