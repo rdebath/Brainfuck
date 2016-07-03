@@ -1054,8 +1054,7 @@ process_file(void)
 
     if (do_codestyle == c_default) {
 	if (do_run) {
-	    if (verbose>2 || debug_mode || enable_trace
-		|| total_nodes == node_type_counts[T_CHR]) {
+	    if (verbose>2 || debug_mode || enable_trace) {
 
 		if (cell_size <= 0) {
 		    fprintf(stderr, "ERROR: run_tree() cannot do %dbit cells.\n",
