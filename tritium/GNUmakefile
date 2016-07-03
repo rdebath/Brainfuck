@@ -210,6 +210,7 @@ DO_LIGHT := $(call try-run,\
 	  } > $(TMP).c ; $(TRYCC2) -w -o $(TMP),1)
 
 ifeq ($(DO_LIGHT),)
+ifeq ($(findstring WINDOWS,$(CPUFOUND)),)
 # Alright, does my copy compile ?
 ifneq ($(TOOLDIR),)
 DO_MYLIGHT := $(call try-run,\
@@ -218,6 +219,7 @@ DO_MYLIGHT := $(call try-run,\
 	  echo 'jit_flush_code(startptr, jit_get_ip().ptr);';	\
 	  echo 'return 0;}';					\
 	  } > $(TMP).c ; $(TRYCC2) -I $(TOOLDIR) -w -o $(TMP),1)
+endif
 endif
 endif
 endif
