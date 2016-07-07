@@ -72,9 +72,6 @@ MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 # Delete the direct to exe rule to make sure %.o files are used.
 % : %.c
 
-# Keep the .o files so we can relink.
-.PRECIOUS: %.o
-
 $(ALLEXE): bf2any.o bf2const.o
 
 #-------------------------------------------------------------------------------
