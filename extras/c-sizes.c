@@ -330,6 +330,7 @@ main()
 #endif
 
 #if defined(LLONG_MAX) && !defined(GOT_LLONG)
+#define GOT_LLONG
     printf("Bytes LL%2d, long long      %"PRIdLLONG"%s%s\n",
 	    (int)sizeof(long long), LLONG_MAX,
 	    (sizeof(long long)==sizeof(time_t)?" (time_t)":""), ""
