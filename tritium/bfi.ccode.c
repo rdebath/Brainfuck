@@ -1005,6 +1005,8 @@ print_ccode(FILE * ofd)
     if (do_run || cell_type_iso || use_dynmem)
 	knr_c_ok = 0;
 
+    if (use_functions<0 && total_nodes == node_type_counts[T_CHR])
+	use_functions = 0;
 #if defined(__GNUC__) && __GNUC__ < 3
     if (use_functions<0)
 	use_functions = (total_nodes >= 1000);
