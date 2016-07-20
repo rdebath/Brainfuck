@@ -196,6 +196,11 @@ static const char * cupid[] = { "->", "<-", "><", "<>", "<<", ">>", "-<", ">-", 
 static const char * pikalang[] =
     {"pipi", "pichu", "pi", "ka", "pikachu", "pikapi", "pika", "chu", 0 };
 
+/* Language "spoon" */
+static const char * spoon[] =
+    { "010", "011", "1", "000", "001010", "0010110", "00100", "0011",
+      "", "00101111" };
+
 /* Language brainbool: http://esolangs.org/wiki/Brainbool */
 static const char * brainbool[] =
     {">>>>>>>>>", "<<<<<<<<<",
@@ -542,6 +547,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-pika") == 0) {
 	lang = pikalang; langclass = L_CDWORDS; return 1;
     } else
+    if (strcmp(arg, "-spoon") == 0) {
+	lang = spoon; langclass = L_CHARS+GEN_HEADER; return 1;
+    } else
     if (strcmp(arg, "-brainbool") == 0) {
 	lang = brainbool; langclass = L_BFCHARS; return 1;
     } else
@@ -624,6 +632,7 @@ check_arg(const char * arg)
 	"\n\t"  "-nyan   'nyan-script' from tommyschaefer on github"
 	"\n\t"  "-@!     @! from http://esolangs.org/wiki/@tention!"
 	"\n\t"  "-pika   Pikalang from https://github.com/skj3gg/pikalang"
+	"\n\t"  "-spoon  Language spoon http://esolangs.org/wiki/spoon"
 	"\n\t"  "-cupid  Cupid from http://esolangs.org/wiki/Cupid"
 	"\n\t"  "-malbrain Malbrain translation"
 	"\n\t"  "-hanoilove Hanoi Love translation"
