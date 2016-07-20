@@ -44,6 +44,7 @@ size_t bf_prefilter(char * buf, size_t maxsize);
 %x ZZZ
 %x TRIP
 %x PETOOH
+%x SPOON
 
 w	[\t ]*
 ws	[\t ]+
@@ -218,6 +219,22 @@ ook	B?[Oo]ok
     .		commentch(yytext[0]);
 }
 
+<SPOON>{
+    1		pc('+');
+    000		pc('-');
+    010		pc('>');
+    011		pc('<');
+    0011	pc(']');
+    00100	pc('[');
+    001010	pc('.');
+    0010110	pc(',');
+    00101110	pc('#');
+    00101111	;
+
+    [ \t\n]+	{int i; for(i=0; i<yyleng; i++) commentch(yytext[i]);}
+    .		commentch(yytext[0]);
+}
+
 <ALWORD>{
     /* Simple "words". These sets don't interfere with each-other. */
 
@@ -377,6 +394,11 @@ int main(int argc, char ** argv)
 
 	    else if (!strcmp(argv[1], "-trip")) {
 		mode = TRIP;
+		character_prefilter = "01";
+	    }
+
+	    else if (!strcmp(argv[1], "-spoon")) {
+		mode = SPOON;
 		character_prefilter = "01";
 	    }
 
