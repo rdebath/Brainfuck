@@ -1,4 +1,4 @@
-
+#!/usr/bin/ruby
 eval 'm=Hash.new(p=0);'+ARGF.read.gsub(/[^adehkKoOru]/,'').gsub(
 	/(kO|Ko|[Kk]u(dah|karek|d))/,
 	'Kudah' => 'p+=1;',
