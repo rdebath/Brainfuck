@@ -26,31 +26,17 @@ outcmd(int ch, int count)
     switch(ch) {
     case '!':
 	pr("#!/bin/csh");
-	pr("set M=(0) V=0 P=15");
-	pr("while ( $P > 0 )");
-	pr("    @ P -= 1");
-	pr("    set M=( $M $M )");
-	pr("end");
+	pr("set M=(0 0) V=0 P=1 E=1 L=()");
 	pr("");
 	pr("# OH! the quoting!!");
 	pr("alias outchar 'awk -v c=\\!^ '\"'\"'BEGIN{printf \"%%c\",c;}'\"'\"");
-	pr("");
-
-#ifdef __linux__
-	/* The -N option only works properly on Linux */
-	pr("alias getch 'set M[$P]=`od -A n -N 1 -w1 -t u1` || exit'");
-#else
-	pr("dd status=none count=1 bs=1 </dev/null >&/dev/null");
-	pr("if ( $status == 0 ) then");
-	pr("    # Can't use a plain 'dd' command because we can't dump stderr");
-	pr("    alias getch 'set M[$P]=`dd status=none count=1 bs=1 | od -A n -t u1` || exit'");
-	pr("else");
-	pr("    alias getch 'sh -c '\"'\"'echo The getch command is broken. 1>&2'\"'\"'; exit'");
-	pr("endif");
-#endif
 
 	pr("");
 	prv("@ P=%d", tapeinit);
+	pr("while ($P > $E)");
+	pr("    @ E += 1");
+	pr("    set M=( $M 0 )");
+	pr("end");
 	break;
 
     case 'X': pr("sh -c 'echo Infinite Loop 1>&2' ; exit 1"); break;
@@ -70,10 +56,28 @@ outcmd(int ch, int count)
 
     case '+': prv("@ M[$P]+=%d", count); break;
     case '-': prv("@ M[$P]-=%d", count); break;
-    case '>': prv("@ P+=%d", count); break;
+    case '>':
+	prv("@ P+=%d", count);
+	pr("while ($P > $E)");
+	pr("    @ E += 1");
+	pr("    set M=( $M 0 )");
+	pr("end");
+	break;
     case '<': prv("@ P-=%d", count); break;
     case '.': pr("outchar $M[$P]"); break;
-    case ',': pr("getch"); do_input++; break;
+    case ',':
+	    pr( "if ($#L == 0) set L=( `echo \"$<\" | mawk 'BEGIN { "
+		"while(1) { if (\\\\!gotline) { gotline = getline ; "
+		"if(\\\\!gotline) break ; line = $0 ; } if (line == "
+		"\"\") { gotline=0 ; print 10 ; break ; } if (\\\\!genord) "
+		"{ for(i=1; i<256; i++) ord[sprintf(\"%%c\",i)] = i ; "
+		"genord=1 ; } c = substr(line, 1, 1) ; line=substr(line, 2) "
+		"; print ord[c] ; } exit 0 ; } ' ` )");
+	    pr("if ($#L > 0 ) then");
+	    pr("    set M[$P]=$L[1]");
+	    pr("    shift L");
+	    pr("endif");
+	    break;
 
     case '[':
 	if(bytecell) pr("@ M[$P] = ($M[$P] %% 256 + 256) %% 256");
