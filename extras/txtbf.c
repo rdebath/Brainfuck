@@ -77,6 +77,24 @@ int runbf(char * prog, int longrun);
 #define HUGEPREFIX2 "+++[>++++++<-]>[>[+++++++>]+[<]>-]"
 #define HUGEPREFIX3 "+++[>+++++++<-]>[>[++++++>]+[<]>-]"
 
+/* These variants init the cells they use with '[-]' first */
+#define INITPREFIX1 "[-]>[-]>[-]<<++++[>++++<-]>[>[++++++++>]+>[-]<[<]>-]"
+#define INITPREFIX2 "[-]>[-]>[-]<<+++[>++++++<-]>[>[+++++++>]+>[-]<[<]>-]"
+#define INITPREFIX3 "[-]>[-]>[-]<<+++[>+++++++<-]>[>[++++++>]+>[-]<[<]>-]"
+
+/* And the 'A' variants add a space. */
+#define HUGEPREFIX1A "++++[>++++<-]>[>[++++++++>]+[<]>-]<++++++++[>++++<-]"
+#define HUGEPREFIX2A "+++[>++++++<-]>[>[+++++++>]+[<]>-]<++++++++[>++++<-]"
+#define HUGEPREFIX3A "+++[>+++++++<-]>[>[++++++>]+[<]>-]<++++++++[>++++<-]"
+
+#define INITPREFIX1A "[-]>[-]>[-]<<++++[>++++<-]>[>[++++++++>]+>[-]<[<]>-]<++++++++[>++++<-]"
+#define INITPREFIX2A "[-]>[-]>[-]<<+++[>++++++<-]>[>[+++++++>]+>[-]<[<]>-]<++++++++[>++++<-]"
+#define INITPREFIX3A "[-]>[-]>[-]<<+++[>+++++++<-]>[>[++++++>]+>[-]<[<]>-]<++++++++[>++++<-]"
+
+#define INITPREFIX1B "[-]>[-]>[-]>[-]<<++++[>++++<-]>[>[++++++++>]+>[-]<[<]>-]<<+++++[>++>++++++<<-]"
+#define INITPREFIX2B "[-]>[-]>[-]>[-]<<+++[>++++++<-]>[>[+++++++>]+>[-]<[<]>-]<<+++++[>++>++++++<<-]"
+#define INITPREFIX3B "[-]>[-]>[-]>[-]<<+++[>+++++++<-]>[>[++++++>]+>[-]<[<]>-]<<+++++[>++>++++++<<-]"
+
 /* These are some very generic multiply loops, the first is vaguely based on
  * English language probilities, the others are cell value coverage loops.
  */
@@ -209,6 +227,8 @@ int flg_init = 0;
 int flg_clear = 0;
 int flg_signed = 1;
 int flg_rtz = 0;
+
+int self_init = 0;
 
 int done_config_wipe = 0;
 
@@ -610,9 +630,26 @@ find_best_conversion(char * linebuf)
     if (enable_special2) {
 	if (verbose>2) fprintf(stderr, "Trying complicated special strings\n");
 
-	gen_special(linebuf, HUGEPREFIX1, "big ASCII 1", 1);
-	gen_special(linebuf, HUGEPREFIX2, "big ASCII 2", 1);
-	gen_special(linebuf, HUGEPREFIX3, "big ASCII 3", 1);
+	if (flg_init) {
+	    self_init = 1;
+	    gen_special(linebuf, INITPREFIX1, "big ASCII 1 (i)", 0);
+	    gen_special(linebuf, INITPREFIX2, "big ASCII 2 (i)", 0);
+	    gen_special(linebuf, INITPREFIX3, "big ASCII 3 (i)", 0);
+	    gen_special(linebuf, INITPREFIX1A, "big ASCII 1A (i)", 0);
+	    gen_special(linebuf, INITPREFIX2A, "big ASCII 2A (i)", 0);
+	    gen_special(linebuf, INITPREFIX3A, "big ASCII 3A (i)", 0);
+	    gen_special(linebuf, INITPREFIX1B, "big ASCII 1B (i)", 0);
+	    gen_special(linebuf, INITPREFIX2B, "big ASCII 2B (i)", 0);
+	    gen_special(linebuf, INITPREFIX3B, "big ASCII 3B (i)", 0);
+	    self_init = 0;
+	} else {
+	    gen_special(linebuf, HUGEPREFIX1, "big ASCII 1", 0);
+	    gen_special(linebuf, HUGEPREFIX2, "big ASCII 2", 0);
+	    gen_special(linebuf, HUGEPREFIX3, "big ASCII 3", 0);
+	    gen_special(linebuf, HUGEPREFIX1A, "big ASCII 1A", 0);
+	    gen_special(linebuf, HUGEPREFIX2A, "big ASCII 2A", 0);
+	    gen_special(linebuf, HUGEPREFIX3A, "big ASCII 3A", 0);
+	}
     }
 
     if (enable_twocell) {
@@ -630,7 +667,7 @@ find_best_conversion(char * linebuf)
 	if (verbose>2) fprintf(stderr, "Trying non-wrap hello-worlds\n");
 
 	for (hellos = hello_world; *hellos; hellos++) {
-	    sprintf(namebuf, "Hello world %d", hellos-hello_world);
+	    sprintf(namebuf, "Hello world %d", (int)(hellos-hello_world));
 	    gen_special(linebuf, *hellos, namebuf, 0);
 	}
     }
@@ -641,12 +678,12 @@ find_best_conversion(char * linebuf)
 	if (verbose>2) fprintf(stderr, "Trying complex hello-worlds\n");
 
 	for (hellos = hello_world2; *hellos; hellos++) {
-	    sprintf(namebuf, "Complex world %d", hellos-hello_world2);
+	    sprintf(namebuf, "Complex world %d", (int)(hellos-hello_world2));
 	    gen_special(linebuf, *hellos, namebuf, 0);
 	}
 
 	if (bytewrap) for (hellos = hello_world_byte; *hellos; hellos++) {
-	    sprintf(namebuf, "Hello bytes %d", hellos-hello_world_byte);
+	    sprintf(namebuf, "Hello bytes %d", (int)(hellos-hello_world_byte));
 	    gen_special(linebuf, *hellos, namebuf, 0);
 	}
     }
@@ -1618,7 +1655,7 @@ gen_special(char * buf, char * initcode, char * name, int usercode)
 		"WARNING: Assuming bytewrapped interpreter for code %s\n",
 		name);
 
-    if (flg_init) {
+    if (flg_init && !self_init) {
 	/* Clear the working cells */
 	if (maxcell<0) maxcell=0;
 	for(i=maxcell; i>=0; i--) {
