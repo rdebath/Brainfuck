@@ -66,6 +66,7 @@ void gen_trislipnest(char * buf);
 int runbf(char * prog, int longrun);
 
 #define MAX_CELLS 512
+#define PREV_BEST 8
 
 /* These setup strings have, on occasion, given good results */
 
@@ -250,6 +251,7 @@ int enable_nestloop = 0;
 int enable_trislipnest = 0;
 int enable_special1 = 1;
 int enable_special2 = 1;
+int enable_rerun = 1;
 
 int flg_lookahead = 0;
 int flg_zoned = 0;
@@ -267,7 +269,7 @@ void add_chr(int ch);
 void add_str(char * p);
 
 char * str_start = 0;
-int str_max = 0, str_next = 0;
+int str_max = 0, str_next = 0, str_mark = 0;
 int str_cells_used = 0;
 
 char bf_print_buf[64];
@@ -276,7 +278,12 @@ int bf_print_off = 0;
 char * best_str = 0;
 int best_len = -1;
 int best_cells = 1;
+int best_mark = 0;
 char * best_name = 0;
+
+char * best_init[PREV_BEST];
+char * best_nmid[PREV_BEST];
+int best_initid = 0;
 
 char * special_init = 0;
 
@@ -304,6 +311,7 @@ wipe_config()
     enable_subrange = 0;
     enable_special1 = 0;
     enable_special2 = 0;
+    enable_rerun = 0;
 
     special_init = 0;
 }
@@ -357,6 +365,9 @@ main(int argc, char ** argv)
 	    argc--; argv++;
 	} else if (strcmp(argv[1], "-lookahead") == 0) {
 	    flg_lookahead = 1;
+	    argc--; argv++;
+	} else if (strcmp(argv[1], "-rerun") == 0) {
+	    enable_rerun = 1;
 	    argc--; argv++;
 	} else if (strcmp(argv[1], "-zoned") == 0) {
 	    flg_zoned = 1;
@@ -467,6 +478,14 @@ main(int argc, char ** argv)
 	    multloop_maxinc = 12;
 	    argc--; argv++;
 
+	} else if (strcmp(argv[1], "-mult3") == 0) {
+	    wipe_config();
+	    enable_multloop = 1;
+	    multloop_maxcell = 10;
+	    multloop_maxloop = 16;
+	    multloop_maxinc = 7;
+	    argc--; argv++;
+
 	} else if (strcmp(argv[1], "-mult-bare") == 0) {
             multloop_no_prefix = 1;
 	    argc--; argv++;
@@ -539,10 +558,11 @@ main(int argc, char ** argv)
 	    fprintf(stderr, "-q      Toggle two cells method\n");
 	    fprintf(stderr, "\n");
 	    fprintf(stderr, "-mult   Toggle multiply loops\n");
-	    fprintf(stderr, "-mult2  Search long multiply loops\n");
+	    fprintf(stderr, "-mult2  Search long multiply loops (slow)\n");
+	    fprintf(stderr, "-mult3  Search long multiply loops (slow)\n");
 	    fprintf(stderr, "-slip   Toggle short slip loops\n");
-	    fprintf(stderr, "-slip2  Search long slip loops\n");
-	    fprintf(stderr, "-N      Toggle nested loops (slow)\n");
+	    fprintf(stderr, "-slip2  Search long slip loops (slow)\n");
+	    fprintf(stderr, "-N      Toggle nested loops (very slow)\n");
 	    fprintf(stderr, "-tri    Search nested and tri-slip/nest loops\n");
 	    fprintf(stderr, "-s10    Try just one subrange multiply size\n");
 	    fprintf(stderr, "-M+99   Specify multiply loop max increment\n");
@@ -749,7 +769,25 @@ find_best_conversion(char * linebuf)
 	gen_nestloop(linebuf);
     }
 
-    if (verbose>2) fprintf(stderr, "Total of %"PRIdMAX" patterns searched.\n", patterns_searched);
+    if (enable_rerun && !flg_lookahead) {
+	int i, save_si = self_init;
+	char *newname;
+	if (verbose>1) fprintf(stderr, "Rerunning with lookahead on found list\n");
+	flg_lookahead = 1; self_init = flg_init;
+
+	for(i=0; i<PREV_BEST; i++)
+	    if (best_init[i] && best_nmid[i]) {
+		newname = malloc(strlen(best_nmid[i]) + 32);
+		strcpy(newname, best_nmid[i]);
+		strcat(newname, " (rerun)");
+		gen_special(linebuf, best_init[i], newname, 1);
+		free(newname);
+	    }
+
+	flg_lookahead = 0; self_init = save_si;
+    }
+
+    if (verbose>1) fprintf(stderr, "Total of %"PRIdMAX" patterns searched.\n", patterns_searched);
 
     if (best_len>=0) {
 	if (verbose)
@@ -758,7 +796,7 @@ find_best_conversion(char * linebuf)
 		best_cells, best_name);
 
 	output_str(best_str);
-	free(str_start); str_start = 0; str_max = str_next = 0;
+	free(str_start); str_start = 0; str_max = str_next = str_mark = 0;
     }
     output_str("\n");
 }
@@ -817,7 +855,37 @@ check_if_best(char * buf, char * name)
 	best_name = malloc(strlen(name)+1);
 	strcpy(best_name, name);
 	best_len = str_next;
+	best_mark = str_mark;
 	best_cells = str_cells_used;
+
+	if (best_mark) {
+	    int i, got_it = 0;
+	    char * str;
+
+	    str = malloc(best_mark+1);
+	    memcpy(str, best_str, best_mark);
+	    str[best_mark] = 0;
+
+	    for(i=0; i<PREV_BEST; i++) {
+		if (best_init[i] != 0 && strcmp(best_init[i], str) == 0) {
+		    got_it = 1;
+		    break;
+		}
+	    }
+	    if (got_it) {
+		/* Duplicates can happen due to zoned vs unzoned. */
+		free(str);
+	    } else {
+		if (best_init[best_initid] != 0) free(best_init[best_initid]);
+		if (best_nmid[best_initid] != 0) free(best_nmid[best_initid]);
+		best_nmid[best_initid] = malloc(strlen(best_name)+1);
+		strcpy(best_nmid[best_initid], best_name);
+
+		best_init[best_initid] = str;
+
+		best_initid = (best_initid + 1) % PREV_BEST;
+	    }
+	}
     }
 
     if (best_len == str_next && str_cells_used == best_cells) {
@@ -825,9 +893,14 @@ check_if_best(char * buf, char * name)
 	if (verbose>2 || (verbose == 2 && str_next < 63))
 	    fprintf(stderr, "Found '%s' len=%d, cells=%d, '%s'\n",
 		    name, str_next, str_cells_used, str_start);
-	else if (verbose>1)
-	    fprintf(stderr, "Found '%s' len=%d, cells=%d, '%.60s'...\n",
+	else if (verbose>1) {
+	    if (str_mark)
+		fprintf(stderr, "Found '%s' len=%d, cells=%d, '%.*s' ...\n",
+		    name, str_next, str_cells_used, str_mark, str_start);
+	    else
+		fprintf(stderr, "Found '%s' len=%d, cells=%d, '%.60s'...\n",
 		    name, str_next, str_cells_used, str_start);
+	}
     }
 }
 
@@ -864,7 +937,7 @@ void
 reinit_state(void)
 {
     memset(cells, 0, sizeof(cells));
-    str_next = 0;
+    str_next = str_mark = 0;
     if (str_start) str_start[str_next] = 0;
     else add_str("<>");
 }
@@ -1078,6 +1151,7 @@ gen_subrange(char * buf, int subrange, int flg_subzone, int flg_nonl)
 	/* Set the translation table */
 	int txn[256] = {};
 	for(i=0; i<=maxcell; i++) txn[rng[i] & 0xFF] = i;
+	str_mark = str_next;
 
 	/* Print each character */
 	for(p=buf; *p;) {
@@ -1111,7 +1185,7 @@ gen_subrange(char * buf, int subrange, int flg_subzone, int flg_nonl)
 void
 gen_multonly(char * buf)
 {
-    int cellincs[10] = {0};
+    int cellincs[MAX_CELLS] = {0};
     int maxcell = 0;
     int currcell=0;
     int i;
@@ -1138,11 +1212,13 @@ return_to_top:
 		cellincs[i] = 1;
 	    }
 
+	    if (toohigh) goto return_to_top;
+
 	    for(maxcell=0; cellincs[maxcell] != 0; )
 		maxcell++;
 
 	    maxcell--; currcell=0;
-	    if (toohigh || maxcell == 0) goto return_to_top;
+	    if (maxcell == 0) goto return_to_top;
 	}
 
 	patterns_searched++;
@@ -1231,8 +1307,8 @@ return_to_top:
 void
 gen_multbyte(char * buf)
 {
-    int cellincs[10] = {0};
-    int cellincs2[10] = {0};
+    int cellincs[MAX_CELLS] = {0};
+    int cellincs2[MAX_CELLS] = {0};
     int maxcell = 0;
     int currcell=0;
     int i, cnt, hasneg;
@@ -1696,6 +1772,7 @@ gen_unzoned(char * buf, int init_offset)
     if (!flg_init && !flg_optimisable && str_cells_used > 0) str_cells_used++;
     if (str_cells_used <= 0) { more_cells=1; str_cells_used=1; }
     if (str_cells_used >= cell_limit) more_cells = 0;
+    str_mark = str_next;
 
     /* Print each character, use closest cell. */
     for(p=buf; *p;) {
@@ -1793,13 +1870,13 @@ gen_lookahead(char * buf, int init_cell)
 
 	    {
 		int currcell2 = i;
-		int la, j;
+		int la, j, mc = 15;
 		int cells2[MAX_CELLS];
 		for(j=0; j<str_cells_used; j++)
 		    cells2[j] = cells[j];
 		cells2[i] = c;
 
-		for(la=0; p[la]; la++)
+		for(la=0; p[la] && mc>0 && range < minrange; la++, mc--)
 		{
 		    int minrange2 = 999999;
 		    int usecell2 = 0;
@@ -1826,6 +1903,28 @@ gen_lookahead(char * buf, int init_cell)
 	    if (range < minrange) {
 		usecell = i;
 		minrange = range;
+	    }
+	}
+
+	if (!flg_optimisable && currcell > usecell && currcell-3 > usecell) {
+	    int tcell = currcell;
+	    while(tcell>0) {if (cells[tcell] == 0) break; tcell--;}
+	    if (cells[tcell] == 0 && abs(usecell-tcell)+3 < currcell-usecell) {
+		currcell = tcell;
+		add_chr('[');
+		add_chr('<');
+		add_chr(']');
+	    }
+	}
+
+	if (!flg_optimisable && currcell < usecell && currcell+3 < usecell) {
+	    int tcell = currcell;
+	    while(tcell<str_cells_used) {if (cells[tcell] == 0) break; tcell++;}
+	    if (cells[tcell] == 0 && abs(usecell-tcell)+3 < usecell-currcell) {
+		currcell = tcell;
+		add_chr('[');
+		add_chr('>');
+		add_chr(']');
 	    }
 	}
 
@@ -1868,6 +1967,7 @@ gen_zoned(char * buf, int init_cell)
     int cells2[MAX_CELLS];
 
     if (str_cells_used <= 0) str_cells_used=1;
+    str_mark = str_next;
 
     for(i=0; i<str_cells_used; i++) {
 	cells2[i] = cells[i];
@@ -1886,7 +1986,8 @@ gen_zoned(char * buf, int init_cell)
 	for(i=st; i<str_cells_used; i++) {
 	    int range = c - cells2[i];
 	    if (bytewrap) range = (signed char)range;
-	    range = abs(range);
+	    range = abs(range) * 4;
+	    range += abs(currcell-i);
 
 	    if (range < minrange) {
 		usecell = i;
