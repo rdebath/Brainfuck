@@ -559,7 +559,7 @@ print_pgm()
 	    for(i = 0; i < pgm[n].arg; i++)
 		fprintf(stderr, "%c",
 			pgm[n].cmd=='M'?'+':
-			pgm[n].cmd=='M'?'-':
+			pgm[n].cmd=='N'?'-':
 			pgm[n].cmd=='R'?'>':
 			'<');
 	}
