@@ -66,7 +66,7 @@ outcmd(int ch, int count)
     case '<': prv("@ P-=%d", count); break;
     case '.': pr("outchar $M[$P]"); break;
     case ',':
-	    pr( "if ($#L == 0) set L=( `echo \"$<\" | mawk 'BEGIN { "
+	    pr( "if ($#L == 0) set L=( `echo \"$<\" | awk 'BEGIN { "
 		"while(1) { if (\\\\!gotline) { gotline = getline ; "
 		"if(\\\\!gotline) break ; line = $0 ; } if (line == "
 		"\"\") { gotline=0 ; print 10 ; break ; } if (\\\\!genord) "
