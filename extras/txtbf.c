@@ -103,6 +103,7 @@ int runbf(char * prog, int longrun);
 #define RUNNERCODE2 ">+++++[<++++++>-]<++[>+>++>+++>++++<<<<-]"
 #define RUNNERCODE3 ">+++++[<++++++>-]<++[>+>++>+++>++++>+++++>++++++>+++++++<<<<<<<-]"
 #define RUNNERCODE4 ">+++++[<++++++>-]<++[>+>++>+++>++++>->-->---<<<<<<<-]"
+#define RUNNERCODE5 ">+++++[<+++++++>-]<[>+>++>+++<<<-]"
 
 /* Some previously found "Hello World" prefixes, so you don't have to do big runs. */
 char * hello_world[] = {
@@ -644,6 +645,12 @@ find_best_conversion(char * linebuf)
 	gen_special(linebuf, RUNNERCODE3, "mult*32 to 224", 0);
 	gen_special(linebuf, RUNNERCODE4, "mult*32 to 128/-96", 0);
 
+	if (!flg_zoned) {
+	    flg_zoned = 1;
+	    gen_special(linebuf, RUNNERCODE5, "Zoned fourcell", 0);
+	    flg_zoned = 0;
+	}
+
 	gen_special(linebuf, "", "Bare cells", 0);
     }
 
@@ -824,7 +831,7 @@ check_if_best(char * buf, char * name)
 {
     if (str_cells_used > cell_limit && cell_limit > 0) return;
 
-    if (best_len == -1 || best_len > str_next || (best_len == str_next && str_cells_used < best_cells)) {
+    if (best_len == -1 || best_len >= str_next) {
 
 	memset(cells, 0, sizeof(cells));
 	runbf(str_start, 1);
@@ -847,7 +854,9 @@ check_if_best(char * buf, char * name)
 	    fprintf(stderr, "\"\n");
 	    exit(99);
 	}
+    }
 
+    if (best_len == -1 || best_len > str_next || (best_len == str_next && str_cells_used < best_cells)) {
 	if (best_str) free(best_str);
 	best_str = malloc(str_next+1);
 	memcpy(best_str, str_start, str_next+1);
@@ -888,7 +897,7 @@ check_if_best(char * buf, char * name)
 	}
     }
 
-    if (best_len == str_next && str_cells_used == best_cells) {
+    if (best_len == str_next) {
 	/* Note this also shows strings of same length */
 	if (verbose>2 || (verbose == 2 && str_next < 63))
 	    fprintf(stderr, "Found '%s' len=%d, cells=%d, '%s'\n",
@@ -1492,6 +1501,8 @@ return_to_top:
 	    maxcell--; currcell=0;
 	}
 
+	if (maxcell>cell_limit) continue;
+
 	patterns_searched++;
 
 	reinit_state();
@@ -1563,7 +1574,11 @@ return_to_top:
 	/* This is the most reliable way of making sure we have the correct
 	 * cell values as produced by the string we've built so far.
 	 */
-	if (runbf(str_start, 0)) continue;
+	if (runbf(str_start, 0)) {
+	    if (verbose>3)
+		fprintf(stderr, "FAILED nestloop: %s\n", str_start);
+	    continue;
+	}
 
 	if (verbose>3)
 	    fprintf(stderr, "Counting nestloop\n");
@@ -1769,7 +1784,10 @@ gen_unzoned(char * buf, int init_offset)
     int currcell = init_offset;
     int more_cells = 0;
 
-    if (!flg_init && !flg_optimisable && str_cells_used > 0) str_cells_used++;
+    if (!flg_init && !flg_optimisable && str_cells_used > 0)
+	if (str_cells_used < cell_limit || cell_limit <= 0)
+	    str_cells_used++;
+
     if (str_cells_used <= 0) { more_cells=1; str_cells_used=1; }
     if (str_cells_used >= cell_limit) more_cells = 0;
     str_mark = str_next;
