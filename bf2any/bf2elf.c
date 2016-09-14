@@ -6,7 +6,7 @@
 #include <sys/stat.h>
 
 #if _POSIX_VERSION >= 199506L
-#include <stdint.h>
+#include <inttypes.h>
 #endif
 
 #include "bf2any.h"
