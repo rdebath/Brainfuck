@@ -21,7 +21,7 @@ class BFCode
 	h['.'] = "putchar(m[p]);\n";
 	h[','] = "m[p]=getchar();\n";
 
-	bfcode ="static void bf() {\n" +
+	bfcode ="void bfprog() {\n" +
 		"static unsigned char m[100000];\n" +
 		"register int p=0;\n" +
 		"setbuf(stdout, 0);\n" +
@@ -31,10 +31,11 @@ class BFCode
 		"}\n";
 
 	builder.include "<stdio.h>"
-	# Beware, I've put the generated code into the "prefix" because the
-	# main argument to the "c" method is NOT part of the cache key.
-	builder.prefix bfcode
-	builder.c "void bfprog() { bf(); }"
+	# Beware, I've put a hash of the generated code into the "prefix"
+	# because the main argument to the "c" method is NOT part of the
+	# cache key.
+	builder.prefix "/*#{ Digest::MD5.hexdigest(bfcode) }*/"
+	builder.c bfcode
     end
 end
 
