@@ -300,11 +300,15 @@ main()
 	    (int)sizeof(int), (int)(((unsigned short)-1)>>1));	/*TWOS*/
 #endif
 #if defined(INT_MAX)
-    printf("Bytes I %2d, int            %d\n",
-	    (int)sizeof(int), INT_MAX);
+    printf("Bytes I %2d, int            %d%s\n",
+	    (int)sizeof(int), INT_MAX,
+	    (sizeof(int)==sizeof(time_t)?" (time_t)":"")
+	    );
 #else
-    printf("Bytes I %2d, int            %d\n",
-	    (int)sizeof(int), ((unsigned)-1)>>1 );		/*TWOS*/
+    printf("Bytes I %2d, int            %d%s\n",
+	    (int)sizeof(int), ((unsigned)-1)>>1,		/*TWOS*/
+	    (sizeof(int)==sizeof(time_t)?" (time_t)":"")
+	    );
 #endif
 
 #if defined(LONG_MAX)
