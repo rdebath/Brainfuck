@@ -314,7 +314,8 @@ main()
 #if defined(LONG_MAX)
     printf("Bytes LI%2d, long int       %ld%s%s\n",
 	    (int)sizeof(long int), LONG_MAX,
-	    (sizeof(long)==sizeof(time_t)?" (time_t)":""), ""
+	    (sizeof(long)==sizeof(time_t) &&
+	     sizeof(int)!=sizeof(time_t) ?" (time_t)":""), ""
 #if defined(LLONG_MAX) && LLONG_MAX == LONG_MAX
 	    " (long long)"
 #define GOT_LLONG
