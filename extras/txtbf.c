@@ -34,8 +34,8 @@
  *  NOTE: Null bytes are ignored.
  *
  *  Also:
- *      ++>+++>+>+++++>+++++++++++>-<[<<<<++++>++++++++>++
- *      ++>++++++++>->++++<],[[>.<-]<<<<[.>],]++++++++++.
+ *	+++++++++[>+++++>++++++++++>>+++++>+<<<<<-
+ *	]>>+>>--<,[<.<.>++.-->[>.<-]<<+.->>,]>>+.
  *
  * TODO: Add loop using nearest cell that's a null.
  */
@@ -66,7 +66,7 @@ void gen_trislipnest(char * buf);
 int runbf(char * prog, int longrun);
 
 #define MAX_CELLS 512
-#define PREV_BEST 8
+#define PREV_BEST 16
 
 /* These setup strings have, on occasion, given good results */
 
@@ -210,6 +210,8 @@ char * hello_world_byte[] = {
 
     "+[------->->->+++<<<]",
     "-[->>[-------->]+[<]<]",
+    "+>-[>>+>+[++>-<<]-<+<+]",		/* http://inversed.ru/InvMem.htm#InvMem_7 */
+    "+[-[<<[+[--->]-[<<<]]]>>>-]",	/* http://inversed.ru/InvMem.htm#InvMem_7 */
     "++[+++++++>++++>->->->++>-<<<<<<]",
     "++[+++++++>++++>->->->--->++<<<<<<]",
     "++++[------->-->--->--->->++++<<<<<]",
@@ -644,6 +646,7 @@ find_best_conversion(char * linebuf)
 	gen_special(linebuf, RUNNERCODE2, "mult*32 to 128", 0);
 	gen_special(linebuf, RUNNERCODE3, "mult*32 to 224", 0);
 	gen_special(linebuf, RUNNERCODE4, "mult*32 to 128/-96", 0);
+	gen_special(linebuf, RUNNERCODE5, "Fourcell", 0);
 
 	if (!flg_zoned) {
 	    flg_zoned = 1;
@@ -776,7 +779,7 @@ find_best_conversion(char * linebuf)
 	gen_nestloop(linebuf);
     }
 
-    if (enable_rerun && !flg_lookahead) {
+    if (enable_rerun && !flg_lookahead && !flg_zoned) {
 	int i, save_si = self_init;
 	char *newname;
 	if (verbose>1) fprintf(stderr, "Rerunning with lookahead on found list\n");
@@ -842,14 +845,15 @@ check_if_best(char * buf, char * name)
 	    fprintf(stderr, "Code: '%s'\n", str_start);
 	    fprintf(stderr, "Output: \"");
 	    for(i=0; buf[i]; i++) {
-		if (i>=' ' && i<='~' && i!='\\' && i!='"')
-		    fprintf(stderr ,"%c", i);
-		else if (i=='\n')
+		int c = buf[i];
+		if (c>=' ' && c<='~' && c!='\\' && c!='"')
+		    fprintf(stderr ,"%c", c);
+		else if (c=='\n')
 		    fprintf(stderr ,"\\n");
-		else if (i=='"' || i=='\\')
-		    fprintf(stderr ,"\\%c", i);
+		else if (c=='"' || c=='\\')
+		    fprintf(stderr ,"\\%c", c);
 		else
-		    fprintf(stderr ,"\\%3o", i);
+		    fprintf(stderr ,"\\%03o", c);
 	    }
 	    fprintf(stderr, "\"\n");
 	    exit(99);
@@ -1203,8 +1207,9 @@ gen_multonly(char * buf)
     {
 return_to_top:
 	{
-	    int toohigh = 0;
+	    int toohigh;
 	    for(i=0; ; i++) {
+		toohigh = 0;
 		if (i >= multloop_maxcell) return;
 		cellincs[i]++;
 		if (i == 0) {
@@ -1214,7 +1219,7 @@ return_to_top:
 			break;
 		    }
 		} else {
-		    if (!bytewrap && cellincs[i]*cellincs[0] > 255+multloop_maxloop)
+		    if (!bytewrap && cellincs[i]*cellincs[0] > 255)
 			toohigh = 1;
 		    if (cellincs[i] <= multloop_maxinc) break;
 		}
