@@ -55,6 +55,7 @@
 #define L_ASCII         0x19    /* ascii(token, count); */
 #define L_EXCON         0x1A    /* ascii(token, count); */
 #define L_ABCD          0x1B    /* ascii(token, count); */
+#define L_BINERDY       0x1C    /* ascii(token, count); */
 
 static const char bf[] = "><+-.,[]";
 static const char * bfout[] = { ">", "<", "+", "-", ".", ",", "[", "]", 0 };
@@ -587,6 +588,9 @@ check_arg(const char * arg)
     if (strcmp(arg, "-abcd") == 0) {
 	lang = 0; langclass = L_ABCD; return 1;
     } else
+    if (strcmp(arg, "-binerdy") == 0) {
+	lang = 0; langclass = L_BINERDY; return 1;
+    } else
     if (strcmp(arg, "-dowhile") == 0) {
 	lang = 0; langclass = L_DOWHILE; return 1;
     } else
@@ -666,6 +670,7 @@ static int disable_optimisation(void)
     case L_ASCII:
     case L_EXCON:
     case L_ABCD:
+    case L_BINERDY:
     case L_TOKENS:
 	return 0;
     }
@@ -829,6 +834,7 @@ outcmd(int ch, int count)
     case L_HANOILOVE:	hanoilove(ch, count); break;
     case L_EXCON:
     case L_ABCD:
+    case L_BINERDY:
     case L_ASCII:       ascii(ch, count); break;
     case L_DOWHILE:	bfdowhile(ch, count); break;
     }
@@ -1341,7 +1347,7 @@ static int msk;
 static struct mem *m;
 static int v = 0xDEADBEEF;
 static int inp = 0;
-static int outbit = 1, outch = 0;
+static int outbit = 1, outch = 0, outtog = 0;
 
     if (ch != '!' && ch != '~')
     {
@@ -1451,6 +1457,17 @@ static int outbit = 1, outch = 0;
 		    }
 		    pc('D');
 		    break;
+		case L_BINERDY:
+		    v = (m->val & 0xFF);
+		    if (outbit) { pc('0'+outtog); outbit = 0; }
+		    {
+			while(outch<v) {outch++; pc('0'+outtog); pc('0'+(outtog=!outtog));}
+			while(outch>v) {outch--; pc('0'+outtog); pc('0'+(outtog=!outtog)); pc('0'+(outtog=!outtog));}
+		    }
+		    pc('0'+outtog);
+		    for(i=0; i<10; i++)
+			pc('0'+(outtog=!outtog));
+		    break;
 		}
 		break;
 
@@ -1467,6 +1484,14 @@ static int outbit = 1, outch = 0;
 	    free(p);
 	    pgm = last = 0;
 	}
+    }
+
+    if (ch == '~' && L_BASE == L_BINERDY && !outbit) {
+	int i;
+	pc('0'+outtog);
+	for(i=0; i<12; i++)
+	    pc('0'+(outtog=!outtog));
+	outbit = 1;
     }
 }
 
