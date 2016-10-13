@@ -105,7 +105,7 @@ END {
     ll = 1;
     print_line();
     if (icount && !debug) {
-	print "fprintf(stderr, \"\\nCommands executed: %\"PRIuMAX\"\\n\", icount);" > of
+	print "fprintf(stderr, \"\\nCommands executed: %\"PRIuCount\"\\n\", icount);" > of
     }
     print "return 0;}" > of
 
@@ -153,13 +153,15 @@ function header() {
     }
 
     if (icount) {
-	print "#ifndef UINTMAX_MAX" > of
-	print "typedef unsigned long uintmax_t;" > of
-	print "#define PRIuMAX \"lu\"" > of
+	print "#ifdef UINTMAX_MAX" > of
+	print "uintmax_t icount = 0;" > of
+	print "#define PRIuCount PRIuMAX" > of
+	print "#else" > of
+	print "unsigned long icount = 0;" > of
+	print "#define PRIuCount \"lu\"" > of
 	print "#endif" > of
 	print "#define t icount++;" > of
 	print "#define T(x) icount += (x);" > of
-	print "uintmax_t icount = 0;" > of
     }
 	
     print "#define r m+=1;" > of
@@ -244,7 +246,7 @@ function print_line() {
 
 function debug_mem() {
     if (icount) {
-	print "fprintf(stderr, \"\\nCommands executed: %\"PRIuMAX\"\\n\", icount);" > of
+	print "fprintf(stderr, \"\\nCommands executed: %\"PRIuCount\"\\n\", icount);" > of
     }
     print "{ unsigned ii, jj=0;" > of;
     print "  for(ii=" memoff "; ii<sizeof(mem)/sizeof(*mem); ii++)" > of;
