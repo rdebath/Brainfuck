@@ -440,10 +440,14 @@ UsageInt64(void)
 #endif
 #endif
 #endif
-    fprintf(stderr, " bits.\n"
+    fprintf(stderr, " bits.\n");
+
+#if !defined(NO_EXT_BE)
+    fprintf(stderr,
 	"The generated C can be configured to use other types "
 	"using the 'C' #define.\n"
 	"The dc(1) generator can have unlimited size cells\n");
+#endif
 
     exit(1);
 }
@@ -1054,11 +1058,16 @@ process_file(void)
 
     if (do_codestyle == c_default) {
 	if (do_run) {
-	    if (verbose>2 || debug_mode || enable_trace) {
+	    if (verbose>2 || debug_mode || enable_trace ||
+		total_nodes == node_type_counts[T_CHR]) {
 
-		if (cell_size <= 0) {
-		    fprintf(stderr, "ERROR: run_tree() cannot do %dbit cells.\n",
-				    cell_length);
+		if (total_nodes != node_type_counts[T_CHR] && cell_size <= 0) {
+		    fprintf(stderr, "ERROR: cannot run combination: "
+				    "%dbit cells%s%s%s.\n",
+			cell_length,
+			debug_mode? ", debug mode":"",
+			enable_trace? ", trace mode":"",
+			verbose>2 ? ", profiling enabled":"");
 		    exit(1);
 		}
 
@@ -1644,7 +1653,9 @@ pointer_regen(void)
 	    n->offset -= current_shift;
 	    break;
 
-	case T_PRT: case T_CHR: case T_INP: case T_ADD: case T_SET:
+	case T_PRT: case T_INP:
+	case T_CHR: case T_DUMP:
+	case T_ADD: case T_SET:
 	    n->offset -= current_shift;
 	    break;
 
@@ -1656,7 +1667,6 @@ pointer_regen(void)
 
 	case T_STOP:
 	case T_MOV:
-	case T_DUMP:
 	    break;
 
 	default:

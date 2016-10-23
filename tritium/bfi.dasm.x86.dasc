@@ -302,6 +302,14 @@ run_dynasm(void)
         case T_ADD:
 	    load_acc_offset(offset);
 	    set_acc_offset(offset);
+	    if (opt_level < 2 && count == 1) {
+		| inc REG_A
+		break;
+	    }
+	    if (opt_level < 2 && count == -1) {
+		| dec REG_A
+		break;
+	    }
 	    if ((count != 128 && count >= 0) || count <= -128) {
 		| add REG_A, count
 	    } else {

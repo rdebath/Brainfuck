@@ -268,6 +268,55 @@ print_c_header(FILE * ofd)
     else
 	mask_defined = 0;
 
+    if (enable_trace || node_type_counts[T_DUMP] != 0) {
+	fprintf(ofd, "%s * imem;\n", cell_type);
+	fprintf(ofd, "%s%s%s%s%s\n",
+		    "static void prtnum(",cell_type," n) {"
+	    "\n"    "    ",cell_type," max = 1, v = 0;"
+	    "\n"    "    v = n;"
+	    "\n"    "    for(;;) {"
+	    "\n"    "        v /= 10;"
+	    "\n"    "        if (v == 0) break;"
+	    "\n"    "        max *= 10;"
+	    "\n"    "    }"
+	    "\n"    "    for(;;) {"
+	    "\n"    "        v = n / max;"
+	    "\n"    "        n = n % max;"
+	    "\n"    "        fputc('0' + (int)v, stderr);"
+	    "\n"    "        if (max == 1) break;"
+	    "\n"    "        max /= 10;"
+	    "\n"    "    }"
+	    "\n"    "}"
+	    "\n");
+
+	fprintf(ofd, "%s%s%s\n",
+		    "static void trace(char tag, int line, int col, "
+		    "char * desc, ",cell_type," * mp) {"
+	    "\n"    "    int i;"
+	    "\n"    "    fprintf(stderr, \"%c(%d,%d)\", tag, line, col);"
+	    "\n"    "    if (desc && *desc)"
+	    "\n"    "\tfprintf(stderr, \"=%s\", desc);"
+	    "\n"    "    fprintf(stderr, \" mem[%d]=\", (int)(mp-imem));"
+	    "\n"    "    if (mp>=imem) {"
+	    "\n"    "\tprtnum(*mp);"
+	    "\n"    "\tif (tag == 'D') for(i=1; i<10; i++) {"
+	    "\n"    "\t    fprintf(stderr, \", \");"
+	    "\n"    "\t    prtnum(mp[i]);"
+	    "\n"    "\t}"
+	    "\n"    "    } else fprintf(stderr, \"?\");"
+	    "\n"    "    fprintf(stderr, \"\\n\");"
+	    "\n"    "}"
+	    "\n");
+
+	if (node_type_counts[T_DUMP] != 0)
+	    fputs(  "#define t_dump(p4,p1,p2) trace('D',p1,p2,0,p4)\n", ofd);
+
+	if (enable_trace)
+	    fputs(  "#define t(p1,p2,p3,p4) trace('P',p1,p2,p3,p4) ;\n", ofd);
+
+	fputs("\n", ofd);
+    }
+
     if (do_run) {
 	if (use_dlopen) {
 	    /* The structure defined in this chunk of code should be put into
@@ -502,11 +551,9 @@ print_c_header(FILE * ofd)
 	    }
     }
 
-    if (enable_trace)
-	fputs(	"#define t(p1,p2,p3,p4) fprintf(stderr, \"P(%d,%d)=%s"
-		"mem[%d]=%d%s\\n\", \\\n\tp1, p2, p3,"
-		" p4-mem, (p4>=mem?*(p4):0), p4>=mem?\"\":\" SIGSEG\");\n\n",
-	    ofd);
+    if (enable_trace || node_type_counts[T_DUMP] != 0) {
+	fprintf(ofd, "  imem = m;\n");
+    }
 }
 
 void
@@ -961,8 +1008,12 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		fprintf(ofd, "return 1;\n");
 	    break;
 
-	case T_NOP:
 	case T_DUMP:
+	    if (!disable_indent) pt(ofd, indent,n);
+	    fprintf(ofd, "t_dump(m+%d,%d,%d);\n", n->offset, n->line, n->col);
+	    break;
+
+	case T_NOP:
 	    fprintf(stderr, "Warning on code generation: "
 		   "%s node: ptr+%d, cnt=%d, @(%d,%d).\n",
 		    tokennames[n->type],
@@ -1005,6 +1056,8 @@ print_ccode(FILE * ofd)
     if (do_run || cell_type_iso || use_dynmem)
 	knr_c_ok = 0;
 
+    if (use_functions<0 && opt_level<1)
+	use_functions = 0;
     if (use_functions<0 && total_nodes == node_type_counts[T_CHR])
 	use_functions = 0;
 #if defined(__GNUC__) && __GNUC__ < 3
