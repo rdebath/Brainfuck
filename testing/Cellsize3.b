@@ -1,50 +1,45 @@
-[   This test is used to determine the cell size for the interpreter.
-    It can only detect the three common sizes, others will (probably)
-    be detected as 32 bit unless the cell size is quite small, in which
-    case the program will output a zero.  The calculations used to get
-    256 and 65536 are a little more complex than they should need to be
-    to defeat the optimisations of certain interpreters that incorrectly
-    wrap cells at compile time.
+[ This contains a VERY simple check for the three common bit sizes.
+  It's the original version for the Bitwidth.b test program.
+
+  In addition a check has been added on the start to check
+  for really large, or non-binary, cells.
 ]
-// This generates 256 to check for larger than byte cells
-+>>++++[-<<[->++++<]>[-<+>]>]< + <[[-]>[-]<
 
-    // This checks for ANY cell size under 1331 by using a double byte
-    // increment and checking the high 'byte'
-    >>>>>
-    >+++++++++++[<+++++++++++>-]<[-<+++++++++++[-<
-	<+>+[<-]<[-<<+>]>>
-    >]>]<<[-]<<
-    +<[[-]>-<]
-    +>
+>[-]<[-]
+++++ [>++++++++<-] >[<++++++++>-]
+    <[>++++++++<-] >[<++++++++>-]
+    <[>++++++++<-] >[<++++++++>-]
+    <[>++++++++<-] >[<++++++++>-]
+    <[>++++++++<-] >[<++++++++>-]
++< [
 
-    [[-]
+    [-]>[-]+++++++++++++[<++++++>-]<.>++++++++[<++++>-]<+.-.>++++++++[<-----
+    --->-]<-.>+++++++++[<++++++>-]<-.+++++++.+++++.-------------.>++++[<++++
+    >-]<+.+++++++.[-]++++++++[>++++<-]>.<++++++++++[>++++++++<-]>-.+++.[-]++
+    ++++++[<++++>-]<.>+++++++++[<++++++++>-]<.+++++++++++++.--------------.-
+    -.[-]++++++++[>++++<-]>.<+++++++++++[>++++++<-]>+.++.+++++++..+++++++.<+
+    +++++++++[>-------<-]>+.[-]++++++++++.[-]<
 
-	// This generates 65536 to check for larger than 16bit cells
-	++>>+++++[-<<[->++++++++<]>[-<+>]>]< + <[[-]>[-]>
+]>[[-]
 
-	    // 32
-	    [-]++++++++++[>+++++<-]>+.-.[-]<
-
-	// ELSE
-	<[-]<[-] ] >[>
-
-	    // 16
-	    +++++++[>+++++++<-]>.+++++.[-]<
-	<[-]]<
-
-
-    <[-]>[-]]<[-
-	// 0
-	>>[-]>[-]++++++++[<++++++>-]<.[-]<<
-    [-]]
-
-
-// ELSE
->[-]<[-]] >[[-]<
-
-    // 8
+// Calculate the value 256 and test if it's zero
+++++++++[>++++++++<-]>[<++++>-]
++<[>-<
+    // Not zero so multiply by 256 again to get 65536
+    [>++++<-]>[<++++++++>-]<[>++++++++<-]
+    +>[>
+        // Print "32"
+        ++++++++++[>+++++<-]>+.-.[-]<
+    <[-]<->] <[>>
+        // Print "16"
+        +++++++[>+++++++<-]>.+++++.[-]<
+<<[-]]] >[>
+    // Print "8"
     ++++++++[>+++++++<-]>.[-]<
-
->[-]]<
-++++++++++.[-]
+<[-]]<
+// Print " bit cells\n"
++++++++++++[>+++>+++++++++>+++++++++>+<<<<-]>-.>-.+++++++.+++++++++++.<.
+>>.++.+++++++..<-.>>-
+Clean up used cells.
+[-]<[-]<[-]<[-]<
+]
