@@ -16,6 +16,10 @@
 
 int ind = 0;
 
+#if defined(__FreeBSD__) && !defined(GLABELS)
+#define GLABELS
+#endif
+
 #if !defined(USE32) && !defined(USE64) && defined(__i386__)
 #define USE32
 #endif
@@ -50,6 +54,10 @@ int ind = 0;
 #define DI	"edi"
 #endif
 
+#ifdef GLABELS
+struct stkdat { struct stkdat * up; int id; } *sp = 0;
+#endif
+
 int
 check_arg(const char * arg)
 {
@@ -81,23 +89,44 @@ outcmd(int ch, int count)
     case '[':
 	puts("movzx "AX", byte ptr ["BX"]");
 	puts("test "AX", "AX);
-	printf("jz %df\n", ind*2+2);
-	printf("%d:\n", ind*2+1);
+#ifdef GLABELS
+	{
+	    struct stkdat * n = malloc(sizeof*n);
+	    n->up = sp;
+	    sp = n;
+	    n->id = ++ind;
+	    printf("jz LE%d\n", n->id);
+	    printf("LB%d:\n", n->id);
+	}
+#else
+	printf("jz %df\n", ind*2+11);
+	printf("%d:\n", ind*2+10);
 	ind++;
+#endif
 	break;
     case ']':
-	ind--;
 	puts("movzx "AX", byte ptr ["BX"]");
 	puts("test "AX", "AX);
-	printf("jnz %db\n", ind*2+1);
-	printf("%d:\n", ind*2+2);
+#ifdef GLABELS
+	{
+	    struct stkdat * n = sp;
+            sp = n->up;
+	    printf("jnz LB%d\n", n->id);
+	    printf("LE%d:\n", n->id);
+            free(n);
+	}
+#else
+	ind--;
+	printf("jnz %db\n", ind*2+10);
+	printf("%d:\n", ind*2+11);
+#endif
 	break;
     case ',':
 	puts("call getchar");
 	puts("cmp "AX", -1");
-	printf("je %df\n", ind*2+3);
+	printf("je 1f\n");
 	puts("mov byte ptr ["BX"], al");
-	printf("%d:\n", ind*2+3);
+	printf("1:\n");
 	break;
     case '.':
 	puts("movzx "AX", byte ptr ["BX"]");
