@@ -135,6 +135,18 @@ DO_LIGHT2 := $(call try-run,\
 ifneq ($(DO_LIGHT2),)
 LIBS_LIGHTNING :=-llightning
 LIGHTNINGEXE := lightning
+else
+# As a static library it needs -lm
+DO_LIGHT2 := $(call try-run,\
+        { echo '\#include <lightning.h>';                               \
+          echo 'int main(){jit_state_t*_jit=0;jit_emit();return 0;}';   \
+          } > $(TMP).c ; $(TRYCC2) -o $(TMP) -llightning -lm,1)
+
+ifneq ($(DO_LIGHT2),)
+LIBS_LIGHTNING :=-llightning -lm
+LIGHTNINGEXE := lightning
+endif
+
 endif
 
 HAVE_GDLM := $(call try-run,\

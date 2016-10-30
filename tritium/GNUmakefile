@@ -201,6 +201,13 @@ DO_LIGHT2 := $(call try-run,\
 	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -llightning,1)
 
 ifeq ($(DO_LIGHT2),)
+# How about lightning.h V2 with a static library, needs -lm ?
+DO_LIGHT3 := $(call try-run,\
+	{ echo '\#include <lightning.h>'; 				\
+	  echo 'int main(){jit_state_t*_jit=0;jit_emit();return 0;}';	\
+	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -llightning -lm,1)
+
+ifeq ($(DO_LIGHT3),)
 # No? How about lightning.h V1 ?
 DO_LIGHT := $(call try-run,\
 	{ echo '\#include <lightning.h>';			\
@@ -219,6 +226,7 @@ DO_MYLIGHT := $(call try-run,\
 	  echo 'jit_flush_code(startptr, jit_get_ip().ptr);';	\
 	  echo 'return 0;}';					\
 	  } > $(TMP).c ; $(TRYCC2) -I $(TOOLDIR) -w -o $(TMP),1)
+endif
 endif
 endif
 endif
@@ -288,7 +296,7 @@ LIBS_TCCLIB=-ltcc
 endif
 endif
 
-ifeq ($(DO_LIGHT)$(DO_LIGHT2)$(DO_MYLIGHT),)
+ifeq ($(DO_LIGHT)$(DO_LIGHT2)$(DO_LIGHT3)$(DO_MYLIGHT),)
 CONF_LIGHTNING=-DDISABLE_GNULIGHTNING
 LIBS_LIGHTNING=
 else
@@ -296,11 +304,16 @@ ifneq ($(DO_LIGHT2),)
 LIBS_LIGHTNING=-llightning
 TYPE_LIGHTNING=
 else
+ifneq ($(DO_LIGHT3),)
+LIBS_LIGHTNING=-llightning -lm
+TYPE_LIGHTNING=
+else
 LIBS_LIGHTNING=
 ifneq ($(DO_LIGHT),)
 TYPE_LIGHTNING=-DGNULIGHTv1 $(GNULGT)
 else
 TYPE_LIGHTNING=-DGNULIGHTv1 $(GNULGT) -I $(TOOLDIR)
+endif
 endif
 endif
 
