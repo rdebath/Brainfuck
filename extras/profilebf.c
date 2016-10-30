@@ -403,7 +403,7 @@ void run(void)
 		fprintf(stderr, "\n");
 	    } else {
 		int a;
-		for (a=0; a<10; a++)
+		for (a=0; a<10 && a <= tape_max-tape_min; a++)
 		    fprintf(stderr, "%c%-5d", a==m?'>':' ', mem[a]);
 		fprintf(stderr, "\n");
 	    }
