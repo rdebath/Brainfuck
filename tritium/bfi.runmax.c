@@ -34,6 +34,9 @@
 #ifdef __SIZEOF_INT128__
 #define C unsigned __int128
 #else
+#ifdef _UINT128_T
+#define C __uint128_t
+#else
 #if defined(ULLONG_MAX) || defined(__LONG_LONG_MAX__)
 #define C unsigned long long
 #else
@@ -41,6 +44,7 @@
 #define C uintmax_t
 #else
 #define C unsigned long
+#endif
 #endif
 #endif
 #endif
@@ -326,6 +330,9 @@ run_supertree(void)
 
 #if defined(__SIZEOF_INT128__) && defined(UINT64_MAX)
 typedef unsigned __int128 uint_long;
+typedef uint64_t uint_cell;
+#elif defined(_UINT128_T) && defined(UINT64_MAX)
+typedef __uint128_t uint_long;
 typedef uint64_t uint_cell;
 #elif defined(UINT64_MAX) && defined(UINT32_MAX) && (UINT32_MAX >= UINT_MAX)
 typedef uint64_t uint_long;

@@ -237,6 +237,9 @@ print_c_header(FILE * ofd)
 		fprintf(ofd, "#ifdef __SIZEOF_INT128__\n");
 		fprintf(ofd, "#define C unsigned __int128\n");
 		fprintf(ofd, "#else\n");
+		fprintf(ofd, "#ifdef _UINT128_T\n");
+		fprintf(ofd, "#define C __uint128_t\n");
+		fprintf(ofd, "#else\n");
 		fprintf(ofd, "#if defined(ULLONG_MAX) || defined(__LONG_LONG_MAX__)\n");
 		fprintf(ofd, "#define C unsigned long long\n");
 		fprintf(ofd, "#else\n");
@@ -244,6 +247,7 @@ print_c_header(FILE * ofd)
 		fprintf(ofd, "#define C uintmax_t\n");
 		fprintf(ofd, "#else\n");
 		fprintf(ofd, "#define C unsigned long\n");
+		fprintf(ofd, "#endif\n");
 		fprintf(ofd, "#endif\n");
 		fprintf(ofd, "#endif\n");
 		fprintf(ofd, "#endif\n");

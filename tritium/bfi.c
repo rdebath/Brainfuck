@@ -3748,11 +3748,6 @@ void
 set_cell_size(int cell_bits)
 {
     /* First try for an, oversized, exact C cell type */
-#if !defined(NO_EXT_BE)
-    if (cell_bits == (int)sizeof(long)*CHAR_BIT && sizeof(long) > sizeof(int)) {
-	cell_type = "unsigned long";
-    } else
-#endif
 #if !defined(NO_EXT_BE) && defined(UINT64_MAX)
     if (cell_bits == (int)sizeof(uint64_t)*CHAR_BIT) {
 	cell_type = "uint64_t";
@@ -3763,6 +3758,11 @@ set_cell_size(int cell_bits)
     if (cell_bits == (int)sizeof(uintmax_t)*CHAR_BIT) {
 	cell_type = "uintmax_t";
 	cell_type_iso = 1;
+    } else
+#endif
+#if !defined(NO_EXT_BE)
+    if (cell_bits == (int)sizeof(long)*CHAR_BIT && sizeof(long) > sizeof(int)) {
+	cell_type = "unsigned long";
     } else
 #endif
 #if !defined(NO_EXT_BE) && defined(__SIZEOF_INT128__)
