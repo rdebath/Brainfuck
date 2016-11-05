@@ -101,6 +101,9 @@ outcmd(int ch, int count)
 	pr("         fi");
 	pr("    fi");
 	pr("fi");
+	pr("if [ .`echoe '\\070'` != .8 ]");
+	pr("then echoe(){ printf \"%%b\" \"$*\" 2>/dev/null ; }");
+	pr("fi");
 	pr("if [ .`echoe '\\171'` = .y ]");
 	pr("then o(){ echoe \"`printf '\\\\\\\\%%03o' $((M$P&255))`\" ; }");
 	pr("else o(){ echoe \"`printf '\\\\\\\\%%04o' $((M$P&255))`\" ; }");

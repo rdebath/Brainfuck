@@ -76,6 +76,8 @@ outcmd(int ch, int count)
     switch(ch) {
     case '!':
 	printf("#!/bin/sh\n");
+	printf("(eval 'x() { :;}' ; x) 2>/dev/null || \n");
+	printf("{ echo Shell too old, functions not working. ; exit 1;}\n");
 	printf("bf(){\n");
 	break;
     case '~':
@@ -212,7 +214,11 @@ outcmd(int ch, int count)
 		"}");
 
 
-	printf("\nP=\nbf\n");
+	printf("\nP=\n");
+	printf("# Everything should be ready so do a final sanity check\n");
+	printf("(r2;u2;r1;u1;l1;f1;[ \"$A\" = 2 ]) 2>/dev/null ||");
+	printf("{ echo Broken shell, more insane than normal. >&2; exit 1;}\n");
+	printf("bf\n");
 	break;
     }
 }
