@@ -105,6 +105,7 @@ char const * program = "C";
 int verbose = 0;
 int help_flag = 0;
 int noheader = 0;
+int rle_input = 0;
 int do_run = -1;
 
 int opt_bytedefault = 0;
@@ -465,6 +466,7 @@ checkarg(char * opt, char * arg)
 	case 'h': help_flag++; break;
 	case 'v': verbose++; break;
 	case 'H': noheader=1; break;
+	case 'R': rle_input=1; break;
 	case '#': debug_mode=1; break;
 	case 'r': do_run=1; break;
 	case 'A': do_run=0; break;
@@ -721,7 +723,7 @@ load_file(FILE * ifd, int is_first, int is_last, char * bfstring)
     struct bfi *p=0, *n=bfprog;
 
 static struct bfi *jst;
-static int dld, inp;
+static int dld, inp, rle = 0, num = 1;
 
     if (is_first) { jst = 0; dld = 0; }
     if (n) { while(n->next) n=n->next; p = n;}
@@ -735,11 +737,24 @@ static int dld, inp;
 	if (ch == '\n') { curr_line++; curr_col=0; }
 	else curr_col ++;
 
+	if (rle_input && ch>='0' && ch<='9') {
+	    if (rle == 0) {
+		num = ch-'0';
+		rle = 1;
+	    } else
+		num = ov_iadd(ov_imul(num, 10), ch-'0');
+	    continue;
+	}
+	rle = 0;
+	/* A long run of digits is a comment */
+	if (num == INT_MIN) num = 1;
+	if (ch == ' ' || ch == '\n' || ch == '\t') continue;
+
 	switch(ch) {
-	case '>': ch = T_MOV; c=  1; break;
-	case '<': ch = T_MOV; c= -1; break;
-	case '+': ch = T_ADD; c=  1; break;
-	case '-': ch = T_ADD; c= -1; break;
+	case '>': ch = T_MOV; c=  num; break;
+	case '<': ch = T_MOV; c= -num; break;
+	case '+': ch = T_ADD; c=  num; break;
+	case '-': ch = T_ADD; c= -num; break;
 	case '[': ch = T_WHL; break;
 	case ']': ch = T_END; break;
 	case '.': ch = T_PRT; break;
@@ -753,6 +768,8 @@ static int dld, inp;
 	    break;
 	default:  ch = T_NOP; break;
 	}
+	num = 1;
+
 	if (ch != T_NOP) {
 #ifndef NO_PREOPT   /* Simple syntax optimisation */
 	    if (opt_level>=0) {
@@ -769,8 +786,11 @@ static int dld, inp;
 		/* RLE compacting of instructions. This will be done by later
 		 * passes, but it's cheaper to do it here. */
 		if (c && p && ch == p->type){
-		    p->count += c;
-		    continue;
+		    int t = ov_iadd(p->count, c);
+		    if (t != INT_MIN) {
+			p->count = t;
+			continue;
+		    }
 		}
 	    }
 #endif
@@ -1705,8 +1725,11 @@ quick_scan(void)
 	    /* If followed by a matching T_ADD merge that in too */
 	    n2 = n->next->next->next;
 	    if (n2 && n2->type == T_ADD && n2->offset == n->next->offset) {
-		n->next->count += n2->count;
-		n2->type = T_NOP;
+		int t = ov_iadd(n->next->count, n2->count);
+		if (t != INT_MIN) {
+		    n->next->count = t;
+		    n2->type = T_NOP;
+		}
 	    }
 
 	    if(verbose>4) {
@@ -2269,6 +2292,10 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 	    case T_ADD:
 		if (n && n->offset == v->offset &&
 			(n->type == T_ADD || n->type == T_CALC) ) {
+		    if (cell_size<=0) {
+			if (ov_iadd(n->count, v->count) == INT_MIN)
+			    return 0;
+		    }
 		    n->count += v->count;
 		    if (cell_mask > 0) n->count = SM(n->count);
 		    v->type = T_NOP;
@@ -2354,6 +2381,10 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 
     switch(v->type) {
 	case T_ADD: /* Promote to T_SET. */
+	    if (cell_size <= 0) {
+		if (ov_iadd(v->count, known_value) == INT_MIN)
+		    break;
+	    }
 	    v->type = T_SET;
 	    v->count += known_value;
 	    if (cell_mask > 0)

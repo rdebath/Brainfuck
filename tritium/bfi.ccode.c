@@ -576,6 +576,8 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		fprintf(ofd, "++m;\n");
 	    else if (n->count == -1)
 		fprintf(ofd, "--m;\n");
+	    else if (n->count == INT_MIN)
+		fprintf(ofd, "m -= 0x%x;\n", -n->count);
 	    else if (n->count < 0)
 		fprintf(ofd, "m -= %d;\n", -n->count);
 	    else if (n->count > 0)
@@ -591,6 +593,8 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		    fprintf(ofd, "++*m;\n");
 		else if (n->count == -1)
 		    fprintf(ofd, "--*m;\n");
+		else if (n->count == INT_MIN)
+		    fprintf(ofd, "*m -= 0x%x;\n", -n->count);
 		else if (n->count < 0)
 		    fprintf(ofd, "*m -= %d;\n", -n->count);
 		else if (n->count > 0)
@@ -602,6 +606,8 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		    fprintf(ofd, "++m[%d];\n", n->offset);
 		else if (n->count == -1)
 		    fprintf(ofd, "--m[%d];\n", n->offset);
+		else if (n->count == INT_MIN)
+		    fprintf(ofd, "m[%d] -= 0x%x;\n", n->offset, -n->count);
 		else if (n->count < 0)
 		    fprintf(ofd, "m[%d] -= %d;\n", n->offset, -n->count);
 		else if (n->count > 0)
@@ -621,7 +627,9 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		fprintf(ofd, "m[%d] = (%s) %d;\n",
 		    n->offset, cell_type, n->count);
 	    } else
-	    if(n->offset == 0)
+	    if (n->count == INT_MIN)
+		fprintf(ofd, "m[%d] = 0x%x;\n", n->offset, n->count);
+	    else if(n->offset == 0)
 		fprintf(ofd, "*m = %d;\n", n->count);
 	    else
 		fprintf(ofd, "m[%d] = %d;\n", n->offset, n->count);
