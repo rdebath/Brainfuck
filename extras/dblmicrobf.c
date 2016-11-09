@@ -44,7 +44,7 @@ int main (int argc, char *argv[]) {
 #if (CELLSIZE > 256) || (CELLSIZE <= 0)
 #define CELLTYPE int
 #else
-#define CELLTYPE char
+#define CELLTYPE unsigned char
 #endif
 
 #if (CELLSIZE == 256) || (CELLSIZE <= 0)

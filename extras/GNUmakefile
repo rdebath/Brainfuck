@@ -5,7 +5,7 @@ INSTALLEXT=
 CLIST=$(filter-out cdowhile.c dblmicrobf.c lightning.c,$(wildcard *.c))
 EXELIST := $(patsubst %.c,%,$(CLIST))
 OBJECTS := $(patsubst %.c,%.o,$(CLIST)) ook.o
-EXTRAS=bf1k bfas ook
+EXTRAS=bf1k bf0k bfas ook
 
 ALLEXE = $(EXELIST) $(MOREEXE) $(EXTRAS) $(LIBDL_EXE) $(LIGHTNINGEXE)
 
@@ -32,6 +32,9 @@ clean:
 
 bf1k: dblmicrobf.c
 	$(CC) -DCELLSIZE=1000 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
+
+bf0k: dblmicrobf.c
+	$(CC) -DCELLSIZE=257 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
 
 bfas: dblmicrobf.c
 	$(CC) -DCELLSIZE=127 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
