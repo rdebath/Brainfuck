@@ -67,7 +67,7 @@ run_maxtree(void)
 	return;
     }
     if (cell_length < (int)(sizeof(C))*CHAR_BIT) {
-	mask = ~( ((C)1) << cell_length);
+	mask = ~( ((C)-1) << cell_length);
     }
 
     if (verbose)
