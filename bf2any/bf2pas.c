@@ -19,6 +19,7 @@ struct instruction {
     int icount;
     struct instruction * next;
     struct instruction * loop;
+    char * cstr;
 } *pgm = 0, *last = 0, *jmpstack = 0;
 
 void loutcmd(int ch, int count, struct instruction *n);
@@ -32,7 +33,7 @@ int ind = 0;
 static int lblcount = 0;
 static int icount = 0;
 
-int disable_savestring = 1;
+static void print_string(char *);
 
 void
 outcmd(int ch, int count)
@@ -44,6 +45,8 @@ outcmd(int ch, int count)
     n->ch = ch;
     n->count = count;
     n->icount = icount;
+    if (ch == '"')
+	n->cstr=strdup(get_string());
     if (!last) {
 	pgm = n;
     } else {
@@ -97,6 +100,8 @@ outcmd(int ch, int count)
     while(pgm) {
 	n = pgm;
 	pgm = pgm->next;
+	if (n->cstr)
+            free(n->cstr);
 	memset(n, '\0', sizeof*n);
 	free(n);
     }
@@ -156,7 +161,42 @@ loutcmd(int ch, int count, struct instruction *n)
     case ']': ind--; pr("end;"); break;
     case ',': pr("if not eof then begin read(inch); tape[tapepos] := ord(inch); end;"); break;
     case '.': pr("write(chr(tape[tapepos]));"); break;
+    case '"': print_string(n->cstr); break;
     case '~': ind --; pr("end."); break;
     }
 }
 
+static void
+print_string(char * str)
+{
+    char buf[256];
+    int badchar = 0;
+    size_t outlen = 0;
+
+    if (!str) return;
+
+    for(;; str++) {
+	if (outlen && (*str == 0 || badchar || outlen > sizeof(buf)-8))
+	{
+	    buf[outlen] = 0;
+	    if (badchar == '\n') {
+		prv("writeln('%s');", buf);
+		badchar = 0;
+	    } else {
+		prv("write('%s');", buf);
+	    }
+	    outlen = 0;
+	}
+	if (badchar) {
+	    prv("write(chr(%d));", badchar);
+	    badchar = 0;
+	}
+	if (!*str) break;
+
+	if (*str >= ' ' && *str <= '~' && *str != '\\' && *str != '\'') {
+	    buf[outlen++] = *str;
+	} else {
+	    badchar = (*str & 0xFF);
+	}
+    }
+}
