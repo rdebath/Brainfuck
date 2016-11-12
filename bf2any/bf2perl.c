@@ -11,7 +11,7 @@
 int ind = 0;
 #define I printf("%*s", ind*4, "")
 
-int disable_savestring = 1;
+static void print_cstring(void);
 
 void
 outcmd(int ch, int count)
@@ -54,5 +54,44 @@ outcmd(int ch, int count)
 	break;
     case '.': I; printf("print chr($m[$p]&255);\n"); break;
     case ',': I; printf("$c = getc(STDIN); if(defined $c){ $m[$p] = ord($c); }\n"); break;
+    case '"': print_cstring(); break;
+    }
+}
+
+static void
+print_cstring(void)
+{
+    char * str = get_string();
+    char buf[256];
+    int gotnl = 0;
+    size_t outlen = 0;
+
+    if (!str) return;
+
+    for(;; str++) {
+	if (outlen && (*str == 0 || gotnl || outlen > sizeof(buf)-8))
+	{
+	    buf[outlen] = 0;
+	    I; printf("print \"%s\";\n", buf);
+	    gotnl = 0; outlen = 0;
+	}
+	if (!*str) break;
+
+	if (*str == '\n') gotnl = 1;
+	if (*str == '"' || *str == '\\' || *str == '@' || *str == '$') {
+	    buf[outlen++] = '\\'; buf[outlen++] = *str;
+	} else if (*str >= ' ' && *str <= '~') {
+	    buf[outlen++] = *str;
+	} else if (*str == '\n') {
+	    buf[outlen++] = '\\'; buf[outlen++] = 'n';
+	} else if (*str == '\t') {
+	    buf[outlen++] = '\\'; buf[outlen++] = 't';
+	} else {
+	    char buf2[16];
+	    int n;
+	    sprintf(buf2, "\\%03o", *str & 0xFF);
+	    for(n=0; buf2[n]; n++)
+		buf[outlen++] = buf2[n];
+	}
     }
 }
