@@ -30,13 +30,8 @@ static char * boilerplate;
 #define prv(s,v)        printf("%*s" s "\n", ind*2, "", (v))
 #define prv2(s,v,v2)    printf("%*s" s "\n", ind*2, "", (v), (v2))
 
-int
-check_arg(const char * arg)
-{
-    if (strcmp(arg, "-O") == 0) return 1;
-    if (strcmp(arg, "-b") == 0) return 1;
-    return 0;
-}
+int disable_savestring = 1;
+int bytecell = -1;
 
 void
 outcmd(int ch, int count)

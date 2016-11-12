@@ -39,11 +39,12 @@ static int icount = 0;
 static void print_cstring(char * str);
 static int no_function = 0;
 
-int
-check_arg(const char * arg)
+static check_arg_t fn_check_arg;
+struct be_interface_s be_interface = {fn_check_arg};
+
+static int
+fn_check_arg(const char * arg)
 {
-    if (strcmp(arg, "-O") == 0) return 1;
-    if (strcmp(arg, "-savestring") == 0) return 1;
     if (strcmp(arg, "-nofunc") == 0) {
 	no_function = 1;
 	return 1;

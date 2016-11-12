@@ -63,13 +63,14 @@ char * ccode = 0;
 size_t ccodesize = 0;
 #endif
 
-int
-check_arg(const char * arg)
+int cells_are_ints = 1;
+static check_arg_t fn_check_arg;
+struct be_interface_s be_interface = {fn_check_arg};
+
+static int
+fn_check_arg(const char * arg)
 {
-    if (strcmp(arg, "-O") == 0) return 1;
     if (strcmp(arg, "-#") == 0) return 1;
-    if (strcmp(arg, "-savestring") == 0) return 1;
-    if (strcmp(arg, "-intcells") == 0) return 1;
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-d      Dump code"

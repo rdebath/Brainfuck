@@ -16,13 +16,8 @@ int loopid = 0;
 
 struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
-int
-check_arg(const char * arg)
-{
-    if (strcmp(arg, "-O") == 0) return 1;
-    if (strcmp(arg, "-intcells") == 0) return sizeof(int)==4;
-    return 0;
-}
+int disable_savestring = 1;
+int cells_are_ints = sizeof(int)==4;
 
 void
 outcmd(int ch, int count)

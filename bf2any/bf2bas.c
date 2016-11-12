@@ -41,6 +41,10 @@ enum { io_basic, io_bbc, io_vb, io_fbas }
 
 struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
+static check_arg_t fn_check_arg;
+struct be_interface_s be_interface = {fn_check_arg};
+int disable_savestring = 1;
+
 void
 line_no_indent(void)
 #define I   line_no_indent()
@@ -52,11 +56,9 @@ line_no_indent(void)
     printf("%*s", ind*4-i, "");
 }
 
-int
-check_arg(const char * arg)
+static int
+fn_check_arg(const char * arg)
 {
-    if (strcmp(arg, "-O") == 0) return 1;
-    else
     if (strcmp("-bbc", arg) ==0) {
 	init_style = init_dim;
 	loop_style = loop_endw;

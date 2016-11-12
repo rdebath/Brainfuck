@@ -15,14 +15,7 @@ FILE * ofd;
 
 static void print_dstring(void);
 
-int
-check_arg(const char * arg)
-{
-    if (strcmp(arg, "-O") == 0) return 1;
-    if (strcmp(arg, "-savestring") == 0) return 1;
-    if (strcmp(arg, "-intcells") == 0) return 1;
-    return 0;
-}
+int cells_are_ints = 1;	/* Assume same machine, same int */
 
 void
 outcmd(int ch, int count)

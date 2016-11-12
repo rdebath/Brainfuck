@@ -9,7 +9,6 @@
 #include "bf2any.h"
 
 int opt_cellsize = 0;
-int bytecell = 0;
 int tapelen = TAPELEN;
 int opt_optim = 0;
 int enable_optim = 0;
@@ -315,26 +314,21 @@ static int zstate = 0;
 }
 
 /*
- *  Decode arguments for the FE
+ *  Decode arguments.
  */
 int enable_rle = 0;
 
 int
+check_arg(const char * arg) {
+    if (be_interface.check_arg == 0) return 0;
+    return (*be_interface.check_arg)(arg);
+}
+
+int
 check_argv(const char * arg)
 {
-    if (strcmp(arg, "-b") == 0) {
-	if (check_arg("-no-byte") && !check_arg(arg))
-	    return 0;
-
-	bytecell++;
-	opt_cellsize = 1;
-
-    } else if (strcmp(arg, "-no-byte") == 0) {
-	if (check_arg("-b") && !check_arg(arg))
-	    return 0;
-
-	bytecell=0;
-	opt_cellsize = 1;
+    if (bytecell >= 0 && !nobytecell && strcmp(arg, "-b") == 0) {
+	bytecell = 1;
 
     } else if (strcmp(arg, "-m") == 0) {
 	check_arg(arg);
@@ -443,20 +437,23 @@ main(int argc, char ** argv)
 	    filelist[filecount++] = argv[ar];
     }
 
-    /* Defaults if not told */
-    if (!opt_cellsize)
-	bytecell = (check_arg("-b") && !check_arg("-no-byte"));
-
-    if (!opt_optim) {
-	opt_optim = enable_mov_optim = 1;
-	enable_optim = !check_arg("-no-default-opt");
+    if (check_arg("+init")) {	/* For bf2bf to choose optimisation method */
+	if (!opt_optim && check_arg("?no-rle")) {
+	    opt_optim = disable_init_optim = 1;
+	}
     }
 
+    /* Defaults if not told */
+    if (!opt_optim)
+	opt_optim = enable_optim = enable_mov_optim = 1;
+
     if (enable_mov_optim)
-	enable_be_optim = check_arg("-O");
+	enable_be_optim = !disable_be_optim;
 
     if (disable_init_optim)
 	lastch = 0;
+
+    if (bytecell != 0) bytecell = 1;
 
     if (filecount == 0)
 	filelist[filecount++] = "-";

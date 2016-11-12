@@ -15,14 +15,6 @@ FILE * ofd;
 
 static void print_string(void);
 
-int
-check_arg(const char * arg)
-{
-    if (strcmp(arg, "-O") == 0) return 1;
-    if (strcmp(arg, "-savestring") == 0) return 1;
-    return 0;
-}
-
 void
 outcmd(int ch, int count)
 {

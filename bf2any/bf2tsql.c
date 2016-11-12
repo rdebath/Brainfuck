@@ -11,10 +11,14 @@
 int ind = 0;
 #define I printf("%*s", ind*4, "")
 
-int
-check_arg(const char * arg)
+int disable_savestring = 1;
+
+static check_arg_t fn_check_arg;
+struct be_interface_s be_interface = {fn_check_arg};
+
+static int
+fn_check_arg(const char * arg)
 {
-    if (strcmp(arg, "-O") == 0) return 1;
     if (strcmp(arg, "-M") == 0) {
 	tapelen = 0;
 	return 1;

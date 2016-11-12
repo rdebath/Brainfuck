@@ -14,11 +14,12 @@ int safetapeoff = 0, curtapeoff = 0;
 
 static void print_cstring(void);
 
-int
-check_arg(const char * arg)
+static check_arg_t fn_check_arg;
+struct be_interface_s be_interface = {fn_check_arg};
+
+static int
+fn_check_arg(const char * arg)
 {
-    if (strcmp(arg, "-O") == 0) return 1;
-    if (strcmp(arg, "-savestring") == 0) return 1;
     if (strcmp(arg, "-M") == 0) {
 	tapelen = 0;
 	return 1;

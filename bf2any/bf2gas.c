@@ -58,12 +58,8 @@ int ind = 0;
 struct stkdat { struct stkdat * up; int id; } *sp = 0;
 #endif
 
-int
-check_arg(const char * arg)
-{
-    if (strcmp(arg, "-b") == 0) return 1;
-    return 0;
-}
+int disable_be_optim = 1;
+int bytecell = -1;
 
 void
 outcmd(int ch, int count)

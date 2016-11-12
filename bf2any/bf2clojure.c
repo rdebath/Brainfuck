@@ -12,11 +12,7 @@ int do_input = 0;
 int ind = 0;
 #define I printf("%*s", ind*4, "")
 
-int
-check_arg(const char * arg)
-{
-    return 0;
-}
+int disable_be_optim = 1;
 
 void
 outcmd(int ch, int count)

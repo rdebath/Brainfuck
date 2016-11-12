@@ -132,10 +132,15 @@ static const char * filename = "a.out";
 static size_t  stack[1024];
 static size_t *st;
 
-int
-check_arg(const char * arg)
+int disable_be_optim = 1;
+int bytecell = -1;
+
+static check_arg_t fn_check_arg;
+struct be_interface_s be_interface = {fn_check_arg};
+
+static int
+fn_check_arg(const char * arg)
 {
-    if (strcmp(arg, "-b") == 0) return 1;
     if (strncmp(arg, "-o", 2) == 0 && arg[2]) {
 	filename = arg+2;
 	return 1;

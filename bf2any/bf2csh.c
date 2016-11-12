@@ -13,12 +13,7 @@ int ind = 0;
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
 
-int
-check_arg(const char * arg)
-{
-    if (strcmp(arg, "-O") == 0) return 1;
-    return 0;
-}
+int disable_savestring = 1;
 
 void
 outcmd(int ch, int count)

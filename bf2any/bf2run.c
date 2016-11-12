@@ -44,11 +44,15 @@ void debugprog(int * p, int *ep);
 void dumpprog(int * p, int *ep);
 void dumpmem(int *tp);
 
-int
-check_arg(const char * arg)
+int disable_savestring = 1;
+int cells_are_ints = 1;
+
+static check_arg_t fn_check_arg;
+struct be_interface_s be_interface = {fn_check_arg};
+
+static int
+fn_check_arg(const char * arg)
 {
-    if (strcmp(arg, "-O") == 0) return 1;
-    if (strcmp(arg, "-intcells") == 0) return 1;
     if (strcmp(arg, "-#") == 0) return 1;
     if (strcmp(arg, "-D") == 0) {
 	checklimits = 1;

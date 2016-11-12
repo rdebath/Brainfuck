@@ -31,13 +31,10 @@ static struct mem *tape = 0, *tapezero = 0, *freelist = 0;
 static int curroff = 0;
 static int reg_known = 0, reg_val;
 
-static int enable_prt = 0;
 static char * sav_str_str = 0;
 static unsigned int sav_str_maxlen = 0, sav_str_len = 0;
 
 static int deadloop = 0;
-
-static int cells_are_ints = 0;
 
 static void
 new_n(struct mem *p) {
@@ -205,8 +202,6 @@ void outopt(int ch, int count)
     {
     default:
 	if (ch == '!') {
-	    enable_prt = check_arg("-savestring");
-	    cells_are_ints = check_arg("-intcells");
 	    flush_tape(1,0);
 	    tape->cleaned = tape->is_set = first_run = !disable_init_optim;
 	} else if (ch == '~' && enable_optim && !disable_init_optim)
@@ -233,7 +228,8 @@ void outopt(int ch, int count)
 	return;
 
     case '.':
-	if (enable_prt && tape->is_set && tape->v > 0 && tape->v < 128) {
+	if (!disable_savestring && enable_be_optim &&
+		tape->is_set && tape->v > 0 && tape->v < 128) {
 	    add_string(tape->v);
 
 	    if (sav_str_len >= 128*1024) /* Limit the buffer size. */

@@ -41,14 +41,6 @@ static void loutcmd(int ch, int count, struct instruction *n);
 static void add_cstring(char *);
 static void print_cstring(char *);
 
-int
-check_arg(const char * arg)
-{
-    if (strcmp(arg, "-O") == 0) return 1;
-    if (strcmp(arg, "-savestring") == 0) return 1;
-    return 0;
-}
-
 static struct instruction *
 node_calloc(void)
 {

@@ -32,12 +32,13 @@ static void print_cstring(void);
 static int use_macro = 0;
 static int bpc = 0;
 
-int
-check_arg(const char * arg)
+int nobytecell = 1;
+static check_arg_t fn_check_arg;
+struct be_interface_s be_interface = {fn_check_arg};
+
+static int
+fn_check_arg(const char * arg)
 {
-    if (strcmp(arg, "-O") == 0) return 1;
-    if (strcmp(arg, "-no-byte") == 0) return 1;
-    if (strcmp(arg, "-savestring") == 0) return 1;
     if (strcmp(arg, "-mac") == 0) {
 	use_macro = 1;
 	return 1;

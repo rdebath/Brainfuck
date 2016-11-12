@@ -17,6 +17,9 @@
 
 #include "bf2any.h"
 
+int disable_savestring = 1;
+int cells_are_ints = 1;
+
 /*
  * dasm64 translation from BF, runs at about 5,000,000,000 instructions per second.
  */
@@ -33,13 +36,10 @@
 
 #ifndef DETECT_ONLY
 #if !CPUCHECK
-int check_arg(const char * arg)
-{
+void outcmd(int ch, int count) {
     fprintf(stderr, "Build failed: Supported processor not detected.\n");
     exit(255);
-    return 0;
 }
-void outcmd(int ch, int count) { }
 #else
 
 #include "dynasm/dasm_proto.h"
@@ -223,14 +223,6 @@ move_tape(void)
 	| sub REG_P, -imov*tape_step
     }
     imov = 0;
-}
-
-int
-check_arg(const char * arg)
-{
-    if (strcmp(arg, "-O") == 0) return 1;
-    if (strcmp(arg, "-intcells") == 0) return 1;
-    return 0;
 }
 
 /* Called from the front end as normal */

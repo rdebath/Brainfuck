@@ -29,13 +29,8 @@ int do_input = 0;
 int do_output = 0;
 int ind = 0;
 
-int
-check_arg(const char * arg)
-{
-    if (strcmp(arg, "-b") == 0) return 1;
-    if (strcmp(arg, "-no-default-opt") == 0) return 1;
-    return 0;
-}
+int disable_be_optim = 1;
+int bytecell = -1;
 
 void
 outcmd(int ch, int count)

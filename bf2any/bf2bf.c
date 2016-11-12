@@ -8,6 +8,10 @@
 
 #include "bf2any.h"
 
+static check_arg_t fn_check_arg;
+struct be_interface_s be_interface = {fn_check_arg};
+int disable_savestring = 1;
+
 /*
  * BF translation to BF. This isn't an identity translation because even
  * without most of the peephole optimisation the loader will still remove
@@ -388,12 +392,16 @@ static void bftranslate(int ch, int count);
 static void bfreprint(void);
 static void bfpackprint(void);
 
-int
-check_arg(const char * arg)
+static int
+fn_check_arg(const char * arg)
 {
+    if (strcmp(arg, "+init") == 0) {
+	disable_be_optim = (disable_optimisation() > 0);
+	return 1;
+    }
+    if (strcmp(arg, "?no-rle") == 0) return (disable_optimisation() > 1);
+
     if (strcmp(arg, "-#") == 0) return 1;
-    if (strcmp(arg, "-no-default-opt") == 0) return disable_optimisation();
-    if (strcmp(arg, "-O") == 0) return !disable_optimisation();
 
     if (strcmp(arg, "-c") == 0) {
 	lang = cbyte; langclass = L_CWORDS; return 1;
@@ -667,14 +675,19 @@ check_arg(const char * arg)
 static int disable_optimisation(void)
 {
     switch(L_BASE) {
+    case L_TOKENS:
     case L_ASCII:
     case L_EXCON:
     case L_ABCD:
     case L_BINERDY:
-    case L_TOKENS:
 	return 0;
+
+    case L_BFRLE:	/* These prefer RLE, but don't have optimisation */
+    case L_BFXML:
+    case L_HANOILOVE:
+	return 1;
     }
-    return 1;
+    return 2;
 }
 
 static void
