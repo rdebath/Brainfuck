@@ -57,6 +57,8 @@ install:
 	$(INSTALL) $$i $(INSTALLDIR)/$$i$(INSTALLEXT) ; \
 	done
 
+.PHONY: all clean install
+
 ifneq ($(CC),cc)
 CFLAGS=-O3 -Wall -Wshadow -DBOFF=256 $(DEFS)
 else
@@ -78,6 +80,10 @@ $(ALLEXE): bf2any.o bf2const.o
 # Special cases and configuration
 #-------------------------------------------------------------------------------
 ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(findstring clean,$(MAKECMDGOALS)),)
+# Clean must be done in sequence.
+.NOTPARALLEL:
+endif
 
 PKGCONF=pkg-config$(TARGET_ARCH)
 #-------------------------------------------------------------------------------

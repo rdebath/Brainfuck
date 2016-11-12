@@ -97,6 +97,12 @@ clock.o: clock.h
 # Don't configure if we're just cleaning.
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(MAKECMDGOALS),realclean)
+
+ifneq ($(findstring clean,$(MAKECMDGOALS)),)
+# But clean must be done in sequence.
+.NOTPARALLEL:
+endif
+
 ################################################################################
 LOGDEV=/dev/null
 MARK := $(shell echo Configuration start >$(LOGDEV))
