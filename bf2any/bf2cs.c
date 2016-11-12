@@ -12,7 +12,7 @@ int ind = 0;
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
 
-int disable_savestring = 1;
+static void print_cstring(void);
 
 void
 outcmd(int ch, int count)
@@ -50,6 +50,7 @@ outcmd(int ch, int count)
     case '<': prv("P -= %d;", count); break;
     case '.': pr("Console.Write((char)M[P]);"); break;
     case ',': pr("M[P]=Console.Read();"); break;
+    case '"': print_cstring(); break;
 
     case '[':
 	if(bytecell) pr("M[P] = (M[P] & 255);");
@@ -66,5 +67,49 @@ outcmd(int ch, int count)
 	ind--; pr("}");
 	ind--; pr("}");
 	break;
+    }
+}
+
+static void
+print_cstring(void)
+{
+    char * str = get_string();
+    char buf[256];
+    int gotnl = 0;
+    int badchar = 0;
+    size_t outlen = 0;
+
+    if (!str) return;
+
+    for(;; str++) {
+	if (outlen && (*str == 0 || badchar || gotnl || outlen > sizeof(buf)-8))
+	{
+	    buf[outlen] = 0;
+	    if (gotnl) {
+		buf[outlen-2] = 0;
+		prv("Console.Write(\"%s\\n\");\n", buf);
+	    } else {
+		prv("Console.Write(\"%s\");\n", buf);
+	    }
+	    gotnl = 0; outlen = 0;
+	}
+	if (badchar) {
+	    prv("Console.Write((char)%d);", badchar);
+	    badchar = 0;
+	}
+	if (!*str) break;
+
+	if (*str == '\n') gotnl = 1;
+	if (*str == '"' || *str == '\\') {
+	    buf[outlen++] = '\\'; buf[outlen++] = *str;
+	} else if (*str >= ' ' && *str <= '~') {
+	    buf[outlen++] = *str;
+	} else if (*str == '\n') {
+	    buf[outlen++] = '\\'; buf[outlen++] = 'n';
+	} else if (*str == '\t') {
+	    buf[outlen++] = '\\'; buf[outlen++] = 't';
+	} else {
+	    badchar = *str;
+	}
     }
 }
