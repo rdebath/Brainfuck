@@ -13,7 +13,7 @@ int ind = 0;
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
 
-int disable_savestring = 1;
+static void print_string(void);
 
 void
 outcmd(int ch, int count)
@@ -73,6 +73,7 @@ outcmd(int ch, int count)
 	    pr("    shift L");
 	    pr("endif");
 	    break;
+    case '"': print_string(); break;
 
     case '[':
 	if(bytecell) pr("@ M[$P] = ($M[$P] %% 256 + 256) %% 256");
@@ -87,5 +88,43 @@ outcmd(int ch, int count)
 
     case '~':
 	break;
+    }
+}
+
+static void
+print_string(void)
+{
+    char * str = get_string();
+    char buf[256];
+    int badchar = 0;
+    size_t outlen = 0;
+
+    if (!str) return;
+
+    for(;; str++) {
+	if (outlen && (*str == 0 || badchar || outlen > sizeof(buf)-8))
+	{
+	    buf[outlen] = 0;
+	    if (badchar == '\n') {
+		prv("echo '%s'", buf);
+		badchar = 0;
+	    } else {
+		prv("echo -n '%s'", buf);
+	    }
+	    outlen = 0;
+	}
+	if (badchar) {
+	    prv("outchar %d", badchar);
+	    badchar = 0;
+	}
+	if (!*str) break;
+
+	if (*str == '-' && outlen == 0) {
+	    badchar = (*str & 0xFF);
+	} else if (*str >= ' ' && *str <= '~' && *str != '\\' && *str != '\'') {
+	    buf[outlen++] = *str;
+	} else {
+	    badchar = (*str & 0xFF);
+	}
     }
 }
