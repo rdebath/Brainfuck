@@ -19,11 +19,12 @@
  */
 
 int do_input = 0;
+int do_output = 0;
 int ind = 0;
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
 
-int disable_savestring = 1;
+static void print_string(void);
 
 void
 outcmd(int ch, int count)
@@ -67,8 +68,9 @@ outcmd(int ch, int count)
     case '-': prv(": $((M$P-=%d))", count); break;
     case '>': prv(": $((P+=%d))", count); break;
     case '<': prv(": $((P-=%d))", count); break;
-    case '.': pr("o"); break;
+    case '.': pr("o $((M$P&255))"); do_output++; break;
     case ',': pr("getch"); do_input++; break;
+    case '"': print_string(); break;
 
     case '[':
 	if(bytecell) { pr("while [ $((M$P&=255)) != 0 ] ; do"); }
@@ -81,29 +83,30 @@ outcmd(int ch, int count)
 	ind--;
 	pr("}");
 
-	pr("");
-	pr("if [ .`echo -n` = .-n ]");
-	pr("then");
-	pr("    echon() { echo \"$1\\c\"; }");
-	pr("    echoe() { echo \"$1\\c\"; }");
-	pr("else");
-	pr("    echon() { echo -n \"$1\"; }");
-	pr("    if [ .`echo -e` = .-e ]");
-	pr("    then echoe() { echo -n \"$1\"; }");
-	pr("    else if [ .`echo -e '\\070\\c'` = .8 ]");
-	pr("         then echoe() { echo -e \"$1\\c\"; }");
-	pr("         else echoe() { echo -n -e \"$1\"; }");
-	pr("         fi");
-	pr("    fi");
-	pr("fi");
-	pr("if [ .`echoe '\\070'` != .8 ]");
-	pr("then echoe(){ printf \"%%b\" \"$*\" 2>/dev/null ; }");
-	pr("fi");
-	pr("if [ .`echoe '\\171'` = .y ]");
-	pr("then o(){ echoe \"`printf '\\\\\\\\%%03o' $((M$P&255))`\" ; }");
-	pr("else o(){ echoe \"`printf '\\\\\\\\%%04o' $((M$P&255))`\" ; }");
-	pr("fi");
-	pr("");
+	if (do_output) {
+	    pr("");
+	    pr("if [ .`echo -n` = .-n ]");
+	    pr("then");
+	    pr("    echon() { echo \"$1\\c\"; }");
+	    pr("    echoe() { echo \"$1\\c\"; }");
+	    pr("else");
+	    pr("    echon() { echo -n \"$1\"; }");
+	    pr("    if [ .`echo -e` = .-e ]");
+	    pr("    then echoe() { echo -n \"$1\"; }");
+	    pr("    else if [ .`echo -e '\\070\\c'` = .8 ]");
+	    pr("         then echoe() { echo -e \"$1\\c\"; }");
+	    pr("         else echoe() { echo -n -e \"$1\"; }");
+	    pr("         fi");
+	    pr("    fi");
+	    pr("fi");
+	    pr("if [ .`echoe '\\070'` != .8 ]");
+	    pr("then echoe(){ printf \"%%b\" \"$*\" 2>/dev/null ; }");
+	    pr("fi");
+	    pr("if [ .`echoe '\\171'` = .y ]");
+	    pr("then o(){ echoe \"`printf '\\\\\\\\%%03o' $1`\" ; }");
+	    pr("else o(){ echoe \"`printf '\\\\\\\\%%04o' $1`\" ; }");
+	    pr("fi");
+	}
 
 	if (do_input) {
 	    pr("");
@@ -134,5 +137,45 @@ outcmd(int ch, int count)
 	pr("");
 	pr("brainfuck ||:");
 	break;
+    }
+}
+
+static void
+print_string(void)
+{
+    char * str = get_string();
+    char buf[256];
+    int badchar = 0;
+    size_t outlen = 0;
+
+    if (!str) return;
+
+    for(;; str++) {
+	if (outlen && (*str == 0 || badchar || outlen > sizeof(buf)-8))
+	{
+	    buf[outlen] = 0;
+	    if (badchar == '\n') {
+		prv("echo '%s'", buf);
+		badchar = 0;
+	    } else {
+		do_output++;
+		prv("echon '%s'", buf);
+	    }
+	    outlen = 0;
+	}
+	if (badchar) {
+	    prv("o %d", badchar);
+	    badchar = 0;
+	    do_output++;
+	}
+	if (!*str) break;
+
+	if (*str == '-' && outlen == 0) {
+	    badchar = (*str & 0xFF);
+	} else if (*str >= ' ' && *str <= '~' && *str != '\\' && *str != '\'') {
+	    buf[outlen++] = *str;
+	} else {
+	    badchar = (*str & 0xFF);
+	}
     }
 }
