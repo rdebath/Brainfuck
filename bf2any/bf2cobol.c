@@ -101,14 +101,7 @@ outcmd(int ch, int count)
 	    I; printf("END-IF\n");
 	    I; printf("IF gotln EQUALS ZERO THEN\n");
 	    I; printf("  ACCEPT inpl\n");
-	    I; printf("  IF inpl EQUALS SPACES THEN\n");
-	    I; printf("    MOVE 1 TO goteof\n");
-	    I; printf("  ELSE\n");
-	    I; printf("    MOVE 1 TO gotln\n");
-	    I; printf("  END-IF\n");
-	    I; printf("  IF goteof EQUALS 1 THEN\n");
-	    I; printf("    EXIT PROGRAM\n");
-	    I; printf("  END-IF\n");
+	    I; printf("  MOVE 1 TO gotln\n");
 	    I; printf("END-IF\n");
 	    I; printf("IF inpl EQUALS SPACES THEN\n");
 	    I; printf("  MOVE ZERO TO gotln\n");
