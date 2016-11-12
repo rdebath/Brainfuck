@@ -807,6 +807,15 @@ outcmd(int ch, int count)
     if (ch == '!' && (langclass & GEN_HEADER) != 0)
 	ps(lang[8]);
 
+    if (ch == '=' && !enable_be_optim) {
+        outcmd('[', 1);
+        outcmd('-', 1);
+        outcmd(']', 1);
+        if (count>0) outcmd('+', count);
+        else if(count<0) outcmd('-', -count);
+        return;
+    }
+
     switch (L_BASE) {
     case L_WORDS:
     case L_JNWORD:

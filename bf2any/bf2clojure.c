@@ -43,6 +43,7 @@ outcmd(int ch, int count)
 	);
 	break;
 
+    case '=': I; printf("(set-pointer %d)\n", count); break;
     case '+': I; printf("(set-pointer (+ (set-or-zero) %d))\n", count); break;
     case '-': I; printf("(set-pointer (- (set-or-zero) %d))\n", count); break;
     case '>': I; printf("(def pointer (+ pointer %d))\n", count); break;

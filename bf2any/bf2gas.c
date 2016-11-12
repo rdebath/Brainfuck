@@ -78,6 +78,7 @@ outcmd(int ch, int count)
 	if (tapeinit)
 	    printf("add "BX", %d\n", tapeinit); break;
 	break;
+    case '=': printf("mov byte ptr ["BX"], %d\n", count & 0xFF); break;
     case '+': printf("add byte ptr ["BX"], %d\n", count); break;
     case '-': printf("sub byte ptr ["BX"], %d\n", count); break;
     case '<': printf("sub "BX", %d\n", count); break;

@@ -23,7 +23,7 @@
  * not required for TC.
  */
 
-#define MAXPRLE	1
+#define MAXPRLE	128
 
 int do_input = 0;
 int do_output = 0;
@@ -35,19 +35,25 @@ int bytecell = -1;
 void
 outcmd(int ch, int count)
 {
-    while (count>MAXPRLE) { outcmd(ch, MAXPRLE); count -= MAXPRLE; }
+    if (ch == '=') {
+        count &= 255;
+    } else {
 
-    if (count > 1) {
-	switch(ch) {
-	case '+': printf("u%d\n", count); break;
-	case '-': printf("d%d\n", count); break;
-	case '>': printf("r%d\n", count); break;
-	case '<': printf("l%d\n", count); break;
+	while (count>MAXPRLE) { outcmd(ch, MAXPRLE); count -= MAXPRLE; }
+
+	if (count > 1) {
+	    switch(ch) {
+	    case '+': printf("u%d\n", count); break;
+	    case '-': printf("d%d\n", count); break;
+	    case '>': printf("r%d\n", count); break;
+	    case '<': printf("l%d\n", count); break;
+	    }
+	    return;
 	}
-	return;
     }
 
     switch(ch) {
+    case '=': printf("f\nv=%d\ns\n", count); break;
     case '+': printf("u\n"); break;
     case '-': printf("d\n"); break;
     case '>': printf("r\n"); break;
@@ -194,17 +200,21 @@ outcmd(int ch, int count)
 
 	if (MAXPRLE>1) {
 	    int i;
-	    for (i=3; i<=MAXPRLE; i++) {
-		printf("fn u%d { u ; u%d; }\n", i, i-1);
-		printf("fn d%d { d ; d%d; }\n", i, i-1);
-		printf("fn l%d { l ; l%d; }\n", i, i-1);
-		printf("fn r%d { r ; r%d; }\n", i, i-1);
-	    }
-
 	    printf("fn u2 { u ; u; }\n");
 	    printf("fn d2 { d ; d; }\n");
 	    printf("fn l2 { l ; l; }\n");
 	    printf("fn r2 { r ; r; }\n");
+	    printf("fn u3 { u2 ; u; }\n");
+	    printf("fn d3 { d2 ; d; }\n");
+	    printf("fn l3 { l2 ; l; }\n");
+	    printf("fn r3 { r2 ; r; }\n");
+
+	    for (i=4; i<=MAXPRLE; i++) {
+		printf("fn u%d { u%d ; u%d; }\n", i, i-i/2, i/2);
+		printf("fn d%d { d%d ; d%d; }\n", i, i-i/2, i/2);
+		printf("fn l%d { l%d ; l%d; }\n", i, i-i/2, i/2);
+		printf("fn r%d { r%d ; r%d; }\n", i, i-i/2, i/2);
+	    }
 	}
 	break;
 

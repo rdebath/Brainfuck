@@ -38,19 +38,26 @@ void
 outcmd(int ch, int count)
 {
     int i;
-    while (count>MAXPRLE) { outcmd(ch, MAXPRLE); count -= MAXPRLE; }
 
-    if (count > 1) {
-	switch(ch) {
-	case '+': printf("u%d\n", count); break;
-	case '-': printf("d%d\n", count); break;
-	case '>': printf("r%d\n", count); break;
-	case '<': printf("l%d\n", count); break;
+    if (ch == '=')
+	count &= 255;
+    else {
+
+	while (count>MAXPRLE) { outcmd(ch, MAXPRLE); count -= MAXPRLE; }
+
+	if (count > 1) {
+	    switch(ch) {
+	    case '+': printf("u%d\n", count); break;
+	    case '-': printf("d%d\n", count); break;
+	    case '>': printf("r%d\n", count); break;
+	    case '<': printf("l%d\n", count); break;
+	    }
+	    return;
 	}
-	return;
     }
 
     switch(ch) {
+    case '=': printf("eval \"M$P=%d\"\n", count); break;
     case '+': printf("u1\n"); break;
     case '-': printf("d1\n"); break;
     case '>': printf("r1\n"); break;

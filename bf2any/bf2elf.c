@@ -78,6 +78,8 @@ MLBIT(2) subchar =  { { 0x80, 0x29 } };			/* sub  [ecx], ... */
 MLBIT(2) addptr =   { { 0x83, 0xC1 } };			/* add  ecx, ...   */
 MLBIT(2) subptr =   { { 0x83, 0xE9 } };			/* sub  ecx, ...   */
 
+MLBIT(2) movchar =  { { 0xC6, 0x01 } };			/* mov  [ecx], ... */
+
 MLBIT(5)
 	epilog_ex = { { 0x92,				/* xchg eax, edx   */
 			0x31, 0xDB,			/* xor  ebx, ebx   */
@@ -154,14 +156,19 @@ outcmd(int ch, int count)
     FILE * ofd;
 #if _POSIX_VERSION >= 199506L
     int32_t p;
-    int8_t arg;
+    uint8_t arg;
 #else
     int p;		/* BEWARE: Assuming this is a good int. */
-    signed char arg;	/* Another assembler type: one byte signed. */
+    unsigned char arg;	/* Another assembler type: one byte signed. */
 #endif
 
-    /* limit count to the range of a signed char */
-    while (count>127) { outcmd(ch, 127); count -= 127; }
+    /* limit count to the range of the byte arg */
+    if (ch == '>' || ch == '<') {
+	while (count>127) { outcmd(ch, 127); count -= 127; }
+    } else if (ch == '-' && count > 127) {
+	ch = '+';
+	count = 256 - count;
+    }
     arg = count;
 
     switch(ch) {
@@ -172,6 +179,7 @@ outcmd(int ch, int count)
 	st = stack;
 	break;
 
+    case '=': emitarg(movchar, arg); break;
     case '+': arg == 1 ? emitobj(incchar) : emitarg(addchar, arg); break;
     case '-': arg == 1 ? emitobj(decchar) : emitarg(subchar, arg); break;
     case '<': arg == 1 ? emitobj(decptr)  : emitarg(subptr, arg); break;
