@@ -2,7 +2,7 @@
 INSTALL=install -p -s
 INSTALLDIR=/usr/local/bin
 INSTALLEXT=
-CLIST=$(filter-out cdowhile.c dblmicrobf.c lightning.c,$(wildcard *.c))
+CLIST=$(filter-out cdowhile.c lightning.c,$(wildcard *.c))
 EXELIST := $(patsubst %.c,%,$(CLIST))
 OBJECTS := $(patsubst %.c,%.o,$(CLIST)) ook.o
 EXTRAS=bf1k bf0k bfas ook
@@ -30,14 +30,14 @@ clean:
 # Delete the direct to exe rule to make sure %.o files are used for ccache.
 % : %.c
 
-bf1k: dblmicrobf.c
-	$(CC) -DCELLSIZE=1000 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
+bf1k: hydrogen.c
+	$(CC) -DMASK=999 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
 
-bf0k: dblmicrobf.c
-	$(CC) -DCELLSIZE=257 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
+bf0k: hydrogen.c
+	$(CC) -DMASK=256 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
 
-bfas: dblmicrobf.c
-	$(CC) -DCELLSIZE=127 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
+bfas: hydrogen.c
+	$(CC) -DMASK=126 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
 
 cdowhile: cdowhile.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@ $(LIBS_LIBDL)

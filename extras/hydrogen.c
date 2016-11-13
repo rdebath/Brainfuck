@@ -20,22 +20,35 @@
 #ifndef MASK
 #define ENABLE_DOUBLE
 #endif
+
 #elif MASK == 2
 #define icell	unsigned short
 #define M(x) x
-#elif MASK < 127
-#define icell	int
+#elif MASK == 3
+#define icell	unsigned int
+#define M(x) ((x) & 0xFFFFFF)
+#elif MASK == 4
+#define icell	unsigned int
 #define M(x) x
+#elif MASK == 8
+#define icell	unsigned long long
+#define M(x) x
+
 #elif MASK == 0xFF || MASK == 0xFFFF || MASK == 0xFFFFFF
-#define icell	int
+#define icell	unsigned int
 #define M(x) ((x) & MASK)
+#elif MASK == 0xFFFFFFFF
+#define icell	unsigned int
+#define M(x) x
+
 #else
 #define icell	int
-#define M(x) ((x)%(MASK+1))
+#define M(x) ((x) % (MASK+1))
+#define MODMASK
 #endif
 
 #ifndef MEMSIZE
-#define MEMSIZE 60000
+#define MEMSIZE 100000
 #endif
 
 #define T fprintf(stderr, "Trace %d\n", __LINE__);
@@ -240,6 +253,11 @@ int main(int argc, char **argv)
 		free(n);
 		n = p;
 	    }
+
+#ifdef MODMASK
+	    if (n->type == T_ADD) n->count = M(n->count);
+#endif
+
 	    if (n->type == T_MOV || n->type == T_ADD) {
 		if (n->count == 0)
 		    n->type = T_NOP;
@@ -618,7 +636,7 @@ run(void)
 #endif
     void * freep;
 
-    m = freep = tcalloc(MEMSIZE+1024, sizeof*p);
+    m = freep = tcalloc(MEMSIZE+1024, sizeof*m);
     m += 1024;
 
     while(n)
@@ -629,6 +647,9 @@ run(void)
 	    break;
 
 	case T_INP: case T_PRT:
+	    arraylen += 2;
+	    break;
+
 	case T_ADD:
 	case T_WHL: case T_END:
 	    arraylen += 3;
@@ -706,20 +727,17 @@ run(void)
 	    p--;
 	    break;
 
-	case T_INP: case T_SAVE: case T_SET4:
+	case T_INP: case T_PRT:
+	case T_SAVE: case T_SET4:
 	case T_ZTEMP2:
 	case T_SAVE2:
-	    break;
-
-	case T_PRT:
-	    *p++ = -1;
 	    break;
 
 	case T_ADD:
 	    *p++ = n->count;
 	    while (n->next && n->next->type == n->type) {
 		n=n->next;
-		p[-1] += n->count;
+		p[-1] = M(p[-1] + n->count);
 	    }
 	    break;
 
@@ -789,33 +807,30 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 #endif
 	switch(*p)
 	{
-	case T_ADD: *m += p[1]; p += 3; break;
+	case T_ADD: *m = M(*m + p[1]); p += 3; break;
 	case T_SET: *m = p[1]; p += 3; break;
 
 	case T_END:
-	    if(M(*m) != 0) p += p[1];
+	    if(*m != 0) p += p[1];
 	    p += 3;
 	    break;
 
 	case T_WHL:
-	    if(M(*m) == 0) p += p[1];
+	    if(*m == 0) p += p[1];
 	    p += 3;
 	    break;
 
 	case T_INP:
 	    {
 		int c = getchar();
-		if (c != EOF) *m = c;
+		if (c != EOF) *m = M(c);
 	    }
 	    p += 2;
 	    break;
 
 	case T_PRT:
-	    {
-		int ch = M(p[1] == -1?*m:p[1]);
-		putchar(ch);
-	    }
-	    p += 3;
+	    putchar(*m);
+	    p += 2;
 	    break;
 
 	case T_STOP:
@@ -824,24 +839,24 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 #ifndef NO_XTRA
 	case T_ZFIND:
 	    /* Search along a rail til you find the end of it. */
-	    while(M(*m)) m += p[1];
+	    while(*m) m += p[1];
 	    p += 3;
 	    break;
 
 	case T_MFIND:
 	    (*m)--;
-	    while(M(*m) != M((icell)-1)) m += p[1];
+	    while(M(*m+1) != 0) m += p[1];
 	    (*m)++;
 	    p += 3;
 	    break;
 
 	case T_ADDWZ:
-	    while(M(*m)) { *m -= 1; m += p[1]; }
+	    while(*m) { *m = M(*m -1); m += p[1]; }
 	    p += 3;
 	    break;
 
 	case T_SAVE: a = *m; *m = 0; p += 2; break;
-	case T_MUL: *m += p[1] * a; p += 3; break;
+	case T_MUL: *m = M(M(*m) + M(p[1] * a)); p += 3; break;
 	case T_QSET: if(a) *m = p[1]; p += 3; break;
 
 	case T_SET4: *m = 0; m[1] = 0; m[2] = 0; m[3] = 0; p += 2; break;
