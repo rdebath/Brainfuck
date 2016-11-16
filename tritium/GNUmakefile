@@ -7,14 +7,16 @@
 #
 # GNU lightning may be V1 or V2 and is detected; note, however, that V1 does
 # NOT work on a 64bit x64. (You can try TARGET_ARCH=-m32 after installing the
-# gcc-multilib package with apt-get. The arch flag -mx32 will NOT work because
-# default Debian kernels do not include the required support.)
+# gcc-multilib package with apt-get. The arch flag -mx32 will NOT work on
+# Debian kernels because kernel support is disabled. You will need to add
+# "syscall.x32=y" to the kernel command line to re-enabled it.
 #
-# Dasm only has assembler for x86 and x86_64 others have not yet been written.
+# Dasm only has assembler for x86, x86_64 and x86_32 others have not yet been
+# written.
 # It is normally a little faster that GNU Lightning.
 #
 # The JIT interpreters will normally get disabled if their requirements don't
-# exist but as the tests are very simple they can be confused.
+# exist but can be manually disabled too.
 #
 # To manually disable a 'JITter' add one or more of the options below to the
 # make command line.
@@ -33,6 +35,8 @@ TARGETFILE=bfi
 INSTALL=install -p -s
 INSTALLDIR=/usr/local/bin
 INSTALLEXT=
+# DEFS=
+# LDFLAGS=
 
 all: $(TARGETFILE)
 
