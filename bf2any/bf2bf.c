@@ -676,6 +676,9 @@ static int disable_optimisation(void)
 {
     switch(L_BASE) {
     case L_TOKENS:
+	disable_savestring = 0;
+	/*FALLTHROUGH*/
+
     case L_ASCII:
     case L_EXCON:
     case L_ABCD:
@@ -1700,8 +1703,25 @@ static int imov = 0, ind = 0;
     case '+': printf("*m +=%d\n", count); break;
     case '-': printf("*m -=%d\n", count); break;
 
-    case '[': printf("while v!=0\n"); break;
+    case '[': printf("while *m!=0\n"); break;
     case ']': printf("endwhile\n"); break;
+
+    case '"':
+	{
+	    char * s = get_string();
+	    printf("printf(\"");
+	    for(;*s;s++)
+		if (*s>=' ' && *s<='~' && *s!='\\')
+		    putchar(*s);
+		else if (*s == '\n')
+		    printf("\\n");
+		else if (*s == '\\')
+		    printf("\\\\");
+		else
+		    printf("\\%03o", *s);
+	    printf("\");\n");
+	}
+	break;
 
     default:
 	printf("\n");
