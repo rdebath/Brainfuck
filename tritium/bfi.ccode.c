@@ -201,11 +201,11 @@ print_c_header(FILE * ofd)
     fprintf(ofd, "/* Code generated from %s */\n\n", bfname);
     fprintf(ofd, "#include <stdio.h>\n");
 
-    if (libtcc_specials || use_functions)
+    if (libtcc_specials || use_functions || use_dynmem)
     {
 	if (knr_c_ok) fprintf(ofd, "#ifdef __STDC__\n");
-	if (use_functions) fprintf(ofd, "#include <stdlib.h>\n");
-	if (libtcc_specials) fprintf(ofd, "#include <string.h>\n");
+	fprintf(ofd, "#include <stdlib.h>\n");
+	fprintf(ofd, "#include <string.h>\n");
 	if (knr_c_ok) fprintf(ofd, "#endif\n");
     }
     fprintf(ofd, "\n");
