@@ -1,0 +1,50 @@
+# https://travis-ci.org/rdebath/Brainfuck/builds
+language: c
+
+# Select Trusty
+dist: trusty
+sudo: false
+group: beta
+
+addons:
+  apt:
+    packages:
+    - libtcc-dev
+    - lua5.1
+    - liblua5.1-bitop0
+    - g++-multilib
+
+os:
+  - linux
+  - osx
+
+compiler:
+  - clang
+  - gcc
+
+env:
+  - TARGET_ARCH=-m64
+  - TARGET_ARCH=-m32
+# Ubunty Precise doesn't know about mx32
+  - TARGET_ARCH=-mx32
+
+matrix:
+    exclude:
+        -
+            os: linux
+            compiler: clang
+            env: TARGET_ARCH=-mx32
+
+# Only run the tests if the exe was built.
+script:
+  - make CC="$CC" -C tritium
+  - make CC="$CC" HAVE_TCL_H= -C bf2any
+  - make CC="$CC" -C extras
+  - test ! -x tritium/bfi || tritium/bfi -v bitwidth.b
+  - test ! -x tritium/bfi || tritium/bfi -v -rc bitwidth.b
+  - test ! -x bf2any/bf2jit || bf2any/bf2jit bitwidth.b
+  - test ! -x bf2any/bf2crun || bf2any/bf2crun bitwidth.b
+  - test ! -x bf2any/bf2run || bf2any/bf2run bitwidth.b
+  - test ! -x tritium/bfi || tritium/bfi testing/Mandelbrot.b
+  - test ! -x tritium/bfi || tritium/bfi testing/Prime.b < testing/Prime.in
+  - test ! -x tritium/bfi || tritium/bfi -h || true
