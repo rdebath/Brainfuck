@@ -174,6 +174,10 @@ else
 UNSAFE += $(call cc-option,$(WERROR) -fno-strict-overflow,-fno-strict-overflow)
 endif
 
+# Optimise for this machine, set MARCH if you want different.
+MARCH =$(call cc-option,$(WERROR) -march=native,-march=native)
+UNSAFE += $(MARCH)
+
 # This appears to be an amplifier not itself unsafe.
 #   -fno-aggressive-loop-optimizations
 

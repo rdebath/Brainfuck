@@ -59,7 +59,7 @@ CC := $(shell ( which 2>/dev/null gcc clang pcc ; echo cc ) | head -1 | sed 's:.
 LEX := flex
 
 ifneq ($(CC),cc)
-CFLAGS=-O3 $(FUNSAFE) -Wall -Wshadow $(DEFS)
+CFLAGS=-O2 $(FUNSAFE) -Wall -Wshadow $(DEFS)
 else
 CFLAGS=-O $(DEFS)
 endif
@@ -104,6 +104,10 @@ endif
 else
 UNSAFE += $(call cc-option,$(WERROR) -fno-strict-overflow,-fno-strict-overflow)
 endif
+
+# Optimise for this machine, set MARCH if you want different.
+MARCH =$(call cc-option,$(WERROR) -march=native,-march=native)
+UNSAFE += $(MARCH)
 
 # GCC complains about flex generated code.
 NOSGN := $(call cc-option,$(WERROR) -Wno-sign-compare,-Wno-sign-compare)
