@@ -494,9 +494,10 @@ print_nasm_header(void)
     printf("\tinc\teax\t\t; syscall 1, exit\n");
     printf("\tint\t0x80\t\t; exit(0)\n");
     printf("\n");
-    printf("\tsection\t.data align=64\n");
-    printf("\tsection\t.bss align=64\n");
+    printf("\tsection\t.data align=4096\n");
+    printf("\tsection\t.bss align=4096\n");
     printf("filesize equ\tsection..bss.start-orgaddr\n");
+    printf("putchbuf: resb 1\n");
     if (most_neg_maad_loop<0)
 	printf("\tresb %d\n", -most_neg_maad_loop);
     printf("mem:\n");
@@ -540,6 +541,7 @@ print_gas_header(void)
 	printf("%%define .byte\tdb\t; Sigh\n");
 	printf("\n");
 	printf("\tsection\t.bss\n");
+	printf("putchbuf: resb 1\n");
 	if (most_neg_maad_loop<0)
 	    printf("\tresb %d\n", -most_neg_maad_loop);
 	printf("mem:\n");
@@ -625,8 +627,6 @@ static int textno = -1;
 	if (enable_trace && !link_main)
 	    printf("%%line 1 lib_string.s\n");
 	outp_line = -1;
-	printf("section .data\n");
-	printf("putchbuf: db 0\n");
 	printf("section .textlib\n");
 	printf("putch:\n");
 	printf("\tpush ecx\n");
