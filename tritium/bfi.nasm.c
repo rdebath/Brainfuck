@@ -12,6 +12,11 @@ static void print_asm_header(void);
 static void print_asm_footer(void);
 static void print_hello_world(void);
 
+#ifdef __APPLE__
+/* Apple has old version of nasm so we must use maximums for sizes. */
+#define oldnasm
+#endif
+
 #ifdef __linux__
 static int link_main = 0;
 #else
@@ -141,6 +146,7 @@ print_nasm(void)
     for(i=0, n = bfprog; n; n=n->next) {
 	n->ipos = i;
 	switch(n->type) {
+#ifndef oldnasm
 	case T_MOV: i++; break;
 	case T_ADD: i+=3; break;
 	case T_SET: i+=3; break;
@@ -149,6 +155,16 @@ print_nasm(void)
 	case T_CHR: i+=9; break;
 	case T_INP: i+=9; break;
 	default: i+=6; break;
+#else
+	case T_MOV: i+=6; break;
+	case T_ADD: i+=6; break;
+	case T_SET: i+=7; break;
+	case T_CALC: i+=64; break;
+	case T_PRT: i+=12; break;
+	case T_CHR: i+=9; break;
+	case T_INP: i+=24; break;
+	default: i+=12; break;
+#endif
 	}
     }
 
@@ -554,17 +570,17 @@ print_gas_header(void)
     }
 
     printf("getch:\n");
-    printf("\tsub esp, 12\n");
+    printf("\tsub esp, 28\n");
     printf("\tmov dword ptr [esp+8], 1\n");
     printf("\tmov dword ptr [esp+4], ecx\n");
     printf("\tmov dword ptr [esp], 0\n");
     printf("\tcall %sread\n", ulines?"_":"");
-    printf("\tadd esp, 12\n");
+    printf("\tadd esp, 28\n");
     printf("\txor edx,edx\n");
     printf("\tret\n");
 
     printf("putch:\n");
-    printf("\tsub esp, 20\n");
+    printf("\tsub esp, 32\n");
     printf("\tmov dword ptr [esp+16], ecx\n");
     printf("\tmov byte ptr [esp+12], al\n");
     printf("\tmov dword ptr [esp+8], 1\n");
@@ -573,19 +589,19 @@ print_gas_header(void)
     printf("\tmov dword ptr [esp], 1\n");
     printf("\tcall %swrite\n", ulines?"_":"");
     printf("\tmov ecx, dword ptr [esp+16]\n");
-    printf("\tadd esp, 20\n");
+    printf("\tadd esp, 32\n");
     printf("\txor edx,edx\n");
     printf("\tret\n");
 
     printf("prttext:\n");
-    printf("\tsub esp, 16\n");
+    printf("\tsub esp, 32\n");
     printf("\tmov dword ptr [esp+12], ecx\n");
     printf("\tmov dword ptr [esp+8], edx\n");
     printf("\tmov dword ptr [esp+4], eax\n");
     printf("\tmov dword ptr [esp], 1\n");
     printf("\tcall %swrite\n", ulines?"_":"");
     printf("\tmov ecx, dword ptr [esp+12]\n");
-    printf("\tadd esp, 16\n");
+    printf("\tadd esp, 32\n");
     printf("\txor edx,edx\n");
     printf("\tret\n");
 
@@ -608,6 +624,7 @@ print_gas_header(void)
 static void
 print_asm_footer(void)
 {
+    printf("exit_prog:\n");
     printf("\tpop ebx\n");
     printf("\tleave\n");
     printf("\tret\n");
