@@ -224,40 +224,38 @@ print_c_header(FILE * ofd)
 
     if (cell_size == 0) {
 	if (cell_length == 0) {
-	    if (knr_c_ok) {
+	    if (knr_c_ok)
 		fprintf(ofd, "#ifdef __STDC__\n");
-		fprintf(ofd, "#include <limits.h>\n");
-		fprintf(ofd, "/* LLONG_MAX came in after inttypes.h, limits.h is very old. */\n");
-		fprintf(ofd, "#if _POSIX_VERSION >= 199506L || defined(LLONG_MAX)\n");
-		fprintf(ofd, "#include <inttypes.h>\n");
-		fprintf(ofd, "#endif\n");
+
+	    fprintf(ofd, "#include <limits.h>\n");
+	    fprintf(ofd, "/* LLONG_MAX came in after inttypes.h, limits.h is very old. */\n");
+	    fprintf(ofd, "#if _POSIX_VERSION >= 199506L || defined(LLONG_MAX)\n");
+	    fprintf(ofd, "#include <inttypes.h>\n");
+	    fprintf(ofd, "#endif\n");
+
+	    if (knr_c_ok)
 		fprintf(ofd, "#endif\n\n");
 
-		fprintf(ofd, "#ifndef C\n");
-		fprintf(ofd, "#ifdef __SIZEOF_INT128__\n");
-		fprintf(ofd, "#define C unsigned __int128\n");
-		fprintf(ofd, "#else\n");
-		fprintf(ofd, "#ifdef _UINT128_T\n");
-		fprintf(ofd, "#define C __uint128_t\n");
-		fprintf(ofd, "#else\n");
-		fprintf(ofd, "#if defined(ULLONG_MAX) || defined(__LONG_LONG_MAX__)\n");
-		fprintf(ofd, "#define C unsigned long long\n");
-		fprintf(ofd, "#else\n");
-		fprintf(ofd, "#if defined(UINTMAX_MAX)\n");
-		fprintf(ofd, "#define C uintmax_t\n");
-		fprintf(ofd, "#else\n");
-		fprintf(ofd, "#define C unsigned long\n");
-		fprintf(ofd, "#endif\n");
-		fprintf(ofd, "#endif\n");
-		fprintf(ofd, "#endif\n");
-		fprintf(ofd, "#endif\n");
-		fprintf(ofd, "#endif\n\n");
-	    } else {
-		fprintf(ofd, "#include <inttypes.h>\n\n");
-		fprintf(ofd, "#ifndef C\n");
-		fprintf(ofd, "#define C uintmax_t\n");
-		fprintf(ofd, "#endif\n\n");
-	    }
+	    fprintf(ofd, "#ifndef C\n");
+	    fprintf(ofd, "#ifdef __SIZEOF_INT128__\n");
+	    fprintf(ofd, "#define C unsigned __int128\n");
+	    fprintf(ofd, "#else\n");
+	    fprintf(ofd, "#ifdef _UINT128_T\n");
+	    fprintf(ofd, "#define C __uint128_t\n");
+	    fprintf(ofd, "#else\n");
+	    fprintf(ofd, "#if defined(ULLONG_MAX) || defined(__LONG_LONG_MAX__)\n");
+	    fprintf(ofd, "#define C unsigned long long\n");
+	    fprintf(ofd, "#else\n");
+	    fprintf(ofd, "#if defined(UINTMAX_MAX)\n");
+	    fprintf(ofd, "#define C uintmax_t\n");
+	    fprintf(ofd, "#else\n");
+	    fprintf(ofd, "#define C unsigned long\n");
+	    fprintf(ofd, "#endif\n");
+	    fprintf(ofd, "#endif\n");
+	    fprintf(ofd, "#endif\n");
+	    fprintf(ofd, "#endif\n");
+	    fprintf(ofd, "#endif\n\n");
+
 	    fprintf(ofd, "#ifndef M\n");
 	    fprintf(ofd, "#define M(v) v\n");
 	    fprintf(ofd, "#endif\n\n");
