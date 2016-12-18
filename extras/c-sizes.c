@@ -98,15 +98,9 @@ int is_big_endian()
 }
 
 #ifdef __STDC__
-int
-#ifdef BROKEN_MAIN
-main(int argc, char ** argv)
+void print_info(void)
 #else
-main(void)
-#endif
-
-#else
-main()
+print_info()
 #endif
 {
     int e = is_big_endian();
@@ -439,8 +433,6 @@ main()
     printf("Bytes LD%2d, long double    %Lg\n", (int)sizeof(long double), LDBL_MAX);
 #endif
 #endif
-
-    return 0;
 }
 
 #ifdef __STDC__
@@ -518,5 +510,147 @@ check_weird()
 	    printf("WARNING(C): Signed integers have %d magnitude bits.\n", x);
 	else
 	    known_weird = 0;
+    }
+}
+
+#ifdef __STDC__
+int
+main(int argc, char ** argv)
+#else
+int
+main(argc, argv)
+int argc;
+char ** argv;
+#endif
+{
+    int bytes_needed = 0;
+    int is_unsigned = 1;
+    if (argc < 2) { print_info(); return 0;}
+
+    if (strcmp(argv[1], "-u8") == 0) {
+#ifdef UINT8_MAX
+	printf("uint8_t\n"); return 0;
+#endif
+	bytes_needed = 1;
+	is_unsigned = 1;
+    } else
+
+    if (strcmp(argv[1], "-i8") == 0) {
+#ifdef INT8_MAX
+	printf("int8_t\n"); return 0;
+#endif
+	bytes_needed = 1;
+	is_unsigned = 0;
+    } else
+
+    if (strcmp(argv[1], "-u16") == 0) {
+#ifdef UINT16_MAX
+	printf("uint16_t\n"); return 0;
+#endif
+	bytes_needed = 2;
+	is_unsigned = 1;
+    } else
+
+    if (strcmp(argv[1], "-i16") == 0) {
+#ifdef INT16_MAX
+	printf("int16_t\n"); return 0;
+#endif
+	bytes_needed = 2;
+	is_unsigned = 0;
+    } else
+
+    if (strcmp(argv[1], "-u32") == 0) {
+#ifdef UINT32_MAX
+	printf("uint32_t\n"); return 0;
+#endif
+	bytes_needed = 4;
+	is_unsigned = 1;
+    } else
+
+    if (strcmp(argv[1], "-i32") == 0) {
+#ifdef INT32_MAX
+	printf("int32_t\n"); return 0;
+#endif
+	bytes_needed = 4;
+	is_unsigned = 0;
+    } else
+
+    if (strcmp(argv[1], "-u64") == 0) {
+#ifdef UINT64_MAX
+	printf("uint64_t\n"); return 0;
+#endif
+	bytes_needed = 8;
+	is_unsigned = 1;
+    } else
+
+    if (strcmp(argv[1], "-i64") == 0) {
+#ifdef INT64_MAX
+	printf("int64_t\n"); return 0;
+#endif
+	bytes_needed = 8;
+	is_unsigned = 0;
+    } else
+
+    if (strcmp(argv[1], "-u128") == 0) {
+#ifdef UINT128_MAX
+	printf("uint128_t\n"); return 0;
+#endif
+#if defined(__SIZEOF_INT128__)
+	printf("unsigned __int128\n"); return 0;
+#endif
+#ifdef _UINT128_T
+	printf("__uint128_t\n"); return 0;
+#endif
+	bytes_needed = 16;
+	is_unsigned = 1;
+    } else
+
+    if (strcmp(argv[1], "-i128") == 0) {
+#ifdef INT128_MAX
+	printf("int128_t\n"); return 0;
+#endif
+#if defined(__SIZEOF_INT128__)
+	printf("__int128\n"); return 0;
+#endif
+#ifdef _INT128_T
+	printf("__int128_t\n"); return 0;
+#endif
+	bytes_needed = 16;
+	is_unsigned = 0;
+    } else
+
+    {
+	fprintf(stderr, "Usage: c-sizes [-iN|-uN]\n");
+	return 1;
+    }
+
+    if (bytes_needed == 1) {
+#if defined(SCHAR_MAX) && defined(CHAR_MAX)
+#if SCHAR_MAX == CHAR_MAX
+	if(!is_unsigned) { printf("char\n"); return 0; }
+#endif
+#endif
+#if defined(UCHAR_MAX) && defined(CHAR_MAX)
+#if UCHAR_MAX == CHAR_MAX
+	if(is_unsigned) { printf("char\n"); return 0; }
+#endif
+#endif
+    }
+
+    if (is_unsigned) {
+	if (sizeof(unsigned char) == bytes_needed) { printf("unsigned char\n"); return 0; }
+	if (sizeof(unsigned short) == bytes_needed) { printf("unsigned short\n"); return 0; }
+	if (sizeof(unsigned) == bytes_needed) { printf("unsigned\n"); return 0; }
+	if (sizeof(unsigned long) == bytes_needed) { printf("unsigned long\n"); return 0; }
+	return 1;
+    } else {
+#ifdef SCHAR_MAX
+	if (sizeof(signed char) == bytes_needed) { printf("signed char\n"); return 0; }
+#endif
+	if (sizeof(char) == bytes_needed) { printf("char\n"); return 0; }
+	if (sizeof(short) == bytes_needed) { printf("short\n"); return 0; }
+	if (sizeof(int) == bytes_needed) { printf("int\n"); return 0; }
+	if (sizeof(long) == bytes_needed) { printf("long\n"); return 0; }
+	return 1;
     }
 }
