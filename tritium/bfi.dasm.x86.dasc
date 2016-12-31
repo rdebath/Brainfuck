@@ -271,13 +271,12 @@ run_dynasm(void)
 #endif
     |.else
     | push rbp
-    | push r15
-    | push r14
-    | push r13
-    | push rbx
-    |
     | mov  rbp, rsp
-    | sub  rsp, 64 // Some shadow space for Windows (if this is ever ported).
+    | sub  rsp, 64	// Note: Win64 needs 32bytes of "Shadow space" too.
+    | mov  [rbp-8], r15
+    | mov  [rbp-16], r14
+    | mov  [rbp-24], r13
+    | mov  [rbp-32], rbx
     |
 #ifndef _WIN32
     | mov  REG_P, PRM
@@ -545,7 +544,7 @@ run_dynasm(void)
 #else
 	    | mov REG_C, REG_A
 #endif
-#ifdef __code_model_small__
+#if (defined(__code_model_small__) && !defined(__PIC__)) || defined(__ILP32__)
 	    | mov   eax, (uintptr_t) putch
 #else
 	    | mov64 rax, (uintptr_t) putch
@@ -616,7 +615,7 @@ run_dynasm(void)
 #else
 		| mov REG_CW, rax
 #endif
-#ifdef __code_model_small__
+#if (defined(__code_model_small__) && !defined(__PIC__)) || defined(__ILP32__)
 		| mov   eax, (uintptr_t) puts_without_nl
 #else
 		| mov64 rax, (uintptr_t) puts_without_nl
@@ -654,7 +653,7 @@ run_dynasm(void)
 #else
 	    | mov REG_C, REG_A
 #endif
-#ifdef __code_model_small__
+#if (defined(__code_model_small__) && !defined(__PIC__)) || defined(__ILP32__)
 	    | mov   eax, (uintptr_t) getch
 #else
 	    | mov64 rax, (uintptr_t) getch
@@ -668,7 +667,7 @@ run_dynasm(void)
 	    |.if I386
 	    | call &failout
 	    |.else
-#ifdef __code_model_small__
+#if (defined(__code_model_small__) && !defined(__PIC__)) || defined(__ILP32__)
 	    | mov   eax, (uintptr_t) failout
 #else
 	    | mov64 rax, (uintptr_t) failout
@@ -709,11 +708,11 @@ run_dynasm(void)
 #endif
     |.else
     | xor rax, rax
+    | mov  r15, [rbp-8]
+    | mov  r14, [rbp-16]
+    | mov  r13, [rbp-24]
+    | mov  rbx, [rbp-32]
     | mov rsp, rbp
-    | pop rbx
-    | pop r13
-    | pop r14
-    | pop r15
     | pop rbp
     |.endif
     | ret
@@ -737,7 +736,7 @@ run_dynasm(void)
 #else
 	| mov REG_C, REG_A
 #endif
-#ifdef __code_model_small__
+#if (defined(__code_model_small__) && !defined(__PIC__)) || defined(__ILP32__)
 	| mov   eax, (uintptr_t) putch
 #else
 	| mov64 rax, (uintptr_t) putch
