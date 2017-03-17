@@ -558,7 +558,7 @@ print_c_header(FILE * ofd)
     }
 }
 
-void
+static void
 print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 {
     while(n != e)

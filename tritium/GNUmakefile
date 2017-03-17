@@ -45,7 +45,8 @@ MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 	 -Wstrict-prototypes -Wstrict-overflow=5 -Wwrite-strings \
 	 -Waggregate-return -Wcast-qual -Wswitch-enum -Wconversion \
 	 -Wunreachable-code -fno-common -Wpadded \
-	 -Wlarger-than=512 -Wstack-usage=512 -Wunsafe-loop-optimizations
+	 -Wlarger-than=512 -Wstack-usage=512 -Wunsafe-loop-optimizations \
+	 -Wmissing-prototypes -Wold-style-definition -Wold-style-declaration
 
 OBJECTS=bfi.o bfi.version.o bfi.ccode.o bfi.nasm.o bfi.bf.o bfi.dc.o \
 	bfi.runarray.o bfi.runmax.o clock.o taperam.o
