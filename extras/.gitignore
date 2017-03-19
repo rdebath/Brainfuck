@@ -2,6 +2,7 @@ bf0k
 bf1k
 bfas
 bfdowhile
+byte2byte
 cdowhile
 deadbeef
 easy
@@ -13,4 +14,6 @@ ook
 ook.c
 profilebf
 proton
+qtable.h
+qtable.tmp
 txtbf

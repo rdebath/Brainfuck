@@ -5,6 +5,7 @@ INSTALLEXT=
 CLIST=$(filter-out cdowhile.c lightning.c,$(wildcard *.c))
 EXELIST := $(patsubst %.c,%,$(CLIST))
 OBJECTS := $(patsubst %.c,%.o,$(CLIST)) ook.o
+ILIST=qtable.h qtable.tmp
 EXTRAS=bf1k bf0k bfas ook
 
 ALLEXE = $(EXELIST) $(MOREEXE) $(EXTRAS) $(LIBDL_EXE) $(LIGHTNINGEXE)
@@ -24,7 +25,7 @@ install:
 	done
 
 clean:
-	-rm -f $(OBJECTS) $(LIBOBJ)
+	-rm -f $(OBJECTS) $(LIBOBJ) $(ILIST)
 	-rm -f ook.c $(ALLEXE) $(patsubst %,%.o,$(MOREEXE))
 
 # Delete the direct to exe rule to make sure %.o files are used for ccache.
@@ -47,6 +48,20 @@ ook: ook.c
 
 lightning: lightning.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ $(LIBS_LIGHTNING) -o $@
+
+qtable.h: byte2byte
+	echo 'char * bftable_s[256][256] =' > qtable.tmp
+	./byte2byte -d >> qtable.tmp
+
+	echo 'char * bftable_u[256][256] =' >> qtable.tmp
+	./byte2byte -d -u >> qtable.tmp
+
+	echo 'char * bftable_b[256][256] =' >> qtable.tmp
+	./byte2byte -d -b >> qtable.tmp
+
+	mv qtable.tmp qtable.h
+
+txtbf.o: txtbf.c qtable.h
 
 ################################################################################
 ifneq ($(MAKECMDGOALS),clean)

@@ -47,6 +47,10 @@
 #include <inttypes.h>
 #endif
 
+#ifndef NOQTABLE
+#include "qtable.h"
+#endif
+
 void find_best_conversion(char * linebuf);
 
 void gen_print(char * buf, int init_offset);
@@ -60,7 +64,7 @@ void gen_nestloop(char * buf);
 void gen_slipnest(char * buf);
 void gen_special(char * buf, char * initcode, char * name, int usercode);
 void gen_twoflower(char * buf);
-void gen_twobyte(char * buf);
+void gen_twincell(char * buf);
 void gen_trislipnest(char * buf);
 
 int runbf(char * prog, int longrun);
@@ -95,6 +99,33 @@ int runbf(char * prog, int longrun);
 #define INITPREFIX1B "[-]>[-]>[-]>[-]<<++++[>++++<-]>[>[++++++++>]+>[-]<[<]>-]<<+++++[>++>++++++<<-]"
 #define INITPREFIX2B "[-]>[-]>[-]>[-]<<+++[>++++++<-]>[>[+++++++>]+>[-]<[<]>-]<<+++++[>++>++++++<<-]"
 #define INITPREFIX3B "[-]>[-]>[-]>[-]<<+++[>+++++++<-]>[>[++++++>]+>[-]<[<]>-]<<+++++[>++>++++++<<-]"
+
+/* These are prefixes for huge ASCII files, it's a handmade sequence to create
+ * a nicely scatter selection of cell values in 0..127. It seems to be a good
+ * starter.
+ */
+#define HUGEPREFIX1_2 "++++[>++++<-]>[>[++++++++>]++[<]>-]"
+#define HUGEPREFIX2_2 "+++[>++++++<-]>[>[+++++++>]++[<]>-]"
+#define HUGEPREFIX3_2 "+++[>+++++++<-]>[>[++++++>]++[<]>-]"
+
+/* These variants init the cells they use with '[-]' first */
+#define INITPREFIX1_2 "[-]>[-]>[-]<<++++[>++++<-]>[>[++++++++>]++>[-]<[<]>-]"
+#define INITPREFIX2_2 "[-]>[-]>[-]<<+++[>++++++<-]>[>[+++++++>]++>[-]<[<]>-]"
+#define INITPREFIX3_2 "[-]>[-]>[-]<<+++[>+++++++<-]>[>[++++++>]++>[-]<[<]>-]"
+
+/* And the 'A' variants add a space. */
+#define HUGEPREFIX1A_2 "++++[>++++<-]>[>[++++++++>]++[<]>-]<++++++++[>++++<-]"
+#define HUGEPREFIX2A_2 "+++[>++++++<-]>[>[+++++++>]++[<]>-]<++++++++[>++++<-]"
+#define HUGEPREFIX3A_2 "+++[>+++++++<-]>[>[++++++>]++[<]>-]<++++++++[>++++<-]"
+
+#define INITPREFIX1A_2 "[-]>[-]>[-]<<++++[>++++<-]>[>[++++++++>]++>[-]<[<]>-]<++++++++[>++++<-]"
+#define INITPREFIX2A_2 "[-]>[-]>[-]<<+++[>++++++<-]>[>[+++++++>]++>[-]<[<]>-]<++++++++[>++++<-]"
+#define INITPREFIX3A_2 "[-]>[-]>[-]<<+++[>+++++++<-]>[>[++++++>]++>[-]<[<]>-]<++++++++[>++++<-]"
+
+#define INITPREFIX1B_2 "[-]>[-]>[-]>[-]<<++++[>++++<-]>[>[++++++++>]++>[-]<[<]>-]<<+++++[>++>++++++<<-]"
+#define INITPREFIX2B_2 "[-]>[-]>[-]>[-]<<+++[>++++++<-]>[>[+++++++>]++>[-]<[<]>-]<<+++++[>++>++++++<<-]"
+#define INITPREFIX3B_2 "[-]>[-]>[-]>[-]<<+++[>+++++++<-]>[>[++++++>]++>[-]<[<]>-]<<+++++[>++>++++++<<-]"
+
 
 /* These are some very generic multiply loops, the first is vaguely based on
  * English language probilities, the others are cell value coverage loops.
@@ -250,6 +281,7 @@ int enable_subrange = 1;
 int subrange_count = 0;
 
 int enable_twocell = 1;
+int enable_twincell = 1;
 int enable_nestloop = 0;
 int enable_trislipnest = 0;
 int enable_special1 = 1;
@@ -311,6 +343,7 @@ wipe_config()
     enable_trislipnest = 0;
     enable_sliploop = 0;
     enable_twocell = 0;
+    enable_twincell = 0;
     enable_subrange = 0;
     enable_special1 = 0;
     enable_special2 = 0;
@@ -386,6 +419,7 @@ main(int argc, char ** argv)
 	    multloop_maxloop = 32;
 	    multloop_maxinc = 12;
 	    enable_twocell = 1;
+	    enable_twincell = 1;
 	    enable_subrange = 1;
 	    enable_nestloop = 1;
 	    enable_trislipnest = 1;
@@ -410,6 +444,7 @@ main(int argc, char ** argv)
 	    wipe_config();
 	    enable_subrange = 1;
 	    enable_twocell = 1;
+	    enable_twincell = 1;
 	    enable_special1 = 1;
 	    flg_optimisable = 1;
 	    argc--; argv++;
@@ -419,6 +454,7 @@ main(int argc, char ** argv)
 	    enable_multloop = 1;
 	    enable_subrange = 1;
 	    enable_twocell = 1;
+	    enable_twincell = 1;
 	    enable_special1 = 1;
 	    flg_optimisable = 1;
 	    argc--; argv++;
@@ -431,6 +467,7 @@ main(int argc, char ** argv)
 	    multloop_maxinc = 12;
 	    enable_subrange = 1;
 	    enable_twocell = 1;
+	    enable_twincell = 1;
 	    enable_special1 = 1;
 	    flg_optimisable = 1;
 	    argc--; argv++;
@@ -493,9 +530,14 @@ main(int argc, char ** argv)
             multloop_no_prefix = 1;
 	    argc--; argv++;
 
-	} else if (strcmp(argv[1], "-q") == 0) {
+	} else if (strcmp(argv[1], "-Q") == 0) {
 	    wipe_config();
 	    enable_twocell = !enable_twocell;
+	    argc--; argv++;
+
+	} else if (strcmp(argv[1], "-q") == 0) {
+	    wipe_config();
+	    enable_twincell = !enable_twincell;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-X") == 0) {
@@ -671,6 +713,16 @@ find_best_conversion(char * linebuf)
 	    gen_special(linebuf, INITPREFIX1B, "big ASCII 1B (i)", 0);
 	    gen_special(linebuf, INITPREFIX2B, "big ASCII 2B (i)", 0);
 	    gen_special(linebuf, INITPREFIX3B, "big ASCII 3B (i)", 0);
+
+	    gen_special(linebuf, INITPREFIX1_2, "big ASCII 1 (i)+", 0);
+	    gen_special(linebuf, INITPREFIX2_2, "big ASCII 2 (i)+", 0);
+	    gen_special(linebuf, INITPREFIX3_2, "big ASCII 3 (i)+", 0);
+	    gen_special(linebuf, INITPREFIX1A_2, "big ASCII 1A (i)+", 0);
+	    gen_special(linebuf, INITPREFIX2A_2, "big ASCII 2A (i)+", 0);
+	    gen_special(linebuf, INITPREFIX3A_2, "big ASCII 3A (i)+", 0);
+	    gen_special(linebuf, INITPREFIX1B_2, "big ASCII 1B (i)+", 0);
+	    gen_special(linebuf, INITPREFIX2B_2, "big ASCII 2B (i)+", 0);
+	    gen_special(linebuf, INITPREFIX3B_2, "big ASCII 3B (i)+", 0);
 	    self_init = 0;
 	} else {
 	    gen_special(linebuf, HUGEPREFIX1, "big ASCII 1", 0);
@@ -679,17 +731,27 @@ find_best_conversion(char * linebuf)
 	    gen_special(linebuf, HUGEPREFIX1A, "big ASCII 1A", 0);
 	    gen_special(linebuf, HUGEPREFIX2A, "big ASCII 2A", 0);
 	    gen_special(linebuf, HUGEPREFIX3A, "big ASCII 3A", 0);
+
+	    gen_special(linebuf, HUGEPREFIX1_2, "big ASCII 1+", 0);
+	    gen_special(linebuf, HUGEPREFIX2_2, "big ASCII 2+", 0);
+	    gen_special(linebuf, HUGEPREFIX3_2, "big ASCII 3+", 0);
+	    gen_special(linebuf, HUGEPREFIX1A_2, "big ASCII 1A+", 0);
+	    gen_special(linebuf, HUGEPREFIX2A_2, "big ASCII 2A+", 0);
+	    gen_special(linebuf, HUGEPREFIX3A_2, "big ASCII 3A+", 0);
 	}
     }
 
     if (enable_twocell) {
 	if (verbose>2) fprintf(stderr, "Trying two cell routine.\n");
 	gen_twoflower(linebuf);
-	if (bytewrap) {
-	    if (verbose>2) fprintf(stderr, "Trying byte two cell routine.\n");
-	    gen_twobyte(linebuf);
-	}
     }
+
+#ifndef NOQTABLE
+    if (enable_twincell) {
+	if (verbose>2) fprintf(stderr, "Trying generic two cell routine.\n");
+	gen_twincell(linebuf);
+    }
+#endif
 
     if (enable_special1) {
 	char ** hellos;
@@ -732,19 +794,19 @@ find_best_conversion(char * linebuf)
 		reinit_state();
 		gen_subrange(linebuf,subrange_count,0,1);
 
-		for(subrange_count = 2; subrange_count<33; subrange_count++) {
+		for(subrange_count = 2; subrange_count<45; subrange_count++) {
 		    reinit_state();
 		    gen_subrange(linebuf,subrange_count,0,0);
 		}
 
-		for(subrange_count = 2; subrange_count<33; subrange_count++) {
+		for(subrange_count = 2; subrange_count<45; subrange_count++) {
 		    if (subrange_count == 10) continue;
 		    reinit_state();
 		    gen_subrange(linebuf,subrange_count,0,1);
 		}
 	    }
 
-	    for(subrange_count = 2; subrange_count<33; subrange_count++) {
+	    for(subrange_count = 2; subrange_count<45; subrange_count++) {
 		reinit_state();
 		gen_subrange(linebuf,subrange_count,1,0);
 	    }
@@ -1714,7 +1776,7 @@ gen_special(char * buf, char * initcode, char * name, int usercode)
     } else {
 	char *p, *b;
 	int m=0, nestlvl=0;
-	int countdown = 1000000;
+	int countdown = 2000000;
 
 	maxcell = -1;
 	str_cells_used = maxcell+1;
@@ -2092,7 +2154,14 @@ static char bestfactor[] = {
     patterns_searched++;
 
     /* Clear the working cells */
-    if (flg_init) { add_str("[-]>[-]"); currcell=!currcell; }
+    if (flg_init) {
+	add_str("[-]>[-]");
+#ifdef FLIPTWOCELL
+	currcell=!currcell;
+#else
+	add_chr('<');
+#endif
+    }
 
     str_cells_used = maxcell+1;
 
@@ -2131,8 +2200,10 @@ static char bestfactor[] = {
 	if (a>1) {
 	    if (cdiff<0) a= -a;
 
-	    if (cells[currcell] == cells[!currcell]) currcell = !currcell;
-	    else if (currcell) add_chr('<'); else add_chr('>');
+#ifdef FLIPTWOCELL
+	    if (cells[currcell] == cells[!currcell]) currcell = !currcell; else
+#endif
+	    if (currcell) add_chr('<'); else add_chr('>');
 
 	    for(i=0; i<b; i++) add_chr('+');
 
@@ -2155,282 +2226,21 @@ static char bestfactor[] = {
 }
 
 /*******************************************************************************
- * This is a generator that uses one cell as a multipler to get a second to
- * the correct value. It uses a table to remove the need for an explicit
- * search.
+ * This is a generator that uses two cells usually one is a multipler which
+ * is used to get a second to the correct value. It uses precalculated tables
+ * to remove the need for an explicit search.
  *
  * It's the classic algorithm but only rarely is it the shortest.
  */
 
+#ifndef NOQTABLE
 void
-gen_twobyte(char * buf)
+gen_twincell(char * buf)
 {
-    /* This table gives the shortest strings (using a byte multiplier form)
-     * for all the values upto 255. It was created with a simple brute force
-     * search.
-     */
-
-static char * convbyte[] = {
-    "", /* (0, 1) non-wrapping */
-    "+", /* (1, 1) non-wrapping */
-    "++", /* (2, 1) non-wrapping */
-    "+++", /* (3, 1) non-wrapping */
-    "++++", /* (4, 1) non-wrapping */
-    "+++++", /* (5, 1) non-wrapping */
-    "++++++", /* (6, 1) non-wrapping */
-    "+++++++", /* (7, 1) non-wrapping */
-    "++++++++", /* (8, 1) non-wrapping */
-    "+++++++++", /* (9, 1) non-wrapping */
-    "++++++++++", /* (10, 1) non-wrapping */
-    "+++++++++++", /* (11, 1) non-wrapping */
-    "++++++++++++", /* (12, 1) non-wrapping */
-    "+++++++++++++", /* (13, 1) non-wrapping */
-    "++++++++++++++", /* (14, 1) non-wrapping */
-    "+++++++++++++++", /* (15, 1) non-wrapping */
-    ">++++[<++++>-]<", /* (15, 2) non-wrapping */
-    ">++++[<++++>-]<+", /* (16, 2) non-wrapping */
-    ">+++[<++++++>-]<", /* (16, 2) non-wrapping */
-    ">+++[<++++++>-]<+", /* (17, 2) non-wrapping */
-    ">++++[<+++++>-]<", /* (16, 2) non-wrapping */
-    ">+++[<+++++++>-]<", /* (17, 2) non-wrapping */
-    ">+++[<+++++++>-]<+", /* (18, 2) non-wrapping */
-    ">++++[<++++++>-]<-", /* (18, 2) non-wrapping */
-    ">++++[<++++++>-]<", /* (17, 2) non-wrapping */
-    ">+++++[<+++++>-]<", /* (17, 2) non-wrapping */
-    ">+++++[<+++++>-]<+", /* (18, 2) non-wrapping */
-    ">+++[<+++++++++>-]<", /* (19, 2) non-wrapping */
-    ">++++[<+++++++>-]<", /* (18, 2) non-wrapping */
-    ">++++[<+++++++>-]<+", /* (19, 2) non-wrapping */
-    ">+++++[<++++++>-]<", /* (18, 2) non-wrapping */
-    ">+++++[<++++++>-]<+", /* (19, 2) non-wrapping */
-    ">++++[<++++++++>-]<", /* (19, 2) non-wrapping */
-    ">++++[<++++++++>-]<+", /* (20, 2) non-wrapping */
-    ">--[<-->+++++++]<--", /* (19, 2) wrapping */
-    ">--[<-->+++++++]<-", /* (18, 2) wrapping */
-    ">--[<-->+++++++]<", /* (17, 2) wrapping */
-    ">---[<+>+++++++]<", /* (17, 2) wrapping */
-    ">---[<+>+++++++]<+", /* (18, 2) wrapping */
-    ">---[<+>+++++++]<++", /* (19, 2) wrapping */
-    ">--[<+>++++++]<---", /* (18, 2) wrapping */
-    ">--[<+>++++++]<--", /* (17, 2) wrapping */
-    ">--[<+>++++++]<-", /* (16, 2) wrapping */
-    ">--[<+>++++++]<", /* (15, 2) wrapping */
-    ">--[<+>++++++]<+", /* (16, 2) wrapping */
-    ">--[<+>++++++]<++", /* (17, 2) wrapping */
-    ">--[<+>++++++]<+++", /* (18, 2) wrapping */
-    ">-[<+>-----]<----", /* (17, 2) wrapping */
-    ">-[<+>-----]<---", /* (16, 2) wrapping */
-    ">-[<+>-----]<--", /* (15, 2) wrapping */
-    ">-[<+>-----]<-", /* (14, 2) wrapping */
-    ">-[<+>-----]<", /* (13, 2) wrapping */
-    ">-[<+>-----]<+", /* (14, 2) wrapping */
-    ">-[<+>-----]<++", /* (15, 2) wrapping */
-    ">-[<+>-----]<+++", /* (16, 2) wrapping */
-    ">-[<+>-----]<++++", /* (17, 2) wrapping */
-    ">-[<+>-----]<+++++", /* (18, 2) wrapping */
-    ">-[<+>+++++++++]<", /* (17, 2) wrapping */
-    ">-[<+>+++++++++]<+", /* (18, 2) wrapping */
-    ">----[<+>----]<----", /* (19, 2) wrapping */
-    ">----[<+>----]<---", /* (18, 2) wrapping */
-    ">----[<+>----]<--", /* (17, 2) wrapping */
-    ">----[<+>----]<-", /* (16, 2) wrapping */
-    ">----[<+>----]<", /* (15, 2) wrapping */
-    ">----[<+>----]<+", /* (16, 2) wrapping */
-    ">----[<+>----]<++", /* (17, 2) wrapping */
-    ">----[<+>----]<+++", /* (18, 2) wrapping */
-    ">----[<--->----]<", /* (17, 2) wrapping */
-    ">----[<--->----]<+", /* (18, 2) wrapping */
-    ">----[<--->----]<++", /* (19, 2) wrapping */
-    ">-[<+>-------]<---", /* (18, 2) wrapping */
-    ">-[<+>-------]<--", /* (17, 2) wrapping */
-    ">-[<+>-------]<-", /* (16, 2) wrapping */
-    ">-[<+>-------]<", /* (15, 2) wrapping */
-    ">-[<+>-------]<+", /* (16, 2) wrapping */
-    ">-[<+>-------]<++", /* (17, 2) wrapping */
-    ">-[<+>-------]<+++", /* (18, 2) wrapping */
-    ">-[<+>---]<--------", /* (19, 2) wrapping */
-    ">-[<+>---]<-------", /* (18, 2) wrapping */
-    ">-[<+>---]<------", /* (17, 2) wrapping */
-    ">-[<+>---]<-----", /* (16, 2) wrapping */
-    ">-[<+>---]<----", /* (15, 2) wrapping */
-    ">-[<+>---]<---", /* (14, 2) wrapping */
-    ">-[<+>---]<--", /* (13, 2) wrapping */
-    ">-[<+>---]<-", /* (12, 2) wrapping */
-    ">-[<+>---]<", /* (11, 2) wrapping */
-    ">-[<+>---]<+", /* (12, 2) wrapping */
-    ">-[<+>---]<++", /* (13, 2) wrapping */
-    ">-[<+>---]<+++", /* (14, 2) wrapping */
-    ">-[<+>---]<++++", /* (15, 2) wrapping */
-    ">-[<+>---]<+++++", /* (16, 2) wrapping */
-    ">-[<+>---]<++++++", /* (17, 2) wrapping */
-    ">-[<+>---]<+++++++", /* (18, 2) wrapping */
-    ">-[<+>---]<++++++++", /* (19, 2) wrapping */
-    ">-[<+>---]<+++++++++", /* (20, 2) wrapping */
-    ">-[<++>-----]<-------", /* (21, 2) wrapping */
-    ">-[<++>-----]<------", /* (20, 2) wrapping */
-    ">-[<++>-----]<-----", /* (19, 2) wrapping */
-    ">-[<++>-----]<----", /* (18, 2) wrapping */
-    ">-[<++>-----]<---", /* (17, 2) wrapping */
-    ">-[<++>-----]<--", /* (16, 2) wrapping */
-    ">-[<++>-----]<-", /* (15, 2) wrapping */
-    ">-[<++>-----]<", /* (14, 2) wrapping */
-    ">-[<++>-----]<+", /* (15, 2) wrapping */
-    ">-[<++>-----]<++", /* (16, 2) wrapping */
-    ">-[<++>-----]<+++", /* (17, 2) wrapping */
-    ">-[<++>-----]<++++", /* (18, 2) wrapping */
-    ">-[<++>-----]<+++++", /* (19, 2) wrapping */
-    ">-[<-->-------]<--", /* (18, 2) wrapping */
-    ">-[<-->-------]<-", /* (17, 2) wrapping */
-    ">-[<-->-------]<", /* (16, 2) wrapping */
-    ">-[<-->-------]<+", /* (17, 2) wrapping */
-    ">-[<-->-------]<++", /* (18, 2) wrapping */
-    ">-[<++>+++++++++]<-", /* (19, 2) wrapping */
-    ">-[<++>+++++++++]<", /* (18, 2) wrapping */
-    ">-[<++>+++++++++]<+", /* (19, 2) wrapping */
-    ">--------[<+++>--]<", /* (19, 2) wrapping */
-    ">----[<+++++>--]<-", /* (18, 2) wrapping */
-    ">----[<+++++>--]<", /* (17, 2) wrapping */
-    ">------[<+++>--]<", /* (17, 2) wrapping */
-    ">----[<+++>--]<--", /* (17, 2) wrapping */
-    ">----[<+++>--]<-", /* (16, 2) wrapping */
-    ">----[<+++>--]<", /* (15, 2) wrapping */
-    ">--[<+>--]<----", /* (15, 2) wrapping */
-    ">--[<+>--]<---", /* (14, 2) wrapping */
-    ">--[<+>--]<--", /* (13, 2) wrapping */
-    ">--[<+>--]<-", /* (12, 2) wrapping */
-    ">--[<+>--]<", /* (11, 2) wrapping */
-    ">--[<->--]<-", /* (12, 2) wrapping */
-    ">--[<->--]<", /* (11, 2) wrapping */
-    ">--[<->--]<+", /* (12, 2) wrapping */
-    ">--[<->--]<++", /* (13, 2) wrapping */
-    ">--[<->--]<+++", /* (14, 2) wrapping */
-    ">--[<->--]<++++", /* (15, 2) wrapping */
-    ">----[<--->--]<", /* (15, 2) wrapping */
-    ">----[<--->--]<+", /* (16, 2) wrapping */
-    ">----[<--->--]<++", /* (17, 2) wrapping */
-    ">------[<--->--]<", /* (17, 2) wrapping */
-    ">----[<----->--]<", /* (17, 2) wrapping */
-    ">----[<----->--]<+", /* (18, 2) wrapping */
-    ">--------[<--->--]<", /* (19, 2) wrapping */
-    ">-[<-->+++++++++]<-", /* (19, 2) wrapping */
-    ">-[<-->+++++++++]<", /* (18, 2) wrapping */
-    ">-[<-->+++++++++]<+", /* (19, 2) wrapping */
-    ">-[<++>-------]<--", /* (18, 2) wrapping */
-    ">-[<++>-------]<-", /* (17, 2) wrapping */
-    ">-[<++>-------]<", /* (16, 2) wrapping */
-    ">-[<++>-------]<+", /* (17, 2) wrapping */
-    ">-[<++>-------]<++", /* (18, 2) wrapping */
-    ">-[<-->-----]<-----", /* (19, 2) wrapping */
-    ">-[<-->-----]<----", /* (18, 2) wrapping */
-    ">-[<-->-----]<---", /* (17, 2) wrapping */
-    ">-[<-->-----]<--", /* (16, 2) wrapping */
-    ">-[<-->-----]<-", /* (15, 2) wrapping */
-    ">-[<-->-----]<", /* (14, 2) wrapping */
-    ">-[<-->-----]<+", /* (15, 2) wrapping */
-    ">-[<-->-----]<++", /* (16, 2) wrapping */
-    ">-[<-->-----]<+++", /* (17, 2) wrapping */
-    ">-[<-->-----]<++++", /* (18, 2) wrapping */
-    ">-[<-->-----]<+++++", /* (19, 2) wrapping */
-    ">-[<-->-----]<++++++", /* (20, 2) wrapping */
-    ">-[<-->-----]<+++++++", /* (21, 2) wrapping */
-    ">-[<->---]<---------", /* (20, 2) wrapping */
-    ">-[<->---]<--------", /* (19, 2) wrapping */
-    ">-[<->---]<-------", /* (18, 2) wrapping */
-    ">-[<->---]<------", /* (17, 2) wrapping */
-    ">-[<->---]<-----", /* (16, 2) wrapping */
-    ">-[<->---]<----", /* (15, 2) wrapping */
-    ">-[<->---]<---", /* (14, 2) wrapping */
-    ">-[<->---]<--", /* (13, 2) wrapping */
-    ">-[<->---]<-", /* (12, 2) wrapping */
-    ">-[<->---]<", /* (11, 2) wrapping */
-    ">-[<->---]<+", /* (12, 2) wrapping */
-    ">-[<->---]<++", /* (13, 2) wrapping */
-    ">-[<->---]<+++", /* (14, 2) wrapping */
-    ">-[<->---]<++++", /* (15, 2) wrapping */
-    ">-[<->---]<+++++", /* (16, 2) wrapping */
-    ">-[<->---]<++++++", /* (17, 2) wrapping */
-    ">-[<->---]<+++++++", /* (18, 2) wrapping */
-    ">-[<->---]<++++++++", /* (19, 2) wrapping */
-    ">-[<->-------]<---", /* (18, 2) wrapping */
-    ">-[<->-------]<--", /* (17, 2) wrapping */
-    ">-[<->-------]<-", /* (16, 2) wrapping */
-    ">-[<->-------]<", /* (15, 2) wrapping */
-    ">-[<->-------]<+", /* (16, 2) wrapping */
-    ">-[<->-------]<++", /* (17, 2) wrapping */
-    ">-[<->-------]<+++", /* (18, 2) wrapping */
-    ">----[<+++>----]<--", /* (19, 2) wrapping */
-    ">----[<+++>----]<-", /* (18, 2) wrapping */
-    ">----[<+++>----]<", /* (17, 2) wrapping */
-    ">----[<->----]<---", /* (18, 2) wrapping */
-    ">----[<->----]<--", /* (17, 2) wrapping */
-    ">----[<->----]<-", /* (16, 2) wrapping */
-    ">----[<->----]<", /* (15, 2) wrapping */
-    ">----[<->----]<+", /* (16, 2) wrapping */
-    ">----[<->----]<++", /* (17, 2) wrapping */
-    ">----[<->----]<+++", /* (18, 2) wrapping */
-    ">----[<->----]<++++", /* (19, 2) wrapping */
-    ">-[<->+++++++++]<-", /* (18, 2) wrapping */
-    ">-[<->+++++++++]<", /* (17, 2) wrapping */
-    ">-[<->-----]<-----", /* (18, 2) wrapping */
-    ">-[<->-----]<----", /* (17, 2) wrapping */
-    ">-[<->-----]<---", /* (16, 2) wrapping */
-    ">-[<->-----]<--", /* (15, 2) wrapping */
-    ">-[<->-----]<-", /* (14, 2) wrapping */
-    ">-[<->-----]<", /* (13, 2) wrapping */
-    ">-[<->-----]<+", /* (14, 2) wrapping */
-    ">-[<->-----]<++", /* (15, 2) wrapping */
-    ">-[<->-----]<+++", /* (16, 2) wrapping */
-    ">-[<->-----]<++++", /* (17, 2) wrapping */
-    ">--[<->++++++]<---", /* (18, 2) wrapping */
-    ">--[<->++++++]<--", /* (17, 2) wrapping */
-    ">--[<->++++++]<-", /* (16, 2) wrapping */
-    ">--[<->++++++]<", /* (15, 2) wrapping */
-    ">--[<->++++++]<+", /* (16, 2) wrapping */
-    ">--[<->++++++]<++", /* (17, 2) wrapping */
-    ">--[<->++++++]<+++", /* (18, 2) wrapping */
-    ">---[<->+++++++]<--", /* (19, 2) wrapping */
-    ">---[<->+++++++]<-", /* (18, 2) wrapping */
-    ">---[<->+++++++]<", /* (17, 2) wrapping */
-    ">--[<++>+++++++]<", /* (17, 2) wrapping */
-    ">--[<++>+++++++]<+", /* (18, 2) wrapping */
-    ">--[<++>+++++++]<++", /* (19, 2) wrapping */
-    ">----[<-------->+]<-", /* (20, 2) wrapping */
-    ">----[<-------->+]<", /* (19, 2) wrapping */
-    ">-----[<------>+]<-", /* (19, 2) wrapping */
-    ">-----[<------>+]<", /* (18, 2) wrapping */
-    ">----[<------->+]<-", /* (19, 2) wrapping */
-    ">----[<------->+]<", /* (18, 2) wrapping */
-    ">---[<--------->+]<", /* (19, 2) wrapping */
-    ">-----[<----->+]<-", /* (18, 2) wrapping */
-    ">-----[<----->+]<", /* (17, 2) wrapping */
-    ">----[<------>+]<", /* (17, 2) wrapping */
-    ">----[<------>+]<+", /* (18, 2) wrapping */
-    ">---[<------->+]<-", /* (18, 2) wrapping */
-    ">---[<------->+]<", /* (17, 2) wrapping */
-    ">----[<----->+]<", /* (16, 2) wrapping */
-    ">---[<------>+]<-", /* (17, 2) wrapping */
-    ">---[<------>+]<", /* (16, 2) wrapping */
-    ">----[<---->+]<-", /* (16, 2) wrapping */
-    ">----[<---->+]<", /* (15, 2) wrapping */
-    "---------------", /* (15, 1) wrapping */
-    "--------------", /* (14, 1) wrapping */
-    "-------------", /* (13, 1) wrapping */
-    "------------", /* (12, 1) wrapping */
-    "-----------", /* (11, 1) wrapping */
-    "----------", /* (10, 1) wrapping */
-    "---------", /* (9, 1) wrapping */
-    "--------", /* (8, 1) wrapping */
-    "-------", /* (7, 1) wrapping */
-    "------", /* (6, 1) wrapping */
-    "-----", /* (5, 1) wrapping */
-    "----", /* (4, 1) wrapping */
-    "---", /* (3, 1) wrapping */
-    "--", /* (2, 1) wrapping */
-    "-", /* (1, 1) wrapping */
-};
     const int maxcell = 1;
     int currcell=0;
     char * p;
+    int curr = 0;
 
     reinit_state();
     patterns_searched++;
@@ -2442,26 +2252,32 @@ static char * convbyte[] = {
 
     /* Print each character */
     for(p=buf; *p; p++) {
-	int ch = *p & 255;
-	int diff = (ch-cells[0]) & 255;
-	int l1 = strlen(convbyte[diff]);
-	int l2 = strlen(convbyte[ch & 255])+3;
+	char *s;
+	int nextc = (unsigned char) *p;
+	if (bytewrap) s = bftable_b[curr][nextc];
+	else if (flg_signed) s = bftable_s[curr][nextc];
+	else s = bftable_u[curr][nextc];
+	curr = nextc;
 
-	if (l2<l1) {
-	    add_str("[-]");
-	    add_str(convbyte[ch & 255]);
-	} else
-	    add_str(convbyte[diff]);
-	cells[0] = ch;
+	while(*s) {
+	    if (*s == '>' || *s == '<') {
+		if (currcell) add_chr('<');
+		else add_chr('>');
+		currcell = !currcell;
+	    } else
+		add_chr(*s);
+	    s++;
+	}
 
 	add_chr('.');
-	if (best_len>0 && str_next > best_len) return;	/* Too big already */
     }
 
+    cells[currcell] = curr;
     currcell = clear_tape(currcell);
 
-    check_if_best(buf, "twobyte");
+    check_if_best(buf, "twincell");
 }
+#endif
 
 /******************************************************************************/
 /* >+>++>+>+>+++[>[->+++>[->++<]<<<++>]<<] */
