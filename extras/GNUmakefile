@@ -96,7 +96,7 @@ ifeq ($(CALLOK),yes)
 # C standard.
 ifneq ($(CC),cc)
 # Check for GCC options c/o the Linux kernel makefiles
-TMP :=Tmp_ctst
+TMP :=/tmp/_test-$$$$
 cc-option = $(shell set -e;               \
 	echo Checking $(CC) "$(1)" > $(LOGDEV); \
 	if ($(CC) $(1) -c -x c /dev/null -o $(TMP) ) >$(LOGDEV) 2>&1;      \

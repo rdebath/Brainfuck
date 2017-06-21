@@ -11,6 +11,11 @@
 #include <limits.h>
 #include <string.h>
 
+#include "bfi.tree.h"
+#include "bfi.run.h"
+#include "clock.h"
+#include "bfi.ccode.h"
+
 #ifndef DISABLE_TCCLIB
 #include <libtcc.h>
 #endif
@@ -22,11 +27,6 @@
 #include <sys/wait.h>
 #include <signal.h>
 #endif
-
-#include "bfi.tree.h"
-#include "bfi.run.h"
-#include "clock.h"
-#include "bfi.ccode.h"
 
 static const char * putname = "putch";
 static int fixed_mask = 0;
