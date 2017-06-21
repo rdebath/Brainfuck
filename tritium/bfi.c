@@ -2516,7 +2516,9 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 			n->type = T_NOP;
 			return 1;
 		    }
+#endif
 
+#if 0
 		    /* Of course it's unlikely that the programmer zero'd
 		     * the temp first! */
 		    if (n && n->type == T_CALC && n->count == 0 &&
@@ -3734,7 +3736,7 @@ getch(int oldch)
 #endif
 	    c = getchar();
 
-	if (iostyle != 2 && c == '\r') continue;
+	if (iostyle < 2 && c == '\r') continue;
 	break;
     }
     unpause_runclock();
@@ -3770,7 +3772,7 @@ putch(int ch)
 #endif
 	putchar(ch);
 
-    if (only_uses_putch) only_uses_putch = 2-(ch == '\n');
+    if (only_uses_putch) only_uses_putch = 2-(ch == '\n' || iostyle == 3);
 
     unpause_runclock();
 }
