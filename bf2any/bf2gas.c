@@ -76,7 +76,7 @@ outcmd(int ch, int count)
 	puts("push "BX);
 	puts("mov "BX", offset flat:buffer");
 	if (tapeinit)
-	    printf("add "BX", %d\n", tapeinit); break;
+	    printf("add "BX", %d\n", tapeinit);
 	break;
     case '=': printf("mov byte ptr ["BX"], %d\n", count & 0xFF); break;
     case '+': printf("add byte ptr ["BX"], %d\n", count); break;
