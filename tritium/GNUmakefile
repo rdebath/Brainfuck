@@ -267,7 +267,7 @@ endif
 # Open SSL big numbers ?
 DO_BN := $(call try-run,\
 	{ echo '\#include <openssl/bn.h>'; 				\
-	  echo 'int main(){BIGNUM t1[1]; BN_init(t1);return(0);}';	\
+	  echo 'int main(){BIGNUM*t1=BN_new();BN_set_word(t1,1);return(0);}'; \
 	  } > $(TMP).c ; $(TRYCC2) $(WERROR) -o $(TMP) -lcrypto,1)
 
 endif	# CC

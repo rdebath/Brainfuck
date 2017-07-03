@@ -144,15 +144,13 @@ run_maxtree(void)
 
 #include <openssl/bn.h>
 
-typedef BIGNUM BIGNUM_V[1];
-
-static BIGNUM_V * mem = 0;
+static BIGNUM ** mem = 0;
 static int dyn_memsize = 0;
 #define MINALLOC 16
 
 static
-BIGNUM_V *
-alloc_ptr(BIGNUM_V *p)
+BIGNUM **
+alloc_ptr(BIGNUM **p)
 {
     int amt, memoff, i, off;
     if (p >= mem && p < mem+dyn_memsize) return p;
@@ -166,18 +164,18 @@ alloc_ptr(BIGNUM_V *p)
     if (memoff<0) {
         memmove(mem+amt, mem, dyn_memsize*sizeof(*mem));
         for(i=0; i<amt; i++)
-            BN_init(mem[i]);
+            mem[i] = BN_new();
         memoff += amt;
     } else {
         for(i=0; i<amt; i++)
-            BN_init(mem[dyn_memsize+i]);
+            mem[dyn_memsize+i] = BN_new();
     }
     dyn_memsize += amt;
     return mem+memoff;
 }
 
-static inline BIGNUM_V *
-move_ptr(BIGNUM_V *p, int off) {
+static inline BIGNUM **
+move_ptr(BIGNUM **p, int off) {
     p += off;
     if (off>=0 && p+max_pointer >= mem+dyn_memsize)
         p = alloc_ptr(p+max_pointer)-max_pointer;
@@ -190,9 +188,8 @@ static void
 run_supertree(void)
 {
     struct bfi * n = bfprog;
-    register BIGNUM_V * m = move_ptr(alloc_ptr(mem),0);
-    BIGNUM_V t1, t2, t3;
-    BN_init(t1); BN_init(t2); BN_init(t3);
+    register BIGNUM ** m = move_ptr(alloc_ptr(mem),0);
+    BIGNUM *t1 = BN_new(), *t2 = BN_new(), *t3 = BN_new();
 
     if (verbose)
 	fprintf(stderr, "Maxtree variant: using OpenSSL Bignums\n");
