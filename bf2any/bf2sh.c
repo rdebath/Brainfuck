@@ -85,26 +85,28 @@ outcmd(int ch, int count)
 
 	if (do_output) {
 	    pr("");
-	    pr("if [ .`echo -n` = .-n ]");
+	    pr("# shellcheck disable=SC2039,SC1117");
+	    pr("if [ \".$(echo -n)\" = .-n ]");
 	    pr("then");
 	    pr("    echon() { echo \"$1\\c\"; }");
 	    pr("    echoe() { echo \"$1\\c\"; }");
 	    pr("else");
 	    pr("    echon() { echo -n \"$1\"; }");
-	    pr("    if [ .`echo -e` = .-e ]");
+	    pr("    if [ \".$(echo -e)\" = .-e ]");
 	    pr("    then echoe() { echo -n \"$1\"; }");
-	    pr("    else if [ .`echo -e '\\070\\c'` = .8 ]");
+	    pr("    else # shellcheck disable=SC1075");
+	    pr("         if [ \".$(echo -e '\\070\\c')\" = .8 ]");
 	    pr("         then echoe() { echo -e \"$1\\c\"; }");
 	    pr("         else echoe() { echo -n -e \"$1\"; }");
 	    pr("         fi");
 	    pr("    fi");
 	    pr("fi");
-	    pr("if [ .`echoe '\\070'` != .8 ]");
+	    pr("if [ \".$(echoe '\\070')\" != .8 ]");
 	    pr("then echoe(){ printf \"%%b\" \"$*\" 2>/dev/null ; }");
 	    pr("fi");
-	    pr("if [ .`echoe '\\171'` = .y ]");
-	    pr("then o(){ echoe \"`printf '\\\\\\\\%%03o' $1`\" ; }");
-	    pr("else o(){ echoe \"`printf '\\\\\\\\%%04o' $1`\" ; }");
+	    pr("if [ \".$(echoe '\\171')\" = .y ]");
+	    pr("then o(){ echoe \"$(printf '\\\\%%03o' \"$1\")\" ; }");
+	    pr("else o(){ echoe \"$(printf '\\\\%%04o' \"$1\")\" ; }");
 	    pr("fi");
 	}
 
@@ -129,13 +131,13 @@ outcmd(int ch, int count)
 	    pr("    A=\"$line\"");
 	    pr("    while [ ${#A} -gt 1 ] ; do A=\"${A%%?}\"; done");
 	    pr("    line=\"${line#?}\"");
-	    pr("    A=`printf %%d \\'\"$A\"`");
-	    pr("    : $((M$P=$A))");
+	    pr("    A=$(printf %%d \\'\"$A\")");
+	    pr("    : $((M$P=A))");
 	    pr("}");
 	}
 
 	pr("");
-	pr("brainfuck ||:");
+	pr("brainfuck");
 	break;
     }
 }

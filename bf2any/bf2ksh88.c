@@ -32,8 +32,8 @@ outcmd(int ch, int count)
 	pr("fi");
 
 	pr("");
-	pr("o() { typeset -i8 N ; N=$1; print -n - \\\\0$(print ${N#8?});}");
-	pr("if [ \"`{ o 65;o 65;} 2>&1 </dev/null`\" != AA ]");
+	pr("o() { typeset -i8 N ; N=$1; print -n - \\\\0\"$(print \"${N#8?}\")\";}");
+	pr("if [ \"$({ o 65;o 65;} 2>&1 </dev/null)\" != AA ]");
 	pr("then");
 	pr("    echo 'ERROR: The print command must be Ksh88 compatible' >&2");
 	pr("    exit 1");

@@ -96,7 +96,7 @@ outcmd(int ch, int count)
 
 	printf("u1() { eval \"A=\\$M$P\"; inc; eval \"M$P=$A\" ; }\n");
 	printf("d1() { eval \"A=\\$M$P\"; dec; eval \"M$P=$A\" ; }\n");
-	printf("f1() { eval \"A=\\$M$P\"; [ .$A = . ] && A=0; }\n");
+	printf("f1() { eval \"A=\\$M$P\"; [ \".$A\" = . ] && A=0; }\n");
 
 	printf("\n");
 	printf("inc() {\n");
@@ -177,12 +177,45 @@ outcmd(int ch, int count)
 	    );
 
 	if(do_output) {
+
+	    printf("%s\n",
+"\n"		"# shellcheck disable=SC2006,SC2039"
+"\n"		"if [ \".`echo -n`\" = .-n ]"
+"\n"		"then"
+"\n"		"    echon() { echo \"$1\\c\"; }"
+"\n"		"    echoe() { echo \"$1\\c\"; }"
+"\n"		"else"
+"\n"		"    echon() { echo -n \"$1\"; }"
+"\n"		"    if [ \".`echo -e`\" = .-e ]"
+"\n"		"    then echoe() { echo -n \"$1\"; }"
+"\n"		"    else echoe() { echo -n -e \"$1\"; }"
+"\n"		"    fi"
+"\n"		"fi"
+		);
 	    printf("\n");
+
+            printf("if [ \".$(echoe '\\171')\" = .y ]\n");
+            printf("then\n\n");
+
 	    printf("o1() {\n");
 	    printf("eval \"A=\\$M$P\"\n");
 	    printf("case \"$A\" in\n");
 	    for(i=0; i<256; i++) {
-		if (i >= ' ' && i <= '~' && i != '\'' && i != '\\')
+		if (i >= ' ' && i <= '~' && i != '\'' && i != '\\' && i != '-')
+		    printf("%d ) echon '%c' ;;\n", i, i);
+		else if (i == 10 )
+		    printf("%d ) echo ;;\n", i);
+		else
+		    printf("%d ) echoe '\\%03o' ;;\n", i, i);
+	    }
+	    printf("esac\n}\n");
+            printf("else\n\n");
+
+	    printf("o1() {\n");
+	    printf("eval \"A=\\$M$P\"\n");
+	    printf("case \"$A\" in\n");
+	    for(i=0; i<256; i++) {
+		if (i >= ' ' && i <= '~' && i != '\'' && i != '\\' && i != '-')
 		    printf("%d ) echon '%c' ;;\n", i, i);
 		else if (i == 10 )
 		    printf("%d ) echo ;;\n", i);
@@ -192,19 +225,8 @@ outcmd(int ch, int count)
 		    printf("%d ) echoe '\\%04o' ;;\n", i, i);
 	    }
 	    printf("esac\n}\n");
-	    printf("%s\n",
-"\n"		"if [ .`echo -n` = .-n ]"
-"\n"		"then"
-"\n"		"    echon() { echo \"$1\\c\"; }"
-"\n"		"    echoe() { echo \"$1\\c\"; }"
-"\n"		"else"
-"\n"		"    echon() { echo -n \"$1\"; }"
-"\n"		"    if [ .`echo -e` = .-e ]"
-"\n"		"    then echoe() { echo -n \"$1\"; }"
-"\n"		"    else echoe() { echo -n -e \"$1\"; }"
-"\n"		"    fi"
-"\n"		"fi"
-		);
+
+            printf("fi\n\n");
 	}
 
 	if (do_input)
