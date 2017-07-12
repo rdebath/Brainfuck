@@ -121,7 +121,7 @@ print_string(void)
 {
     char * str = get_string();
     char buf[256];
-    int badchar = 0;
+    int badchar = 0, badecho = 0;
     size_t outlen = 0;
 
     if (!str) return;
@@ -130,11 +130,24 @@ print_string(void)
 	if (outlen && (*str == 0 || badchar || outlen > sizeof(buf)-8))
 	{
 	    buf[outlen] = 0;
-	    if (badchar == '\n') {
+	    if (badchar == '\n' && !badecho) {
 		prv("echo '%s'", buf);
 		badchar = 0;
 	    } else {
-		prv("print -n '%s'", buf);
+		if (badchar == '\n') {
+		    badchar = 0;
+		    if (buf[0] == '-') {
+			prv("print - '%s'", buf);
+		    } else {
+			prv("print '%s'", buf);
+		    }
+		} else {
+		    if (buf[0] == '-') {
+			prv("print -n - '%s'", buf);
+		    } else {
+			prv("print -n '%s'", buf);
+		    }
+		}
 	    }
 	    outlen = 0;
 	}
@@ -145,9 +158,19 @@ print_string(void)
 	if (!*str) break;
 
 	if (*str == '-' && outlen == 0) {
-	    badchar = (*str & 0xFF);
+	    badecho = 1;
+	    buf[outlen++] = *str;
 	} else if (*str >= ' ' && *str <= '~' && *str != '\\' && *str != '\'') {
 	    buf[outlen++] = *str;
+	} else if (*str == 27 || *str == '\'') {
+	    badecho = 1;
+	    buf[outlen++] = '\\';
+	    sprintf(buf+outlen, "%03o", *str);
+	    outlen += 3;
+	} else if (*str == '\\') {
+	    badecho = 1;
+	    buf[outlen++] = '\\';
+	    buf[outlen++] = '\\';
 	} else {
 	    badchar = (*str & 0xFF);
 	}
