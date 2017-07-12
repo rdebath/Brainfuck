@@ -466,7 +466,7 @@ outcmd(int ch, int count)
 	|.if I386
 	| call &getchar
 	|.else
-#ifdef __code_model_small__
+#if (defined(__code_model_small__) && !defined(__PIC__)) || defined(__ILP32__)
 	| mov	eax, (uintptr_t) getchar
 	| call  rax
 #else
@@ -505,7 +505,7 @@ outcmd(int ch, int count)
 #else
 	| movzx rcx, byte [REG_P]
 #endif
-#ifdef __code_model_small__
+#if (defined(__code_model_small__) && !defined(__PIC__)) || defined(__ILP32__)
 	| mov	eax, (uintptr_t) putchar
 	| call  rax
 #else
