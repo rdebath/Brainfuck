@@ -748,7 +748,8 @@ ps(const char * s)
 	    if ((*p&0xFF) >= 0xE3 && (*p&0xFF) <= 0xEA)
 		l++;
 	    p++;
-	}
+	} else
+	    p++;
     }
 }
 
