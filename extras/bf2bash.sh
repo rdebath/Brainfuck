@@ -124,13 +124,14 @@ case "$1" in
     mask="${1:2}"
     ((mask <= 0)) && mask=8
     mask=$((2**mask-1))
-    if ((mask <= 0)) ; then mask=-1; fi
     shift ;;
 "" )
     echo "Usage: $0 bfprogram.b" >&2
     exit 1
     ;;
 esac
+
+if ((mask <= 0)) ; then maskop=''; mask=-1; else maskop="${mask}&"; fi
 
 while read line
 do  ll=${#line}
@@ -212,7 +213,7 @@ addcmd() {
 
     case "$1" in
     ">" ) cmd='((P=P+'$cnt'))' ;;
-    "+" ) cmd='((M[P]='"$mask"'&(M[P]+'$cnt')))' ;;
+    "+" ) cmd='((M[P]='"$maskop"'(M[P]+'$((mask & cnt))')))' ;;
     "=" ) cmd='((M[P]=0))' ;;
     "[" ) cmd='while ((M[P])) ; do' ;;
     "]" ) cmd='done' ;;
