@@ -66,6 +66,12 @@ run_maxtree(void)
 	run_supertree();
 	return;
     }
+#if !defined(DISABLE_BN)
+    if (iostyle == 3) {
+	run_supertree();
+	return;
+    }
+#endif
     if (cell_length < (int)(sizeof(C))*CHAR_BIT) {
 	mask = ~( ((C)-1) << cell_length);
     }
@@ -276,7 +282,13 @@ run_supertree(void)
 		putch(n->count);
 		break;
 	    case T_PRT:
-		{
+		if (iostyle == 3) {
+		    char * dec_num;
+		    BN_mask_bits(m[n->offset], cell_length);
+		    dec_num = BN_bn2dec(m[n->offset]);
+		    printf("%s\n", dec_num);
+		    OPENSSL_free(dec_num);
+		} else {
 		    int input_chr;
 		    BN_zero(t2);
 		    input_chr = BN_get_word(m[n->offset]);
@@ -285,7 +297,28 @@ run_supertree(void)
 		}
 		break;
 	    case T_INP:
-		{   /* Cell is too large for an int */
+		if (iostyle == 3) {
+		    char * bntxtptr = 0;
+		    int rv;
+		    rv = scanf("%ms", &bntxtptr);
+		    if (rv == EOF || rv == 0) {
+			int c = 1;
+			switch(eofcell)
+			{
+			case 2: c = -1; break;
+			case 3: c = 0; break;
+			case 4: c = EOF; break;
+			}
+			if (c<=0)
+			    BN_zero(m[n->offset]);
+			if (c<0)
+			    BN_sub_word(m[n->offset], -c);
+		    } else {
+			BN_dec2bn(&m[n->offset], bntxtptr);
+			BN_mask_bits(m[n->offset], cell_length);
+			free(bntxtptr);
+		    }
+		} else {   /* Cell is too large for an int */
 		    int ch = -256;
 		    ch = getch(ch);
 		    if (ch > 0)
