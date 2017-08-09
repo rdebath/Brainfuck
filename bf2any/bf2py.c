@@ -26,13 +26,14 @@ int ind = 0;
 int do_dump = 0;
 int use_oslib = 0;
 int use_putcell = 0;
+int use_putstr = 0;
 int use_getcell = 0;
 
 FILE * ofd;
 char * pycode = 0;
 size_t pycodesize = 0;
 
-int disable_savestring = 1;
+static void print_string(void);
 
 static check_arg_t fn_check_arg;
 struct be_interface_s be_interface = {fn_check_arg};
@@ -134,6 +135,23 @@ outcmd(int ch, int count)
 	    fprintf(ofd, "\n");
 	}
 
+	if (use_putstr) {
+	    I; fprintf(ofd, "if (platform.python_implementation() == 'PyPy'):\n");
+	    ind++;
+	    I; fprintf(ofd, "def putstr(v):\n");
+	    ind++;
+	    I; fprintf(ofd, "os.write(1, v)\n");
+	    ind--;
+	    ind--;
+	    I; fprintf(ofd, "else:\n"); ind++;
+	    I; fprintf(ofd, "def putstr(v):\n");
+	    ind++;
+	    I; fprintf(ofd, "os.write(1, v.encode('ascii'))\n");
+	    ind--;
+	    ind--;
+	    fprintf(ofd, "\n");
+	}
+
 	if (use_getcell) {
 	    I; fprintf(ofd, "if (platform.python_implementation() == 'PyPy'):\n");
 	    ind++;
@@ -210,6 +228,7 @@ outcmd(int ch, int count)
 	ind--;
 	break;
 
+    case '"': print_string(); break;
     case '.':
 	I; fprintf(ofd, "putcell(m[p])\n");
 	use_putcell = 1;
@@ -242,4 +261,52 @@ outcmd(int ch, int count)
 	Py_Finalize();
     }
 #endif
+}
+
+static void
+print_string()
+{
+    char * str = get_string();
+    char buf[256];
+    int gotnl = 0;
+    size_t outlen = 0;
+
+    if (!str) return;
+
+    for(;; str++) {
+	if (outlen && (*str == 0 || gotnl || outlen > sizeof(buf)-8))
+	{
+	    buf[outlen] = 0;
+
+	    if (use_oslib) {
+		I; fprintf(ofd, "putstr('%s')\n", buf);
+		use_putstr = 1;
+	    } else if (gotnl) {
+		buf[outlen-2] = 0;
+		I; fprintf(ofd, "print('%s')\n", buf);
+	    } else {
+		I; fprintf(ofd, "sys.stdout.write('%s')\n", buf);
+	    }
+
+	    gotnl = 0; outlen = 0;
+	}
+	if (!*str) break;
+
+	if (*str == '\n') gotnl = 1;
+	if (*str == '\'' || *str == '\\') {
+	    buf[outlen++] = '\\'; buf[outlen++] = *str;
+	} else if (*str >= ' ' && *str <= '~') {
+	    buf[outlen++] = *str;
+	} else if (*str == '\n') {
+	    buf[outlen++] = '\\'; buf[outlen++] = 'n';
+	} else if (*str == '\t') {
+	    buf[outlen++] = '\\'; buf[outlen++] = 't';
+	} else {
+	    char buf2[16];
+	    int n;
+	    sprintf(buf2, "\\%03o", *str & 0xFF);
+	    for(n=0; buf2[n]; n++)
+		buf[outlen++] = buf2[n];
+	}
+    }
 }
