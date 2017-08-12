@@ -589,7 +589,7 @@ main(int argc, char ** argv)
 
 #ifdef __STDC_ISO_10646__
 #if !defined(LEGACYOS) && _POSIX_VERSION >= 200112L
-    setlocale(LC_ALL, "");
+    setlocale(LC_CTYPE, "");
     if (!opt_bytedefault)
 	if (!strcmp("UTF-8", nl_langinfo(CODESET))) libc_allows_utf8 = 1;
 #endif
