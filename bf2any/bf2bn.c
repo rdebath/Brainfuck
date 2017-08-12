@@ -126,7 +126,7 @@ outcmd(int ch, int count)
 	"\n"	"    BIGNUM * t2 = BN_new();"
 	"\n"	"    input_chr = BN_get_word(chr);"
 	"\n"	"    BN_zero(t2);"
-	"\n"	"    if(BN_cmp(chr,t2) < 0) input_chr = -input_chr;"
+	"\n"	"    if(BN_cmp(chr,t2) < 0) input_chr = -(input_chr&255);"
 	"\n"	"    BN_free(t2);"
 	"\n"
 	"\n"	"    if (input_chr < 0x80) {            /* one-byte char */"
