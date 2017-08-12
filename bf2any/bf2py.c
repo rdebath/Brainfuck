@@ -103,99 +103,132 @@ outcmd(int ch, int count)
 	I; fprintf(ofd, "return 0\n\n");
 	ind--;
 
-	if (use_putcell) {
-	    if (use_oslib) {
-		I; fprintf(ofd, "if (platform.python_implementation() == 'PyPy'):\n");
-		ind++;
-		I; fprintf(ofd, "def putcell(v):\n");
-		ind++;
-		I; fprintf(ofd, "os.write(1, chr(v %% 255))\n");
-		ind--;
-		ind--;
-		I; fprintf(ofd, "else:\n"); ind++;
+	if (use_oslib) {
+	    I; fprintf(ofd, "if __name__ == \"__main__\":\n"); ind++;
+	}
+
+	if (use_putcell && !use_oslib) {
+
+	    I; fprintf(ofd, "try:\n");
+	    I; fprintf(ofd, "    unichr\n");
+	    I; fprintf(ofd, "except NameError:\n");
+	    ind++;
+	    I; fprintf(ofd, "def putcell(v):\n");
+	    if(bytecell) {
+		I; fprintf(ofd, "    v &= 255\n");
 	    }
+	    I; fprintf(ofd, "    try:\n");
+	    I; fprintf(ofd, "        sys.stdout.write(chr(v))\n");
+	    I; fprintf(ofd, "        sys.stdout.flush()\n");
+	    I; fprintf(ofd, "    except ValueError:\n");
+	    I; fprintf(ofd, "        try:\n");
+	    I; fprintf(ofd, "            sys.stdout.write(chr(0xFFFD))\n");
+	    I; fprintf(ofd, "        except ValueError:\n");
+	    I; fprintf(ofd, "            sys.stdout.write('?')\n");
+
+	    ind--;
+	    I; fprintf(ofd, "else:\n");
+	    ind++;
 
 	    I; fprintf(ofd, "def putcell(v):\n");
-	    ind++;
-	    I; fprintf(ofd, "try:\n");
-	    ind++;
-	    if (!use_oslib) {
-		I; fprintf(ofd, "sys.stdout.write(chr(v))\n");
-		I; fprintf(ofd, "sys.stdout.flush()\n");
+	    if(bytecell) {
+		I; fprintf(ofd, "    sys.stdout.write(chr(v & 255))\n");
+		I; fprintf(ofd, "    sys.stdout.flush()\n");
 	    } else {
-		I; fprintf(ofd, "os.write(1, chr(v).encode('ascii'))\n");
+		I; fprintf(ofd, "    try:\n");
+		I; fprintf(ofd, "        sys.stdout.write(unichr(v))\n");
+		I; fprintf(ofd, "        sys.stdout.flush()\n");
+		I; fprintf(ofd, "    except ValueError:\n");
+		I; fprintf(ofd, "        sys.stdout.write(chr(v & 255))\n");
 	    }
+
 	    ind--;
-	    I; fprintf(ofd, "except:\n");
+	    fprintf(ofd, "\n");
+	}
+
+	if (use_putcell && use_oslib) {
+
+	    I; fprintf(ofd, "try:\n");
+	    I; fprintf(ofd, "    unichr\n");
+	    I; fprintf(ofd, "except NameError:\n");
 	    ind++;
-	    I; fprintf(ofd, "pass\n");
+
+	    I; fprintf(ofd, "def putcell(v):\n");
+	    I; fprintf(ofd, "    try:\n");
+	    I; fprintf(ofd, "        os.write(1, chr(v).encode())\n");
+	    I; fprintf(ofd, "    except ValueError:\n");
+	    I; fprintf(ofd, "        pass\n");
+
 	    ind--;
+	    I; fprintf(ofd, "else:\n");
+	    ind++;
+
+	    if(bytecell) {
+		I; fprintf(ofd, "def putcell(v):\n");
+		I; fprintf(ofd, "    os.write(1, chr(v & 255))\n");
+	    } else {
+		I; fprintf(ofd, "def putcell(v):\n");
+		I; fprintf(ofd, "    try:\n");
+		I; fprintf(ofd, "        os.write(1, unichr(v).encode('utf-8'))\n");
+		I; fprintf(ofd, "    except ValueError:\n");
+		I; fprintf(ofd, "        pass\n");
+	    }
+
 	    ind--;
-	    if (use_oslib) ind--;
 	    fprintf(ofd, "\n");
 	}
 
 	if (use_putstr) {
-	    I; fprintf(ofd, "if (platform.python_implementation() == 'PyPy'):\n");
-	    ind++;
 	    I; fprintf(ofd, "def putstr(v):\n");
-	    ind++;
-	    I; fprintf(ofd, "os.write(1, v)\n");
-	    ind--;
-	    ind--;
-	    I; fprintf(ofd, "else:\n"); ind++;
-	    I; fprintf(ofd, "def putstr(v):\n");
-	    ind++;
-	    I; fprintf(ofd, "os.write(1, v.encode('ascii'))\n");
-	    ind--;
-	    ind--;
+	    I; fprintf(ofd, "    os.write(1, v.encode('ascii'))\n");
 	    fprintf(ofd, "\n");
 	}
 
 	if (use_getcell) {
-	    I; fprintf(ofd, "if (platform.python_implementation() == 'PyPy'):\n");
-	    ind++;
 	    I; fprintf(ofd, "def getcell(v):\n");
-	    ind++;
-	    I; fprintf(ofd, "return ord(os.read(0, 1)[0])\n");
-	    ind--;
-	    ind--;
-	    I; fprintf(ofd, "else:\n");
-	    ind++;
-	    I; fprintf(ofd, "def getcell(v):\n");
-	    ind++;
-	    I; fprintf(ofd, "try:\n");
-	    ind++;
-
-	    I; fprintf(ofd, "c = os.read(0, 1);\n");
-	    I; fprintf(ofd, "if c != '' :\n");
-	    ind++;
-	    I; fprintf(ofd, "v = ord(c)\n");
-	    ind--;
-	    ind--;
-	    I; fprintf(ofd, "except:\n");
-	    ind++;
-	    I; fprintf(ofd, "pass\n");
-	    ind--;
-	    I; fprintf(ofd, "return v\n");
-
-	    ind--;
-	    ind--;
+	    I; fprintf(ofd, "    try:\n");
+	    I; fprintf(ofd, "        c = os.read(0, 1);\n");
+	    I; fprintf(ofd, "        if c != '' :\n");
+	    I; fprintf(ofd, "            v = ord(c)\n");
+	    I; fprintf(ofd, "    except ValueError:\n");
+	    I; fprintf(ofd, "        pass\n");
+	    I; fprintf(ofd, "    return v\n");
 	    fprintf(ofd, "\n");
 	}
 
 	if (!do_dump) {
 	    I; fprintf(ofd, "brainfuck(None)\n");
+	    ind--;
 	    break;
 	}
 
-	I; fprintf(ofd, "if __name__ == \"__main__\":\n"); ind++;
-	I; fprintf(ofd, "brainfuck(sys.argv)\n"); ind--;
+	if (!use_oslib) {
+	    I; fprintf(ofd, "if __name__ == \"__main__\":\n"); ind++;
+	}
+
+	I; fprintf(ofd, "brainfuck(sys.argv)\n");
+	ind--;
 
 	if (use_oslib && tapelen>0) {
 	    fprintf(ofd, "\n");
-	    I; fprintf(ofd, "def target(*args):\n"); ind++;
-	    I; fprintf(ofd, "return brainfuck, None\n"); ind--;
+	    I; fprintf(ofd, "if __name__ == \"__rpython__\":\n"); ind++;
+	    ind++;
+	    I; fprintf(ofd, "def target(*args):\n");
+	    I; fprintf(ofd, "    return brainfuck, None\n");
+
+	    if (use_putcell) {
+		I; fprintf(ofd, "def putcell(v):\n");
+		I; fprintf(ofd, "    os.write(1, chr(v & 255))\n");
+	    }
+	    if (use_putstr) {
+		I; fprintf(ofd, "def putstr(v):\n");
+		I; fprintf(ofd, "    os.write(1, v)\n");
+	    }
+	    if (use_getcell) {
+		I; fprintf(ofd, "def getcell(v):\n");
+		I; fprintf(ofd, "    return ord(os.read(0, 1)[0])\n");
+	    }
+	    ind--;
 	}
 	break;
 
@@ -236,9 +269,10 @@ outcmd(int ch, int count)
 
     case ',':
 	if (!use_oslib) {
+	    I; fprintf(ofd, "sys.stdout.flush()\n");
 	    I; fprintf(ofd, "c = sys.stdin.read(1);\n");
 	    I; fprintf(ofd, "if c != '' :\n");
-	    ind++; I; ind--; fprintf(ofd, "m[p] = ord(c)\n");
+	    ind++; I; fprintf(ofd, "m[p] = ord(c)\n"); ind--;
 	} else {
 	    I; fprintf(ofd, "m[p] = getcell(m[p])\n");
 	    use_getcell = 1;
