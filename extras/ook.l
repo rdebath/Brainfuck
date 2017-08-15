@@ -328,6 +328,7 @@ char bf[] = "><+-.,[]#";
 
 size_t (*custom_prefilter)(char *, size_t) = 0;
 size_t tiny_bf_to_bf(char * buf, size_t max_size);
+size_t qqq_to_bf(char * buf, size_t max_size);
 
 int main(int argc, char ** argv)
 {
@@ -405,6 +406,11 @@ int main(int argc, char ** argv)
 	    else if (!strcmp(argv[1], "-tinybf")) {
 		mode = INITIAL;
 		custom_prefilter = tiny_bf_to_bf;
+	    }
+
+	    else if (!strcmp(argv[1], "-???") || !strcmp(argv[1], "-qqq")) {
+		mode = INITIAL;
+		custom_prefilter = qqq_to_bf;
 	    }
 
 	    else {
@@ -640,6 +646,39 @@ tiny_bf_to_bf(char * buf, size_t max_size)
 		lookahead_len--;
 	    }
 	    if (!*lookahead) more = 1;
+	}
+    }
+    return n;
+}
+
+size_t
+qqq_to_bf(char * buf, size_t max_size)
+{
+    static int qqq_state = 0;
+
+    size_t n;
+    int c;
+
+    for(n=0; n<max_size;) {
+	c = getc(yyin);
+	if (c == EOF) return n;
+
+	switch(c)
+	{
+	case '\n': buf[n++] = '\n'; break;	/* Keep shorter lines. */
+	case ';': buf[n++] = '>'; break;
+	case '-': buf[n++] = '<'; break;
+	case '.': buf[n++] = '+'; break;
+	case ',': buf[n++] = '-'; break;
+	case '!': buf[n++] = '.'; break;
+	case '?': buf[n++] = ','; break;
+
+	case '\'': qqq_state = 1-qqq_state; break;
+	case '"':
+	    if (qqq_state == 0)
+		buf[n++] = '[';
+	    else
+		buf[n++] = ']';
 	}
     }
     return n;

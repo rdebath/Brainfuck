@@ -60,6 +60,7 @@ int disable_savestring = 1;
 #define L_EXCON         0x1A    /* ascii(token, count); */
 #define L_ABCD          0x1B    /* ascii(token, count); */
 #define L_BINERDY       0x1C    /* ascii(token, count); */
+#define L_QQQ           0x1D    /* qqq(token, count); */
 
 static const char bf[] = "><+-.,[]";
 static const char * bfout[] = { ">", "<", "+", "-", ".", ",", "[", "]", 0 };
@@ -387,6 +388,7 @@ static void bfugly(int ch, int count);
 static void malbrain(int ch, int count);
 static void hanoilove(int ch, int count);
 static void ascii(int ch, int count);
+static void qqq(int ch, int count);
 static void bfdowhile(int ch, int count);
 static void bftranslate(int ch, int count);
 static void bfreprint(void);
@@ -608,6 +610,9 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-dump") == 0) {
 	lang = 0; langclass = L_TOKENS; return 1;
     } else
+    if (strcmp(arg, "-qqq") == 0 || strcmp(arg, "-???") == 0) {
+	lang = 0; langclass = L_QQQ; return 1;
+    } else
 
     if (strncmp(arg, "-w", 2) == 0 && arg[2] >= '0' && arg[2] <= '9') {
 	maxcol = atol(arg+2);
@@ -652,6 +657,7 @@ fn_check_arg(const char * arg)
 	"\n\t"  "-excon  EXCON translation -- http://esolangs.org/wiki/EXCON"
 	"\n\t"  "-abcd   ABCD translation -- http://esolangs.org/wiki/ABCD"
 	"\n\t"  "-dowhile Do ... while translataion."
+	"\n\t"  "-???    https://esolangs.org/wiki/%3F%3F%3F"
 	"\n\t"  "-dc     Convert to dc(1) using the first of below."
 	"\n\t"  "-dc1      Use an array and a pointer variable."
 	"\n\t"  "-dc2      Use an array with the pointer on the stack (not V7)."
@@ -863,6 +869,7 @@ outcmd(int ch, int count)
     case L_BINERDY:
     case L_ASCII:       ascii(ch, count); break;
     case L_DOWHILE:	bfdowhile(ch, count); break;
+    case L_QQQ:		qqq(ch, count); break;
     }
 
     if (ch == '~' && (langclass & GEN_HEADER) != 0)
@@ -1652,6 +1659,27 @@ bfdowhile(int ch, int count)
 	    }
 	}
     }
+}
+
+void
+qqq(int ch, int count)
+{
+    char * p;
+
+    if (! (p = strchr(bf,ch))) return;
+
+    switch(ch)
+    {
+    case '>': ch = ';'; break;
+    case '<': ch = '-'; break;
+    case '+': ch = '.'; break;
+    case '-': ch = ','; break;
+    case '.': ch = '!'; break;
+    case ',': ch = '?'; break;
+    case '[': if (state!=0) {pc('\''); state=!state;} ch = '"'; break;
+    case ']': if (state==0) {pc('\''); state=!state;} ch = '"'; break;
+    }
+    while (count-->0) pc(ch);
 }
 
 void
