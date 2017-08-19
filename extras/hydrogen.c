@@ -33,6 +33,9 @@
 #elif MASK == 8
 #define icell	unsigned long long
 #define M(x) x
+#elif MASK == 16
+#define icell	__uint128_t
+#define M(x) x
 
 #elif MASK == 0xFF || MASK == 0xFFFF || MASK == 0xFFFFFF
 #define icell	unsigned int
