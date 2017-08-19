@@ -48,7 +48,7 @@ outcmd(int ch, int count)
     case '-': prv("M[P] -= %d;", count); break;
     case '>': prv("P += %d;", count); break;
     case '<': prv("P -= %d;", count); break;
-    case '.': pr("Console.Write((char)M[P]);"); break;
+    case '.': pr("Console.Write(Char.ConvertFromUtf32( (ulong)M[P]>0x10FFFF?0xFFFD:(int)M[P] ));"); break;
     case ',': pr("M[P]=Console.Read();"); break;
     case '"': print_cstring(); break;
 
