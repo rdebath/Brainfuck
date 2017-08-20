@@ -119,7 +119,6 @@ int maxpc = 0;
 struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
 static void link_and_run(dasm_State **state);
-static void puts_without_nl(char * s) { fputs(s, stdout); }
 static void failout(void) __attribute__ ((__noreturn__));
 
 static void failout(void) { fprintf(stderr, "STOP Command executed.\n"); exit(1); }
@@ -146,6 +145,11 @@ free_saved_memory(void)
         free(n->memp);
         free(n);
     }
+}
+
+static void puts_without_nl(char * s)
+{
+    while(*s) putch(*s++);
 }
 
 static int acc_loaded = 0;
@@ -574,9 +578,8 @@ run_dynasm(void)
                 unsigned i = 0;
                 struct bfi * v = n;
                 char *s;
-                while(v->next && v->next->type == T_CHR &&
-                        v->next->count > 0 &&
-                            (v->next->count < 127 || iostyle != 1)) {
+                while(v && v->type == T_CHR && v->count > 0 &&
+                            (v->count < 127 || iostyle != 1)) {
 
                     if (i+2 > maxstrlen) {
                         if (maxstrlen) maxstrlen *= 2; else maxstrlen = 4096;

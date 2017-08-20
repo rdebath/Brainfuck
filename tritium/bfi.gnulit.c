@@ -151,8 +151,6 @@ load_acc_offset(int offset)
     acc_hi_dirty = (tape_step*8 != cell_size);
 }
 
-static void puts_without_nl(char * s) { fputs(s, stdout); }
-
 static void failout(void) __attribute__ ((__noreturn__));
 static void failout(void) { fprintf(stderr, "STOP Command executed.\n"); exit(1); }
 
@@ -180,6 +178,11 @@ free_saved_memory(void)
     }
 }
 
+static void puts_without_nl(char * s)
+{
+    while(*s) putch(*s++);
+}
+
 void
 run_gnulightning(void)
 {
@@ -201,6 +204,7 @@ run_gnulightning(void)
 
     if (cell_size == 8) tape_step = 1; else
     tape_step = sizeof(int);
+    only_uses_putch = 1;
 
 #ifdef GNULIGHTv1
     /* TODO: Use mmap for allocating memory, the x86 execute protection
@@ -428,9 +432,8 @@ run_gnulightning(void)
 		unsigned i = 0;
 		struct bfi * v = n;
 		char *s;
-		while(v->next && v->next->type == T_CHR &&
-			v->next->count > 0 &&
-			    (v->next->count < 127 || iostyle != 1)) {
+		while(v && v->type == T_CHR && v->count > 0 &&
+			    (v->count < 127 || iostyle != 1)) {
 
 		    if (i+2 > maxstrlen) {
 			if (maxstrlen) maxstrlen *= 2; else maxstrlen = 4096;
