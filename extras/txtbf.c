@@ -34,10 +34,9 @@
  *  NOTE: Null bytes are ignored.
  *
  *  Also:
- *	+++++++++[>+++++>++++++++++>>+++++>+<<<<<-
- *	]>>+>>--<,[<.<.>++.-->[>.<-]<<+.->>,]>>+.
+ *	+++++++++[>++++++++++>+++++>>+<<<<-]>+>>>+<
+ *	,[<<.>.--<++.-->>[-<.>]<+++.->>.<,]
  *
- * TODO: Add loop using nearest cell that's a null.
  */
 #include <stdio.h>
 #include <string.h>
@@ -56,7 +55,7 @@ void find_best_conversion(char * linebuf);
 void gen_print(char * buf, int init_offset);
 void check_if_best(char * buf, char * name);
 
-void gen_subrange(char * buf, int subrange, int flg_zoned, int flg_nonl);
+void gen_subrange(char * buf, int subrange, int flg_zoned);
 void gen_ascii(char * buf);
 void gen_multonly(char * buf);
 void gen_multbyte(char * buf);
@@ -66,65 +65,15 @@ void gen_special(char * buf, char * initcode, char * name, int usercode);
 void gen_twoflower(char * buf);
 void gen_twincell(char * buf);
 void gen_trislipnest(char * buf);
+void gen_countslide(char * linebuf);
 
 int runbf(char * prog, int longrun);
 
 #define MAX_CELLS 512
+#define MAX_STEPS 1000000
 #define PREV_BEST 16
 
 /* These setup strings have, on occasion, given good results */
-
-/* These are prefixes for huge ASCII files, it's a handmade sequence to create
- * a nicely scatter selection of cell values in 0..127. It seems to be a good
- * starter.
- */
-#define HUGEPREFIX1 "++++[>++++<-]>[>[++++++++>]+[<]>-]"
-#define HUGEPREFIX2 "+++[>++++++<-]>[>[+++++++>]+[<]>-]"
-#define HUGEPREFIX3 "+++[>+++++++<-]>[>[++++++>]+[<]>-]"
-
-/* These variants init the cells they use with '[-]' first */
-#define INITPREFIX1 "[-]>[-]>[-]<<++++[>++++<-]>[>[++++++++>]+>[-]<[<]>-]"
-#define INITPREFIX2 "[-]>[-]>[-]<<+++[>++++++<-]>[>[+++++++>]+>[-]<[<]>-]"
-#define INITPREFIX3 "[-]>[-]>[-]<<+++[>+++++++<-]>[>[++++++>]+>[-]<[<]>-]"
-
-/* And the 'A' variants add a space. */
-#define HUGEPREFIX1A "++++[>++++<-]>[>[++++++++>]+[<]>-]<++++++++[>++++<-]"
-#define HUGEPREFIX2A "+++[>++++++<-]>[>[+++++++>]+[<]>-]<++++++++[>++++<-]"
-#define HUGEPREFIX3A "+++[>+++++++<-]>[>[++++++>]+[<]>-]<++++++++[>++++<-]"
-
-#define INITPREFIX1A "[-]>[-]>[-]<<++++[>++++<-]>[>[++++++++>]+>[-]<[<]>-]<++++++++[>++++<-]"
-#define INITPREFIX2A "[-]>[-]>[-]<<+++[>++++++<-]>[>[+++++++>]+>[-]<[<]>-]<++++++++[>++++<-]"
-#define INITPREFIX3A "[-]>[-]>[-]<<+++[>+++++++<-]>[>[++++++>]+>[-]<[<]>-]<++++++++[>++++<-]"
-
-#define INITPREFIX1B "[-]>[-]>[-]>[-]<<++++[>++++<-]>[>[++++++++>]+>[-]<[<]>-]<<+++++[>++>++++++<<-]"
-#define INITPREFIX2B "[-]>[-]>[-]>[-]<<+++[>++++++<-]>[>[+++++++>]+>[-]<[<]>-]<<+++++[>++>++++++<<-]"
-#define INITPREFIX3B "[-]>[-]>[-]>[-]<<+++[>+++++++<-]>[>[++++++>]+>[-]<[<]>-]<<+++++[>++>++++++<<-]"
-
-/* These are prefixes for huge ASCII files, it's a handmade sequence to create
- * a nicely scatter selection of cell values in 0..127. It seems to be a good
- * starter.
- */
-#define HUGEPREFIX1_2 "++++[>++++<-]>[>[++++++++>]++[<]>-]"
-#define HUGEPREFIX2_2 "+++[>++++++<-]>[>[+++++++>]++[<]>-]"
-#define HUGEPREFIX3_2 "+++[>+++++++<-]>[>[++++++>]++[<]>-]"
-
-/* These variants init the cells they use with '[-]' first */
-#define INITPREFIX1_2 "[-]>[-]>[-]<<++++[>++++<-]>[>[++++++++>]++>[-]<[<]>-]"
-#define INITPREFIX2_2 "[-]>[-]>[-]<<+++[>++++++<-]>[>[+++++++>]++>[-]<[<]>-]"
-#define INITPREFIX3_2 "[-]>[-]>[-]<<+++[>+++++++<-]>[>[++++++>]++>[-]<[<]>-]"
-
-/* And the 'A' variants add a space. */
-#define HUGEPREFIX1A_2 "++++[>++++<-]>[>[++++++++>]++[<]>-]<++++++++[>++++<-]"
-#define HUGEPREFIX2A_2 "+++[>++++++<-]>[>[+++++++>]++[<]>-]<++++++++[>++++<-]"
-#define HUGEPREFIX3A_2 "+++[>+++++++<-]>[>[++++++>]++[<]>-]<++++++++[>++++<-]"
-
-#define INITPREFIX1A_2 "[-]>[-]>[-]<<++++[>++++<-]>[>[++++++++>]++>[-]<[<]>-]<++++++++[>++++<-]"
-#define INITPREFIX2A_2 "[-]>[-]>[-]<<+++[>++++++<-]>[>[+++++++>]++>[-]<[<]>-]<++++++++[>++++<-]"
-#define INITPREFIX3A_2 "[-]>[-]>[-]<<+++[>+++++++<-]>[>[++++++>]++>[-]<[<]>-]<++++++++[>++++<-]"
-
-#define INITPREFIX1B_2 "[-]>[-]>[-]>[-]<<++++[>++++<-]>[>[++++++++>]++>[-]<[<]>-]<<+++++[>++>++++++<<-]"
-#define INITPREFIX2B_2 "[-]>[-]>[-]>[-]<<+++[>++++++<-]>[>[+++++++>]++>[-]<[<]>-]<<+++++[>++>++++++<<-]"
-#define INITPREFIX3B_2 "[-]>[-]>[-]>[-]<<+++[>+++++++<-]>[>[++++++>]++>[-]<[<]>-]<<+++++[>++>++++++<<-]"
 
 
 /* These are some very generic multiply loops, the first is vaguely based on
@@ -146,6 +95,8 @@ char * hello_world[] = {
     "++++++++++++++[>+++++>+++++++>++++++>+++>++<<<<<-]",
     "++++++++++++++[>+++++>+++++++>++++++>++>+++<<<<<-]",
     "++++++++++++++[>+++++>+++++++>+++>++++++<<<<-]",
+    "+++++++++++++[>+++++>++++++++>+<<<-]",
+    "+++++++++++++[>++++>++++>++++>+<<<<-]",
     "+++++++++++[>++++++>+++++++>++++++++>++++>+++>+<<<<<<-]",
     "+++++++++++[>+>++++++>+++++++>++++++++>++++>+++<<<<<<-]",
     "++++++++++[>+++++++>++++++++++>++++>+<<<<-]",
@@ -158,10 +109,42 @@ char * hello_world[] = {
     ">++++[<++++>-]<+[>++++>++++++>+++++>++<<<<-]",
     ">++++[<++++>-]<+[>++++>++++++>++>+++++++<<<<-]",
     ">++++[<++++>-]<+[>++++>++++++>++>+++++<<<<-]",
+    ">++++[<++++>-]<[>+++>+++>+++>+++<<<<-]",
+    ">+++++++[<+++>-]<++[>+>++>+++>++++>+++++>+++++++<<<<<<-]",
+    ">+++++++[<++++>-]<[>+++>++++>++++<<<-]",
 
     0 };
 
 char * hello_world2[] = {
+    "++++[>+++++<-]>[>[++++++>]+[<]>-]",
+    "++++[>+++++<-]>[>[++++++>]++[<]>-]",
+    "+++[>++++++<-]>[>[+++++++>]++[<]>-]",
+    "++++[>++++++<-]>[>[+++++>]+++[<]>-]",
+
+    "++++[>++++++<-]>[>++>[+++++>]+++[<]>-]",
+    "++++[>++++<-]>[>++>[++++++++>]++[<]>-]",
+    "++++[>++++<-]>[>++>[++++++++>]+[<]>-]",
+    "++++[>++++<-]>[>++>[++++++>]++[<]>-]",
+    "++++[>++++<-]>[>+>++>[+++++++>]+++[<]>-]",
+    "++++[>++++<-]>[>[++++++>]++[<]>-]",
+    "+++[>++++++<-]>[>++>[+++++>]+[<]>-]",
+    "+++[>++++++<-]>[>[++++++++>]++[<]>-]",
+    "+++[>++++++<-]>[>[+++++++>]+++[<]>-]",
+
+    "++++[>++++++<-]>[>++>[+++++>]+++>[-]<[<]>-]",
+    "++++[>++++++<-]>[>[+++++>]+++>[-]<[<]>-]",
+    "++++[>+++++<-]>[>[++++++>]++>[-]<[<]>-]",
+    "++++[>+++++<-]>[>[++++++>]+>[-]<[<]>-]",
+    "++++[>++++<-]>[>++>[++++++++>]++>[-]<[<]>-]",
+    "++++[>++++<-]>[>++>[++++++++>]+>[-]<[<]>-]",
+    "++++[>++++<-]>[>++>[++++++>]++>[-]<[<]>-]",
+    "++++[>++++<-]>[>+>++>[+++++++>]+++>[-]<[<]>-]",
+    "++++[>++++<-]>[>[++++++>]++>[-]<[<]>-]",
+    "+++[>++++++<-]>[>++>[+++++>]+>[-]<[<]>-]",
+    "+++[>++++++<-]>[>[++++++++>]++>[-]<[<]>-]",
+    "+++[>++++++<-]>[>[+++++++>]+++>[-]<[<]>-]",
+    "+++[>++++++<-]>[>[+++++++>]++>[-]<[<]>-]",
+
     "+++++++++++[>++++[>++>++>++>+>+<<<<<-]>->+>>-[<]<-]",
     "+++++++++[>++++++[>++>++>++>++>+<<<<<-]>>+>->>-[<]<-]",
     "+++++++++[>++++[>++>+++>+++>+++>+<<<<<-]>>->>+>+[<]<-]",
@@ -174,19 +157,41 @@ char * hello_world2[] = {
     "++++++++[>++++[>+++>++>+<<<-]>->+<<<-]",
     "++++++++[>++++[>++>+++>+++>+<<<<-]>+>-<<<-]",
     "++++++++[>++++[>++>++>+++>+<<<<-]>+>+>-<<<<-]",
+    "++++[>+++++++[>+++>+>++++>++++<<<<-]<-]",
     "+++[>+++++[>+++++>+++++>++++++>+++>++<<<<<-]>-<<-]",
     "+++[>+++++[>+++++>+++++>++++++>++>+++<<<<<-]>-<<-]",
 
     ">+>++++>+>+>+++[>[->+++<<++>]<<]",
     ">+>++++>+>+>+++[>[->+++>[->++<]<<<++>]<<]",
+    ">+>++++>+>+[>[->+++++<<++++>]<<]",
+    ">+>+++>++>+[>[->++++<<++++>]<<]",
+    ">+>+++>+>+++[>[->+++<<+++>]<<]",
+    ">+>+++>+>+[>[->+++++<<++++>]<<]",
     ">+>++>++>+++[>[->+++<<+++>]<<]",
+    ">+>++>++>+[>[->++++<<++++>]<<]",
+    ">+>++>++>+[>[->+++<<++++>]<<]",
+    ">+>++>+>+++[>[->+++<<+++>]<<]",
     ">+>++>+>++>+++++[>[->++<<++>]<<]",
-    ">+>+>+++++++>++>+++[>[->+++<<+++>]<<]",
+    ">+>++>+>++[>[->+++++<<+++>]<<]",
+    ">+>++>+>+[>[->+++++<<++++>]<<]",
+    ">+>+>+++>+++[>[->+++<<+++>]<<]",
+    ">+>+>+++>++[>[->++++<<+++>]<<]",
+    ">+>+>+++>+[>[->+++<<++++>]<<]",
     ">+>+>++>+++[>[->+++<<+++>]<<]",
     ">+>+>++>+++[>[->++<<+++>]<<]",
     ">+>+>++>++[>[->++++<<+++>]<<]",
+    ">+>+>++>+[>[->++++<<++++>]<<]",
+    ">+>+>++>+[>[->+++<<++++>]<<]",
+    ">+>+>+>++[>[->+++++<<+++>]<<]",
     ">+>+>+>++[>[->++++<<+++>]<<]",
-    ">+>+>+>+>++++[>[->+++<<+++>]<<]",
+    ">+>+>+>+[>[->+++++<<++++>]<<]",
+
+    0 };
+
+char * hello_world3[] = {
+
+    "->+>+>>+>---[++++++++++++[>+++++>++>+<<<-]+<+]", /* https://esolangs.org/wiki/Talk:Brainfuck#Shortest_known_.22hello_world.22_program. */
+    "--->->->>+>+>>+[++++[>+++[>++++>-->+++<<<-]<-]<+++]",  /* https://esolangs.org/wiki/Talk:Brainfuck#Shortest_known_.22hello_world.22_program. */
 
     0 };
 
@@ -207,6 +212,7 @@ char * hello_world_byte[] = {
     "+[[->]-[-<]>--]",
     "+[[->]-[<]>+>-]",
     "-[[+>]+[<]>+++]",
+    ">+[[+>]+[<]>++]",
     ">+[[>]-[---<]>]",
     ">-[[>]+[++<]>+]",
 
@@ -239,13 +245,26 @@ char * hello_world_byte[] = {
     ">-[[>]+[+++<]>++]",
     ">-[[>]+[---<]>>-]",
 
+    ">+[>[------>]+[<]>+]",
     "+[------->->->+++<<<]",
+    ">+[[++++++++>]+[<]>+]",
     "-[->>[-------->]+[<]<]",
+    ">++[[++++++++>]+[<]>+]",
+    ">+[>[-------->]+[<]>+]",
     "+>-[>>+>+[++>-<<]-<+<+]",		/* http://inversed.ru/InvMem.htm#InvMem_7 */
+    ">++[[++++++++>]+[<]>++]",
+    ">+++[>[-------->]-[<]>+]",
+    ">++++[[++++++++>]++[<]>+]",
+    ">>+[>[-------->]+[<<]>>+]",
     "+[-[<<[+[--->]-[<<<]]]>>>-]",	/* http://inversed.ru/InvMem.htm#InvMem_7 */
+    ">>+[++[<+++>->+++<]>+++++++]",	/* https://codegolf.stackexchange.com/questions/55422/hello-world */
+    ">-[++[>+++>+++<<<++>-]---->+]",	/* https://codegolf.stackexchange.com/questions/55422/hello-world */
+    ">+>+>+>+>++++[>[->+++<<+++>]<<]",
+    ">+>>->--<<<[+[>->->-<<<<+>---]>]", /* https://codegolf.stackexchange.com/questions/55422/hello-world */
     "++[+++++++>++++>->->->++>-<<<<<<]",
     "++[+++++++>++++>->->->--->++<<<<<<]",
     "++++[------->-->--->--->->++++<<<<<]",
+    ">+>+>+++++++>++>+++[>[->+++<<+++>]<<]",
     "++[--------------->-->--->->+++++<<<<]",
     ">++++[<++++>-]<[++>+++>+++>---->+<<<<]",
     "++++++[+++++++>->++>++>---->+++>-<<<<<<]",
@@ -255,6 +274,12 @@ char * hello_world_byte[] = {
     "+++++++++++++[+++++++>->++>++>----->---->+++<<<<<<]",
     "+++++++++++++[------->+>-->-->+++++>--->++++<<<<<<]",
 
+#if (MAX_CELLS>2814) && (MAX_STEPS>55000000)
+    /* Too many steps and too many cells */
+    ">-[[-------->]-[--<]>-]",
+    ">+[[++++++++>]+[++<]>+]",
+#endif
+
     0 };
 
 int flg_binary = 0;
@@ -263,13 +288,11 @@ int flg_clear = 0;
 int flg_signed = 1;
 int flg_rtz = 0;
 
-int self_init = 0;
-
 int done_config_wipe = 0;
 
 int enable_multloop = 0;
 int multloop_maxcell = 5;
-int multloop_maxloop = 20;
+int multloop_maxloop = 40;
 int multloop_maxinc = 10;
 int multloop_no_prefix = 0;
 
@@ -282,18 +305,20 @@ int subrange_count = 0;
 
 int enable_twocell = 1;
 int enable_twincell = 1;
+int enable_countslide = 0;
 int enable_nestloop = 0;
 int enable_trislipnest = 0;
-int enable_special1 = 1;
-int enable_special2 = 1;
+int enable_special = 1;
 int enable_rerun = 1;
 
+int flg_fliptwocell = 0;
 int flg_lookahead = 0;
 int flg_zoned = 0;
 int flg_optimisable = 0;
 
 int verbose = 0;
 int bytewrap = 0;
+int bytenowrap = 0;
 int maxcol = 72;
 int blocksize = 0;
 int cell_limit = MAX_CELLS;
@@ -342,11 +367,11 @@ wipe_config()
     enable_nestloop = 0;
     enable_trislipnest = 0;
     enable_sliploop = 0;
+    enable_countslide = 0;
     enable_twocell = 0;
     enable_twincell = 0;
     enable_subrange = 0;
-    enable_special1 = 0;
-    enable_special2 = 0;
+    enable_special = 0;
     enable_rerun = 0;
 
     special_init = 0;
@@ -416,15 +441,16 @@ main(int argc, char ** argv)
 	    sliploop_maxind = 8;
 	    enable_multloop = 1;
 	    multloop_maxcell = 7;
-	    multloop_maxloop = 32;
+	    multloop_maxloop = 40;
 	    multloop_maxinc = 12;
 	    enable_twocell = 1;
 	    enable_twincell = 1;
+	    enable_countslide = 1;
 	    enable_subrange = 1;
 	    enable_nestloop = 1;
 	    enable_trislipnest = 1;
-	    enable_special1 = 1;
-	    enable_special2 = 1;
+	    enable_special = 1;
+	    enable_rerun = 1;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-std") == 0) {
@@ -440,12 +466,16 @@ main(int argc, char ** argv)
 	    special_init = argv[1]+2;
 	    argc--; argv++;
 
+	} else if (strcmp(argv[1], "-0") == 0) {
+	    flg_optimisable = !flg_optimisable;
+	    argc--; argv++;
+
 	} else if (strcmp(argv[1], "-O0") == 0) {
 	    wipe_config();
 	    enable_subrange = 1;
 	    enable_twocell = 1;
 	    enable_twincell = 1;
-	    enable_special1 = 1;
+	    enable_special = 1;
 	    flg_optimisable = 1;
 	    argc--; argv++;
 
@@ -455,7 +485,7 @@ main(int argc, char ** argv)
 	    enable_subrange = 1;
 	    enable_twocell = 1;
 	    enable_twincell = 1;
-	    enable_special1 = 1;
+	    enable_special = 1;
 	    flg_optimisable = 1;
 	    argc--; argv++;
 
@@ -463,12 +493,12 @@ main(int argc, char ** argv)
 	    wipe_config();
 	    enable_multloop = 1;
 	    multloop_maxcell = 7;
-	    multloop_maxloop = 32;
+	    multloop_maxloop = 40;
 	    multloop_maxinc = 12;
 	    enable_subrange = 1;
 	    enable_twocell = 1;
 	    enable_twincell = 1;
-	    enable_special1 = 1;
+	    enable_special = 1;
 	    flg_optimisable = 1;
 	    argc--; argv++;
 
@@ -487,8 +517,16 @@ main(int argc, char ** argv)
 	} else if (strcmp(argv[1], "-b") == 0) {
 	    bytewrap = !bytewrap;
 	    argc--; argv++;
+	} else if (strcmp(argv[1], "-nb") == 0) {
+	    bytenowrap = !bytenowrap;
+	    argc--; argv++;
 	} else if (strcmp(argv[1], "-rtz") == 0) {
 	    flg_rtz = !flg_rtz;
+	    argc--; argv++;
+
+	} else if (strcmp(argv[1], "-slide") == 0) {
+	    wipe_config();
+	    enable_countslide = !enable_countslide;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-slip") == 0) {
@@ -505,6 +543,13 @@ main(int argc, char ** argv)
 	    sliploop_maxind = 7;
 	    argc--; argv++;
 
+	} else if (strcmp(argv[1], "-slip3") == 0) {
+	    wipe_config();
+	    enable_sliploop = 1;
+	    sliploop_maxcell = 10;
+	    sliploop_maxind = 9;
+	    argc--; argv++;
+
 	} else if (strcmp(argv[1], "-mult") == 0) {
 	    wipe_config();
 	    enable_multloop = !enable_multloop;
@@ -514,7 +559,7 @@ main(int argc, char ** argv)
 	    wipe_config();
 	    enable_multloop = 1;
 	    multloop_maxcell = 7;
-	    multloop_maxloop = 32;
+	    multloop_maxloop = 40;
 	    multloop_maxinc = 12;
 	    argc--; argv++;
 
@@ -522,7 +567,7 @@ main(int argc, char ** argv)
 	    wipe_config();
 	    enable_multloop = 1;
 	    multloop_maxcell = 10;
-	    multloop_maxloop = 16;
+	    multloop_maxloop = 40;
 	    multloop_maxinc = 7;
 	    argc--; argv++;
 
@@ -535,6 +580,12 @@ main(int argc, char ** argv)
 	    enable_twocell = !enable_twocell;
 	    argc--; argv++;
 
+	} else if (strcmp(argv[1], "-Q+") == 0) {
+	    wipe_config();
+	    enable_twocell = !enable_twocell;
+	    flg_fliptwocell = enable_twocell;
+	    argc--; argv++;
+
 	} else if (strcmp(argv[1], "-q") == 0) {
 	    wipe_config();
 	    enable_twincell = !enable_twincell;
@@ -542,7 +593,7 @@ main(int argc, char ** argv)
 
 	} else if (strcmp(argv[1], "-X") == 0) {
 	    wipe_config();
-	    enable_special1 = enable_special2 = !enable_special1;
+	    enable_special = !enable_special;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-S") == 0) {
@@ -597,10 +648,12 @@ main(int argc, char ** argv)
 	    fprintf(stderr, "-i      Add/remove cell init strings and return to cell zero\n");
 	    fprintf(stderr, "-c      Add/remove cell clear strings and return to cell zero\n");
 	    fprintf(stderr, "-rtz    Set/clear Return to cell zero\n");
-	    fprintf(stderr, "-sc/-uc Assume chars are signed/unsigned\n");
+	    fprintf(stderr, "-sc/-uc Assume input chars are signed/unsigned\n");
 	    fprintf(stderr, "-b      Assume cells are bytes\n");
+	    fprintf(stderr, "-nb     Assume cells are non-wrapping unsigned bytes\n");
 	    fprintf(stderr, "\n");
 	    fprintf(stderr, "-q      Toggle two cells method\n");
+	    fprintf(stderr, "-Q      Toggle simple two cells method\n");
 	    fprintf(stderr, "\n");
 	    fprintf(stderr, "-mult   Toggle multiply loops\n");
 	    fprintf(stderr, "-mult2  Search long multiply loops (slow)\n");
@@ -622,7 +675,7 @@ main(int argc, char ** argv)
 	}
     }
     flg_rtz = (flg_rtz || flg_init || flg_clear);
-    if (bytewrap) flg_signed = 0;
+    if (bytewrap || bytenowrap) flg_signed = 0;
 
     if (multloop_maxcell > cell_limit) multloop_maxcell = cell_limit;
     if (sliploop_maxcell > cell_limit) sliploop_maxcell = cell_limit;
@@ -661,6 +714,7 @@ main(int argc, char ** argv)
 		*p++ = 0;
 		if (!flg_clear) flg_init = 1;
 		find_best_conversion(linebuf);
+		output_str("\n");
 		p = linebuf;
 	    }
 	}
@@ -677,17 +731,19 @@ void
 find_best_conversion(char * linebuf)
 {
     best_len = -1;	/* Clear 'best' string */
+    patterns_searched = 0;
 
     if (special_init != 0)
 	gen_special(linebuf, special_init, "from -I option", 1);
 
-    if (enable_special1) {
+    if (enable_special) {
 	if (verbose>2) fprintf(stderr, "Trying special strings\n");
 
 	gen_special(linebuf, RUNNERCODE1, "mult English", 0);
 	gen_special(linebuf, RUNNERCODE2, "mult*32 to 128", 0);
 	gen_special(linebuf, RUNNERCODE3, "mult*32 to 224", 0);
-	gen_special(linebuf, RUNNERCODE4, "mult*32 to 128/-96", 0);
+	if (!bytenowrap)
+	    gen_special(linebuf, RUNNERCODE4, "mult*32 to 128/-96", 0);
 	gen_special(linebuf, RUNNERCODE5, "Fourcell", 0);
 
 	if (!flg_zoned) {
@@ -697,48 +753,6 @@ find_best_conversion(char * linebuf)
 	}
 
 	gen_special(linebuf, "", "Bare cells", 0);
-    }
-
-    if (enable_special2) {
-	if (verbose>2) fprintf(stderr, "Trying complicated special strings\n");
-
-	if (flg_init) {
-	    self_init = 1;
-	    gen_special(linebuf, INITPREFIX1, "big ASCII 1 (i)", 0);
-	    gen_special(linebuf, INITPREFIX2, "big ASCII 2 (i)", 0);
-	    gen_special(linebuf, INITPREFIX3, "big ASCII 3 (i)", 0);
-	    gen_special(linebuf, INITPREFIX1A, "big ASCII 1A (i)", 0);
-	    gen_special(linebuf, INITPREFIX2A, "big ASCII 2A (i)", 0);
-	    gen_special(linebuf, INITPREFIX3A, "big ASCII 3A (i)", 0);
-	    gen_special(linebuf, INITPREFIX1B, "big ASCII 1B (i)", 0);
-	    gen_special(linebuf, INITPREFIX2B, "big ASCII 2B (i)", 0);
-	    gen_special(linebuf, INITPREFIX3B, "big ASCII 3B (i)", 0);
-
-	    gen_special(linebuf, INITPREFIX1_2, "big ASCII 1 (i)+", 0);
-	    gen_special(linebuf, INITPREFIX2_2, "big ASCII 2 (i)+", 0);
-	    gen_special(linebuf, INITPREFIX3_2, "big ASCII 3 (i)+", 0);
-	    gen_special(linebuf, INITPREFIX1A_2, "big ASCII 1A (i)+", 0);
-	    gen_special(linebuf, INITPREFIX2A_2, "big ASCII 2A (i)+", 0);
-	    gen_special(linebuf, INITPREFIX3A_2, "big ASCII 3A (i)+", 0);
-	    gen_special(linebuf, INITPREFIX1B_2, "big ASCII 1B (i)+", 0);
-	    gen_special(linebuf, INITPREFIX2B_2, "big ASCII 2B (i)+", 0);
-	    gen_special(linebuf, INITPREFIX3B_2, "big ASCII 3B (i)+", 0);
-	    self_init = 0;
-	} else {
-	    gen_special(linebuf, HUGEPREFIX1, "big ASCII 1", 0);
-	    gen_special(linebuf, HUGEPREFIX2, "big ASCII 2", 0);
-	    gen_special(linebuf, HUGEPREFIX3, "big ASCII 3", 0);
-	    gen_special(linebuf, HUGEPREFIX1A, "big ASCII 1A", 0);
-	    gen_special(linebuf, HUGEPREFIX2A, "big ASCII 2A", 0);
-	    gen_special(linebuf, HUGEPREFIX3A, "big ASCII 3A", 0);
-
-	    gen_special(linebuf, HUGEPREFIX1_2, "big ASCII 1+", 0);
-	    gen_special(linebuf, HUGEPREFIX2_2, "big ASCII 2+", 0);
-	    gen_special(linebuf, HUGEPREFIX3_2, "big ASCII 3+", 0);
-	    gen_special(linebuf, HUGEPREFIX1A_2, "big ASCII 1A+", 0);
-	    gen_special(linebuf, HUGEPREFIX2A_2, "big ASCII 2A+", 0);
-	    gen_special(linebuf, HUGEPREFIX3A_2, "big ASCII 3A+", 0);
-	}
     }
 
     if (enable_twocell) {
@@ -753,36 +767,9 @@ find_best_conversion(char * linebuf)
     }
 #endif
 
-    if (enable_special1) {
-	char ** hellos;
-	char namebuf[64];
-	if (verbose>2) fprintf(stderr, "Trying non-wrap hello-worlds\n");
-
-	for (hellos = hello_world; *hellos; hellos++) {
-	    sprintf(namebuf, "Hello world %d", (int)(hellos-hello_world));
-	    gen_special(linebuf, *hellos, namebuf, 0);
-	}
-    }
-
-    if (enable_special2) {
-	char ** hellos;
-	char namebuf[64];
-	if (verbose>2) fprintf(stderr, "Trying complex hello-worlds\n");
-
-	for (hellos = hello_world2; *hellos; hellos++) {
-	    sprintf(namebuf, "Complex world %d", (int)(hellos-hello_world2));
-	    gen_special(linebuf, *hellos, namebuf, 0);
-	}
-
-	if (bytewrap) for (hellos = hello_world_byte; *hellos; hellos++) {
-	    sprintf(namebuf, "Hello bytes %d", (int)(hellos-hello_world_byte));
-	    gen_special(linebuf, *hellos, namebuf, 0);
-	}
-    }
-
     if (subrange_count > 0) {
 	reinit_state();
-	gen_subrange(linebuf,subrange_count,flg_zoned,0);
+	gen_subrange(linebuf,subrange_count,flg_zoned);
     } else if (subrange_count == 0) {
 
 	if (enable_subrange) {
@@ -792,27 +779,27 @@ find_best_conversion(char * linebuf)
 	    if (!flg_zoned) {
 		subrange_count=10;
 		reinit_state();
-		gen_subrange(linebuf,subrange_count,0,1);
-
-		for(subrange_count = 2; subrange_count<45; subrange_count++) {
-		    reinit_state();
-		    gen_subrange(linebuf,subrange_count,0,0);
-		}
+		gen_subrange(linebuf,subrange_count,0);
 
 		for(subrange_count = 2; subrange_count<45; subrange_count++) {
 		    if (subrange_count == 10) continue;
 		    reinit_state();
-		    gen_subrange(linebuf,subrange_count,0,1);
+		    gen_subrange(linebuf,subrange_count,0);
 		}
 	    }
 
 	    for(subrange_count = 2; subrange_count<45; subrange_count++) {
 		reinit_state();
-		gen_subrange(linebuf,subrange_count,1,0);
+		gen_subrange(linebuf,subrange_count,1);
 	    }
 	}
 
 	subrange_count = 0;
+    }
+
+    if (enable_countslide) {
+	if (verbose>2) fprintf(stderr, "Trying 'Counted Slide' routine @%"PRIdMAX".\n", patterns_searched);
+	gen_countslide(linebuf);
     }
 
     if (enable_sliploop) {
@@ -827,6 +814,10 @@ find_best_conversion(char * linebuf)
 
     if (enable_multloop) {
 	if (verbose>2) fprintf(stderr, "Trying multiply loops @%"PRIdMAX".\n", patterns_searched);
+	/* Hide the unlikey ones */
+	if (!enable_special && multloop_maxloop >= 35 &&
+		multloop_maxcell >= 4 && multloop_maxinc >= 3)
+	    gen_special(linebuf, RUNNERCODE5, "Fourcell", 0);
 	gen_multonly(linebuf);
     }
 
@@ -841,11 +832,43 @@ find_best_conversion(char * linebuf)
 	gen_nestloop(linebuf);
     }
 
+    if (enable_special) {
+	char ** hellos;
+	char namebuf[64];
+	if (verbose>2) fprintf(stderr, "Trying non-wrap hello-worlds\n");
+
+	for (hellos = hello_world; *hellos; hellos++) {
+	    sprintf(namebuf, "Hello world %d", (int)(hellos-hello_world));
+	    gen_special(linebuf, *hellos, namebuf, 0);
+	}
+    }
+
+    if (enable_special && !flg_optimisable) {
+	char ** hellos;
+	char namebuf[64];
+	if (verbose>2) fprintf(stderr, "Trying complex hello-worlds\n");
+
+	for (hellos = hello_world2; *hellos; hellos++) {
+	    sprintf(namebuf, "Complex world %d", (int)(hellos-hello_world2));
+	    gen_special(linebuf, *hellos, namebuf, 0);
+	}
+
+	if (!bytenowrap) for (hellos = hello_world3; *hellos; hellos++) {
+	    sprintf(namebuf, "Complex world (-ve) %d", (int)(hellos-hello_world3));
+	    gen_special(linebuf, *hellos, namebuf, 0);
+	}
+
+	if (bytewrap) for (hellos = hello_world_byte; *hellos; hellos++) {
+	    sprintf(namebuf, "Hello bytes %d", (int)(hellos-hello_world_byte));
+	    gen_special(linebuf, *hellos, namebuf, 0);
+	}
+    }
+
     if (enable_rerun && !flg_lookahead && !flg_zoned) {
-	int i, save_si = self_init;
+	int i;
 	char *newname;
 	if (verbose>1) fprintf(stderr, "Rerunning with lookahead on found list\n");
-	flg_lookahead = 1; self_init = flg_init;
+	flg_lookahead = 1;
 
 	for(i=0; i<PREV_BEST; i++)
 	    if (best_init[i] && best_nmid[i]) {
@@ -856,10 +879,11 @@ find_best_conversion(char * linebuf)
 		free(newname);
 	    }
 
-	flg_lookahead = 0; self_init = save_si;
+	flg_lookahead = 0;
     }
 
-    if (verbose>1) fprintf(stderr, "Total of %"PRIdMAX" patterns searched.\n", patterns_searched);
+    if (verbose>1 && patterns_searched>1)
+	fprintf(stderr, "Total of %"PRIdMAX" patterns searched.\n", patterns_searched);
 
     if (best_len>=0) {
 	if (verbose)
@@ -897,15 +921,50 @@ check_if_best(char * buf, char * name)
     if (str_cells_used > cell_limit && cell_limit > 0) return;
 
     if (best_len == -1 || best_len >= str_next) {
+	/* We have a short string; check if it actually does the job! */
+	int clr_ok = 1, run_ok = 1, rv;
 
-	memset(cells, 0, sizeof(cells));
-	runbf(str_start, 1);
-	if (strncmp(buf, bf_print_buf, sizeof(bf_print_buf)) != 0) {
+	if (flg_init) {
+	    int i;
+	    for(i=0; i<MAX_CELLS; i++)
+		cells[i] = 0x55;
+	} else
+	    memset(cells, 0, sizeof(cells));
+
+	rv = runbf(str_start, 1);
+	if (rv < -1) run_ok = 0;  /* Will timeout for large inputs */
+
+	/* Only check the clear if we ran to completion */
+	if (rv >= 0 && strncmp(buf, bf_print_buf, bf_print_off) == 0) {
+
+	    if (flg_clear) {
+		int i, clean_unknown = 0;
+
+		if (flg_init) {
+		    memset(cells, 0, sizeof(cells));
+		    clean_unknown = (runbf(str_start, 1) < 0);
+		}
+
+		if (!clean_unknown)
+		    for(i=0; i<str_cells_used; i++)
+			if (cells[i] != 0)
+			    clr_ok = 0;
+	    }
+	}
+
+	if (flg_init)
+	    memset(cells, 0, sizeof(cells));
+
+	if (!clr_ok || !run_ok || strncmp(buf, bf_print_buf, bf_print_off) != 0) {
 	    int i;
 	    fprintf(stderr, "ERROR: Consistancy check for generated BF code FAILED.\n");
+	    if (!run_ok)
+		fprintf(stderr, "ERROR: Interpreter range error.\n");
+	    if (!clr_ok)
+		fprintf(stderr, "ERROR: Cell clear function failed.\n");
 	    fprintf(stderr, "Name: '%s'\n", name);
 	    fprintf(stderr, "Code: '%s'\n", str_start);
-	    fprintf(stderr, "Output: \"");
+	    fprintf(stderr, "Requested output: \"");
 	    for(i=0; buf[i]; i++) {
 		int c = buf[i];
 		if (c>=' ' && c<='~' && c!='\\' && c!='"')
@@ -922,7 +981,11 @@ check_if_best(char * buf, char * name)
 	}
     }
 
-    if (best_len == -1 || best_len > str_next || (best_len == str_next && str_cells_used < best_cells)) {
+    if (best_len == -1 || best_len > str_next ||
+       (best_len == str_next && (
+	    (str_cells_used < best_cells) ||
+	    (str_cells_used == best_cells && str_mark != 0 && str_mark < best_mark)
+	    ))) {
 	if (best_str) free(best_str);
 	best_str = malloc(str_next+1);
 	memcpy(best_str, str_start, str_next+1);
@@ -1065,7 +1128,25 @@ clear_tape(int currcell)
 
     /* Put the pointer back to the zero cell */
     if (flg_clear || flg_rtz || flg_init)
+    {
+	if (!flg_optimisable && cells[0] == 0 && currcell>3) {
+	    int usefn = 1;
+	    int cc = currcell, cval = 0;
+
+	    while(cc>0) {
+		if (cells[cc] == 0) break;
+		cc--; cval++;
+	    }
+	    if (cc<0 || cells[cc]) usefn = 0;
+
+	    if (usefn && cval > 3) {
+		add_str("[<]");
+		currcell = cc;
+	    }
+	}
+
 	while(currcell > 0) { add_chr('<'); currcell--; }
+    }
 
     return currcell;
 }
@@ -1092,7 +1173,7 @@ clear_tape(int currcell)
  */
 
 void
-gen_subrange(char * buf, int subrange, int flg_subzone, int flg_nonl)
+gen_subrange(char * buf, int subrange, int flg_subzone)
 {
     int counts[256] = {};
     int rng[256] = {};
@@ -1102,8 +1183,7 @@ gen_subrange(char * buf, int subrange, int flg_subzone, int flg_nonl)
     int i, j;
     char name[256];
 
-    sprintf(name, "Subrange %d, %s%s", subrange,
-	    flg_subzone?"zoned":"unzoned",flg_nonl?", nonl":"");
+    sprintf(name, "Subrange %d%s", subrange, flg_subzone?", zoned":"");
 
     patterns_searched++;
 
@@ -1118,7 +1198,6 @@ gen_subrange(char * buf, int subrange, int flg_subzone, int flg_nonl)
 
 	if (usecell > maxcell) maxcell = usecell;
 
-	if (flg_nonl && c == '\n') continue;
 	if (r == 0) continue;
 	counts[usecell] ++;
     }
@@ -1264,6 +1343,15 @@ gen_multonly(char * buf)
     int maxcell = 0;
     int currcell=0;
     int i;
+    int max_ch = -128, min_ch = 255;
+    char * p;
+
+    for(p=buf; *p;) {
+        int c = *p++;
+        if (flg_signed) c = (signed char)c; else c = (unsigned char)c;
+	if (c<min_ch) min_ch = c;
+	if (c>max_ch) max_ch = c;
+    }
 
     for(;;)
     {
@@ -1281,7 +1369,11 @@ return_to_top:
 			break;
 		    }
 		} else {
-		    if (!bytewrap && cellincs[i]*cellincs[0] > 255)
+		    if (!bytewrap && (
+			    cellincs[i]*cellincs[0] > 255 ||
+			    (cellincs[i]-1)*cellincs[0] >= max_ch ||
+			    (cellincs[i]+1)*cellincs[0] < min_ch
+			    ))
 			toohigh = 1;
 		    if (cellincs[i] <= multloop_maxinc) break;
 		}
@@ -1753,6 +1845,7 @@ gen_special(char * buf, char * initcode, char * name, int usercode)
     int remaining_offset = 0;
     int i;
     int bytewrap_override = 0;
+    char init_mode[MAX_CELLS];
 
     reinit_state();
 
@@ -1766,7 +1859,7 @@ gen_special(char * buf, char * initcode, char * name, int usercode)
      * By running it of course!
      * Use a local interpreter so we can give a better error message.
      */
-    if(!usercode) {
+    if(!usercode && !flg_init) {
 	remaining_offset = runbf(initcode, 1);
 	if (remaining_offset<0) {
 	    fprintf(stderr, "Code '%s' failed '%s'\n", name, initcode);
@@ -1776,22 +1869,37 @@ gen_special(char * buf, char * initcode, char * name, int usercode)
     } else {
 	char *p, *b;
 	int m=0, nestlvl=0;
-	int countdown = 2000000;
+	int countdown = MAX_STEPS;
 
 	maxcell = -1;
 	str_cells_used = maxcell+1;
+	init_mode[0] = (*initcode == '\0');
 
 	for(p=b=initcode;*p;p++) {
 	    switch(*p) {
 		case '>': m++;break;
 		case '<': m--;break;
-		case '+': cells[m]++;break;
-		case '-': cells[m]--;break;
-		case '[': if(cells[m]==0)while((nestlvl+=(*p=='[')-(*p==']'))&&p[1])p++;break;
-		case ']': if(cells[m]!=0)while((nestlvl+=(*p==']')-(*p=='['))&&p>b)p--;break;
+		case '+': cells[m]++; if(!init_mode[m]) init_mode[m] = 1; break;
+		case '-': cells[m]--; if(!init_mode[m]) init_mode[m] = 1; break;
+		case '[':
+		    if(!init_mode[m]) {
+			if(p[1] == '-' && p[2] == ']')
+			    init_mode[m] = 2;
+			else
+			    init_mode[m] = 1;
+		    }
+		    if(cells[m]==0)while((nestlvl+=(*p=='[')-(*p==']'))&&p[1])p++;
+		    break;
+		case ']':
+		    if(!init_mode[m]) init_mode[m] = 1;
+		    if(cells[m]!=0)while((nestlvl+=(*p==']')-(*p=='['))&&p>b)p--;
+		    break;
 	    }
 	    if (m<0 || m>= MAX_CELLS || --countdown == 0) break;
-	    if (m>maxcell) { maxcell = m; str_cells_used = maxcell+1; }
+	    if (m>maxcell) {
+		maxcell = m; str_cells_used = maxcell+1;
+		if (m>0) init_mode[m] = 0;
+	    }
 	    if (bytewrap || bytewrap_override) cells[m] &= 255;
 	    else if ((cells[m] & 255) == 0 && cells[m] != 0) {
 		bytewrap_override = 1;
@@ -1813,13 +1921,49 @@ gen_special(char * buf, char * initcode, char * name, int usercode)
 		"WARNING: Assuming bytewrapped interpreter for code %s\n",
 		name);
 
-    if (flg_init && !self_init) {
+    if (flg_init) {
+	int init_done = 0;
+
+	if (maxcell>10 && maxcell < 256 && !flg_optimisable) {
+	    int dirty = 0;
+	    for(i=0; i<maxcell+1; i++)
+		if (init_mode[i] == 1)
+		    dirty++;
+
+	    if (dirty>10) {
+		/* This is a "self cleaning rail", it fills N cells with '1'
+		 * completely ignoring the previous contents. It then removes
+		 * the rail to leave clean cells.
+		 */
+		int v = maxcell-2;
+		add_str("[-]");
+		if (v>16) {
+		    add_str(">[-]");
+		    for(i=0; i<v/8; i++)
+			add_chr('+');
+		    add_str("[-<++++++++>]<");
+		    v = v%8;
+		}
+		for(i=0;i<v; i++)
+		    add_chr('+');
+		add_str(">[-]>[-]<<[->>[>]+>[-]<[<]<]");
+		add_str(">>[>]<[-<]<");
+		init_done = 1;
+	    }
+	}
+
 	/* Clear the working cells */
-	if (maxcell<0) maxcell=0;
-	for(i=maxcell; i>=0; i--) {
-	    while(currcell < i) { add_chr('>'); currcell++; }
-	    while(currcell > i) { add_chr('<'); currcell--; }
-	    add_str("[-]");
+	if (!init_done) {
+	    if (maxcell<0) maxcell=0;
+	    for(i=maxcell; i>=0; i--) {
+		if(init_mode[i] == 1 || i == 0) {
+		    while(currcell < i) { add_chr('>'); currcell++; }
+		    while(currcell > i) { add_chr('<'); currcell--; }
+		}
+		if(init_mode[i] == 1) {
+		    add_str("[-]");
+		}
+	    }
 	}
     }
 
@@ -1850,6 +1994,7 @@ gen_unzoned(char * buf, int init_offset)
     int i;
     int currcell = init_offset;
     int more_cells = 0;
+    int min_cell = 0;
 
     if (!flg_init && !flg_optimisable && str_cells_used > 0)
 	if (str_cells_used < cell_limit || cell_limit <= 0)
@@ -1859,6 +2004,9 @@ gen_unzoned(char * buf, int init_offset)
     if (str_cells_used >= cell_limit) more_cells = 0;
     str_mark = str_next;
 
+    if (flg_clear && !flg_optimisable && str_cells_used > 4 && cells[0] == 0)
+	min_cell = 1;
+
     /* Print each character, use closest cell. */
     for(p=buf; *p;) {
 	int minrange = 999999;
@@ -1867,7 +2015,7 @@ gen_unzoned(char * buf, int init_offset)
 
 	if (flg_signed) c = (signed char)c; else c = (unsigned char)c;
 
-	for(i=0; i<str_cells_used+more_cells; i++) {
+	for(i=min_cell; i<str_cells_used+more_cells; i++) {
 	    int range = c - cells[i];
 	    if (bytewrap) range = (signed char)range;
 	    range = abs(range);
@@ -1892,7 +2040,11 @@ gen_unzoned(char * buf, int init_offset)
 
 	if (!flg_optimisable && currcell < usecell && currcell+3 < usecell) {
 	    int tcell = currcell;
-	    while(tcell<str_cells_used) {if (cells[tcell] == 0) break; tcell++;}
+	    if (flg_init) {
+		while(tcell<str_cells_used-1) {if (cells[tcell] == 0) break; tcell++;}
+	    } else {
+		while(tcell<str_cells_used) {if (cells[tcell] == 0) break; tcell++;}
+	    }
 	    if (cells[tcell] == 0 && abs(usecell-tcell)+3 < usecell-currcell) {
 		currcell = tcell;
 		add_chr('[');
@@ -2004,7 +2156,11 @@ gen_lookahead(char * buf, int init_cell)
 
 	if (!flg_optimisable && currcell < usecell && currcell+3 < usecell) {
 	    int tcell = currcell;
-	    while(tcell<str_cells_used) {if (cells[tcell] == 0) break; tcell++;}
+	    if (flg_init) {
+		while(tcell<str_cells_used-1) {if (cells[tcell] == 0) break; tcell++;}
+	    } else {
+		while(tcell<str_cells_used) {if (cells[tcell] == 0) break; tcell++;}
+	    }
 	    if (cells[tcell] == 0 && abs(usecell-tcell)+3 < usecell-currcell) {
 		currcell = tcell;
 		add_chr('[');
@@ -2156,11 +2312,10 @@ static char bestfactor[] = {
     /* Clear the working cells */
     if (flg_init) {
 	add_str("[-]>[-]");
-#ifdef FLIPTWOCELL
-	currcell=!currcell;
-#else
-	add_chr('<');
-#endif
+	if (flg_fliptwocell)
+	    currcell=!currcell;
+	else
+	    add_chr('<');
     }
 
     str_cells_used = maxcell+1;
@@ -2200,10 +2355,12 @@ static char bestfactor[] = {
 	if (a>1) {
 	    if (cdiff<0) a= -a;
 
-#ifdef FLIPTWOCELL
-	    if (cells[currcell] == cells[!currcell]) currcell = !currcell; else
-#endif
-	    if (currcell) add_chr('<'); else add_chr('>');
+	    if (flg_fliptwocell && cells[currcell] == cells[!currcell])
+		currcell = !currcell;
+	    else if (currcell)
+		add_chr('<');
+	    else
+		add_chr('>');
 
 	    for(i=0; i<b; i++) add_chr('+');
 
@@ -2356,6 +2513,73 @@ return_to_top:
     }
 }
 
+/* This generates some sequences that create a ramp of values from large
+ * to small. The collection of values is usually scattered nicely over
+ * the ASCII range (or the full unsigned byte range). The property that
+ * usually makes these special is that they are a rather short way to
+ * generate this sort of pattern.
+ */
+void
+gen_countslide(char * linebuf)
+{
+static char * countpre[] = {
+    "++++[>++++<-]",
+    "+++[>++++++<-]",
+    "++++[>+++++<-]",
+    "+++[>+++++++<-]",
+    "++++[>++++++<-]",
+    "+++++[>+++++<-]",
+    0};
+
+static char * extra_cell[] = {
+    ">[>",
+    ">[>+>",
+    ">[>++>",
+    ">[>+>++>",
+    0};
+
+static char * rampadd[] = {
+    "[++++++++++>]",
+    "[+++++++++>]",
+    "[++++++++>]",
+    "[+++++++>]",
+    "[++++++>]",
+    "[+++++>]",
+    "[++++>]",
+    "[+++>]",
+    0};
+
+static char * rampadj[] = {
+    "+",
+    "++",
+    "+++",
+    "++++",
+    0};
+
+static char codebuf[128];
+static char namebuf[128];
+
+    int a,b,c,d;
+    for(a=0; a<6; a++)
+	for(b=0; b<4; b++)
+	    for(c=0; c<8; c++)
+		for(d=0; d<4; d++)
+		{
+		    strcpy(codebuf, countpre[a]);
+		    strcat(codebuf, extra_cell[b]);
+		    strcat(codebuf, rampadd[c]);
+		    strcat(codebuf, rampadj[d]);
+
+		    if (flg_init)
+			strcat(codebuf, ">[-]<");
+
+		    strcat(codebuf, "[<]>-]");
+		    sprintf(namebuf, "Counted Slope %d,%d,%d,%d%s",
+			    a,b,c,d,flg_init?" (i)":"");
+		    gen_special(linebuf, codebuf, namebuf, 0);
+		}
+}
+
 /******************************************************************************/
 
 struct bfi { int mov; int cmd; int arg; } *pgm = 0;
@@ -2365,7 +2589,7 @@ int
 runbf(char * prog, int longrun)
 {
     int m= 0, p= -1, n= -1, j= -1, ch;
-    int maxcell = 0, countdown = (longrun?1000000:10000);
+    int maxcell = 0, countdown = (longrun?MAX_STEPS:10000);
     while((ch = *prog++)) {
 	int r = (ch == '<' || ch == '>' || ch == '+' || ch == '-');
 	if (r || (ch == ']' && j>=0) || ch == '[' || ch == '.') {
@@ -2393,7 +2617,8 @@ runbf(char * prog, int longrun)
 
     for(n=0; ; n++) {
 	m += pgm[n].mov;
-	if (m<0 || m>=MAX_CELLS || --countdown == 0) return -1;
+	if (m<0 || m>=MAX_CELLS) return -2;
+	if (--countdown == 0) return -1;
 	if (m>maxcell) maxcell = m;
 
         switch(pgm[n].cmd)
@@ -2411,5 +2636,6 @@ runbf(char * prog, int longrun)
         }
 
 	if (bytewrap) cells[m] &= 255;
+	if (bytenowrap && (cells[m] < 0 || cells[m] > 255)) return -3;
     }
 }
