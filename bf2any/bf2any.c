@@ -483,7 +483,8 @@ main(int argc, char ** argv)
 		    qstring = 0;
 		} else {
 		    outrun('[', 1); outrun('-', 1); outrun(']', 1);
-		    outrun('+', ch); outrun('.', 1); lastch = '.';
+		    outrun('+', ch); outrun('.', 1);
+		    lastch = '.'; c = 0;
 		    continue;
 		}
 	    }
