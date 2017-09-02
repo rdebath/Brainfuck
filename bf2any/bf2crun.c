@@ -486,12 +486,12 @@ compile_and_run_libtcc(void)
     if (verbose)
 	fprintf(stderr, "Compiling and running with libtcc\n");
     s = tcc_new();
-    if (s == NULL) { perror("tcc_new()"); exit(7); }
+    if (s == NULL) { perror("tcc_new() failed"); exit(7); }
     tcc_set_output_type(s, TCC_OUTPUT_MEMORY);
     tcc_compile_string(s, ccode);
 
     rv = tcc_run(s, 0, 0);
-    if (rv) fprintf(stderr, "tcc_run returned %d\n", rv);
+    if (rv) { perror("tcc_run() failed"); exit(8); }
     tcc_delete(s);
     free(ccode);
 }

@@ -9,7 +9,6 @@ group: beta
 addons:
   apt:
     packages:
-    - libtcc-dev
     - lua5.1
     - liblua5.1-bitop0
     - g++-multilib
@@ -43,7 +42,7 @@ script:
   - test ! -x tritium/bfi || tritium/bfi -v bitwidth.b
   - test ! -x tritium/bfi || tritium/bfi -v -rc bitwidth.b
   - test ! -x bf2any/bf2jit || bf2any/bf2jit bitwidth.b
-  - test ! -x bf2any/bf2crun || bf2any/bf2crun bitwidth.b
+  - test ! -x bf2any/bf2crun || bf2any/bf2crun -v bitwidth.b
   - test ! -x bf2any/bf2run || bf2any/bf2run bitwidth.b
   - test ! -x tritium/bfi || tritium/bfi testing/Mandelbrot.b
   - test ! -x tritium/bfi || tritium/bfi testing/Prime.b < testing/Prime.in
