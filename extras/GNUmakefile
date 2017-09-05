@@ -5,7 +5,7 @@ INSTALLEXT=
 CLIST=$(filter-out cdowhile.c lightning.c,$(wildcard *.c))
 EXELIST := $(patsubst %.c,%,$(CLIST))
 OBJECTS := $(patsubst %.c,%.o,$(CLIST)) ook.o
-ILIST=qtable.h qtable.tmp
+ILIST=qtable.h qtable.tmp byte2byte.tmp
 EXTRAS=bf1k bf0k bfas ook
 
 ALLEXE = $(EXELIST) $(MOREEXE) $(EXTRAS) $(LIBDL_EXE) $(LIGHTNINGEXE)
@@ -49,17 +49,20 @@ ook: ook.c
 lightning: lightning.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ $(LIBS_LIGHTNING) -o $@
 
-qtable.h: byte2byte
+qtable.h: byte2byte.tmp
 	echo 'char * bftable_s[256][256] =' > qtable.tmp
-	./byte2byte -d >> qtable.tmp
+	./byte2byte.tmp -d >> qtable.tmp
 
 	echo 'char * bftable_u[256][256] =' >> qtable.tmp
-	./byte2byte -d -u >> qtable.tmp
+	./byte2byte.tmp -d -u >> qtable.tmp
 
 	echo 'char * bftable_b[256][256] =' >> qtable.tmp
-	./byte2byte -d -b >> qtable.tmp
+	./byte2byte.tmp -d -b >> qtable.tmp
 
 	mv qtable.tmp qtable.h
+
+byte2byte.tmp: byte2byte.c
+	$(HOSTCC) -O -o $@ $^
 
 txtbf.o: txtbf.c qtable.h
 
@@ -69,7 +72,9 @@ LOGDEV=/dev/null
 MARK := $(shell echo Configuration start >$(LOGDEV))
 ################################################################################
 
-CC := $(shell ( which 2>/dev/null gcc clang pcc ; echo cc ) | head -1 | sed 's:.*/::')
+HOSTCC := $(shell ( which 2>/dev/null gcc clang pcc ; echo cc ) | head -1 | sed 's:.*/::')
+CC := $(HOSTCC)
+
 # LEX := $(shell ( which 2>/dev/null flex ; echo lex ) | head -1 | sed 's:.*/::')
 LEX := flex
 
