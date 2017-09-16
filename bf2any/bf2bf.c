@@ -60,7 +60,8 @@ int disable_savestring = 1;
 #define L_EXCON         0x1A    /* ascii(token, count); */
 #define L_ABCD          0x1B    /* ascii(token, count); */
 #define L_BINERDY       0x1C    /* ascii(token, count); */
-#define L_QQQ           0x1D    /* qqq(token, count); */
+#define L_TICK          0x1D    /* ascii(token, count); */
+#define L_QQQ           0x1E    /* qqq(token, count); */
 
 static const char bf[] = "><+-.,[]";
 static const char * bfout[] = { ">", "<", "+", "-", ".", ",", "[", "]", 0 };
@@ -601,6 +602,9 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-binerdy") == 0) {
 	lang = 0; langclass = L_BINERDY; return 1;
     } else
+    if (strcmp(arg, "-tick") == 0) {
+	lang = 0; langclass = L_TICK; return 1;
+    } else
     if (strcmp(arg, "-dowhile") == 0) {
 	lang = 0; langclass = L_DOWHILE; return 1;
     } else
@@ -689,6 +693,7 @@ static int disable_optimisation(void)
     case L_EXCON:
     case L_ABCD:
     case L_BINERDY:
+    case L_TICK:
 	return 0;
 
     case L_BFRLE:	/* These prefer RLE, but don't have optimisation */
@@ -867,6 +872,7 @@ outcmd(int ch, int count)
     case L_EXCON:
     case L_ABCD:
     case L_BINERDY:
+    case L_TICK:
     case L_ASCII:       ascii(ch, count); break;
     case L_DOWHILE:	bfdowhile(ch, count); break;
     case L_QQQ:		qqq(ch, count); break;
@@ -1400,7 +1406,7 @@ static int outbit = 1, outch = 0, outtog = 0;
 	    n->loop = jmpstack; jmpstack = n;
 	} else if (n->ch == ']') {
 	    n->loop = jmpstack; jmpstack = jmpstack->loop; n->loop->loop = n;
-	} else if (n->ch == ',') inp = 1;
+	} else if (n->ch == ',' && L_BASE == L_ASCII) inp = 1;
     }
 
     if (ch == '!') {
@@ -1500,6 +1506,31 @@ static int outbit = 1, outch = 0, outtog = 0;
 		    pc('0'+outtog);
 		    for(i=0; i<10; i++)
 			pc('0'+(outtog=!outtog));
+		    break;
+		case L_TICK:
+		    v = (m->val & 0xFF);
+		    {
+			static unsigned char curval[256];
+			static int curcell = 0;
+			int best = 0, best_d = v - curval[0];
+			if (best_d < 0) best_d += 256;
+			for (i=0; i<256; i++) {
+			    int diff = v - curval[i];
+			    if (diff < 0) diff += 256;
+			    if (diff < best_d) {
+				best_d = diff;
+				best = i;
+			    }
+			}
+			while(curcell<best) {pc('>'); curcell++;}
+			while(curcell>best) {pc('<'); curcell--;}
+			while(curval[curcell] != v) {
+			    pc('+');
+			    curval[curcell]++;
+			    curval[curcell] &= 0xFF;
+			}
+			pc('.');
+		    }
 		    break;
 		}
 		break;
