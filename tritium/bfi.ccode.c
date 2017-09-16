@@ -581,7 +581,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    else if (n->count > 0)
 		fprintf(ofd, "m += %d;\n", n->count);
 	    else
-		fprintf(ofd, "/* m += 0; */\n");
+		fprintf(ofd, "; /* m += 0; */\n");
 	    break;
 
 	case T_ADD:
@@ -598,7 +598,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		else if (n->count > 0)
 		    fprintf(ofd, "*m += %d;\n", n->count);
 		else
-		    fprintf(ofd, "/* *m += 0; */\n");
+		    fprintf(ofd, "; /* *m += 0; */\n");
 	    } else {
 		if (n->count == 1)
 		    fprintf(ofd, "++m[%d];\n", n->offset);
@@ -611,7 +611,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		else if (n->count > 0)
 		    fprintf(ofd, "m[%d] += %d;\n", n->offset, n->count);
 		else
-		    fprintf(ofd, "/* m[%d] += 0; */\n", n->offset);
+		    fprintf(ofd, "; /* m[%d] += 0; */\n", n->offset);
 	    }
 	    if (enable_trace) {
 		pt(ofd, indent,0);

@@ -819,6 +819,10 @@ static int dld, inp, rle = 0, num = 1;
     for(n=bfprog; n; n=n->next) {
 	switch(n->type)
 	{
+	    case T_ADD:
+	    case T_MOV:
+		if(n->count == 0) n->type = T_NOP;
+		break;
 	    case T_WHL: n->count = ++lid; break;
 	    case T_ERR: /* Unbalanced bkts */
 		fprintf(stderr,
@@ -1743,7 +1747,9 @@ quick_scan(void)
 	 * conditional abort.
 	 */
 	if( n->type == T_WHL && n->next &&
-	    n->next->type == T_END ) {
+	    (n->next->type == T_END ||
+	     (n->next->type == T_NOP && n->next->next && n->next->next->type == T_END)
+	    )){
 
 	    /* Insert a T_STOP */
 	    n2 = add_node_after(n);
