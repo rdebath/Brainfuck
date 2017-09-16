@@ -511,7 +511,7 @@ main(int argc, char ** argv)
 	    /* Do the RLE */
 	    if (m && ch == lastch) { c+=multi; continue; }
 	    /* Post the RLE token onward */
-	    if (c) outrun(lastch, c);
+	    if (c) { outrun(lastch, c); c=0; }
 	    if (!m) {
 		/* Non RLE tokens here */
 		if (ch == '"') { qstring++; continue; }
@@ -519,14 +519,15 @@ main(int argc, char ** argv)
 		if (ch == '=') {
 		    outrun('[', 1); outrun('-', 1); outrun(']', 1);
 		    lastch = ']';
-		    c = 0;
 		    continue;
 		}
-		if (!b && ch == ']') continue; /* Ignore too many ']' */
+		if (!b && ch == ']') {
+		    fprintf(stderr, "Warning: skipping unbalanced ']' command.\n");
+		    continue; /* Ignore too many ']' */
+		}
 		b += (ch=='[') - (ch==']');
 		if (lastch == '[' && ch == ']') outrun('X', 1);
 		outrun(ch, 1);
-		c = 0;
 	    } else
 		c = multi;
 	    lastch = ch;
@@ -534,7 +535,11 @@ main(int argc, char ** argv)
 	if (ifd != stdin) fclose(ifd);
     }
     if(c) outrun(lastch, c);
-    while(b>0){ outrun(']', 1); b--;} /* Not enough ']', add some. */
+    if(b>0) {
+	fprintf(stderr, "Warning: closing unbalanced '[' command.\n");
+	outrun('[', 1); outrun('-', 1); outrun(']', 1);
+	while(b>0){ outrun(']', 1); b--;} /* Not enough ']', add some. */
+    }
     if (enable_debug && lastch != '#') outrun('#', 0);
     outrun('~', 0);
     return 0;
