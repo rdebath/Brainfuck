@@ -113,10 +113,9 @@ pt(FILE* ofd, int indent_to, struct bfi * n)
 {
     int i, j;
     for(j=(n==0 || !enable_trace); j<2; j++) {
-	if (max_indent > 16) {
+	if (max_indent > 10) {
 	    int k = indent_to;
-	    if (max_indent < 64) k *= 2;
-	    k += 2;
+	    if (max_indent < 64) k = 2*k+2; else k++;
 	    if (k>128) k = 128;
 	    for(i=0; i+7<k; ) {
 		fprintf(ofd, "\t");
