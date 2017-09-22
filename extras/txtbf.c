@@ -285,7 +285,7 @@ char * hello_world_byte[] = {
 int flg_binary = 0;
 int flg_init = 0;
 int flg_clear = 0;
-int flg_signed = 1;
+int flg_signed = 0;
 int flg_rtz = 0;
 
 int done_config_wipe = 0;
@@ -318,7 +318,6 @@ int flg_optimisable = 0;
 
 int verbose = 0;
 int bytewrap = 0;
-int bytenowrap = 0;
 int maxcol = 72;
 int blocksize = 0;
 int cell_limit = MAX_CELLS;
@@ -517,9 +516,6 @@ main(int argc, char ** argv)
 	} else if (strcmp(argv[1], "-b") == 0) {
 	    bytewrap = !bytewrap;
 	    argc--; argv++;
-	} else if (strcmp(argv[1], "-nb") == 0) {
-	    bytenowrap = !bytenowrap;
-	    argc--; argv++;
 	} else if (strcmp(argv[1], "-rtz") == 0) {
 	    flg_rtz = !flg_rtz;
 	    argc--; argv++;
@@ -675,7 +671,7 @@ main(int argc, char ** argv)
 	}
     }
     flg_rtz = (flg_rtz || flg_init || flg_clear);
-    if (bytewrap || bytenowrap) flg_signed = 0;
+    if (bytewrap) flg_signed = 0;
 
     if (multloop_maxcell > cell_limit) multloop_maxcell = cell_limit;
     if (sliploop_maxcell > cell_limit) sliploop_maxcell = cell_limit;
@@ -741,8 +737,9 @@ find_best_conversion(char * linebuf)
 
 	gen_special(linebuf, RUNNERCODE1, "mult English", 0);
 	gen_special(linebuf, RUNNERCODE2, "mult*32 to 128", 0);
-	gen_special(linebuf, RUNNERCODE3, "mult*32 to 224", 0);
-	if (!bytenowrap)
+	if (!flg_signed)
+	    gen_special(linebuf, RUNNERCODE3, "mult*32 to 224", 0);
+	if (flg_signed || bytewrap)
 	    gen_special(linebuf, RUNNERCODE4, "mult*32 to 128/-96", 0);
 	gen_special(linebuf, RUNNERCODE5, "Fourcell", 0);
 
@@ -766,6 +763,39 @@ find_best_conversion(char * linebuf)
 	gen_twincell(linebuf);
     }
 #endif
+
+    if (enable_special) {
+	char ** hellos;
+	char namebuf[64];
+	if (verbose>2) fprintf(stderr, "Trying non-wrap hello-worlds\n");
+
+	for (hellos = hello_world; *hellos; hellos++) {
+	    sprintf(namebuf, "Hello world %d", (int)(hellos-hello_world));
+	    gen_special(linebuf, *hellos, namebuf, 0);
+	}
+    }
+
+    if (enable_special && !flg_optimisable) {
+	char ** hellos;
+	char namebuf[64];
+	if (verbose>2) fprintf(stderr, "Trying complex hello-worlds\n");
+
+	for (hellos = hello_world2; *hellos; hellos++) {
+	    sprintf(namebuf, "Complex world %d", (int)(hellos-hello_world2));
+	    gen_special(linebuf, *hellos, namebuf, 0);
+	}
+
+	if (flg_signed || bytewrap)
+	    for (hellos = hello_world3; *hellos; hellos++) {
+		sprintf(namebuf, "Complex world (-ve) %d", (int)(hellos-hello_world3));
+		gen_special(linebuf, *hellos, namebuf, 0);
+	    }
+
+	if (bytewrap) for (hellos = hello_world_byte; *hellos; hellos++) {
+	    sprintf(namebuf, "Hello bytes %d", (int)(hellos-hello_world_byte));
+	    gen_special(linebuf, *hellos, namebuf, 0);
+	}
+    }
 
     if (subrange_count > 0) {
 	reinit_state();
@@ -830,38 +860,6 @@ find_best_conversion(char * linebuf)
 	if (verbose>2) fprintf(stderr, "Trying 'nested loop' routine @%"PRIdMAX".\n", patterns_searched);
 	reinit_state();
 	gen_nestloop(linebuf);
-    }
-
-    if (enable_special) {
-	char ** hellos;
-	char namebuf[64];
-	if (verbose>2) fprintf(stderr, "Trying non-wrap hello-worlds\n");
-
-	for (hellos = hello_world; *hellos; hellos++) {
-	    sprintf(namebuf, "Hello world %d", (int)(hellos-hello_world));
-	    gen_special(linebuf, *hellos, namebuf, 0);
-	}
-    }
-
-    if (enable_special && !flg_optimisable) {
-	char ** hellos;
-	char namebuf[64];
-	if (verbose>2) fprintf(stderr, "Trying complex hello-worlds\n");
-
-	for (hellos = hello_world2; *hellos; hellos++) {
-	    sprintf(namebuf, "Complex world %d", (int)(hellos-hello_world2));
-	    gen_special(linebuf, *hellos, namebuf, 0);
-	}
-
-	if (!bytenowrap) for (hellos = hello_world3; *hellos; hellos++) {
-	    sprintf(namebuf, "Complex world (-ve) %d", (int)(hellos-hello_world3));
-	    gen_special(linebuf, *hellos, namebuf, 0);
-	}
-
-	if (bytewrap) for (hellos = hello_world_byte; *hellos; hellos++) {
-	    sprintf(namebuf, "Hello bytes %d", (int)(hellos-hello_world_byte));
-	    gen_special(linebuf, *hellos, namebuf, 0);
-	}
     }
 
     if (enable_rerun && !flg_lookahead && !flg_zoned) {
@@ -2276,13 +2274,10 @@ gen_print(char * buf, int init_offset)
  * It's the classic algorithm but only rarely is it the shortest.
  */
 
-void
-gen_twoflower(char * buf)
-{
-    /* This table gives the shortest strings (using a simple multiplier form)
-     * for all the values upto 255. It was created with a simple brute force
-     * search.
-     */
+/* This table gives the shortest strings (using a simple multiplier form)
+ * for all the values upto 255. It was created with a simple brute force
+ * search.
+ */
 static char bestfactor[] = {
 	 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 	 4, 4, 3, 3, 4, 3, 3,20, 4, 5, 5, 3, 4, 4, 5, 5,
@@ -2300,6 +2295,10 @@ static char bestfactor[] = {
 	13,11,14,14,14,14,28,28,12,12,12,27,11,13,13,30,
 	14,15,15,28,12,12,10,11,11,29,13,13,13,30,14,14,
 	15,15,11,11,11,29,29,13,13,13,30,30,14,14,31,15};
+
+void
+gen_twoflower(char * buf)
+{
 
     const int maxcell = 1;
     int currcell=0;
@@ -2522,62 +2521,67 @@ return_to_top:
 void
 gen_countslide(char * linebuf)
 {
-static char * countpre[] = {
-    "++++[>++++<-]",
-    "+++[>++++++<-]",
-    "++++[>+++++<-]",
-    "+++[>+++++++<-]",
-    "++++[>++++++<-]",
-    "+++++[>+++++<-]",
-    0};
+static char codebuf[128], *s;
+static char namebuf[128];
+    int p1,p2,p3,p4;
 
 static char * extra_cell[] = {
-    ">[>",
-    ">[>+>",
-    ">[>++>",
-    ">[>+>++>",
+    "[>[",
+    "[>+>[",
+    "[>++>[",
+    "[>+++>[",
+    "[>+>++>[",
+    "[>++>+>[",
     0};
 
-static char * rampadd[] = {
-    "[++++++++++>]",
-    "[+++++++++>]",
-    "[++++++++>]",
-    "[+++++++>]",
-    "[++++++>]",
-    "[+++++>]",
-    "[++++>]",
-    "[+++>]",
-    0};
+    for(p2=0; p2<6; p2++)
+	for(p4=-10; p4<10; p4++)
+	    if (p4 != 0 && (flg_signed || p4>0))
+		for(p3=3; p3<20; p3++)
+		    for(p1=7; p1<65; p1++)
+		    {
+			int i,t,a,b,c=0;
+			if ( (p1-1)*p3+p4 > 255) continue;
+			if ( p4<0 && p3 <= -p4) continue;
 
-static char * rampadj[] = {
-    "+",
-    "++",
-    "+++",
-    "++++",
-    0};
+			s = codebuf;
 
-static char codebuf[128];
-static char namebuf[128];
+			t = bestfactor[p1]; a =(t&0xF); t = !!(t&0x10);
+			b = p1/a+t;
 
-    int a,b,c,d;
-    for(a=0; a<6; a++)
-	for(b=0; b<4; b++)
-	    for(c=0; c<8; c++)
-		for(d=0; d<4; d++)
-		{
-		    strcpy(codebuf, countpre[a]);
-		    strcat(codebuf, extra_cell[b]);
-		    strcat(codebuf, rampadd[c]);
-		    strcat(codebuf, rampadj[d]);
+			if (a>1) {
+			    for(i=0; i<b; i++) *s++ = '+';
 
-		    if (flg_init)
-			strcat(codebuf, ">[-]<");
+			    *s++ = '['; *s++ = '>';
+			    while(a > 0) { *s++ = '+'; a--; c += b; }
+			    *s++ = '<'; *s++ = '-'; *s++ = ']';
+			}
+			*s++ = '>';
 
-		    strcat(codebuf, "[<]>-]");
-		    sprintf(namebuf, "Counted Slope %d,%d,%d,%d%s",
-			    a,b,c,d,flg_init?" (i)":"");
-		    gen_special(linebuf, codebuf, namebuf, 0);
-		}
+			while(c < p1) { *s++ = '+'; c++; }
+			while(c > p1) { *s++ = '-'; c--; }
+
+			strcpy(s, extra_cell[p2]);
+			s = codebuf + strlen(codebuf);
+
+			for(i=0; i<p3; i++) *s++ = '+';
+			*s++ = '>'; *s++ = ']';
+			if (p4>0)
+			for(i=0; i<p4; i++) *s++ = '+';
+			if (p4<0)
+			for(i=0; i>p4; i--) *s++ = '-';
+			*s = 0;
+
+			if (flg_init)
+			    strcat(codebuf, ">[-]<");
+
+			strcat(codebuf, "[<]>-]");
+
+			sprintf(namebuf, "Counted Slope %d,%d,%d,%d%s",
+				p1,p2,p3,p4,flg_init?" (i)":"");
+			gen_special(linebuf, codebuf, namebuf, 0);
+
+		    }
 }
 
 /******************************************************************************/
@@ -2636,6 +2640,11 @@ runbf(char * prog, int longrun)
         }
 
 	if (bytewrap) cells[m] &= 255;
-	if (bytenowrap && (cells[m] < 0 || cells[m] > 255)) return -3;
+	else {
+	    if (cells[m] > 255 ||
+		(!flg_signed && cells[m] < 0) ||
+		(flg_signed && cells[m] < -128))
+		return -3;
+	}
     }
 }
