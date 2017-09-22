@@ -1,4 +1,5 @@
-#!/bin/sh
+#!/bin/bash
+if [ ! -n "$BASH_VERSION" ];then exec bash "$0" "$@";else set +o posix;fi
 
 [ -f "$1" ] || { echo >&2 "Usage: $0 BF_Program"; exit 1;}
 
@@ -21,8 +22,8 @@ xxd -g0 -l18 -c18
 )"
 
 for i in "$P"/broken-bf?.c
-do  echo $(basename "$i") :"$(
-    ( ulimit -t 2 ; tcc -run $i "$1" </dev/null |
+do  echo "$(basename "$i")" :"$(
+    ( ulimit -t 2 ; tcc -run "$i" "$1" </dev/null |
     xxd -g0 -l18 -c18 ) 2>&1 )"
 done
 
