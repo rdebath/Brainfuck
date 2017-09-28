@@ -149,6 +149,7 @@ run_maxtree(void)
 #if !defined(DISABLE_BN)
 
 #include <openssl/bn.h>
+#include <openssl/crypto.h>
 
 static BIGNUM ** mem = 0;
 static int dyn_memsize = 0;
