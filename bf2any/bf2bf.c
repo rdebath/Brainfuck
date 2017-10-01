@@ -1005,18 +1005,18 @@ bftranslate(int ch, int count)
 	    /* This generates 256 to check for larger than byte cells. */
 	    pc(0); puts("// This generates 256 to check for larger than byte cells");
 	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]");
-	    pmc("<[" ">>\n\n");
+	    pmc("<[" "[-]\n\n");
 
 	    pc(0); puts("// This code may be replaced by the original source");
 	    lang = bfout; bfreprint();
 	    pc('\n'); puts("// to here");
 
-	    pmc("\n<<[-]]\n\n");
+	    pmc("\n[-]]\n\n");
 
 	    /* This generates 256 to check for cells upto 8 bits */
 	    pc(0); puts("// This code runs on byte sized cells");
-	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]");
-	    pmc("+<[>-<[-]]>[>");
+	    pmc("[-]>[-]++++++++[<++++++++>-]<[>++++<-]");
+	    pmc("+>[<->[-]]<[[-]");
 
 	    pmc("\n\n");
 
@@ -1028,7 +1028,7 @@ bftranslate(int ch, int count)
 	    }
 
 	    pmc("\n\n");
-	    pmc("<[-]]<");
+	    pmc("[-]]");
 	} else {
 	    /* Eight bit and thirty two bit. */
 	    /* This condition is a bit more difficult to optimise and a bit
