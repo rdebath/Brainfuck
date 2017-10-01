@@ -261,6 +261,7 @@ run_supertree(void)
 		    BN_sub(t1, t1, t3);
 		}
 
+		BN_mask_bits(t1, cell_length);
 		BN_copy(m[n->offset], t1);
 		break;
 
