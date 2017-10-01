@@ -723,7 +723,7 @@ load_file(FILE * ifd, int is_first, int is_last, char * bfstring)
     struct bfi *p=0, *n=bfprog;
 
 static struct bfi *jst;
-static int dld, inp, rle = 0, num = 1;
+static int dld, inp, rle = 0, num = 1, ov_flg;
 
     if (is_first) { jst = 0; dld = 0; }
     if (n) { while(n->next) n=n->next; p = n;}
@@ -741,13 +741,14 @@ static int dld, inp, rle = 0, num = 1;
 	    if (rle == 0) {
 		num = ch-'0';
 		rle = 1;
+		ov_flg = 0;
 	    } else
-		num = ov_iadd(ov_imul(num, 10), ch-'0');
+		num = ov_iadd(ov_imul(num, 10, &ov_flg), ch-'0', &ov_flg);
 	    continue;
 	}
 	rle = 0;
 	/* A long run of digits is a comment */
-	if (num == INT_MIN) num = 1;
+	if (ov_flg) num = 1;
 	if (ch == ' ' || ch == '\n' || ch == '\t') continue;
 
 	switch(ch) {
@@ -786,8 +787,8 @@ static int dld, inp, rle = 0, num = 1;
 		/* RLE compacting of instructions. This will be done by later
 		 * passes, but it's cheaper to do it here. */
 		if (c && p && ch == p->type){
-		    int t = ov_iadd(p->count, c);
-		    if (t != INT_MIN) {
+		    int ov_flg_rle = 0, t = ov_iadd(p->count, c, &ov_flg_rle);
+		    if (!ov_flg_rle) {
 			p->count = t;
 			continue;
 		    }
@@ -1729,8 +1730,8 @@ quick_scan(void)
 	    /* If followed by a matching T_ADD merge that in too */
 	    n2 = n->next->next->next;
 	    if (n2 && n2->type == T_ADD && n2->offset == n->next->offset) {
-		int t = ov_iadd(n->next->count, n2->count);
-		if (t != INT_MIN) {
+		int ov_flg=0, t = ov_iadd(n->next->count, n2->count, &ov_flg);
+		if (!ov_flg) {
 		    n->next->count = t;
 		    n2->type = T_NOP;
 		}
@@ -2299,8 +2300,9 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 		if (n && n->offset == v->offset &&
 			(n->type == T_ADD || n->type == T_CALC) ) {
 		    if (cell_size<=0) {
-			if (ov_iadd(n->count, v->count) == INT_MIN)
-			    return 0;
+			int ov_flg=0;
+			(void)ov_iadd(n->count, v->count, &ov_flg);
+			if (ov_flg) return 0;
 		    }
 		    n->count += v->count;
 		    if (cell_mask > 0) n->count = SM(n->count);
@@ -2388,8 +2390,9 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
     switch(v->type) {
 	case T_ADD: /* Promote to T_SET. */
 	    if (cell_size <= 0) {
-		if (ov_iadd(v->count, known_value) == INT_MIN)
-		    break;
+		int ov_flg=0;
+		(void) ov_iadd(v->count, known_value, &ov_flg);
+		if (ov_flg) break;
 	    }
 	    v->type = T_SET;
 	    v->count += known_value;
@@ -2615,10 +2618,14 @@ find_known_calc_state(struct bfi * v)
 
     if (v->count2 && v->count3 && v->offset2 == v->offset3) {
 	/* This is an unlikely overflow. */
-	if (cell_size<=0 && ov_iadd(v->count2, v->count3) == INT_MIN) {
-	    if (verbose>5)
-		fprintf(stderr, "T_CALC merge overflow @(%d,%d)\n", v->line, v->col);
-	    return 0;
+	if (cell_size<=0) {
+	    int ov_flg=0;
+	    (void) ov_iadd(v->count2, v->count3, &ov_flg);
+	    if (ov_flg) {
+		if (verbose>5)
+		    fprintf(stderr, "T_CALC merge overflow @(%d,%d)\n", v->line, v->col);
+		return 0;
+	    }
 	}
 
 	/* Merge identical sides */
@@ -2674,8 +2681,9 @@ find_known_calc_state(struct bfi * v)
 
     if (const_found2 && cell_size<=0) {
 	/* If the calc might overflow ignore the constant */
-	int cnt = ov_iadd(v->count, ov_imul(v->count2, known_value2));
-	if (cnt == INT_MIN) {
+	int ov_flg=0;
+	(void) ov_iadd(v->count, ov_imul(v->count2, known_value2, &ov_flg), &ov_flg);
+	if (ov_flg) {
 	    if (verbose>5)
 		fprintf(stderr, "T_CALC const2 overflow %d+%d*%d @(%d,%d)\n",
 			v->count, v->count2, known_value2, v->line, v->col);
@@ -2685,8 +2693,9 @@ find_known_calc_state(struct bfi * v)
 
     if (const_found3 && cell_size<=0) {
 	/* If the calc might overflow ignore the constant */
-	int cnt = ov_iadd(v->count, ov_imul(v->count3, known_value3));
-	if (cnt == INT_MIN) {
+	int ov_flg=0;
+	(void) ov_iadd(v->count, ov_imul(v->count3, known_value3, &ov_flg), &ov_flg);
+	if (ov_flg) {
 	    if (verbose>5)
 		fprintf(stderr, "T_CALC const3 overflow %d+%d*%d @(%d,%d)\n",
 			v->count, v->count3, known_value3, v->line, v->col);
@@ -2791,11 +2800,15 @@ find_known_calc_state(struct bfi * v)
 	 * and the next node wipes it. */
 	/* This is a BF standard form. */
 
-	if (cell_size<=0 && ov_imul(v->count2, n2->count2) == INT_MIN) {
-	    if (verbose>5)
-		fprintf(stderr, "T_CALC merge Mult overflow %d*%d @(%d,%d)\n",
-			v->count2, n2->count2, v->line, v->col);
-	    return rv;
+	if (cell_size<=0) {
+	    int ov_flg=0;
+	    (void) ov_imul(v->count2, n2->count2, &ov_flg);
+	    if (ov_flg) {
+		if (verbose>5)
+		    fprintf(stderr, "T_CALC merge Mult overflow %d*%d @(%d,%d)\n",
+			    v->count2, n2->count2, v->line, v->col);
+		return rv;
+	    }
 	}
 
 	v->offset2 = n2->offset2;
@@ -2944,19 +2957,20 @@ flatten_loop(struct bfi * v, int constant_count)
 
 	    if (n->type == T_END || n->type == T_ENDIF) break;
 	    if (n->type == T_ADD) {
-		newcount = ov_imul(n->count, constant_count);
-		if (newcount == INT_MIN) {
+		int ov_flg = 0;
+		newcount = ov_imul(n->count, constant_count, &ov_flg);
+		if (ov_flg) {
 		    if (verbose>5) fprintf(stderr, "  Loop calculation overflow @(%d,%d)\n", n->line, n->col);
 		    return 0;
 		}
 	    }
 	    if (n->type == T_CALC) {
 		/* n->count2 = pow(n->count2, constant_count) */
-		int i, j = n->count2;
+		int ov_flg=0, i, j = n->count2;
 		newcount = j;
-		for(i=0; i<constant_count-1; i++)
-		    newcount = ov_imul(newcount, j);
-		if (newcount == INT_MIN) {
+		for(i=0; i<constant_count-1 && !ov_flg; i++)
+		    newcount = ov_imul(newcount, j, &ov_flg);
+		if (ov_flg) {
 		    if (verbose>5) fprintf(stderr, "  Loop power calculation overflow @(%d,%d)\n", n->line, n->col);
 		    return 0;
 		}

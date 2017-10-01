@@ -11,20 +11,22 @@
  */
 
 static inline
-signed int ov_imul(signed int a, signed int b) {
+signed int ov_imul(signed int a, signed int b, int * ov) {
 
   /* Propagate overflow indicator */
-  if (a == INT_MIN || b == INT_MIN) return INT_MIN;
+  if (*ov) return INT_MIN;
 
   if (a > 0) {  /* a is positive */
     if (b > 0) {  /* a and b are positive */
       if (a > (INT_MAX / b)) {
         /* Handle error */
+	*ov = 1;
 	return INT_MIN;
       }
     } else { /* a positive, b nonpositive */
       if (b < (INT_MIN / a)) {
         /* Handle error */
+	*ov = 1;
 	return INT_MIN;
       }
     } /* a positive, b nonpositive */
@@ -32,11 +34,13 @@ signed int ov_imul(signed int a, signed int b) {
     if (b > 0) { /* a is nonpositive, b is positive */
       if (a < (INT_MIN / b)) {
         /* Handle error */
+	*ov = 1;
 	return INT_MIN;
       }
     } else { /* a and b are nonpositive */
       if ( (a != 0) && (b < (INT_MAX / a))) {
         /* Handle error */
+	*ov = 1;
 	return INT_MIN;
       }
     } /* End if a and b are nonpositive */
@@ -46,14 +50,15 @@ signed int ov_imul(signed int a, signed int b) {
 }
 
 static inline
-signed int ov_iadd(signed int a, signed int b) {
+signed int ov_iadd(signed int a, signed int b, int * ov) {
 
   /* Propagate overflow indicator */
-  if (a == INT_MIN || b == INT_MIN) return INT_MIN;
+  if (*ov) return INT_MIN;
 
   if (((b > 0) && (a > (INT_MAX - b))) ||
       ((b < 0) && (a < (INT_MIN - b)))) {
     /* Handle error */
+    *ov = 1;
     return INT_MIN;
 
   } else {
@@ -62,14 +67,15 @@ signed int ov_iadd(signed int a, signed int b) {
 }
 
 static inline
-signed int ov_isub(signed int a, signed int b) {
+signed int ov_isub(signed int a, signed int b, int * ov) {
 
   /* Propagate overflow indicator */
-  if (a == INT_MIN || b == INT_MIN) return INT_MIN;
+  if (*ov) return INT_MIN;
 
   if ((b > 0 && a < INT_MIN + b) ||
       (b < 0 && a > INT_MAX + b)) {
     /* Handle error */
+    *ov = 1;
     return INT_MIN;
   } else {
     return a - b;
@@ -77,13 +83,14 @@ signed int ov_isub(signed int a, signed int b) {
 }
 
 static inline
-signed int ov_idiv(signed int a, signed int b) {
+signed int ov_idiv(signed int a, signed int b, int * ov) {
 
   /* Propagate overflow indicator */
-  if (a == INT_MIN || b == INT_MIN) return INT_MIN;
+  if (*ov) return INT_MIN;
 
   if ((b == 0) || ((a == INT_MIN) && (b == -1))) {
     /* Handle error */
+    *ov = 1;
     return INT_MIN;
   } else {
     return a / b;
@@ -91,13 +98,14 @@ signed int ov_idiv(signed int a, signed int b) {
 }
 
 static inline
-signed int ov_imod(signed int a, signed int b) {
+signed int ov_imod(signed int a, signed int b, int * ov) {
 
   /* Propagate overflow indicator */
-  if (a == INT_MIN || b == INT_MIN) return INT_MIN;
+  if (*ov) return INT_MIN;
 
   if ((b == 0 ) || ((a == INT_MIN) && (b == -1))) {
     /* Handle error */
+    *ov = 1;
     return INT_MIN;
   } else {
     return a % b;
@@ -105,9 +113,12 @@ signed int ov_imod(signed int a, signed int b) {
 }
 
 static inline
-signed int ov_ineg(signed int a) {
-  /* Propagate overflow indicator, and it's an overflow on 2's-c. */
-  if (a == INT_MIN) return INT_MIN;
+signed int ov_ineg(signed int a, int * ov) {
+  /* Propagate overflow indicator, and INT_MIN is overflow on 2's-c. */
+  if (*ov || a == INT_MIN) {
+      *ov = 1;
+      return INT_MIN;
+  }
   return -a;
 }
 
