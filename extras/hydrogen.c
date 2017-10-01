@@ -11,13 +11,13 @@
 
 /* Choose a cell size: 0, 1, 2, 4, 127, 255, 65535, others.
  */
-#if MASK == 1 || !defined(MASK)
+#if MASK <= 1 || !defined(MASK)
 #define icell	unsigned char
 #define M(x) x
 #ifndef ALIGNED
 #define dcell	unsigned short
 #endif
-#ifndef MASK
+#if !defined(MASK) || MASK < 1
 #define ENABLE_DOUBLE
 #endif
 
@@ -30,12 +30,19 @@
 #elif MASK == 4
 #define icell	unsigned int
 #define M(x) x
-#elif MASK == 8
+#elif MASK < 8 && MASK > 4
+#define icell	unsigned long long
+#define M(x) ((x) & ((1ULL << (MASK*8)) -1))
+#elif MASK == 8 || MASK == 64
 #define icell	unsigned long long
 #define M(x) x
 #elif MASK == 16
 #define icell	__uint128_t
 #define M(x) x
+
+#elif MASK < 64
+#define icell	unsigned long long
+#define M(x) ((x) & ((1ULL << MASK) -1))
 
 #elif MASK == 0xFF || MASK == 0xFFFF || MASK == 0xFFFFFF
 #define icell	unsigned int
@@ -43,6 +50,11 @@
 #elif MASK == 0xFFFFFFFF
 #define icell	unsigned int
 #define M(x) x
+
+#elif MASK > 0xFFFFFF
+#define icell	unsigned long long
+#define M(x) ((x) % (MASK+1))
+#define MODMASK
 
 #else
 #define icell	int
