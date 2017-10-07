@@ -190,20 +190,6 @@ ifeq ($(HAVE_GDLM),)
 CFLAGS += -include lib/getdelim.c
 endif
 
-HAVE_STRD := $(call try-run,\
-	{ echo '\#define _GNU_SOURCE'; \
-	  echo '\#include <stdio.h>'; \
-	  echo '\#include <string.h>'; \
-	  echo 'int main () {'; \
-	  echo 'char *b=0;'; \
-	  echo 'b=strdup("hello");'; \
-	  echo 'return !b;}'; \
-	  } > $(TMP).c ; $(TRYCC2) -o $(TMP),1)
-
-ifeq ($(HAVE_STRD),)
-CFLAGS += -include lib/strdup.h
-endif
-
 STDC99 := $(call try-run,\
         { echo '\#include <stdio.h>'; \
           echo 'int main () {printf("Hello World!");return 0;}'; \

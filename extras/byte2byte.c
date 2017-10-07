@@ -30,6 +30,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Ancient systems don't have strdup */
+#if defined(__GNUC__) \
+    && (__GNUC__ > 2) || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
+#if (_XOPEN_VERSION+0) < 500 && _POSIX_VERSION < 200809L
+#if !defined(strdup) && !defined(_WIN32)
+#define strdup(str) \
+    ({char*_s=(str);int _l=strlen(_s)+1;void*_t=malloc(_l);if(_t)memcpy(_t,_s,_l);_t;})
+#endif
+#endif
+#endif
+
 int cell_wrap = 0;
 int cell_unsigned = 0;
 int textmode = 0;
