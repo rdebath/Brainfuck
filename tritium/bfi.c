@@ -328,6 +328,9 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("   -E5      Disable ',' command, ie: treat it as a comment character.\n");
     printf("   -E6      Treat running the ',' command as an error and Stop.\n");
     printf("\n");
+    printf("   -I'xx'   Use the string as the input to the BF program.\n");
+    printf("   -P'pgm'  The string pgm is the first part of the BF program.\n");
+    printf("\n");
     printf("General extras\n");
     printf("   -fintio\n");
     printf("        Use decimal I/O instead of character I/O.\n");
@@ -652,12 +655,7 @@ main(int argc, char ** argv)
     if(help_flag)
 	LongUsage(stdout, 0);
 
-    if(program_string) {
-	if(filecount)
-	    Usage("Error: File arguments and -P cannot be used together");
-    } else
-
-    if(filecount == 0) {
+    if(!program_string && filecount == 0) {
 	if (isatty(STDIN_FILENO))
 	    Usage("Error: Filename or '-' should be specified");
 	filelist[filecount++] = "-";
@@ -679,27 +677,34 @@ main(int argc, char ** argv)
 #include "bfi.be.def"
 #endif
 
-    if (filecount == 1 && strcmp(filelist[0], "-"))
-	bfname = filelist[0];	/* From argv */
+    {
+	int first=1;
 
-    for(ar = 0; ar<filecount; ar++) {
-	FILE * ifd;
-	const char * fname = filelist[ar];
+	if (filecount == 1 && strcmp(filelist[0], "-"))
+	    bfname = filelist[0];	/* From argv */
 
-	if (!fname || strcmp(fname, "-") == 0) ifd = stdin;
-	else if ((ifd = fopen(fname, "r")) == 0) {
-	    perror(fname);
-	    exit(1);
+	if(program_string) {
+	    load_file(0, 1, (filecount==0), program_string);
+	    first = 0;
 	}
 
-	load_file(ifd, ar==0, ar+1>=filecount, 0);
+	for(ar = 0; ar<filecount; ar++) {
+	    FILE * ifd;
+	    const char * fname = filelist[ar];
 
-	if (ifd!=stdin) fclose(ifd);
+	    if (!fname || strcmp(fname, "-") == 0) ifd = stdin;
+	    else if ((ifd = fopen(fname, "r")) == 0) {
+		perror(fname);
+		exit(1);
+	    }
+
+	    load_file(ifd, first, ar+1>=filecount, 0);
+	    first = 0;
+
+	    if (ifd!=stdin) fclose(ifd);
+	}
+	free(filelist); filelist = 0;
     }
-    free(filelist); filelist = 0;
-
-    if(program_string)
-	load_file(0, 1, 1, program_string);
 
     process_file();
 
