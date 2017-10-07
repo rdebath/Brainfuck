@@ -64,7 +64,8 @@ qtable.h: byte2byte.tmp
 byte2byte.tmp: byte2byte.c
 	$(HOSTCC) -O -o $@ $^
 
-txtbf.o: txtbf.c qtable.h
+txtbf: txtbf.c
+	$(CC) $(CFLAGS) $(QTABLEDEF) $(LDFLAGS) $(TARGET_ARCH) txtbf.c -o $@
 
 ################################################################################
 ifneq ($(MAKECMDGOALS),clean)
@@ -188,6 +189,16 @@ HAVE_GDLM := $(call try-run,\
 
 ifeq ($(HAVE_GDLM),)
 CFLAGS += -include lib/getdelim.c
+endif
+
+LOW_MEM := $(call try-run,\
+            [ "`ulimit -v 2>$(LOGDEV)`" = unlimited ] || \
+            [ "`ulimit -v 2>$(LOGDEV)`" -lt 40960 ] ,1)
+
+ifeq ($(LOW_MEM),)
+QTABLEDEF = -DNOQTABLE
+else
+txtbf: qtable.h
 endif
 
 STDC99 := $(call try-run,\
