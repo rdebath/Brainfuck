@@ -208,6 +208,10 @@ static const char * spoon[] =
     { "010", "011", "1", "000", "001010", "0010110", "00100", "0011",
       "", "00101111" };
 
+/* Language "trollscript" */
+static const char * troll[] =
+    { "ooo", "ool", "olo", "oll", "loo", "lol", "llo", "lll", "Tro", "ll." };
+
 /* Language brainbool: http://esolangs.org/wiki/Brainbool */
 static const char * brainbool[] =
     {">>>>>>>>>", "<<<<<<<<<",
@@ -365,7 +369,7 @@ static const char ** lang = bfout;
 static const char ** c = 0;
 static int linefix = EOF;
 static int col = 0;
-static int maxcol = 72;
+static int maxcol = -1;
 static int state = 0;
 static int bf_mov = 0;
 static int enable_bf_mov = 0;
@@ -400,6 +404,7 @@ fn_check_arg(const char * arg)
 {
     if (strcmp(arg, "+init") == 0) {
 	disable_be_optim = (disable_optimisation() > 0);
+	if (maxcol < 0) maxcol = 72;
 	return 1;
     }
     if (strcmp(arg, "?no-rle") == 0) return (disable_optimisation() > 1);
@@ -518,7 +523,7 @@ fn_check_arg(const char * arg)
 	lang = lisp2; langclass = L_CHARS; return 1;
     } else
     if (strcmp(arg, "-bewbs") == 0) {
-	lang = bewbs; langclass = L_JNWORD; return 1;
+	lang = bewbs; langclass = L_WORDS; return 1;
     } else
     if (strcmp(arg, "-chi") == 0 || strcmp(arg, "-chinese") == 0) {
 	lang = chinese; langclass = L_JNWORD; return 1;
@@ -617,7 +622,14 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-qqq") == 0 || strcmp(arg, "-???") == 0) {
 	lang = 0; langclass = L_QQQ; return 1;
     } else
+    if (strcmp(arg, "-troll") == 0) {
+	lang = troll; langclass = L_JNWORD+GEN_HEADER; return 1;
+    } else
 
+    if (strcmp(arg, "-w") == 0) {
+	maxcol = 0;
+	return 1;
+    } else
     if (strncmp(arg, "-w", 2) == 0 && arg[2] >= '0' && arg[2] <= '9') {
 	maxcol = atol(arg+2);
 	return 1;

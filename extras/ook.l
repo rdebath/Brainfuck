@@ -45,6 +45,7 @@ size_t bf_prefilter(char * buf, size_t maxsize);
 %x TRIP
 %x PETOOH
 %x SPOON
+%x TROLL
 
 w	[\t ]*
 ws	[\t ]+
@@ -235,6 +236,22 @@ ook	B?[Oo]ok
     .		commentch(yytext[0]);
 }
 
+<TROLL>{
+    ooo		pc('>');
+    ool		pc('<');
+    olo		pc('+');
+    oll		pc('-');
+    loo		pc('.');
+    lol		pc(',');
+    llo		pc('[');
+    lll		pc(']');
+    tro		;
+    "ll."	;
+
+    [ \t\n]+	{int i; for(i=0; i<yyleng; i++) commentch(yytext[i]);}
+    .		commentch(yytext[0]);
+}
+
 <ALWORD>{
     /* Simple "words". These sets don't interfere with each-other. */
 
@@ -308,6 +325,7 @@ ook	B?[Oo]ok
 .		commentch(yytext[0]);
 %%
 
+void Usage(void);
 void addcmd(int, int);
 void run(void);
 struct bfi { int mov; int cmd; int arg; } *pgm = 0;
@@ -318,7 +336,9 @@ int on_eof = 1, runit = 0, debug = 0;
 int sof = 1, cln = 0, col = 0, ccol = 0;
 int alset = 0;
 
-int quiet = 0;
+int quiet = 1;
+
+char * progname = "C";
 
 char * character_prefilter = 0;
 char * character_conversion = 0;
@@ -338,6 +358,7 @@ int main(int argc, char ** argv)
     char ** filelist = 0;
     int ar, filecount = 0;
 
+    progname = argv[0];
     filelist = calloc(argc, sizeof *filelist);
 
     while(argc>1)
@@ -345,12 +366,14 @@ int main(int argc, char ** argv)
 	if(argv[1][0] == '-' && enable_opts) {
 	    if (!strcmp(argv[1], "--")) enable_opts = 1;
 	    else if (!strcmp(argv[1], "-r")) runit = 1;
+	    else if (!strcmp(argv[1], "-run")) runit = 1;
 
 	    else if (!strcmp(argv[1], "-e")) on_eof = -1;
 	    else if (!strcmp(argv[1], "-z")) on_eof = 0;
 	    else if (!strcmp(argv[1], "-n")) on_eof = 1;
 	    else if (!strcmp(argv[1], "-d")) debug = 1;
 	    else if (!strcmp(argv[1], "-q")) quiet = 1;
+	    else if (!strcmp(argv[1], "-v")) quiet = 0;
 
 	    else if (!strcmp(argv[1], "-chash")) line_cc = '#';
 	    else if (!strcmp(argv[1], "-cslash")) line_cc = '/';
@@ -403,6 +426,11 @@ int main(int argc, char ** argv)
 		character_prefilter = "01";
 	    }
 
+	    else if (!strcmp(argv[1], "-troll")) {
+		mode = TROLL;
+		character_prefilter = "trol.TROL";
+	    }
+
 	    else if (!strcmp(argv[1], "-tinybf")) {
 		mode = INITIAL;
 		custom_prefilter = tiny_bf_to_bf;
@@ -415,6 +443,7 @@ int main(int argc, char ** argv)
 
 	    else {
 		fprintf(stderr, "Unknown option %s\n", argv[1]);
+		Usage();
 		exit(1);
 	    }
 	    argv++, argc--;
@@ -455,6 +484,62 @@ int main(int argc, char ** argv)
 	run();
     }
     return 0;
+}
+
+void
+Usage(void)
+{
+    fprintf(stderr, "%s: [options] [file]\n", progname);
+
+    fprintf(stderr, "\n");
+    fprintf(stderr, "This program converts various trivial brainfuck substitutions\n");
+    fprintf(stderr, "into brainfuck and, optionally, runs it.\n");
+    fprintf(stderr, "Most of these are defined on https://esolangs.org\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Options:\n");
+
+    fprintf(stderr, "   -run -r  Run the converted brainfuck\n");
+    fprintf(stderr, "   -v       Verbose, try to include original source in output.\n");
+    fprintf(stderr, "   -d       Debug, use '#' for a debug character.\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "   -e       Use -1 for EOF.\n");
+    fprintf(stderr, "   -z       Use 0 for EOF.\n");
+    fprintf(stderr, "   -n       Leave the cell unchanged on EOF.\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "   -chash   A comment starts at a '#' til the end of line.\n");
+    fprintf(stderr, "   -cslash  A comment starts at a '/' til the end of line.\n");
+    fprintf(stderr, "   -csemi   A comment starts at a ';' til the end of line.\n");
+    fprintf(stderr, "   -nocom   Disable any default line comments.\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "   -ook     Input using Ook! with '/' comments. \n");
+    fprintf(stderr, "   -bfrle   Input run length encoded BF, decimal repeat prefix, '=' and quoted\n");
+    fprintf(stderr, "            strings.\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "   -bf='><+-.,[]#'\n");
+    fprintf(stderr, "            Input using any single character substitution.\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "   -blub    Input using blub.\n");
+    fprintf(stderr, "   -pog     Input using pogaack.\n");
+    fprintf(stderr, "   -fk      Input using fuck fuck.\n");
+    fprintf(stderr, "   -zzz     Input using zzz.\n");
+    fprintf(stderr, "   -nice    Input using up, down, left, right, in, out, begin, end.\n");
+    fprintf(stderr, "   -eris    Input using BrainFNORD discordian buzzwords.\n");
+    fprintf(stderr, "   -pika    Input using Pikalang, sounds made by Pikachu\n");
+    fprintf(stderr, "   -fish    Input using There Once was a Fish Named Fred\n");
+    fprintf(stderr, "   -bewbs   Input using Bewbs\n");
+    fprintf(stderr, "   -chi     Input using some random Chinese\n");
+    fprintf(stderr, "   -lisp    Input using lots of parentheses\n");
+    fprintf(stderr, "   -mini    Input using just the first letters of -nice\n");
+    fprintf(stderr, "   -alphuck Input using yet another single letter substitution.\n");
+    fprintf(stderr, "   -petooh  Input using Petooh https://github.com/Ky6uk/PETOOH\n");
+    fprintf(stderr, "   -trip    Input using Triplet\n");
+    fprintf(stderr, "   -tinybf  Input using TinyBF\n");
+    fprintf(stderr, "   -troll   Input using Trollscript\n");
+    fprintf(stderr, "   -??? -qqq\n");
+    fprintf(stderr, "            Input using ???\n");
+
+//  fprintf(stderr, "--------------------------------------------------------------------------------\n");
+
 }
 
 static void
