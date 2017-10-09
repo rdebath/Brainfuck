@@ -831,7 +831,7 @@ outcmd(int ch, int count)
     if (ch == '!' && (langclass & GEN_HEADER) != 0)
 	ps(lang[8]);
 
-    if (ch == '=' && !enable_be_optim) {
+    if (ch == '=' && !enable_be_optim && L_BASE != L_BFRLE) {
         outcmd('[', 1);
         outcmd('-', 1);
         outcmd(']', 1);
@@ -1206,6 +1206,17 @@ bfrle(int ch, int count)
 {
     char * p;
     char buf[64];
+
+    if (ch == '=') {
+	pc('=');
+	if (count == 0) return;
+	if (count>0) {
+	    ch = '+';
+	} else {
+	    count = -count;
+	    ch = '-';
+	}
+    }
 
     if (! (p = strchr(bf,ch))) return;
 
