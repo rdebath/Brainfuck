@@ -141,15 +141,8 @@ outcmd(int ch, int count)
     if (embed_tokens) {
 	if (count == 1)
 	    printf("{%c}", ch);
-	else if (enable_be_optim || count == 0)
+	else
 	    printf("{%c%d}", ch, count);
-	else {
-	    int i;
-	    putchar('{');
-	    for(i=0; i<count; i++)
-		putchar(ch);
-	    putchar('}');
-	}
     }
 
 #define WRITETOS \
