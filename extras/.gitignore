@@ -1,3 +1,4 @@
+*.tmp
 bf-trace
 bf0k
 bf1k
@@ -16,5 +17,5 @@ ook.c
 profilebf
 proton
 qtable.h
-qtable.tmp
+trixy
 txtbf

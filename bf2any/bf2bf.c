@@ -10,7 +10,7 @@
 
 static check_arg_t fn_check_arg;
 struct be_interface_s be_interface = {fn_check_arg};
-int disable_savestring = 1;
+int disable_be_optim = 1;
 
 /*
  * BF translation to BF. This isn't an identity translation because even
@@ -55,11 +55,6 @@ int disable_savestring = 1;
 #define L_MALBRAIN      0x16    /* malbrain(token, count); */
 #define L_HANOILOVE     0x17    /* hanoilove(token, count); */
 #define L_DOWHILE       0x18    /* bfdowhile(token, count); */
-#define L_ASCII         0x19    /* ascii(token, count); */
-#define L_EXCON         0x1A    /* ascii(token, count); */
-#define L_ABCD          0x1B    /* ascii(token, count); */
-#define L_BINERDY       0x1C    /* ascii(token, count); */
-#define L_TICK          0x1D    /* ascii(token, count); */
 #define L_QQQ           0x1E    /* qqq(token, count); */
 
 static const char bf[] = "><+-.,[]";
@@ -376,7 +371,7 @@ static int enable_bf_mov = 0;
 static int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
 
 static int bf_multi = 0, tmp_clean = 1;
-static struct instruction *pgm = 0, *last = 0, *jmpstack = 0;
+static struct instruction *pgm = 0, *last = 0;
 
 /* Default double and quad to the easiest to prove algorithms. */
 const char ** doubler = doubler_copy;
@@ -390,7 +385,6 @@ static void bfxml(int ch, int count);
 static void bfugly(int ch, int count);
 static void malbrain(int ch, int count);
 static void hanoilove(int ch, int count);
-static void ascii(int ch, int count);
 static void qqq(int ch, int count);
 static void bfdowhile(int ch, int count);
 static void bftranslate(int ch, int count);
@@ -401,7 +395,6 @@ static int
 fn_check_arg(const char * arg)
 {
     if (strcmp(arg, "+init") == 0) {
-	disable_be_optim = (disable_optimisation() > 0);
 	if (maxcol < 0) maxcol = 72;
 	return 1;
     }
@@ -593,21 +586,6 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-hanoilove") == 0) {
 	lang = 0; langclass = L_HANOILOVE; return 1;
     } else
-    if (strcmp(arg, "-ascii") == 0) {
-	lang = 0; langclass = L_ASCII; return 1;
-    } else
-    if (strcmp(arg, "-excon") == 0) {
-	lang = 0; langclass = L_EXCON; return 1;
-    } else
-    if (strcmp(arg, "-abcd") == 0) {
-	lang = 0; langclass = L_ABCD; return 1;
-    } else
-    if (strcmp(arg, "-binerdy") == 0) {
-	lang = 0; langclass = L_BINERDY; return 1;
-    } else
-    if (strcmp(arg, "-tick") == 0) {
-	lang = 0; langclass = L_TICK; return 1;
-    } else
     if (strcmp(arg, "-dowhile") == 0) {
 	lang = 0; langclass = L_DOWHILE; return 1;
     } else
@@ -664,9 +642,6 @@ fn_check_arg(const char * arg)
 	"\n\t"  "-cupid  Cupid from http://esolangs.org/wiki/Cupid"
 	"\n\t"  "-malbrain Malbrain translation"
 	"\n\t"  "-hanoilove Hanoi Love translation"
-	"\n\t"  "-ascii  Convert BF to ASCII"
-	"\n\t"  "-excon  EXCON translation -- http://esolangs.org/wiki/EXCON"
-	"\n\t"  "-abcd   ABCD translation -- http://esolangs.org/wiki/ABCD"
 	"\n\t"  "-dowhile Do ... while translataion."
 	"\n\t"  "-???    https://esolangs.org/wiki/%3F%3F%3F"
 	"\n\t"  "-dc     Convert to dc(1) using the first of below."
@@ -692,13 +667,6 @@ fn_check_arg(const char * arg)
 static int disable_optimisation(void)
 {
     switch(L_BASE) {
-
-    case L_ASCII:
-    case L_EXCON:
-    case L_ABCD:
-    case L_BINERDY:
-    case L_TICK:
-	return 0;
 
     case L_BFRLE:	/* These prefer RLE, but don't have optimisation */
     case L_BFXML:
@@ -823,7 +791,7 @@ outcmd(int ch, int count)
     if (ch == '!' && (langclass & GEN_HEADER) != 0)
 	ps(lang[8]);
 
-    if (ch == '=' && !enable_be_optim && L_BASE != L_BFRLE) {
+    if (ch == '=' && L_BASE != L_BFRLE) {
         outcmd('[', 1);
         outcmd('-', 1);
         outcmd(']', 1);
@@ -872,11 +840,6 @@ outcmd(int ch, int count)
     case L_UGLYBF:	bfugly(ch, count); break;
     case L_MALBRAIN:	malbrain(ch, count); break;
     case L_HANOILOVE:	hanoilove(ch, count); break;
-    case L_EXCON:
-    case L_ABCD:
-    case L_BINERDY:
-    case L_TICK:
-    case L_ASCII:       ascii(ch, count); break;
     case L_DOWHILE:	bfdowhile(ch, count); break;
     case L_QQQ:		qqq(ch, count); break;
     }
@@ -1390,186 +1353,6 @@ hanoilove(int ch, int count)
 	pc('!');
 	pc(';');
 	break;
-    }
-}
-
-void
-ascii(int ch, int count)
-{
-static int msk;
-static struct mem *m;
-static int v = 0xDEADBEEF;
-static int inp = 0;
-static int outbit = 1, outch = 0, outtog = 0;
-
-    if (ch != '!' && ch != '~')
-    {
-	struct instruction * n = calloc(1, sizeof*n);
-	if (!n) { perror("calloc"); exit(42); }
-
-	n->ch = ch;
-	n->count = count;
-	if (!last) {
-	    pgm = n;
-	} else {
-	    last->next = n;
-	}
-	last = n;
-
-	if (n->ch == '[') {
-	    n->loop = jmpstack; jmpstack = n;
-	} else if (n->ch == ']') {
-	    n->loop = jmpstack; jmpstack = jmpstack->loop; n->loop->loop = n;
-	} else if (n->ch == ',' && L_BASE == L_ASCII) inp = 1;
-    }
-
-    if (ch == '!') {
-	msk = (bytecell)?0xFF:-1;
-	m = calloc(1,sizeof*m);
-	setbuf(stdout, 0);
-    }
-
-    if (pgm && (ch == '~' || (!inp && !jmpstack)))
-    {
-	struct instruction * n;
-	int i;
-
-	for(n=pgm; n; n=n->next) switch(n->ch) {
-
-	    case '=': m->val = n->count; break;
-	    case 'B': v = (m->val & msk); break;
-	    case 'm': /* if (v == 0) break; */
-	    case 'M': m->val = m->val + v*n->count; break;
-	    case 'n': /* if (v == 0) break; */
-	    case 'N': m->val = m->val - v*n->count; break;
-	    case 's': /* if (v == 0) break; */
-	    case 'S': m->val = m->val + v; break;
-	    case 'Q': if (v != 0) m->val = n->count; break;
-
-	    case '+': m->val = m->val + n->count; break;
-	    case '-': m->val = m->val - n->count; break;
-	    case '<':
-		for(i=0; i<n->count; i++) {
-		    if (m->prev == 0) {
-			if ((m->prev = calloc(1,sizeof*m)) == 0) {
-			    perror("calloc"); exit(1);
-			}
-			m->prev->next = m;
-		    }
-		    m=m->prev;
-		}
-		break;
-	    case '>':
-		for(i=0; i<n->count; i++) {
-		    if (m->next == 0) {
-			if ((m->next = calloc(1,sizeof*m)) == 0) {
-			    perror("calloc"); exit(1);
-			}
-			m->next->prev = m;
-		    }
-		    m=m->next;
-		}
-		break;
-	    case '[': if((m->val & msk) == 0) n=n->loop; break;
-	    case ']': if((m->val & msk) != 0) n=n->loop; break;
-
-	    case '.':
-		switch(L_BASE) {
-		case L_ASCII:
-		    putchar(m->val & 0xFF); break;
-		case L_EXCON:
-		    v = (m->val & 0xFF);
-		    {
-			int bit = 1;
-			for(bit = 1; bit < 0x100; bit <<=1) {
-			    if ((outch & bit) != (v & bit)) {
-				if (bit < outbit) {
-				    pc(':');
-				    outbit = 1;
-				    outch = 0;
-				    bit = 1;
-				}
-			    }
-			    if ((outch & bit) != (v & bit)) {
-				while (bit > outbit) {
-				    outbit <<= 1;
-				    pc('<');
-				}
-				outch ^= outbit;
-				pc('^');
-			    }
-			}
-		    }
-		    pc('!');
-		    break;
-		case L_ABCD:
-		    v = (m->val & 0xFF);
-		    {
-			while(outch<v) {outch++; pc('A');}
-			while(outch>v) {outch--; pc('B');}
-		    }
-		    pc('D');
-		    break;
-		case L_BINERDY:
-		    v = (m->val & 0xFF);
-		    if (outbit) { pc('0'+outtog); outbit = 0; }
-		    {
-			while(outch<v) {outch++; pc('0'+outtog); pc('0'+(outtog=!outtog));}
-			while(outch>v) {outch--; pc('0'+outtog); pc('0'+(outtog=!outtog)); pc('0'+(outtog=!outtog));}
-		    }
-		    pc('0'+outtog);
-		    for(i=0; i<10; i++)
-			pc('0'+(outtog=!outtog));
-		    break;
-		case L_TICK:
-		    v = (m->val & 0xFF);
-		    {
-			static unsigned char curval[256];
-			static int curcell = 0;
-			int best = 0, best_d = v - curval[0];
-			if (best_d < 0) best_d += 256;
-			for (i=0; i<256; i++) {
-			    int diff = v - curval[i];
-			    if (diff < 0) diff += 256;
-			    if (diff < best_d) {
-				best_d = diff;
-				best = i;
-			    }
-			}
-			while(curcell<best) {pc('>'); curcell++;}
-			while(curcell>best) {pc('<'); curcell--;}
-			while(curval[curcell] != v) {
-			    pc('+');
-			    curval[curcell]++;
-			    curval[curcell] &= 0xFF;
-			}
-			pc('.');
-		    }
-		    break;
-		}
-		break;
-
-	    case ',':
-		if (L_BASE == L_ASCII) {
-		    if((v=getchar()) != EOF) m->val = v;
-		}
-		break;
-	}
-
-	for(n=pgm; n; ) {
-	    struct instruction * p = n;
-	    n = n->next;
-	    free(p);
-	    pgm = last = 0;
-	}
-    }
-
-    if (ch == '~' && L_BASE == L_BINERDY && !outbit) {
-	int i;
-	pc('0'+outtog);
-	for(i=0; i<12; i++)
-	    pc('0'+(outtog=!outtog));
-	outbit = 1;
     }
 }
 
