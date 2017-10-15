@@ -367,6 +367,7 @@ static int maxcol = -1;
 static int state = 0;
 static int bf_mov = 0;
 static int enable_bf_mov = 0;
+static int disable_optim = 0;
 
 static int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
 
@@ -377,7 +378,6 @@ static struct instruction *pgm = 0, *last = 0;
 const char ** doubler = doubler_copy;
 const char ** bfquad = bfquadz;
 
-static int disable_optimisation(void);
 static void risbf(int ch, int count);
 static void headsecks(int ch, int count);
 static void bfrle(int ch, int count);
@@ -396,14 +396,47 @@ fn_check_arg(const char * arg)
 {
     if (strcmp(arg, "+init") == 0) {
 	if (maxcol < 0) maxcol = 72;
+
+	if (!(langclass & GEN_RLE)) {
+	    if (bytecell) c = cbyte; else c = cint;
+	} else {
+	    if (bytecell) c = cbyte_rle; else c = cint_rle;
+	}
+	if (lang == cbyte) lang = c;
+
+	if (!disable_optim && (langclass != L_BF || bf_multi != 0)) {
+	    /* This enables BF style optimisation of '<' and '>' on OUTPUT */
+	    if (L_BASE == L_BF || L_BASE == L_BFCHARS || L_BASE == L_DOWHILE)
+		enable_bf_mov = 1;
+	}
+
 	return 1;
     }
-    if (strcmp(arg, "?no-rle") == 0) return (disable_optimisation() > 1);
+    if (strcmp(arg, "+no-rle") == 0) {
+	/*
+	 * Most of the translations in this collection don't have a
+	 * preference for RLE encoding but these output formats create
+	 * significantly shorter code for RLE strings.
+	 */
+	switch(L_BASE) {
+	case L_BFRLE:
+	case L_BFXML:
+	case L_HANOILOVE:
+	    return 0;
+	case L_JNWORD:
+	    if (langclass & C_ADDRLE)
+		return 0;
+	}
+	return 1;
+    }
 
     if (strcmp(arg, "-#") == 0) return 1;
 
     if (strcmp(arg, "-c") == 0) {
 	lang = cbyte; langclass = L_CWORDS; return 1;
+    } else
+    if (strcmp(arg, "-m") == 0) {
+	disable_optim = 1; return 1;
     } else
 
     if (strcmp(arg, "-single") == 0) {
@@ -664,18 +697,6 @@ fn_check_arg(const char * arg)
 	return 0;
 }
 
-static int disable_optimisation(void)
-{
-    switch(L_BASE) {
-
-    case L_BFRLE:	/* These prefer RLE, but don't have optimisation */
-    case L_BFXML:
-    case L_HANOILOVE:
-	return 1;
-    }
-    return 2;
-}
-
 static void
 pc(int ch)
 {
@@ -746,22 +767,6 @@ void
 outcmd(int ch, int count)
 {
     char * p;
-
-    if (ch == '!') {
-	if (!(langclass & GEN_RLE)) {
-	    if (bytecell) c = cbyte; else c = cint;
-	} else {
-	    if (bytecell) c = cbyte_rle; else c = cint_rle;
-	}
-	if (lang == cbyte) lang = c;
-
-	if (enable_mov_optim) {
-	    /* This enables BF style optimisation of '<' and '>' on OUTPUT */
-	    if (L_BASE == L_BF) enable_bf_mov = 1;
-	    if (L_BASE == L_BFCHARS) enable_bf_mov = 1;
-	    if (L_BASE == L_DOWHILE) enable_bf_mov = 1;
-	}
-    }
 
     if (ch == '!' && (langclass & C_HEADERS) != 0) {
 	int i,j;

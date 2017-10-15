@@ -12,9 +12,6 @@ int opt_cellsize = 0;
 int tapelen = TAPELEN;
 int opt_optim = 0;
 int enable_optim = 0;
-int enable_be_optim = 0;
-int enable_bf_optim = 0;
-int enable_mov_optim = 0;
 int disable_init_optim = 0;
 int enable_debug;
 const char * current_file;
@@ -54,9 +51,6 @@ static int madd_offset[32];
 static int madd_inc[32];
 static int madd_zmode[32];
 static int madd_count = 0;
-
-static int simple_rle_cmd = 0;
-static int simple_rle_count = 0;
 
 static void
 outtxn(int ch, int repcnt)
@@ -170,7 +164,7 @@ outtxn(int ch, int repcnt)
     if (mov
 	|| (loopz == 0 && inc != -1 && inc != 1)
 	|| (loopz != 0 && inc != 0)
-	|| (!enable_be_optim && loopz) )
+	|| (disable_be_optim && loopz) )
 	{ outtxn(0, 0); return; }
 
     /* Delete old loop */
@@ -183,7 +177,7 @@ outtxn(int ch, int repcnt)
 	qcmd[qcnt] = 'Q'; qrep[qcnt] = 1; qcnt ++;
 	qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
     }
-    if (enable_be_optim) {
+    if (!disable_be_optim) {
 	qcmd[qcnt] = '='; qrep[qcnt] = 0; qcnt ++;
     }
 
@@ -226,7 +220,7 @@ outtxn(int ch, int repcnt)
     if (mov != 0) {
 	qcmd[qcnt] = '>'; qrep[qcnt] = 0 - mov; qcnt ++;
     }
-    if (!enable_be_optim) {
+    if (disable_be_optim) {
 	qcmd[qcnt] = 'N'; qrep[qcnt] = 1; qcnt ++;
 	qcmd[qcnt] = 'E'; qrep[qcnt] = 0; qcnt ++;
     }
@@ -237,74 +231,14 @@ outtxn(int ch, int repcnt)
 
 /*
     For full structual optimisation (loops to multiplies) this function
-    is skipped and the the outtxn function is called.
-
-    Otherwise there is a simple filter to find [-]+++ sequences for
-    "-Obf" optimisation, it ignores '[+]'.  The symbols are then passed
-    to the constant folding optimisations, that can now output pure BF
-    for any input.
-
-    The third option "-Omov" is a filter that just merges '<>' commands
-    and sends them directly to the BE.
-
-    The last is no transformations, just pass to the BE.
+    calls the outtxn function otherwise the commands are just pass to
+    the BE.
 */
 void
 outrun(int ch, int count)
 {
-static int zstate = 0;
     if (enable_optim) {
 	outtxn(ch, count);
-
-    } else if (enable_bf_optim) {
-	switch(zstate)
-	{
-	case 1:
-	    if (count == 1 && ch == '-') { zstate++; return; }
-	    outopt('[', 1);
-	    break;
-	case 2:
-	    if (count == 1 && ch == ']') { zstate++; return; }
-	    outopt('[', 1);
-	    outopt('-', 1);
-	    break;
-	case 3:
-	    if (ch == '+') { outopt('=', count); zstate=0; return; }
-	    if (ch == '-') { outopt('=', -count); zstate=0; return; }
-	    outopt('=', 0);
-	    break;
-	}
-	zstate=0;
-	if (count == 1 && ch == '[') { zstate++; return; }
-	outopt(ch, count);
-
-    } else if (enable_mov_optim) {
-	/* This is a very simple optimisation of reversing commands, it's
-	 * normally not needed as it's a side effect of the other types
-	 * of optimisation.
-	 */
-	if (ch == '<') { ch = '>'; count = -count; }
-	if (ch == '-') { ch = '+'; count = -count; }
-	if (simple_rle_cmd == ch) {
-	    simple_rle_count += count;
-	    return;
-	}
-	if (simple_rle_count) {
-	    if (simple_rle_count < 0) {
-		if (simple_rle_cmd == '>') simple_rle_cmd = '<';
-		if (simple_rle_cmd == '+') simple_rle_cmd = '-';
-		simple_rle_count = -simple_rle_count;
-	    }
-	    outcmd(simple_rle_cmd, simple_rle_count);
-	    simple_rle_count = simple_rle_cmd = 0;
-	}
-	if (ch == '>' || ch == '+') {
-	    simple_rle_cmd = ch;
-	    simple_rle_count = count;
-	    return;
-	}
-	outcmd(ch, count);
-	return;
 
     } else {
 	/* Disable optimisations; input codes are sent directly to BE */
@@ -334,13 +268,8 @@ check_argv(const char * arg)
 	check_arg(arg);
 	opt_optim = disable_init_optim = 1;
     } else if (strcmp(arg, "-O") == 0) {
-	opt_optim = enable_mov_optim = 1;
+	opt_optim = 1;
 	enable_optim = 1;
-    } else if (strcmp(arg, "-Obf") == 0) {
-	opt_optim = enable_mov_optim = 1;
-	enable_bf_optim = 1;
-    } else if (strcmp(arg, "-Omov") == 0) {
-	opt_optim = enable_mov_optim = 1;
     } else if (strcmp(arg, "-p") == 0) {
 	disable_init_optim = 1;
 
@@ -402,9 +331,7 @@ main(int argc, char ** argv)
 	    "\n\t"  "-R      Decode rle on '+-<>', quoted strings and '='."
 	    "\n\t"  "-m      Disable optimisation (including dead loop removal)"
 	    "\n\t"  "-p      This is a part of a BF program"
-	    "\n\t"  "-O      Enable full optimisation"
-	    "\n\t"  "-Obf    Enable simple optimisation suitable for BF output"
-	    "\n\t"  "-Omov   Enable only movement optimisation"
+	    "\n\t"  "-O      Enable optimisation"
 	    "\n\t"  "-M<num> Set length of tape, default is ", TAPELEN,
 	    ""
 	    );
@@ -438,17 +365,14 @@ main(int argc, char ** argv)
     }
 
     if (check_arg("+init")) {	/* For bf2bf to choose optimisation method */
-	if (!opt_optim && check_arg("?no-rle")) {
+	if (!opt_optim && check_arg("+no-rle")) {
 	    opt_optim = disable_init_optim = 1;
 	}
     }
 
     /* Defaults if not told */
     if (!opt_optim)
-	opt_optim = enable_optim = enable_mov_optim = 1;
-
-    if (enable_mov_optim)
-	enable_be_optim = !disable_be_optim;
+	opt_optim = enable_optim = 1;
 
     if (disable_init_optim)
 	lastch = 0;
@@ -504,7 +428,7 @@ main(int argc, char ** argv)
 		(ch != '#' || !enable_debug) &&
 		((ch != '"' && ch != '=') || !enable_rle)) continue;
 	    /* Check for loop comments; ie: ][ comment ] */
-	    if (lc || (ch=='[' && lastch==']' && enable_mov_optim)) {
+	    if (lc || (ch=='[' && lastch==']' && enable_optim)) {
 		lc += (ch=='[') - (ch==']'); continue;
 	    }
 	    if (lc) continue;

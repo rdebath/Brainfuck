@@ -1,9 +1,6 @@
 
 extern int tapelen;
 extern int enable_optim;
-extern int enable_be_optim;
-extern int enable_bf_optim;
-extern int enable_mov_optim;
 extern int disable_init_optim;
 extern int enable_debug;
 extern const char * current_file;

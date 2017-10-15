@@ -108,7 +108,7 @@ flush_tape(int no_output, int keep_knowns)
 
 	    if ((p->v || p->is_set) &&
 		    (curroff != 0 || (tapeoff != 0 || flipcount == 0)) &&
-		    (!keep_knowns || p == tape || !enable_be_optim)) {
+		    (!keep_knowns || p == tape || disable_be_optim)) {
 		if (p->cleaned && p->cleaned_val == p->v && p->is_set) {
 		    if (!keep_knowns) clear_cell(p);
 		} else {
@@ -116,15 +116,7 @@ flush_tape(int no_output, int keep_knowns)
 		    if (tapeoff > outoff) { outcmd('>', tapeoff-outoff); outoff=tapeoff; }
 		    if (tapeoff < outoff) { outcmd('<', outoff-tapeoff); outoff=tapeoff; }
 		    if (p->is_set) {
-			if (p->cleaned && !enable_be_optim && enable_bf_optim &&
-				 abs(p->v-p->cleaned_val) <= abs(p->v)+3) {
-			    if (p->v > p->cleaned_val)
-				outcmd('+', p->v-p->cleaned_val);
-			    if (p->v < p->cleaned_val)
-				outcmd('-', p->cleaned_val-p->v);
-			} else {
-			    outcmd('=', p->v);
-			}
+			outcmd('=', p->v);
 		    } else {
 			if (p->v > 0) outcmd('+', p->v);
 			if (p->v < 0) outcmd('-', -p->v);
@@ -182,7 +174,7 @@ void outopt(int ch, int count)
 	if (ch == ']') deadloop--;
 	return;
     }
-    if (ch == '[' && enable_mov_optim) {
+    if (ch == '[') {
 	if (tape->is_set && tape->v == 0) {
 	    deadloop++;
 	    return;
@@ -219,7 +211,7 @@ void outopt(int ch, int count)
 	return;
 
     case '.':
-	if (!disable_savestring && enable_be_optim &&
+	if (!disable_savestring && !disable_be_optim &&
 		tape->is_set && tape->v > 0 && tape->v < 128) {
 	    add_string(tape->v);
 
@@ -262,7 +254,7 @@ void outopt(int ch, int count)
 
 	flush_tape(0,1);
 	reg_known = 0; reg_val = 0;
-	if (enable_be_optim) {
+	if (!disable_be_optim) {
 	    outcmd(ch, count);
 	} else {
 	    outcmd('[', 1);
@@ -280,7 +272,7 @@ void outopt(int ch, int count)
 	if (!reg_known) {
 	    flush_tape(0,1);
 	    clear_cell(tape);
-	    if (enable_be_optim) {
+	    if (!disable_be_optim) {
 		outcmd(ch, count);
 	    } else switch(ch) {
 		case 'M': case 'm':
