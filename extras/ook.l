@@ -47,6 +47,7 @@ size_t bf_prefilter(char * buf, size_t maxsize);
 %x SPOON
 %x TROLL
 %x CUPID
+%x TERNARY
 
 w	[\t ]*
 ws	[\t ]+
@@ -268,6 +269,21 @@ ook	B?[Oo]ok
     .		commentch(yytext[0]);
 }
 
+<TERNARY>{
+    "01"	pc('>');
+    "00"	pc('<');
+    "11"	pc('+');
+    "10"	pc('-');
+    "20"	pc('.');
+    "21"	pc(',');
+    "02"	pc('[');
+    "12"	pc(']');
+    "22"	pc('#');
+
+    [ \t\n]+	{int i; for(i=0; i<yyleng; i++) commentch(yytext[i]);}
+    .		commentch(yytext[0]);
+}
+
 <ALWORD>{
     /* Simple "words". These sets don't interfere with each-other. */
 
@@ -452,6 +468,11 @@ int main(int argc, char ** argv)
 		character_prefilter = "<->";
 	    }
 
+	    else if (!strcmp(argv[1], "-ternary")) {
+		mode = TERNARY;
+		character_prefilter = "012";
+	    }
+
 	    else if (!strcmp(argv[1], "-tinybf")) {
 		mode = INITIAL;
 		custom_prefilter = tiny_bf_to_bf;
@@ -557,6 +578,7 @@ Usage(void)
     fprintf(stderr, "   -tinybf  Input using TinyBF\n");
     fprintf(stderr, "   -troll   Input using Trollscript\n");
     fprintf(stderr, "   -cupid   Input using Cupid\n");
+    fprintf(stderr, "   -ternary Input using Ternary\n");
     fprintf(stderr, "   -??? -qqq\n");
     fprintf(stderr, "            Input using ???\n");
 

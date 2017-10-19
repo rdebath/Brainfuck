@@ -193,6 +193,9 @@ static const char *atpling[] =
 /* Language Cupid */
 static const char * cupid[] = { "->", "<-", "><", "<>", "<<", ">>", "-<", ">-", 0 };
 
+/* Language Ternary */
+static const char * ternary[] = { "01", "00", "11", "10", "20", "21", "02", "12", 0 };
+
 /* Language pikalang -- https://github.com/skj3gg/pikalang */
 static const char * pikalang[] =
     {"pipi", "pichu", "pi", "ka", "pikachu", "pikapi", "pika", "chu", 0 };
@@ -585,6 +588,9 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-cp") == 0 || strcmp(arg, "-cupid") == 0) {
 	lang = cupid; langclass = L_JNWORD; return 1;
     } else
+    if (strcmp(arg, "-ternary") == 0) {
+	lang = ternary; langclass = L_JNWORD; return 1;
+    } else
     if (strcmp(arg, "-pika") == 0) {
 	lang = pikalang; langclass = L_CDWORDS; return 1;
     } else
@@ -673,6 +679,7 @@ fn_check_arg(const char * arg)
 	"\n\t"  "-pika   Pikalang from https://github.com/skj3gg/pikalang"
 	"\n\t"  "-spoon  Language spoon http://esolangs.org/wiki/spoon"
 	"\n\t"  "-cupid  Cupid from http://esolangs.org/wiki/Cupid"
+	"\n\t"  "-ternary Ternary from http://esolangs.org/wiki/Ternary"
 	"\n\t"  "-malbrain Malbrain translation"
 	"\n\t"  "-hanoilove Hanoi Love translation"
 	"\n\t"  "-dowhile Do ... while translataion."
