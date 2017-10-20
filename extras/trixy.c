@@ -12,11 +12,12 @@ void putch(int);
 void dump(void);
 static void pc(int ch);
 struct bfi { int mov; int cmd; int arg; } *pgm = 0;
-int pgmlen = 0, on_eof = 1, debug = 0;
+int pgmlen = 0, on_eof = 1, debug = 0, in_ascii = 0;
 
 int col = 0, maxcol = 72;
 
-enum outtype {L_ASCII, L_EXCON, L_ABCD, L_BINERDY, L_TICK} out_format = L_ASCII;
+enum outtype {L_ASCII, L_EXCON, L_ABCD, L_MINIMAL, L_BINERDY, L_TICK, L_MSF}
+    out_format = L_ASCII;
 
 int main(int argc, char **argv)
 {
@@ -29,24 +30,29 @@ int main(int argc, char **argv)
 	if (!strcmp(argv[ar], "-e")) on_eof = -1;
 	else if (!strcmp(argv[ar], "-z")) on_eof = 0;
 	else if (!strcmp(argv[ar], "-n")) on_eof = 1;
-	else if (!strcmp(argv[ar], "-d")) debug = 1;
+	else if (!strcmp(argv[ar], "-#")) debug = 1;
+	else if (!strcmp(argv[ar], "-iascii")) in_ascii = 1;
 	else if (!strcmp(argv[ar], "-ascii")) out_format = L_ASCII;
 	else if (!strcmp(argv[ar], "-excon")) out_format = L_EXCON;
 	else if (!strcmp(argv[ar], "-abcd")) out_format = L_ABCD;
+	else if (!strcmp(argv[ar], "-minimal")) out_format = L_MINIMAL;
 	else if (!strcmp(argv[ar], "-binerdy")) out_format = L_BINERDY;
 	else if (!strcmp(argv[ar], "-tick")) out_format = L_TICK;
+	else if (!strcmp(argv[ar], "-msf")) out_format = L_MSF;
 	else if (argv[ar][0] == '-' && argv[ar][1] != '\0') {
 	    fprintf(stderr, "Unknown option '%s'\n", argv[ar]);
 	    fprintf(stderr, "Usage: %s [options] [file]\n", argv[0]);
 	    fprintf(stderr, "    -e       EOF is -1\n");
 	    fprintf(stderr, "    -z       EOF is zero\n");
 	    fprintf(stderr, "    -n       EOF leaves the cell alone\n");
-	    fprintf(stderr, "    -d       Enable '#' command.\n");
+	    fprintf(stderr, "    -#       Enable '#' command.\n");
+	    fprintf(stderr, "    -iascii  Input in ASCII.\n");
 	    fprintf(stderr, "    -ascii   Output in ASCII.\n");
 	    fprintf(stderr, "    -excon   Output in EXCON.\n");
 	    fprintf(stderr, "    -abcd    Output in ABCD.\n");
 	    fprintf(stderr, "    -binerdy Output in Binerdy.\n");
 	    fprintf(stderr, "    -tick    Output in Tick.\n");
+	    fprintf(stderr, "    -minimal Output in Minimal.\n");
 
 	    exit(1);
 	} else if (fn == 0)
@@ -57,7 +63,7 @@ int main(int argc, char **argv)
 	}
     }
     ifd = fn && strcmp(fn, "-") ? fopen(fn, "r") : stdin;
-    if(!ifd) perror(fn); else {
+    if(!ifd) perror(fn); else if (!in_ascii) {
 	while((ch = getc(ifd)) != EOF && (ifd != stdin || ch != '!' || j >= 0 || !i)) {
 	    int r = (ch == '<' || ch == '>' || ch == '+' || ch == '-');
 	    if (r || (debug && ch == '#') || (ch == ']' && j >= 0) ||
@@ -92,7 +98,9 @@ int main(int argc, char **argv)
 	}
 	if (ifd != stdin) fclose(ifd);
 	if (pgm) { pgm[n+1].cmd = 0; run(); }
-    }
+    } else
+	while((ch = getc(ifd)) != EOF)
+	    putch(ch);
 
     if (col > 0) pc('\n');
     return !ifd;
@@ -142,7 +150,6 @@ pc(int ch)
     }
 }
 
-
 void
 putch(int v)
 {
@@ -183,6 +190,13 @@ putch(int v)
 	}
 	pc('D');
 	break;
+    case L_MINIMAL:
+	{
+	    while(outch < v) { outch++; pc('+'); }
+	    while(outch > v) { outch--; pc('-'); }
+	}
+	pc('.');
+	break;
     case L_BINERDY:
 	{
 	    int i;
@@ -217,6 +231,12 @@ putch(int v)
 		curval[curcell]++;
 		curval[curcell] &= 0xFF;
 	    }
+	    pc('.');
+	}
+	break;
+    case L_MSF:
+	{
+	    while(outch != v) { outch=((outch+1)&0xFF); pc('+'); }
 	    pc('.');
 	}
 	break;
