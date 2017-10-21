@@ -1,9 +1,7 @@
-[+++++++.+++.][   <- If you get this nl your loops are fucked. ->
-
+[
     This routine is a demonstration of checking for the three cell sizes
-    that are normal for Brainfuck. The demo code also checks for several
-    bugs that have been noted in optimising and non-optimising interpreters
-    and compilers.
+    that are normal for Brainfuck. The demo code also checks for bugs
+    that have been noted in various interpreters and compilers.
 
     It should print one of three slight variations of "Hello world" followed
     by an exclamation point then the maximum cell value (if it's less than a
@@ -31,9 +29,10 @@
 	Also there's some commented out code afterwards
 
 	>[-]<[-]++++++++[->+++++++++<]>.----[--<+++>]<-.+++++++.><.+++.
-	[-] [[-]++>[-]+++++[<++++++>-]<.++>+++++++[<+++++++>-]<.+>+
-	+++[<+++++>-]<.+.+++++++++++.------------.---.----.+++.>++++
-	++++[<-------->-]<---.>++++[<----->-]<---.[-][]]
+	[-][[-]>[-]+++++++++[<+++++>-]<+...--------------.>++++++++++[<+
+	++++>-]<.+++.-------.>+++++++++[<----->-]<.-.>++++++++[<+++++++>
+	-]<++.-----------.--.-----------.+++++++.----.++++++++++++++.>++
+	++++++++[<----->-]<..[-]++++++++++.[-]+++++++[.,]-]
 
 	===== END DEMO CODE =====
 <<
@@ -175,7 +174,7 @@ Multiply by 256 again to get 65536
 	<<<<<<<<+>>>>>>>>]<<<<<<<]<
 
 	The number is only printed if we found the actual maxint
-	[
+	>+<[
 	    Space
 	    >[-]>[-]+++++[<++++++>-]<++.[-]<
 
@@ -184,6 +183,16 @@ Multiply by 256 again to get 65536
 	    ->+<[<-]]]]]]]]]]>]<<[>++++++[<++++++++>-]<-.[-]<]]
 
 	]
+
+	Check if we should have had a value but didn't
+	>[
+	    >[-]>[-]++++[<++++++++>-]<[<++++++++>-]>+++[<++++++++>-]<+++++++
+	    [<-------->-]<------->+<[[-]>-<]>[>[-]<[-]++++[->++++++++<]>.+++
+	    +++[-<++>]<.[-->+++<]>++.<++++[>----<-]>.[-]<]
+
+	    [-]>[-]++++++++[<++++++++>-]<[>++++<-]+>[<->[-]]<[>[-]<[-]++++[-
+	    >++++++++<]>.---[-<+++>]<.---.--------------.[-->+<]>--.[-]<]
+	]<
 
 	This is a hard optimisation barrier
 	It contains several difficult to 'prove' constructions close together

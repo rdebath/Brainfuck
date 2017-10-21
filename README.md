@@ -5,16 +5,16 @@ This repository contains various [brainfuck](http://esolangs.org/wiki/Brainfuck)
 
 The classic description of BF is the C translation below, the opcode column is the direct translation used by my Tritium interpreter.
 
-| Opcode | Brainfuck   | C                  |
-| -------|:-----------:|--------------------|
-| T_MOV  | `>`         | ++ptr;             |
-| T_MOV  | `<`         | --ptr;             |
-| T_ADD  | `+`         | ++*ptr;            |
-| T_ADD  | `-`         | --*ptr;            |
-| T_WHL  | `[`         | while (*ptr) {     |
-| T_END  | `]`         | }                  |
-| T_PRT  | `.`         | putchar(*ptr);     |
-| T_INP  | `,`         | *ptr = getchar();  |
+| Opcode | Brainfuck   | C                   |
+| -------|:-----------:|---------------------|
+| T_MOV  | `>`         | ++ptr;              |
+| T_MOV  | `<`         | --ptr;              |
+| T_ADD  | `+`         | ++*ptr;             |
+| T_ADD  | `-`         | --*ptr;             |
+| T_WHL  | `[`         | while (*ptr) {      |
+| T_END  | `]`         | }                   |
+| T_PRT  | `.`         | putchar(*ptr);      |
+| T_INP  | `,`         | ptr[0] = getchar(); |
 
 There are several BF interpreters and tools in this repository.
 
@@ -22,22 +22,14 @@ There are several BF interpreters and tools in this repository.
 
   But the official output of the Bitwidth program is a display of the cell size ie:
 
-  <dl><dt>8 Bit cells<dd>Hello World! 255<dt>16 Bit cells<dd>Hello world! 65535<dt>32 bit cells<dd>Hello, world!</dl>
+  <dl><dt>8 Bit cells<dd>Hello World! 255<dt>16 Bit cells<dd>Hello world! 65535<dt>32 bit cells<dd>Hello, world!<dt>8 Bit cells without wrapping<dd>Hello World! Ltd</dl>
 
-  Though before you try it you might like to try this slightly less nasty Hello World! 
+  Though for a quick check this "Hello World!" program may be better, however, it has far fewer checks.
 
-  ```brainfuck
-  1 []><[][]><[][]><[][]><[][]><[][]><[][]><[][]><[][]><[][]><[]
-  2 []>+>+>++>++<[>[->++++<<+++>]<<]>----.>->+.+++++++..+++.<+[]
-  3 [ This is hellbox, a 104 command Hello World               ]
-  4 [   >+>+>++>++<[>[->++++<<+++>]<<]>----.>>+.+++++++..+++   ]
-  5 [   .>.<<<+++++++++++++++.>>.+++.------.--------.>+.>++.   ]
-  6 [ -- Robert de Bath -- 2014                                ]
-  7 []>>.<<<+++++++++++++++.>>.+++.------.--------.>+.+>++.<<<[]
-  8 []><[][]><[][]><[][]><[][]><[][]><[][]><[][]><[][]><[][]><[]
+  ```bf
+  ++++[>++++<-]>[>+>++>[+++++++>]+++[<]>-]>>>>>>>>-.
+  <<<<.<..+++.<.>>>>.<<<.+++.------.>-.<<+.<------.
   ```
-  
-  Lines 2 and 7 are the code that should be run, lines 1 and 8 are decorative and lines 3 to 6 can contain anything where each line is enclosed in [] and contains balanced brackets.
 
 2. VIM Syntax highlighting file for brainfuck.
 
@@ -45,13 +37,13 @@ There are several BF interpreters and tools in this repository.
 
   In addition it highlights SOME of the other characters as comments.  Generally it tries (with moderate success) to distinguish between proper comments and sequences that are probably supposed to be comments but actually contain active BF command characters. In addition it tries to identify the 'dead code' style comment loops highlighting any BF command characters within the loop in the 'PreProc' style to distinguish them from commands that may actually be executed.
 
-3. Tritium (officially Ρ‴) this BF interpreter/compiler/JIT runner makes other programs look slow. It is simply the fastest BF interpreter you'll find. For top speed the cell size should be 8 or 32bits, but it supports ANY fixed cell size.
+3. Tritium (officially Ρ‴) this BF interpreter/compiler/JIT runner makes other programs look slow. It is simply the fastest BF interpreter you'll find. For top speed the cell size should be 8 or 32bits, but it supports ANY fixed bit cell size.
 
 4. Brainfuck to anything. Well not *exactly* anything but the list includes ...
   * run -- a direct interpreter -- blisteringly quick too for one without JIT.
   * jit -- OTOH this one uses LuaJIT's Dynasm, it's the fastest bf2any program.
   * crun -- Convert to C and run using libtcc or libdl. Using TCC it's quicker than bf2run ... just, GCC is a lot quicker, even without GCC doing any optimisation.
-  * bf -- Ook, Blub, fuck fuck, "there once was a fish named Fred" and over 50 similar transliterations. Also includes Cell doubler (and quad) mappings. Some can be compiled as C (most are *deoptimised* but -rle is not.) The optimiser can still run so this can be used as a BF->BF optimiser. For actual BF->BF optimisation best results are got with -Obf.
+  * bf -- Ook, Blub, fuck fuck, "there once was a fish named Fred" and over 50 similar transliterations. Also includes Cell doubler (and quad) mappings. Some can be compiled as C (most are *deoptimised* but -rle is not.)
   * asmjs -- Convert to the "asm.js" dialect of javascript (Includes a nodejs wrapper)
   * awk	-- Code for (almost) any version of AWK.
   * bash -- GNU bash, uses arrays, arithimetic etc. (NO external programs or subshells used)
@@ -94,8 +86,7 @@ There are several BF interpreters and tools in this repository.
   They have all been tested using many of the BF programs from the [Esoteric Files Archive](https://github.com/graue/esofiles/tree/master/brainfuck/src) (And of course tortured!)
 
 5. The 'extras' subdirectory.
-  * Hello_world.bewbs -- An interpreter for strange BF variant.
-  * bf.pl -- A very small bf->perl tranlate and execute.
+  * bf.pl -- A very small bf->perl translate and execute.
   * bf.rb -- A similar program in Ruby, not as Golfed.
   * bf.sed -- A BF interpreter in SED.
   * bf2bash.sh -- A BF interpreter in bash
@@ -107,11 +98,14 @@ There are several BF interpreters and tools in this repository.
   * bf2c_v2.b -- A weird RLE optimising BF->C in BF.
   * bf2lua.lua -- A RLE optimising BF->lua and run in lua.
   * bfdowhile.c -- A "buggy" BF interpreter that is (surprisingly) still Turing complete.
+  * bfopt.c -- A Brainfuck to brainfuck optimiser.
   * blub.pl -- "Blub" interpreter in Perl
+  * byte2byte.c -- Optimal two cell text to BF converter.
   * cdowhile.c -- A "buggy" BF interpreter that is (surprisingly) still Turing complete.
   * dblmicrobf.c -- A plain BF interpreter with weird cell sizes.
   * deadbeef.c -- A nice quick interpreter that ONLY has a two command lookahead.
   * easy.c -- A pipelined BF interpreter (or an interpreter for the 'easy' language).
+  * Hello_world.bewbs -- An interpreter for strange BF variant.
   * hydrogen.c -- A component of Tritium that also understands some cell doubling constructs.
   * k-on-fuck.pl -- Another BF variant in perl.
   * lightning.c -- A plain jit interpreter using GNU lightning V2.
@@ -123,10 +117,13 @@ There are several BF interpreters and tools in this repository.
   * ook.l -- A program in Lex that interprets about 20 different trivial BF substitutions (including Ook).
   * ook.pl -- A perl program to interpret Ook.
   * petooh.rb -- A Ruby problem to interpret 'Petooh'
+  * pikalang.rb -- A 'Pikalang' interpreter in Ruby.
   * pogaack.pl -- A Perl program to interpret 'Pogaack'
   * profilebf.c -- A BF interpreter for counting and measuring Brainfuck.
   * proton.c -- Another component interpreter for Tritium.
   * spoon.rb -- A 'Spoon' interpreter in Ruby.
+  * trixy.c -- Conversion of Brainfuck to EXCON, ABCD, Binerdy and Tick.
+  * txtbf.b -- A BF program to generate BF programs that output specific text strings.
   * txtbf.c -- A program to generate BF programs that output specific text strings.
   * zero.rb -- A Ruby program to interpret 'Zerolang'.
 
