@@ -1087,6 +1087,8 @@ if arg and arg[0] then
   if package and prefix then package.path = prefix.."?.lua;"..package.path end
 end
 
+bit = bit or require("bitops")
+
 -- Start DynASM.
 parseargs{...}
 
