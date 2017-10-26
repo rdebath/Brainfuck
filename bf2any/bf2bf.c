@@ -152,6 +152,10 @@ static const char *k_on_fuck[] =
 static const char *petooh[] =
     { "Kudah", "kudah", "Ko", "kO", "Kukarek", "kukarek", "Kud", "kud", 0 };
 
+/* Some random Arabic letters */
+static const char *arabic[] =
+    { "ش", "س", "ث", "ت", "ص", "ض", "ق", "ف" };
+
 /* dc(1) using an array and a pointer in another variable */
 static const char *dc1[] =
 {   "lp%d+sp", "lp%d-sp", "lp;a%d+lp:a", "lp;a%d-lp:a",
@@ -636,6 +640,9 @@ fn_check_arg(const char * arg)
     } else
     if (strcmp(arg, "-troll") == 0) {
 	lang = troll; langclass = L_JNWORD+GEN_HEADER; return 1;
+    } else
+    if (strcmp(arg, "-ara") == 0 || strcmp(arg, "-arabic") == 0) {
+	lang = arabic; langclass = L_JNWORD; return 1;
     } else
 
     if (strcmp(arg, "-w") == 0) {

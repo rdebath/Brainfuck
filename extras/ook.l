@@ -331,23 +331,15 @@ ook	B?[Oo]ok
     "{.}[.]"		pcs('[', 4);
     "[.]{.}"		pcs(']', 4);
 
-    右			pcs('>', 5);
-    左			pcs('<', 5);
-    上			pcs('+', 5);
-    下			pcs('-', 5);
-    出			pcs('.', 5);
-    里			pcs(',', 5);
-    始			pcs('[', 5);
-    末			pcs(']', 5);
+    "(("		pcs('>', 5);
+    "))"		pcs('<', 5);
+    "()("		pcs('+', 5);
+    "())"		pcs('-', 5);
+    ")())"		pcs('.', 5);
+    ")((("		pcs(',', 5);
+    ")()("		pcs('[', 5);
+    ")(()"		pcs(']', 5);
 
-    "(("		pcs('>', 6);
-    "))"		pcs('<', 6);
-    "()("		pcs('+', 6);
-    "())"		pcs('-', 6);
-    ")())"		pcs('.', 6);
-    ")((("		pcs(',', 6);
-    ")()("		pcs('[', 6);
-    ")(()"		pcs(']', 6);
 }
 
 \001.*		{int i; for(i=1; i<yyleng; i++) commentch(yytext[i]);}
@@ -381,6 +373,7 @@ char bf[] = "><+-.,[]#";
 size_t (*custom_prefilter)(char *, size_t) = 0;
 size_t tiny_bf_to_bf(char * buf, size_t max_size);
 size_t qqq_to_bf(char * buf, size_t max_size);
+size_t utf8_conversion(char * buf, size_t max_size);
 
 int main(int argc, char ** argv)
 {
@@ -425,8 +418,7 @@ int main(int argc, char ** argv)
 	    else if (!strcmp(argv[1], "-pika")) { mode = ALWORD; alset = 2; }
 	    else if (!strcmp(argv[1], "-fish")) { mode = ALWORD; alset = 3; }
 	    else if (!strcmp(argv[1], "-bewbs")) { mode = ALWORD; alset = 4; }
-	    else if (!strcmp(argv[1], "-chi")) { mode = ALWORD; alset = 5; }
-	    else if (!strcmp(argv[1], "-lisp")) { mode = ALWORD; alset = 6; character_prefilter="()"; }
+	    else if (!strcmp(argv[1], "-lisp")) { mode = ALWORD; alset = 5; character_prefilter="()"; }
 
 	    else if (!strcmp(argv[1], "-mini")) {
 		mode = INITIAL;
@@ -438,10 +430,23 @@ int main(int argc, char ** argv)
 		character_prefilter = "aceijops";
 		character_conversion = bf;
 	    }
-	    else if (!strncmp(argv[1], "-bf=", 4) && strlen(argv[1]) <= 13) {
+	    else if (!strcmp(argv[1], "-chi") || !strcmp(argv[1], "-chinese")) {
+		mode = INITIAL;
+		character_prefilter = "右左上下出里始末";
+		character_conversion = bf;
+		custom_prefilter = utf8_conversion;
+	    }
+	    else if (!strcmp(argv[1], "-ara") || !strcmp(argv[1], "-arabic")) {
+		mode = INITIAL;
+		character_prefilter = "شسثتصضقف";
+		character_conversion = bf;
+		custom_prefilter = utf8_conversion;
+	    }
+	    else if (!strncmp(argv[1], "-bf=", 4)) {
 		mode = INITIAL;
 		character_prefilter = argv[1]+4;
 		character_conversion = bf;
+		custom_prefilter = utf8_conversion;
 	    }
 	    else if (!strcmp(argv[1], "-petooh")) {
 		mode = PETOOH;
@@ -559,6 +564,7 @@ Usage(void)
     fprintf(stderr, "\n");
     fprintf(stderr, "   -bf='><+-.,[]#'\n");
     fprintf(stderr, "            Input using any single character substitution.\n");
+    fprintf(stderr, "            Note: Uses UTF8 codepoints.\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "   -blub    Input using blub.\n");
     fprintf(stderr, "   -pog     Input using pogaack.\n");
@@ -570,6 +576,7 @@ Usage(void)
     fprintf(stderr, "   -fish    Input using There Once was a Fish Named Fred\n");
     fprintf(stderr, "   -bewbs   Input using Bewbs\n");
     fprintf(stderr, "   -chi     Input using some random Chinese\n");
+    fprintf(stderr, "   -arabic  Input using some random Arabic letters\n");
     fprintf(stderr, "   -lisp    Input using lots of parentheses\n");
     fprintf(stderr, "   -mini    Input using just the first letters of -nice\n");
     fprintf(stderr, "   -alphuck Input using yet another single letter substitution.\n");
@@ -579,8 +586,7 @@ Usage(void)
     fprintf(stderr, "   -troll   Input using Trollscript\n");
     fprintf(stderr, "   -cupid   Input using Cupid\n");
     fprintf(stderr, "   -ternary Input using Ternary\n");
-    fprintf(stderr, "   -??? -qqq\n");
-    fprintf(stderr, "            Input using ???\n");
+    fprintf(stderr, "   -???     Input using ??? (also -qqq)\n");
 
 //  fprintf(stderr, "--------------------------------------------------------------------------------\n");
 
@@ -808,6 +814,76 @@ qqq_to_bf(char * buf, size_t max_size)
 		buf[n++] = '[';
 	    else
 		buf[n++] = ']';
+	}
+    }
+    return n;
+}
+
+size_t
+utf8_conversion(char * buf, size_t max_size)
+{
+    size_t n;
+    int c = 0xDEADBEEF;
+    static unsigned char chrbuf[16], *utf = chrbuf;
+    static unsigned char UTFlen[] = {
+        0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+        4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        /*             4, 4, 4, 5, 5, 5, 5, 6, 6, 7, 8 // not in standard. */
+    };
+
+    for ( n = 0; n < max_size && (c = getc( yyin )) != EOF;) {
+	if (c == line_cc) c = '\001';
+	else if (c>=0 && c<' ' && c!='\t' && c!='\n') c = ' ';
+
+	c = (unsigned char)c;
+	if (c < 0x7f) {
+	    char *m, *r;
+	    m = character_prefilter;
+	    r = character_conversion;
+
+	    while(*m && *r) {
+		if (*m == c) {
+		    buf[n++] = *r;
+		    break;
+		}
+		r++; m++;
+		while((unsigned char)*m >= 0x80 && (unsigned char)*m <= 0xC0)
+		    m++;
+	    }
+
+	    utf = chrbuf;
+	} else if(c>= 0xC0) {
+	    utf = chrbuf; *utf++ = c;
+	} else if (utf-chrbuf < 8) {
+	    *utf++ = c;
+	    if (utf-chrbuf == UTFlen[chrbuf[0]&0x3F]) {
+		unsigned char *m;
+		char *r;
+
+		m = (unsigned char*) character_prefilter;
+		r = character_conversion;
+		while(*m && *r) {
+		    if (*m == chrbuf[0]) {
+			int i, f=1;
+			for(i=0; i<UTFlen[chrbuf[0]&0x3F]; i++) {
+			    if (chrbuf[i] != m[i] ) {
+				f = 0;
+				break;
+			    }
+			}
+			if (f) {
+			    buf[n++] = *r;
+			    break;
+			}
+		    }
+
+		    r++; m++;
+		    while(*m >= 0x80 && *m <= 0xC0)
+			m++;
+		}
+	    }
 	}
     }
     return n;
