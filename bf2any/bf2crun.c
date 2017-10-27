@@ -42,6 +42,7 @@ static void compile_and_run_libtcc(void);
 static void compile_and_run(void);
 #endif
 static void print_cstring(void);
+static void open_ofd(void);
 
 static int imov = 0;
 static int verbose = 0;
@@ -171,36 +172,7 @@ outcmd(int ch, int count)
 
     switch(ch) {
     case '!':
-#ifndef DISABLE_LIBTCC
-	if (runmode == run_libtcc) {
-	    ofd = open_memstream(&ccode, &ccodesize);
-	} else
-#endif
-#ifndef DISABLE_DLOPEN
-	if (runmode != no_run) {
-	    runmode = run_dll;
-#if _POSIX_VERSION >= 200809L
-	    if( mkdtemp(tmpdir) == 0 ) {
-		perror("mkdtemp()");
-		exit(1);
-	    }
-#else
-#warning mkdtemp not used _POSIX_VERSION is too low, using mktemp instead
-	    if (mkdir(mktemp(tmpdir), 0700) < 0) {
-		perror("mkdir(mktemp()");
-		exit(1);
-	    }
-#endif
-	    strcpy(ccode_name, tmpdir); strcat(ccode_name, "/"BFBASE".c");
-	    strcpy(dl_name, tmpdir); strcat(dl_name, "/"BFBASE".so");
-	    strcpy(obj_name, tmpdir); strcat(obj_name, "/"BFBASE".o");
-	    ofd = fopen(ccode_name, "w");
-	} else
-#endif
-	{
-	    runmode = no_run;
-	    ofd = stdout;
-	}
+	open_ofd();
 
 	/* Annoyingly most C compilers don't like this line. */
 	/* pr("#!/usr/bin/tcc -run"); */
@@ -422,6 +394,41 @@ print_cstring(void)
 	    for(n=0; buf2[n]; n++)
 		buf[outlen++] = buf2[n];
 	}
+    }
+}
+
+static void
+open_ofd(void)
+{
+#ifndef DISABLE_LIBTCC
+    if (runmode == run_libtcc) {
+	ofd = open_memstream(&ccode, &ccodesize);
+    } else
+#endif
+#ifndef DISABLE_DLOPEN
+    if (runmode != no_run) {
+	runmode = run_dll;
+#if _POSIX_VERSION >= 200809L
+	if( mkdtemp(tmpdir) == 0 ) {
+	    perror("mkdtemp()");
+	    exit(1);
+	}
+#else
+#warning mkdtemp not used _POSIX_VERSION is too low, using mktemp instead
+	if (mkdir(mktemp(tmpdir), 0700) < 0) {
+	    perror("mkdir(mktemp()");
+	    exit(1);
+	}
+#endif
+	strcpy(ccode_name, tmpdir); strcat(ccode_name, "/"BFBASE".c");
+	strcpy(dl_name, tmpdir); strcat(dl_name, "/"BFBASE".so");
+	strcpy(obj_name, tmpdir); strcat(obj_name, "/"BFBASE".o");
+	ofd = fopen(ccode_name, "w");
+    } else
+#endif
+    {
+	runmode = no_run;
+	ofd = stdout;
     }
 }
 

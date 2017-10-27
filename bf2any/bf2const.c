@@ -241,15 +241,17 @@ void outopt(int ch, int count)
     case '=': tape->v = count; tape->is_set = 1; break;
 
     case 'B':
-	/* Some BE are not 32 bits, try to avoid cell size mistakes */
-	if (!cells_are_ints && (tape->v > 65536 || tape->v < -65536))
-	    ;
-	else
-	if (tape->is_set) {
+	if (tape->is_set)
+	{
 	    if (bytecell) tape->v %= 256; /* Note: preserves sign but limits range. */
-	    reg_known = 1;
-	    reg_val = tape->v;
-	    break;
+	    /* Some BE are not 32 bits, try to avoid cell size mistakes */
+	    if (!cells_are_ints && (tape->v > 65536 || tape->v < -65536))
+		;
+	    else {
+		reg_known = 1;
+		reg_val = tape->v;
+		break;
+	    }
 	}
 
 	flush_tape(0,1);

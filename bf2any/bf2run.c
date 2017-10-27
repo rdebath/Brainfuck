@@ -27,7 +27,7 @@ static size_t tapealloc;
 #define TOKEN_LIST(Mac) \
     Mac(STOP) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
     Mac(SET) Mac(BEG) Mac(MUL) Mac(MUL1) Mac(QSET) Mac(QMUL) Mac(QMUL1) \
-    Mac(ZFIND) Mac(RAILC) Mac(DUMP)
+    Mac(ZFIND) Mac(RAILC) Mac(RAILZ) Mac(DUMP)
 
 #define GEN_TOK_ENUM(NAME) T_ ## NAME,
 enum token { TOKEN_LIST(GEN_TOK_ENUM) TCOUNT};
@@ -169,6 +169,13 @@ outcmd(int ch, int count)
 	    mptr[-8] = T_RAILC;
 	    mptr[-7] = mptr[-3];
 	    mptr -= 6;
+	} else
+	if ((prevtk & 0xFFFF) == ((T_WHL<<8) + T_SET) && mptr[-4] == 0
+	    && mptr[-6] == 0 && mptr[-3] != 0) {
+	    /* [[-]<<<] loop */
+	    mptr[-8] = T_RAILZ;
+	    mptr[-7] = mptr[-3];
+	    mptr -= 6;
 	}
 	/* TODO: Add special for [-<<<+] */
 	break;
@@ -212,7 +219,7 @@ dumpprog(int * p, int * ep)
 	    break;
 	case T_SET: case T_ADD:
 	case T_MUL: case T_QSET: case T_QMUL:
-	case T_ZFIND: case T_RAILC:
+	case T_ZFIND: case T_RAILC: case T_RAILZ:
 	    printf(" %d", *p++);
 	    break;
 	default:
@@ -258,6 +265,7 @@ runprog(register int * p, register icell *mp)
 	case T_MUL1: *mp += a; p+=2; break;
 	case T_ZFIND: while((*mp&msk)) mp += p[2]; p+=3; break;
 	case T_RAILC: while((*mp&msk)) {*mp -=1; mp += p[2]; } p+=3; break;
+	case T_RAILZ: while((*mp&msk)) {*mp =0; mp += p[2]; } p+=3; break;
 	case T_PRT: putchar(*mp); p+=2; break;
 	case T_INP: if((a=getchar()) != EOF) *mp = a; p+=2; break;
 	case T_MUL: *mp += p[2] * a; p+=3; break;
