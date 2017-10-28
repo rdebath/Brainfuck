@@ -92,36 +92,14 @@ outtxn(int ch, int repcnt)
 	/* We didn't add the '[' -- add it now */
     }
 
+    /* The current loop has another one embedded.
+       Send the old loop start out */
+    if (ch == '[') outtxn(0, 0);
+
     /* New token */
     qcmd[qcnt] = ch;
     qrep[qcnt] = repcnt;
     qcnt++;
-
-    /* Actually change '[-]' and '[+]' to a single token */
-    if (qcnt >= 3) {
-	if (qcmd[qcnt-3] == '[' && qrep[qcnt-2] == 1 && qcmd[qcnt-1] == ']'
-	    && (qcmd[qcnt-2] == '-' || qcmd[qcnt-2] == '+')) {
-	    qcnt -= 3;
-	    outtxn('=', 0);
-	    return;
-	}
-    }
-
-    /* The current loop has another one embedded and it's not [-].
-       Send the old loop start out */
-    if (qcnt > 3 && qcmd[qcnt-3] == '[') {
-	int sc[3], sr[3];
-	qcnt -= 3;
-	for(i=0; i<3; i++) {
-	    sc[i] = qcmd[qcnt+i];
-	    sr[i] = qrep[qcnt+i];
-	}
-	outtxn(0, 0);
-	for(i=0; i<3; i++) {
-	    outtxn(sc[i], sr[i]);
-	}
-	return;
-    }
 
     /* Rest is to decode a 'simple' loop */
     if (ch != ']') return;
@@ -232,20 +210,42 @@ outtxn(int ch, int repcnt)
 
 /*
     For full structual optimisation (loops to multiplies) this function
-    calls the outtxn function otherwise the commands are just pass to
-    the BE.
+    calls the outtxn function after finding '=' commands otherwise the
+    commands are just pass to the BE.
 */
 void
 outrun(int ch, int count)
 {
-    if (enable_optim) {
-	outtxn(ch, count);
+static int zstate = 0;
+static int icount = 0;
+    if (!enable_optim) { outcmd(ch, count); return; }
 
-    } else {
-	/* Disable optimisations; input codes are sent directly to BE */
-	outcmd(ch, count);
-	return;
+    switch(zstate)
+    {
+    case 1:
+	if (count%2 == 1 && ch == '-') { zstate=2; icount = count; return; }
+	if (count%2 == 1 && ch == '+') { zstate=3; icount = count; return; }
+	outtxn('[', 1);
+	break;
+    case 2:
+	if (count == 1 && ch == ']') { zstate=4; return; }
+	outtxn('[', 1);
+	outtxn('-', icount);
+	break;
+    case 3:
+	if (count == 1 && ch == ']') { zstate=4; return; }
+	outtxn('[', 1);
+	outtxn('+', icount);
+	break;
+    case 4:
+	if (ch == '+') { outtxn('=', count); zstate=0; return; }
+	if (ch == '-') { outtxn('=', -count); zstate=0; return; }
+	outtxn('=', 0);
+	break;
     }
+    zstate=0;
+    if (count == 1 && ch == '[') { zstate++; return; }
+    outtxn(ch, count);
 }
 
 /*

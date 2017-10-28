@@ -108,7 +108,7 @@ flush_tape(int no_output, int keep_knowns)
 
 	    if ((p->v || p->is_set) &&
 		    (curroff != 0 || (tapeoff != 0 || flipcount == 0)) &&
-		    (!keep_knowns || p == tape || disable_be_optim)) {
+		    (!keep_knowns || p == tape)) {
 		if (p->cleaned && p->cleaned_val == p->v && p->is_set) {
 		    if (!keep_knowns) clear_cell(p);
 		} else {
