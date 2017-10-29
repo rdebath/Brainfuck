@@ -180,15 +180,15 @@ end
 
 -- lshift
 function fallback.lshift(v, s)
-	if (v < 0) or (s < 0) then error("bad shift") end
+	if (s < 0) then error("bad shift") end
 	if s > 31 then return 0 end
-	return mfloor(checkint32(v) * 2^s) % 0x100000000
+	return mfloor(fallback.band(v, 0xFFFFFFFF) * 2^s) % 0x100000000
 end
 
 -- rshift
 function fallback.rshift(v, s)
-	if (v < 0) or (s < 0) then error("bad shift") end
-	return mfloor(checkint32(v) / 2^s) % 0x100000000
+	if (s < 0) then error("bad shift") end
+	return mfloor(fallback.band(v, 0xFFFFFFFF) / 2^s) % 0x100000000
 end
 
 -- arshift
