@@ -27,7 +27,7 @@ LDLIBS=
 
 ifneq ($(MAKECMDGOALS),clean)
 # Need this early
-CC := $(shell ( which 2>/dev/null gcc clang pcc ; echo cc ) | head -1 | sed 's:.*/::')
+CC := $(shell ( which 2>/dev/null clang gcc pcc ; echo cc ) | head -1 | sed 's:.*/::')
 ifneq ($(wildcard $(TOOLDIR)/dynasm/dynasm),)
 CPUFOUND := $(shell $(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -DDETECT_ONLY \
 		-E -dM -x c bf2jit.x86.dasc | grep DASM_FOUND_CPU )
