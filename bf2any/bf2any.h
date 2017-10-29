@@ -4,6 +4,7 @@ extern int enable_optim;
 extern int disable_init_optim;
 extern int enable_debug;
 extern const char * current_file;
+extern char * extra_commands;
 
 void outcmd(int ch, int count);
 void outopt(int ch, int count);

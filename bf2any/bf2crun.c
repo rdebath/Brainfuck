@@ -119,6 +119,11 @@ fn_check_arg(const char * arg)
 	runmode = run_libtcc; return 1;
     } else
 #endif
+    if (strcmp(arg, "-brain") == 0) {
+	enable_debug = 1;
+	extra_commands = "*/%{}!?:;$^#";
+	return 1;
+    } else
 	return 0;
 }
 
@@ -201,6 +206,8 @@ outcmd(int ch, int count)
 	/* pr("#!/usr/bin/tcc -run"); */
 
 	if (use_unistd) {
+	    if (enable_debug)
+		pr("#include <stdio.h>");
 	    pr("#include <unistd.h>");
 	    if (bytecell) {
 		pr( "#define GETC(x) read(0, &(x), 1)");
@@ -221,6 +228,36 @@ outcmd(int ch, int count)
 	    pr("#define GETC(x) { v=getchar(); if(v!=EOF) (x)=v; }");
 	    pr("#define PUTC(x) putchar(x)");
 	}
+
+	pr("#ifndef MEMSZ");
+	prv("#define MEMSZ %d", tapesz-tapeinit);
+	pr("#endif");
+	pr("#ifndef TAPEOFF");
+	prv("#define TAPEOFF %d", tapeinit);
+	pr("#endif");
+
+	if (enable_debug) {
+	    pr("#ifndef do_dump");
+	    pr("#define do_dump() call_dump(mem,m)");
+	    if (bytecell)
+		pr("void call_dump(char *mem, char *m)");
+	    else
+		pr("void call_dump(int *mem, int *m)");
+	    pr("{");
+	    ind++;
+	    pr("int i;");
+	    pr("fprintf(stderr,\"P[%%d]=%%d: \",m-(mem+TAPEOFF),*m);");
+	    pr("for(i=0; i<16; i++) {");
+	    ind++;
+	    pr("fprintf(stderr,\" %%d\", mem[i+TAPEOFF]);");
+	    pr("if (m==mem+i+TAPEOFF) fprintf(stderr,\"<\");");
+	    ind--;
+	    pr("}");
+	    pr("fprintf(stderr,\"\\n\");");
+	    ind--;
+	    pr("}");
+	    pr("#endif");
+	}
 	if (runmode == run_dll) {
 	    pr("int brainfuck(void){");
 	    ind++;
@@ -229,12 +266,12 @@ outcmd(int ch, int count)
 	    ind++;
 	}
 	if (bytecell) {
-	    prv("static char mem[%d];", tapesz);
-	    prv("register char *m = mem + %d;", tapeinit);
+	    pr("static char mem[MEMSZ+TAPEOFF];");
+	    pr("register char *m = mem + TAPEOFF;");
 	    pr("register int v;");
 	} else {
-	    prv("static int mem[%d];", tapesz);
-	    prv("register int v, *m = mem + %d;", tapeinit);
+	    pr("static int mem[MEMSZ+TAPEOFF];");
+	    pr("register int v, *m = mem + TAPEOFF;");
 	}
 	if (runmode == no_run && !use_unistd)
 	    pr("setbuf(stdout,0);");
@@ -264,10 +301,60 @@ outcmd(int ch, int count)
     case '.': pr("PUTC(*m);"); break;
     case '"': print_cstring(); break;
     case ',': pr("GETC(*m);"); break;
-    case '#': if (runmode == no_run) pr("do_dump();"); break;
+    case '#': pr("do_dump();"); break;
 
     case '[': pr("while(*m) {"); ind++; break;
     case ']': ind--; pr("}"); break;
+
+    default:
+	if (ch>=256)
+	{
+	    switch(extra_commands[ch-256])
+	    {
+	    case '*':
+		pr("*m *= m[-1];");
+		break;
+	    case '/':
+		pr("*m /= m[-1];");
+		break;
+	    case '%':
+		pr("*m %%= m[-1];");
+		break;
+	    case '{':
+		pr("{int f=*m; while(f-->0) {");
+		ind++;
+		break;
+	    case '}':
+		ind--;
+		pr("}}");
+		break;
+	    case '!':
+		pr("break;");
+		break;
+	    case '?':
+		pr("if(*m) {");
+		ind++;
+		break;
+	    case ':':
+		ind--;
+		pr("} else {");
+		ind++;
+		break;
+	    case ';':
+		ind--;
+		pr("}");
+		break;
+	    case '$':
+		pr("printf(\"%%d.%%02d\",*m/100,*m%%100);");
+		break;
+	    case '^':
+		prv("m = mem + %d + *m;", tapeinit);
+		break;
+	    case '#':
+		pr("do_dump();");
+		break;
+	    }
+	}
     }
 
     if (ch != '~') return;

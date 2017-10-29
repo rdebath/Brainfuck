@@ -15,6 +15,7 @@ int enable_optim = 0;
 int disable_init_optim = 0;
 int enable_debug;
 const char * current_file;
+char * extra_commands = 0;
 
 /* Brainfuck loader.
  *
@@ -43,7 +44,7 @@ const char * current_file;
  *
  * The tokens are passed to the backend for conversion into the final code.
  */
-static char qcmd[64];
+static int qcmd[64];
 static int qrep[64];
 static int qcnt = 0;
 
@@ -312,6 +313,7 @@ main(int argc, char ** argv)
     FILE * ifd;
     int digits = 0, number = 0, multi = 1;
     int qstring = 0;
+    char * xc = 0;
     char ** filelist = 0;
     int filecount = 0;
 
@@ -426,6 +428,7 @@ main(int argc, char ** argv)
 	    /* These ones are not */
 	    if(!m && ch != '[' && ch != ']' && ch != '.' && ch != ',' &&
 		(ch != '#' || !enable_debug) &&
+		(!extra_commands || (xc = strchr(extra_commands, ch)) == 0) &&
 		((ch != '"' && ch != '=') || !enable_rle)) continue;
 	    /* Check for loop comments; ie: ][ comment ] */
 	    if (lc || (ch=='[' && lastch==']' && enable_optim)) {
@@ -438,6 +441,11 @@ main(int argc, char ** argv)
 	    if (c) { outrun(lastch, c); c=0; }
 	    if (!m) {
 		/* Non RLE tokens here */
+		if (xc) {
+		    outrun(256+(xc-extra_commands), 1);
+		    xc = 0;
+		    continue;
+		}
 		if (ch == '"') { qstring++; continue; }
 		if (ch == ',') inp = 1;
 		if (ch == '=') {
