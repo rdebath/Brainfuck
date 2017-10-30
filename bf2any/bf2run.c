@@ -44,7 +44,6 @@ void debugprog(int * p, int *ep);
 void dumpprog(int * p, int *ep);
 void dumpmem(int *tp);
 
-int disable_savestring = 1;
 int cells_are_ints = 1;
 
 static check_arg_t fn_check_arg;

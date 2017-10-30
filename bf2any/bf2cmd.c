@@ -16,7 +16,6 @@ int loopid = 0;
 
 struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
-int disable_savestring = 1;
 int cells_are_ints = sizeof(int)==4;
 
 void

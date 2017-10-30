@@ -17,7 +17,6 @@
 
 #include "bf2any.h"
 
-int disable_savestring = 1;
 int cells_are_ints = 1;
 
 /*

@@ -80,8 +80,62 @@ static void add_string(int ch)
 char *
 get_string(void)
 {
-    if (sav_str_len) return sav_str_str;
-    else return 0;
+    if (sav_str_len) {
+	sav_str_len = 0;
+	return sav_str_str;
+    } else return 0;
+}
+
+static void
+flush_string(void)
+{
+    if (sav_str_len<=0) return;
+    add_string(0);
+    outcmd('"', 0);
+    if (sav_str_len<=0) return;
+
+    {
+	int outoff = 0, tapeoff = 0;
+	int direction = 1;
+	int flipcount = 1;
+	struct mem* p = tapezero;
+
+	for(;;)
+	{
+	    if (p->is_set)
+		break;
+
+	    if (direction > 0 && p->n) {
+		p=p->n; tapeoff ++;
+	    } else
+	    if (direction < 0 && p->p) {
+		p=p->p; tapeoff --;
+	    } else
+	    if (flipcount) {
+		flipcount--;
+		direction = -direction;
+	    } else {
+		fprintf(stderr, "FAILED\n");
+		exit(1);
+	    }
+	}
+
+	if (tapeoff > outoff) { outcmd('>', tapeoff-outoff); outoff=tapeoff; }
+	if (tapeoff < outoff) { outcmd('<', outoff-tapeoff); outoff=tapeoff; }
+	tapezero = p;
+	curroff -= tapeoff;
+    }
+
+    {
+	char c, *p = sav_str_str;
+	while(*p) {
+	    outcmd('=', (c = *p++));
+	    outcmd('.', 1);
+	}
+	tapezero->cleaned = 1;
+	tapezero->cleaned_val = c;
+	sav_str_len = 0;
+    }
 }
 
 static void
@@ -90,13 +144,13 @@ flush_tape(int no_output, int keep_knowns)
     int outoff = 0, tapeoff = 0;
     int direction = 1;
     int flipcount = 2;
-    struct mem *p = tapezero;
+    struct mem *p;
 
-    if (sav_str_len>0) {
-	add_string(0);
-	outcmd('"', 0);
-	sav_str_len = 0;
-    }
+    if (sav_str_len>0)
+	flush_string();
+
+    p = tapezero;
+
     if(tapezero) {
 	if (curroff > 0) direction = -1;
 
@@ -211,16 +265,12 @@ void outopt(int ch, int count)
 	return;
 
     case '.':
-	if (!disable_savestring && !disable_be_optim &&
-		tape->is_set && tape->v > 0 && tape->v < 128) {
+	if (tape->is_set && tape->v > 0 && tape->v < 128) {
 	    add_string(tape->v);
 
-	    if (sav_str_len >= 128*1024) /* Limit the buffer size. */
-	    {
-		add_string(0);
-		outcmd('"', 0);
-		sav_str_len = 0;
-	    }
+	    /* Limit the buffer size. */
+	    if (sav_str_len >= 128*1024 - (tape->v=='\n')*1024)
+		flush_string();
 	    break;
 	}
 	flush_tape(0,1);

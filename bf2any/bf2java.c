@@ -73,8 +73,7 @@ outcmd(int ch, int count)
         n->loop = jmpstack; jmpstack = n;
     } else if (n->ch == ']') {
         n->loop = jmpstack; jmpstack = jmpstack->loop; n->loop->loop = n;
-    } else if (ch == '"')
-        n->cstr = strdup(get_string());
+    }
 
     if (ch != '~') return;
 

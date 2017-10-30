@@ -11,8 +11,6 @@
 int ind = 0;
 #define I printf("%*s", ind*4, "")
 
-int disable_savestring = 1;
-
 static check_arg_t fn_check_arg;
 struct be_interface_s be_interface = {fn_check_arg};
 

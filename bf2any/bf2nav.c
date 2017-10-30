@@ -30,7 +30,6 @@ static char * boilerplate;
 #define prv(s,v)        printf("%*s" s "\n", ind*2, "", (v))
 #define prv2(s,v,v2)    printf("%*s" s "\n", ind*2, "", (v), (v2))
 
-int disable_savestring = 1;
 int bytecell = -1;
 
 void
