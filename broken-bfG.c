@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-int jmpstk[200], sp = 0;
+int jmpstk[2000], sp = 0;
 
 int
 main(int argc, char **argv){
@@ -17,12 +17,24 @@ main(int argc, char **argv){
 	switch(pgm[p]) {
 	case '+': mem[m]++; break;
 	case '-': mem[m]--; break;
-	case '>': m++; if(m==60000) {fprintf(stderr, "Tape overflow\n"); return -1; } break;
-	case '<': m--; if(m==60000) {fprintf(stderr, "Tape underflow\n"); return -1; } break;
+	case '>': m++; break;
+	case '<': m--; break;
 	case '.': putchar(mem[m]); break;
 	case ',': {int a=getchar(); if(a!=EOF) mem[m]=a;} break;
-	case '[': jmpstk[++sp] = p; break;
-	case ']': if(mem[m]==0) {if(sp>0)sp--;} else p=jmpstk[sp]; break;
+	case ']':
+	    if (sp) {
+		if (mem[m]) p=jmpstk[sp-1]; else sp--;
+	    }
+	    break;
+	case '[':
+	    if(mem[m])
+		jmpstk[sp++] = p;
+	    else {
+		while(pgm[p] && pgm[p] != ']') p++;
+		if (pgm[p] == 0) return 1;
+	    }
+	    break;
 	}
     }
+    return 0;
 }
