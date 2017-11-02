@@ -28,7 +28,6 @@
 
 int ind = 0;
 int use_unistd = 0;
-int use_mmove = 0;
 enum { no_run, run_libtcc, run_dll } runmode = run_libtcc;
 FILE * ofd;
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
@@ -44,7 +43,6 @@ static void compile_and_run(void);
 static void print_cstring(void);
 static void open_ofd(void);
 
-static int imov = 0;
 static int verbose = 0;
 
 #ifndef DISABLE_DLOPEN
@@ -104,9 +102,6 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-d") == 0) {
 	runmode = no_run; return 1;
     } else
-    if (strcmp(arg, "-mmove") == 0) {
-	use_mmove = 1; return 1;
-    } else
     if (strcmp(arg, "-unix") == 0) {
 	use_unistd = 1; return 1;
     } else
@@ -131,44 +126,41 @@ fn_check_arg(const char * arg)
 void
 outcmd(int ch, int count)
 {
-    if (imov && ch != '>' && ch != '<') {
-	int mov = imov;
+    int mov = 0;
 
-	if (use_mmove) {
-	    imov = 0;
+    if (enable_optim) {
+	static struct ostack { struct ostack *p; int d; } *sp;
+	static int imov = 0;
 
-	    switch(ch) {
-	    case '=': prv2("*(m+=%d) = %d;", mov, count); return;
-	    case '+': prv2("*(m+=%d) +=%d;", mov, count); return;
-	    case '-': prv2("*(m+=%d) -=%d;", mov, count); return;
-	    case 'B': prv("v= *(m+=%d);", mov); return;
-	    case 'M': prv2("*(m+=%d) += v*%d;", mov, count); return;
-	    case 'N': prv2("*(m+=%d) -= v*%d;", mov, count); return;
-	    case 'S': prv("*(m+=%d) += v;", mov); return;
-	    }
-	} else {
-	    switch(ch) {
-	    case '=': prv2("m[%d] = %d;", mov, count); return;
-	    case 'B': prv("v= m[%d];", mov); return;
-	    case 'M': prv2("m[%d] += v*%d;", mov, count); return;
-	    case 'N': prv2("m[%d] -= v*%d;", mov, count); return;
-	    case 'S': prv("m[%d] += v;", mov); return;
-	    case 'Q': prv2("if(v) m[%d] = %d;", mov, count); return;
-	    case 'm': prv2("if(v) m[%d] += v*%d;", mov, count); return;
-	    case 'n': prv2("if(v) m[%d] -= v*%d;", mov, count); return;
-	    case 's': prv("if(v) m[%d] += v;", mov); return;
-	    case '+': prv2("m[%d] +=%d;", mov, count); return;
-	    case '-': prv2("m[%d] -=%d;", mov, count); return;
-	    case '.': prv("PUTC(m[%d]);", mov); return;
-	    }
+        if (ch == '>') {
+            imov += count; return;
+        } else if (ch == '<') {
+            imov -= count; return;
 	}
 
-	imov = 0;
-	if (mov > 0)
-	    prv("m += %d;", mov);
-	else if (mov < 0)
-	    prv("m -= %d;", -mov);
-    }
+	mov = imov;
+
+	if (ch == '[') {
+	    struct ostack * np = malloc(sizeof(struct ostack));
+	    np->p = sp;
+	    np->d = imov;
+	    sp = np;
+	} else if (ch == ']') {
+	    struct ostack * np = sp;
+	    sp = sp->p;
+	    count = imov - np->d;
+	    mov = imov = np->d;
+	    free(np);
+	} else if (mov && (ch == '#' || ch >= 256)) {
+	    if (mov > 0) {
+		prv("m += %d;", mov);
+	    } else if (mov < 0) {
+		prv("m -= %d;", -mov);
+	    }
+	    mov = imov = 0;
+	}
+    } else if (ch == ']')
+	count = 0;
 
     switch(ch) {
     case '!':
@@ -254,27 +246,34 @@ outcmd(int ch, int count)
 	    pr("fprintf(stderr, \"Infinite Loop\\n\"); return 1;");
 	break;
 
-    case '=': prv("*m = %d;", count); break;
-    case 'B': pr("v = *m;"); break;
-    case 'M': prv("*m += v*%d;", count); break;
-    case 'N': prv("*m -= v*%d;", count); break;
-    case 'S': pr("*m += v;"); break;
-    case 'Q': prv("if(v) *m = %d;", count); break;
-    case 'm': prv("if(v) *m += v*%d;", count); break;
-    case 'n': prv("if(v) *m -= v*%d;", count); break;
-    case 's': pr("if(v) *m += v;"); break;
+    case '=': prv2("m[%d] = %d;", mov, count); return;
+    case 'B': prv("v= m[%d];", mov); return;
+    case 'M': prv2("m[%d] += v*%d;", mov, count); return;
+    case 'N': prv2("m[%d] -= v*%d;", mov, count); return;
+    case 'S': prv("m[%d] += v;", mov); return;
+    case 'Q': prv2("if(v) m[%d] = %d;", mov, count); return;
+    case 'm': prv2("if(v) m[%d] += v*%d;", mov, count); return;
+    case 'n': prv2("if(v) m[%d] -= v*%d;", mov, count); return;
+    case 's': prv("if(v) m[%d] += v;", mov); return;
 
-    case '+': prv("*m +=%d;", count); break;
-    case '-': prv("*m -=%d;", count); break;
-    case '>': imov += count; break;
-    case '<': imov -= count; break;
-    case '.': pr("PUTC(*m);"); break;
+    case '+': prv2("m[%d] += %d;", mov, count); return;
+    case '-': prv2("m[%d] -= %d;", mov, count); return;
+    case '>': prv("m += %d;", count); break;
+    case '<': prv("m -= %d;", count); break;
+    case '.': prv("PUTC(m[%d]);", mov); return;
     case '"': print_cstring(); break;
-    case ',': pr("GETC(*m);"); break;
+    case ',': prv("GETC(m[%d]);", mov); break;
     case '#': pr("do_dump();"); break;
 
-    case '[': pr("while(*m) {"); ind++; break;
-    case ']': ind--; pr("}"); break;
+    case '[': prv("while(m[%d]) {", mov); ind++; break;
+    case ']':
+	if (count > 0)
+            prv("m += %d;", count);
+        else if (count < 0)
+            prv("m -= %d;", -count);
+	ind--;
+	pr("}");
+	break;
 
     default:
 	if (ch>=256)

@@ -27,9 +27,52 @@ fn_check_arg(const char * arg)
     return 0;
 }
 
+static char *
+cell(int mov)
+{
+    static char buf[6+3+sizeof(mov)*3];
+    if (mov == 0) return "m[p]";
+    if (mov < 0)
+	sprintf(buf, "m[p-%d]", -mov);
+    else
+	sprintf(buf, "m[p+%d]", mov);
+    return buf;
+}
+
 void
 outcmd(int ch, int count)
 {
+    int mov = 0;
+    char * cm;
+
+    if (enable_optim) {
+	static struct ostack { struct ostack *p; int d; } *sp;
+	static int imov = 0;
+
+        if (ch == '>') {
+            imov += count; return;
+        } else if (ch == '<') {
+            imov -= count; return;
+	}
+
+	mov = imov;
+
+	if (ch == '[') {
+	    struct ostack * np = malloc(sizeof(struct ostack));
+	    np->p = sp;
+	    np->d = imov;
+	    sp = np;
+	} else if (ch == ']') {
+	    struct ostack * np = sp;
+	    sp = sp->p;
+	    count = imov - np->d;
+	    mov = imov = np->d;
+	    free(np);
+	}
+    } else if (ch == ']')
+	count = 0;
+
+    cm = cell(mov);
     switch(ch) {
     case '!':
 	puts("#!/usr/bin/ruby");
@@ -44,23 +87,23 @@ outcmd(int ch, int count)
 	    puts("m.push(0) while p>=m.length");
 	break;
 
-    case '=': I; printf("m[p] = %d\n", count); break;
+    case '=': I; printf("%s = %d\n", cm, count); break;
     case 'B':
-	if(bytecell) { I; printf("m[p] &= 255\n"); }
-	I; printf("v = m[p]\n");
+	if(bytecell) { I; printf("%s &= 255\n", cm); }
+	I; printf("v= %s\n", cm);
 	break;
-    case 'M': I; printf("m[p] = m[p]+v*%d\n", count); break;
-    case 'N': I; printf("m[p] = m[p]-v*%d\n", count); break;
-    case 'S': I; printf("m[p] = m[p]+v\n"); break;
-    case 'Q': I; printf("m[p] = %d unless v == 0\n", count); break;
-    case 'm': I; printf("m[p] = m[p]+v*%d unless v == 0\n", count); break;
-    case 'n': I; printf("m[p] = m[p]-v*%d unless v == 0\n", count); break;
-    case 's': I; printf("m[p] = m[p]+v unless v == 0\n"); break;
+    case 'M': I; printf("%s += v*%d\n", cm, count); break;
+    case 'N': I; printf("%s -= v*%d\n", cm, count); break;
+    case 'S': I; printf("%s += v\n", cm); break;
+    case 'Q': I; printf("%s = %d unless v == 0\n", cm, count); break;
+    case 'm': I; printf("%s += v*%d unless v == 0\n", cm, count); break;
+    case 'n': I; printf("%s -= v*%d unless v == 0\n", cm, count); break;
+    case 's': I; printf("%s += v unless v == 0\n", cm); break;
 
     case 'X': I; printf("raise 'Aborting Infinite Loop.'\n"); break;
 
-    case '+': I; printf("m[p] += %d\n", count); break;
-    case '-': I; printf("m[p] -= %d\n", count); break;
+    case '+': I; printf("%s += %d\n", cm, count); break;
+    case '-': I; printf("%s -= %d\n", cm, count); break;
     case '<':
 	I; printf("p -= %d\n", count);
 	curtapeoff -= count;
@@ -74,26 +117,32 @@ outcmd(int ch, int count)
 	}
 	break;
     case '[':
-	if(bytecell) { I; printf("m[p] &= 255\n"); }
-	I; printf("while m[p] != 0\n");
+	if(bytecell) { I; printf("%s &= 255\n", cm); }
+	I; printf("while %s != 0\n", cm);
 	ind++;
 	curtapeoff = safetapeoff = 0;
 	break;
     case ']':
-	if(bytecell) { I; printf("m[p] &= 255\n"); }
+	if (count > 0) {
+            I; printf("p += %d\n", count);
+        } else if (count < 0) {
+            I; printf("p -= %d\n", -count);
+	}
+
+	if(bytecell) { I; printf("%s &= 255\n", cm); }
 	ind--; I; printf("end\n");
 	curtapeoff = safetapeoff = 0;
 	break;
     case '"': print_cstring(); break;
     case '.':
 	I;
-	if(bytecell) printf("putc m[p]\n");
-	else         printf("begin print ''<<m[p] rescue putc m[p] end\n");
+	if(bytecell) printf("putc %s\n", cm);
+	else printf("begin print '' << %s rescue putc %s end\n", cm, cm);
 	break;
     case ',':
 	I;
-	if (bytecell) printf("m[p] = $stdin.getbyte if !$stdin.eof\n");
-	else          printf("m[p] = $stdin.getc.ord if !$stdin.eof\n");
+	if (bytecell) printf("%s = $stdin.getbyte if !$stdin.eof\n", cm);
+	else          printf("%s = $stdin.getc.ord if !$stdin.eof\n", cm);
 	break;
     }
 }

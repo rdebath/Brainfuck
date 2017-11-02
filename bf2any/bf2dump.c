@@ -4,90 +4,136 @@
 
 #include "bf2any.h"
 
+static char *
+cell(int mov)
+{
+    static char buf[3+3+sizeof(mov)*3];
+    if (mov == 0) return "*m";
+    sprintf(buf, "m[%d]", mov);
+    return buf;
+}
+
 void
 outcmd(int ch, int count)
 {
-static int imov = 0, ind = 0;
+static int ind = 0;
+    int mov = 0;
 
-    if (imov && ch != '>' && ch != '<') {
-        int mov = imov;
+#ifdef CHEADER
+    if (ch == '!')
+	printf("%s\n",  "#include<stdio.h>"
+		"\n"	"#define I(a,b)"
+		"\n"	"#define putch(x) putchar(x)"
+		"\n"	"#define getch(x) v=getchar();if(v!=EOF) x=v;"
+		"\n"	"unsigned char mem[30000], *m=mem, v;"
+		"\n"	"int"
+		"\n"	"main()");
+#endif
 
-	switch(ch) {
-	case '=': case 'B': case 'M': case 'N': case 'S': case 'Q':
-	case 'm': case 'n': case 's': case '+': case '-':
+    printf("I('%c', %d) \t", ch, count);
 
-	    printf("%c %3d: %*s", ch, count, ind*2, "");
-	    switch(ch) {
-	    case '=': printf("m[%d] = %d\n", mov, count); return;
-	    case 'B': printf("v = m[%d]\n", mov); return;
-	    case 'M': printf("m[%d] += v*%d\n", mov, count); return;
-	    case 'N': printf("m[%d] -= v*%d\n", mov, count); return;
-	    case 'S': printf("m[%d] += v\n", mov); return;
-	    case 'Q': printf("if(v!=0) m[%d] = %d\n", mov, count); return;
-	    case 'm': printf("if(v!=0) m[%d] += v*%d\n", mov, count); return;
-	    case 'n': printf("if(v!=0) m[%d] -= v*%d\n", mov, count); return;
-	    case 's': printf("if(v!=0) m[%d] += v\n", mov); return;
-	    case '+': printf("m[%d] +=%d\n", mov, count); return;
-	    case '-': printf("m[%d] -=%d\n", mov, count); return;
+    if (enable_optim) {
+	static struct ostack { struct ostack *p; int d; } *sp;
+	static int imov = 0;
+
+        if (ch == '>') {
+	    printf("\n");
+            imov += count; return;
+        } else if (ch == '<') {
+	    printf("\n");
+            imov -= count; return;
+	}
+
+	mov = imov;
+
+	if (ch == '[') {
+	    struct ostack * np = malloc(sizeof(struct ostack));
+	    np->p = sp;
+	    np->d = imov;
+	    sp = np;
+	} else if (ch == ']') {
+	    struct ostack * np = sp;
+	    sp = sp->p;
+	    count = imov - np->d;
+	    mov = imov = np->d;
+	    free(np);
+	} else if (mov && ch == '#') {
+	    if (mov > 0) {
+		printf("%*s", ind*2, "");
+		printf("m += %d;\n", mov);
+		printf("%10s\t", "");
+	    } else if (mov < 0) {
+		printf("%*s", ind*2, "");
+		printf("m -= %d;\n", -mov);
+		printf("%10s\t", "");
 	    }
+	    mov = imov = 0;
 	}
+    } else if (ch == ']')
+	count = 0;
 
-	if (mov) {
-	    imov = 0;
-	    if (mov > 0)
-		printf("> %3d: %*sm += %d\n", mov, ind*2, "", mov);
-	    else if (mov < 0)
-		printf("< %3d: %*sm -= %d\n", -mov, ind*2, "", -mov);
-	}
-    }
+    if (ch == ']' || ch == '~') ind--;
+    printf("%*s", ind*2, "");
 
     switch(ch) {
-    case '>': imov += count; return;
-    case '<': imov -= count; return;
-    }
-    if (ch == ']') ind--;
+    case '=': printf("%s = %d;\n", cell(mov), count); break;
+    case 'B': printf("v = %s;\n", cell(mov)); break;
+    case 'M': printf("%s += v*%d;\n", cell(mov), count); break;
+    case 'N': printf("%s -= v*%d;\n", cell(mov), count); break;
+    case 'S': printf("%s += v;\n", cell(mov)); break;
+    case 'Q': printf("if(v!=0) %s = %d;\n", cell(mov), count); break;
+    case 'm': printf("if(v!=0) %s += v*%d;\n", cell(mov), count); break;
+    case 'n': printf("if(v!=0) %s -= v*%d;\n", cell(mov), count); break;
+    case 's': printf("if(v!=0) %s += v;\n", cell(mov)); break;
 
-    printf("%c %3d: %*s", ch, count, ind*2, "");
-    switch(ch) {
-    case '=': printf("*m = %d\n", count); break;
-    case 'B': printf("v = *m\n"); break;
-    case 'M': printf("*m += v*%d\n", count); break;
-    case 'N': printf("*m -= v*%d\n", count); break;
-    case 'S': printf("*m += v\n"); break;
-    case 'Q': printf("if(v!=0) *m = %d\n", count); break;
-    case 'm': printf("if(v!=0) *m += v*%d\n", count); break;
-    case 'n': printf("if(v!=0) *m -= v*%d\n", count); break;
-    case 's': printf("if(v!=0) *m += v\n"); break;
+    case '>': printf("m += %d;\n", count); break;
+    case '<': printf("m -= %d;\n", count); break;
+    case '+': printf("%s += %d;\n", cell(mov), count); break;
+    case '-': printf("%s -= %d;\n", cell(mov), count); break;
+    case '.': printf("putch(%s);\n", cell(mov)); break;
+    case ',': printf("getch(%s);\n", cell(mov)); break;
 
-    case '+': printf("*m +=%d\n", count); break;
-    case '-': printf("*m -=%d\n", count); break;
+    case 'X':
+	printf("fprintf(stderr, \"Abort: Infinite Loop.\\n\"); exit(1);\n");
+	break;
 
-    case '[': printf("while *m!=0\n"); break;
-    case ']': printf("endwhile\n"); break;
+    case '[':
+	printf("while (%s!=0) {\n", cell(mov));
+	ind++;
+	break;
 
-    case '.': printf("putch(*m)\n"); break;
-    case ',': printf("getch(*m)\n"); break;
+    case ']':
+	if (count > 0)
+	    printf("  m += %d;\n%10s\t%*s", count, "", ind*2, "");
+	else if (count < 0)
+	    printf("  m -= %d;\n%10s\t%*s", -count, "", ind*2, "");
+	printf("} /* %s */\n", cell(mov));
+	break;
 
     case '"':
 	{
-	    char * s = get_string();
-	    printf("printf(\"");
+	    char * s = get_string(), *p=s;
+	    int percent = 0;
+	    for(p=s;*p && !percent;p++) percent = (*p == '%');
+	    printf("printf(%s\"", percent?"\"%s\",":"");
 	    for(;*s;s++)
-		if (*s>=' ' && *s<='~' && *s!='\\')
+		if (*s>=' ' && *s<='~' && *s!='\\' && *s!='"')
 		    putchar(*s);
 		else if (*s == '\n')
 		    printf("\\n");
-		else if (*s == '\\')
-		    printf("\\\\");
+		else if (*s == '\\' || *s == '"')
+		    printf("\\%c", *s);
 		else
 		    printf("\\%03o", *s);
 	    printf("\");\n");
 	}
 	break;
 
+    case '!': puts("{"); ind++; break;
+    case '~': puts("}"); break;
+
     default:
-	printf("\n");
+	printf("/* ? */\n");
 	break;
     }
-    if (ch == '[') ind++;
 }

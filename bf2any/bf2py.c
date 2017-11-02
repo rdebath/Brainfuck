@@ -62,9 +62,53 @@ fn_check_arg(const char * arg)
     return 0;
 }
 
+static char *
+cell(int mov)
+{
+    static char buf[6+3+sizeof(mov)*3];
+    if (mov == 0) return "m[p]";
+    if (mov < 0)
+	sprintf(buf, "m[p-%d]", -mov);
+    else
+	sprintf(buf, "m[p+%d]", mov);
+    return buf;
+}
+
 void
 outcmd(int ch, int count)
 {
+    int mov = 0;
+    char * mc;
+
+    if (enable_optim) {
+	static struct ostack { struct ostack *p; int d; } *sp;
+	static int imov = 0;
+
+        if (ch == '>') {
+            imov += count; return;
+        } else if (ch == '<') {
+            imov -= count; return;
+	}
+
+	mov = imov;
+
+	if (ch == '[') {
+	    struct ostack * np = malloc(sizeof(struct ostack));
+	    np->p = sp;
+	    np->d = imov;
+	    sp = np;
+	} else if (ch == ']') {
+	    struct ostack * np = sp;
+	    sp = sp->p;
+	    count = imov - np->d;
+	    mov = imov = np->d;
+	    free(np);
+	}
+    } else if (ch == ']')
+	count = 0;
+
+    mc = cell(mov);
+
     switch(ch) {
     case '!':
 #ifndef DISABLE_LIBPY
@@ -232,38 +276,44 @@ outcmd(int ch, int count)
 	}
 	break;
 
-    case '=': I; fprintf(ofd, "m[p] = %d\n", count); break;
+    case '=': I; fprintf(ofd, "%s = %d\n", mc, count); break;
     case 'B':
-	if(bytecell) { I; fprintf(ofd, "m[p] &= 255\n"); }
-	I; fprintf(ofd, "v = m[p]\n");
+	if(bytecell) { I; fprintf(ofd, "%s &= 255\n", mc); }
+	I; fprintf(ofd, "v = %s\n", mc);
 	break;
-    case 'M': I; fprintf(ofd, "m[p] = m[p]+v*%d\n", count); break;
-    case 'N': I; fprintf(ofd, "m[p] = m[p]-v*%d\n", count); break;
-    case 'S': I; fprintf(ofd, "m[p] = m[p]+v\n"); break;
-    case 'Q': I; fprintf(ofd, "if (v != 0) : m[p] = %d\n", count); break;
-    case 'm': I; fprintf(ofd, "if (v != 0) : m[p] = m[p]+v*%d\n", count); break;
-    case 'n': I; fprintf(ofd, "if (v != 0) : m[p] = m[p]-v*%d\n", count); break;
-    case 's': I; fprintf(ofd, "if (v != 0) : m[p] = m[p]+v\n"); break;
+    case 'M': I; fprintf(ofd, "%s = %s+v*%d\n", mc, mc, count); break;
+    case 'N': I; fprintf(ofd, "%s = %s-v*%d\n", mc, mc, count); break;
+    case 'S': I; fprintf(ofd, "%s = %s+v\n", mc, mc); break;
+    case 'Q': I; fprintf(ofd, "if (v != 0) : %s = %d\n", mc, count); break;
+    case 'm': I; fprintf(ofd, "if (v != 0) : %s = %s+v*%d\n", mc, mc, count); break;
+    case 'n': I; fprintf(ofd, "if (v != 0) : %s = %s-v*%d\n", mc, mc, count); break;
+    case 's': I; fprintf(ofd, "if (v != 0) : %s = %s+v\n", mc, mc); break;
 
     case 'X': I; fprintf(ofd, "raise Exception('Aborting infinite loop')\n"); break;
 
-    case '+': I; fprintf(ofd, "m[p] += %d\n", count); break;
-    case '-': I; fprintf(ofd, "m[p] -= %d\n", count); break;
+    case '+': I; fprintf(ofd, "%s += %d\n", mc, count); break;
+    case '-': I; fprintf(ofd, "%s -= %d\n", mc, count); break;
     case '<': I; fprintf(ofd, "p -= %d\n", count); break;
     case '>': I; fprintf(ofd, "p += %d\n", count); break;
     case '[':
-	if(bytecell) { I; fprintf(ofd, "m[p] &= 255\n"); }
-	I; fprintf(ofd, "while m[p] :\n"); ind++; break;
+	if(bytecell) { I; fprintf(ofd, "%s &= 255\n", mc); }
+	I; fprintf(ofd, "while %s :\n", mc); ind++; break;
     case ']':
+        if (count > 0) {
+            I; fprintf(ofd, "p += %d\n", count);
+        } else if (count < 0) {
+            I; fprintf(ofd, "p -= %d\n", -count);
+	}
+
 	if(bytecell) {
-	    I; fprintf(ofd, "m[p] &= 255\n");
+	    I; fprintf(ofd, "%s &= 255\n", mc);
 	}
 	ind--;
 	break;
 
     case '"': print_string(); break;
     case '.':
-	I; fprintf(ofd, "putcell(m[p])\n");
+	I; fprintf(ofd, "putcell(%s)\n", mc);
 	use_putcell = 1;
 	break;
 
@@ -272,9 +322,9 @@ outcmd(int ch, int count)
 	    I; fprintf(ofd, "sys.stdout.flush()\n");
 	    I; fprintf(ofd, "c = sys.stdin.read(1);\n");
 	    I; fprintf(ofd, "if c != '' :\n");
-	    ind++; I; fprintf(ofd, "m[p] = ord(c)\n"); ind--;
+	    ind++; I; fprintf(ofd, "%s = ord(c)\n", mc); ind--;
 	} else {
-	    I; fprintf(ofd, "m[p] = getcell(m[p])\n");
+	    I; fprintf(ofd, "%s = getcell(%s)\n", mc, mc);
 	    use_getcell = 1;
 	}
 	break;
