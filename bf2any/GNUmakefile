@@ -97,6 +97,8 @@ bf2gas64.o: bf2gas.c
 
 bf2semi.o: bf2semi.c bf2whitespace.c
 
+bf2crun.o bf2dump.o bf2py.o bf2rb.o: move_opt.h
+
 #-------------------------------------------------------------------------------
 # Assemble the dynasm machine code.
 ifneq ($(CPUFOUND),)

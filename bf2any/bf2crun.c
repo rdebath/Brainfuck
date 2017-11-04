@@ -16,6 +16,7 @@
 #endif
 
 #include "bf2any.h"
+#include "move_opt.h"
 
 /*
  * GCC-O0 translation from BF, runs at about 2,700,000,000 instructions per second.
@@ -128,39 +129,18 @@ outcmd(int ch, int count)
 {
     int mov = 0;
 
-    if (enable_optim) {
-	static struct ostack { struct ostack *p; int d; } *sp;
-	static int imov = 0;
-
-        if (ch == '>') {
-            imov += count; return;
-        } else if (ch == '<') {
-            imov -= count; return;
+    if (ch == '#' || ch >= 256) {
+	int ch2 = '~', count2 = 0, mov2 = 0;
+	move_opt(&ch2, &count2, &mov2);
+	if (count2 > 0) {
+	    prv("m += %d;", count2);
+	} else if (count2 < 0) {
+	    prv("m -= %d;", -count2);
 	}
-
-	mov = imov;
-
-	if (ch == '[') {
-	    struct ostack * np = malloc(sizeof(struct ostack));
-	    np->p = sp;
-	    np->d = imov;
-	    sp = np;
-	} else if (ch == ']') {
-	    struct ostack * np = sp;
-	    sp = sp->p;
-	    count = imov - np->d;
-	    mov = imov = np->d;
-	    free(np);
-	} else if (mov && (ch == '#' || ch >= 256)) {
-	    if (mov > 0) {
-		prv("m += %d;", mov);
-	    } else if (mov < 0) {
-		prv("m -= %d;", -mov);
-	    }
-	    mov = imov = 0;
-	}
-    } else if (ch == ']')
-	count = 0;
+    } else {
+	move_opt(&ch, &count, &mov);
+	if (ch == 0) return;
+    }
 
     switch(ch) {
     case '!':

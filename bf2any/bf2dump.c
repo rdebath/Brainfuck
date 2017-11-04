@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "bf2any.h"
+#include "move_opt.h"
 
 static char *
 cell(int mov)
@@ -32,45 +33,8 @@ static int ind = 0;
 
     printf("I('%c', %d) \t", ch, count);
 
-    if (enable_optim) {
-	static struct ostack { struct ostack *p; int d; } *sp;
-	static int imov = 0;
-
-        if (ch == '>') {
-	    printf("\n");
-            imov += count; return;
-        } else if (ch == '<') {
-	    printf("\n");
-            imov -= count; return;
-	}
-
-	mov = imov;
-
-	if (ch == '[') {
-	    struct ostack * np = malloc(sizeof(struct ostack));
-	    np->p = sp;
-	    np->d = imov;
-	    sp = np;
-	} else if (ch == ']') {
-	    struct ostack * np = sp;
-	    sp = sp->p;
-	    count = imov - np->d;
-	    mov = imov = np->d;
-	    free(np);
-	} else if (mov && ch == '#') {
-	    if (mov > 0) {
-		printf("%*s", ind*2, "");
-		printf("m += %d;\n", mov);
-		printf("%10s\t", "");
-	    } else if (mov < 0) {
-		printf("%*s", ind*2, "");
-		printf("m -= %d;\n", -mov);
-		printf("%10s\t", "");
-	    }
-	    mov = imov = 0;
-	}
-    } else if (ch == ']')
-	count = 0;
+    move_opt(&ch, &count, &mov);
+    if (ch == 0) { putchar('\n'); return; }
 
     if (ch == ']' || ch == '~') ind--;
     printf("%*s", ind*2, "");

@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "bf2any.h"
+#include "move_opt.h"
 
 /* Ah, yes, this should be first too ... idiots. */
 #if !defined(DISABLE_LIBPY) && (_POSIX_VERSION < 200809L)
@@ -80,32 +81,8 @@ outcmd(int ch, int count)
     int mov = 0;
     char * mc;
 
-    if (enable_optim) {
-	static struct ostack { struct ostack *p; int d; } *sp;
-	static int imov = 0;
-
-        if (ch == '>') {
-            imov += count; return;
-        } else if (ch == '<') {
-            imov -= count; return;
-	}
-
-	mov = imov;
-
-	if (ch == '[') {
-	    struct ostack * np = malloc(sizeof(struct ostack));
-	    np->p = sp;
-	    np->d = imov;
-	    sp = np;
-	} else if (ch == ']') {
-	    struct ostack * np = sp;
-	    sp = sp->p;
-	    count = imov - np->d;
-	    mov = imov = np->d;
-	    free(np);
-	}
-    } else if (ch == ']')
-	count = 0;
+    move_opt(&ch, &count, &mov);
+    if (ch == 0) return;
 
     mc = cell(mov);
 
