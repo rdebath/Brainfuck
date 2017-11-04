@@ -130,7 +130,7 @@ flush_string(void)
 	char c=0, *p = sav_str_str;
 	while(*p) {
 	    outcmd('=', (c = *p++));
-	    outcmd('.', 1);
+	    outcmd('.', 0);
 	}
 	tapezero->cleaned = 1;
 	tapezero->cleaned_val = c;
@@ -309,7 +309,7 @@ void outopt(int ch, int count)
 	if (!disable_be_optim) {
 	    outcmd(ch, count);
 	} else {
-	    outcmd('[', 1);
+	    outcmd('[', 0);
 	}
 	return;
 
@@ -337,14 +337,14 @@ void outopt(int ch, int count)
 		    outcmd('+', 1);
 		    break;
 		case 'Q':
-		    outcmd('[', 1);
+		    outcmd('[', 0);
 		    outcmd('-', 1);
-		    outcmd(']', 1);
+		    outcmd(']', 0);
 		    if (count)
 			outcmd('+', count);
 		    break;
 		case 'E':
-		    outcmd(']', 1);
+		    outcmd(']', 0);
 		    break;
 	    }
 	    return;

@@ -47,6 +47,7 @@ int disable_be_optim = 1;
 #define L_BF            3       /* Generated code is BF. */
 #define L_BFCHARS       4       /* Generated code is sort of like BF. */
 
+#define L_TOKENS        0x10    /* token(token, count); */
 #define L_RISBF         0x11    /* risbf(token, count); */
 #define L_HEADSECKS     0x12    /* headsecks(token, count); */
 #define L_BFRLE         0x13    /* bfrle(token, count); */
@@ -635,6 +636,9 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-petooh") == 0) {
 	lang = petooh; langclass = L_WORDS; return 1;
     } else
+    if (strcmp(arg, "-dump") == 0) {
+       lang = 0; langclass = L_TOKENS; return 1;
+    } else
     if (strcmp(arg, "-qqq") == 0 || strcmp(arg, "-???") == 0) {
 	lang = 0; langclass = L_QQQ; return 1;
     } else
@@ -810,16 +814,20 @@ outcmd(int ch, int count)
     if (ch == '!' && (langclass & GEN_HEADER) != 0)
 	ps(lang[8]);
 
-    if (ch == '=' && L_BASE != L_BFRLE) {
-        outcmd('[', 1);
-        outcmd('-', 1);
-        outcmd(']', 1);
-        if (count>0) outcmd('+', count);
-        else if(count<0) outcmd('-', -count);
-        return;
-    }
+    if (L_BASE != L_TOKENS && L_BASE != L_BFRLE)
+    {
+	if (ch == '=') {
+	    outcmd('[', 1);
+	    outcmd('-', 1);
+	    outcmd(']', 1);
+	    if (count>0) outcmd('+', count);
+	    else if(count<0) outcmd('-', -count);
+	    return;
+	}
 
-    if (ch == '[' || ch == ']' || ch == '.' || ch == ',') count = 1;
+	if (ch == '[' || ch == ']' || ch == '.' || ch == ',')
+	    count = 1;
+    }
 
     switch (L_BASE) {
     case L_WORDS:
@@ -853,6 +861,7 @@ outcmd(int ch, int count)
 	while(count-->0) pmc(lang[p-bf]);
 	break;
 
+    case L_TOKENS:	printf("%c %d\n", ch, count); break;
     case L_RISBF:	risbf(ch, count); break;
     case L_HEADSECKS:	headsecks(ch, count); break;
     case L_BF:		bftranslate(ch, count); break;
@@ -1202,7 +1211,9 @@ bfrle(int ch, int count)
 	sprintf(buf, "%d%c", count, ch);
 #endif
 	ps(buf);
-    } else while (count-- > 0)
+    } else if (count < 2)
+	pc(ch);
+    else while (count-- > 0)
 	pc(ch);
 }
 

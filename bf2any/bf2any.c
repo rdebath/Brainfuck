@@ -225,16 +225,16 @@ static int icount = 0;
     case 1:
 	if (count%2 == 1 && ch == '-') { zstate=2; icount = count; return; }
 	if (count%2 == 1 && ch == '+') { zstate=3; icount = count; return; }
-	outtxn('[', 1);
+	outtxn('[', 0);
 	break;
     case 2:
-	if (count == 1 && ch == ']') { zstate=4; return; }
-	outtxn('[', 1);
+	if (ch == ']') { zstate=4; return; }
+	outtxn('[', 0);
 	outtxn('-', icount);
 	break;
     case 3:
-	if (count == 1 && ch == ']') { zstate=4; return; }
-	outtxn('[', 1);
+	if (ch == ']') { zstate=4; return; }
+	outtxn('[', 0);
 	outtxn('+', icount);
 	break;
     case 4:
@@ -244,7 +244,7 @@ static int icount = 0;
 	break;
     }
     zstate=0;
-    if (count == 1 && ch == '[') { zstate++; return; }
+    if (ch == '[') { zstate++; return; }
     outtxn(ch, count);
 }
 
@@ -408,8 +408,7 @@ main(int argc, char ** argv)
 		if (qstring == 2) {
 		    qstring = 0;
 		} else {
-		    outrun('[', 1); outrun('-', 1); outrun(']', 1);
-		    outrun('+', ch); outrun('.', 1);
+		    outrun('=', ch); outrun('.', 0);
 		    lastch = '.'; c = 0;
 		    continue;
 		}
@@ -442,24 +441,19 @@ main(int argc, char ** argv)
 	    if (!m) {
 		/* Non RLE tokens here */
 		if (xc) {
-		    outrun(256+(xc-extra_commands), 1);
+		    outrun(256+(xc-extra_commands), 0);
 		    xc = 0;
 		    continue;
 		}
 		if (ch == '"') { qstring++; continue; }
 		if (ch == ',') inp = 1;
-		if (ch == '=') {
-		    outrun('[', 1); outrun('-', 1); outrun(']', 1);
-		    lastch = ']';
-		    continue;
-		}
 		if (!b && ch == ']') {
 		    fprintf(stderr, "Warning: skipping unbalanced ']' command.\n");
 		    continue; /* Ignore too many ']' */
 		}
 		b += (ch=='[') - (ch==']');
 		if (lastch == '[' && ch == ']') outrun('X', 1);
-		outrun(ch, 1);
+		outrun(ch, 0);
 	    } else
 		c = multi;
 	    lastch = ch;
@@ -469,8 +463,8 @@ main(int argc, char ** argv)
     if(c) outrun(lastch, c);
     if(b>0) {
 	fprintf(stderr, "Warning: closing unbalanced '[' command.\n");
-	outrun('[', 1); outrun('-', 1); outrun(']', 1);
-	while(b>0){ outrun(']', 1); b--;} /* Not enough ']', add some. */
+	outrun('=', 0);
+	while(b>0){ outrun(']', 0); b--;} /* Not enough ']', add some. */
     }
     if (enable_debug && lastch != '#') outrun('#', 0);
     outrun('~', 0);
