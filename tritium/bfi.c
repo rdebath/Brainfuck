@@ -379,6 +379,12 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("        Control usage of position independed code flag.\n");
     printf("   -fleave-temps\n");
     printf("        Do not delete C code and library file when done.\n");
+    printf("   -ffunct\n");
+    printf("        Generate multiple functions for BF code.\n");
+    printf("   -fno-funct\n");
+    printf("        Generate BF code in a single function.\n");
+    printf("   -fgoto\n");
+    printf("        Use gotos not while loops for [].\n");
 #endif
 #if !defined(DISABLE_TCCLIB)
     printf("   -ltcc\n");

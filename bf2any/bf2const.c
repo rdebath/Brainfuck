@@ -127,7 +127,7 @@ flush_string(void)
     }
 
     {
-	char c, *p = sav_str_str;
+	char c=0, *p = sav_str_str;
 	while(*p) {
 	    outcmd('=', (c = *p++));
 	    outcmd('.', 1);

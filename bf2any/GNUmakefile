@@ -61,9 +61,9 @@ install:
 .PHONY: all clean install
 
 ifneq ($(CC),cc)
-CFLAGS=-O3 -Wall -Wshadow -DBOFF=256 $(DEFS)
+CFLAGS=-O3 -Wall -Wshadow $(DEFS)
 else
-CFLAGS=-O -DBOFF=256 $(DEFS)
+CFLAGS=-O $(DEFS)
 endif
 
 # for: make DEFS='$(MOREDEFS)'

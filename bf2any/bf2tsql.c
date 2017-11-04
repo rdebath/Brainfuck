@@ -11,19 +11,6 @@
 int ind = 0;
 #define I printf("%*s", ind*4, "")
 
-static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg};
-
-static int
-fn_check_arg(const char * arg)
-{
-    if (strcmp(arg, "-M") == 0) {
-	tapelen = 0;
-	return 1;
-    }
-    return 0;
-}
-
 void
 outcmd(int ch, int count)
 {
@@ -117,9 +104,8 @@ outcmd(int ch, int count)
 	ind--; I; printf("END\n");
 	break;
     case '.':
-	I;
 	if(bytecell) { I; printf("set @ccell = @ccell & 255\n"); }
-	printf("EXEC #pch @ccell,@linebuf OUTPUT\n");
+	I; printf("EXEC #pch @ccell,@linebuf OUTPUT\n");
 	break;
     case ',':
 	I; printf("RAISERROR ('Input command not implemented', 16, 1) RETURN\n");

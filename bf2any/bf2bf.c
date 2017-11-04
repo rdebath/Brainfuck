@@ -9,7 +9,7 @@
 #include "bf2any.h"
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg};
+struct be_interface_s be_interface = { .check_arg = fn_check_arg};
 int disable_be_optim = 1;
 
 /*
@@ -1318,14 +1318,14 @@ hanoilove(int ch, int count)
 	    int maxbit, v;
 
 	    while(state != 1) {state = (state+1)%4; pc('.');}
-	    pc('\''); // Save reg
+	    pc('\''); /* Save reg */
 	    while(state != 0) {state = (state+1)%4; pc('.');}
 
 	    for(v=count+1,maxbit=0; v; v>>=1,maxbit++)
 		;
 	    maxbit = (1<<(maxbit-2));
 
-	    // reg = 2
+	    /* reg = 2 */
 	    pc(','); pc(';');
 
 	    for(v=count+1; maxbit; ) {
@@ -1334,10 +1334,10 @@ hanoilove(int ch, int count)
 		if (!maxbit) break;
 		pc('\''); pc(';');
 	    }
-	    pc('\''); // Save count
+	    pc('\''); /* Save count */
 
 	    while(state != 1) {state = (state+1)%4; pc('.');}
-	    pc(','); // pop saved reg
+	    pc(','); /* pop saved reg */
 
 	    count = 0;
 	}
