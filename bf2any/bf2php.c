@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "bf2any.h"
+#include "move_opt.h"
 
 /*
  * PHP translation from BF, runs at about 41,000,000 instructions per second.
@@ -13,9 +14,28 @@ int ind = 0;
 
 static void print_cstring(void);
 
+static char *
+cell(int mov)
+{
+    static char buf[9+3+sizeof(mov)*3];
+    if (mov == 0) return "$m[$p]";
+    if (mov < 0)
+	sprintf(buf, "$m[$p-%d]", -mov);
+    else
+	sprintf(buf, "$m[$p+%d]", mov);
+    return buf;
+}
+
 void
 outcmd(int ch, int count)
 {
+    int mov = 0;
+    char * mc;
+
+    move_opt(&ch, &count, &mov);
+    if (ch == 0) return;
+
+    mc = cell(mov);
     switch(ch) {
     case '!':
 	printf( "%s%d%s%d%s",
@@ -24,36 +44,41 @@ outcmd(int ch, int count)
 		"$p=",tapeinit,";\n");
 	break;
 
-    case '=': I; printf("$m[$p] = %d;\n", count); break;
+    case '=': I; printf("%s = %d;\n", mc, count); break;
     case 'B':
-	if(bytecell) { I; printf("$m[$p] &= 255;\n"); }
-	I; printf("$v = $m[$p];\n");
+	if(bytecell) { I; printf("%s &= 255;\n", mc); }
+	I; printf("$v = %s;\n", mc);
 	break;
-    case 'M': I; printf("$m[$p] = $m[$p]+$v*%d;\n", count); break;
-    case 'N': I; printf("$m[$p] = $m[$p]-$v*%d;\n", count); break;
-    case 'S': I; printf("$m[$p] = $m[$p]+$v;\n"); break;
-    case 'Q': I; printf("if ($v != 0) $m[$p] = %d;\n", count); break;
-    case 'm': I; printf("if ($v != 0) $m[$p] = $m[$p]+$v*%d;\n", count); break;
-    case 'n': I; printf("if ($v != 0) $m[$p] = $m[$p]-$v*%d;\n", count); break;
-    case 's': I; printf("if ($v != 0) $m[$p] = $m[$p]+$v;\n"); break;
+    case 'M': I; printf("%s = %s+$v*%d;\n", mc, mc, count); break;
+    case 'N': I; printf("%s = %s-$v*%d;\n", mc, mc, count); break;
+    case 'S': I; printf("%s = %s+$v;\n", mc, mc); break;
+    case 'Q': I; printf("if ($v != 0) %s = %d;\n", mc, count); break;
+    case 'm': I; printf("if ($v != 0) %s = %s+$v*%d;\n", mc, mc, count); break;
+    case 'n': I; printf("if ($v != 0) %s = %s-$v*%d;\n", mc, mc, count); break;
+    case 's': I; printf("if ($v != 0) %s = %s+$v;\n", mc, mc); break;
 
     case 'X': I; printf("fwrite(STDERR, \"Abort: Infinite Loop.\\n\"); exit;\n"); break;
 
-    case '+': I; printf("$m[$p] += %d;\n", count); break;
-    case '-': I; printf("$m[$p] -= %d;\n", count); break;
+    case '+': I; printf("%s += %d;\n", mc, count); break;
+    case '-': I; printf("%s -= %d;\n", mc, count); break;
     case '<': I; printf("$p -= %d;\n", count); break;
     case '>': I; printf("$p += %d;\n", count); break;
     case '[':
-	if(bytecell) { I; printf("$m[$p] &= 255;\n"); }
-	I; printf("while($m[$p] != 0){\n");
+	if(bytecell) { I; printf("%s &= 255;\n", mc); }
+	I; printf("while(%s != 0){\n", mc);
 	ind++;
 	break;
     case ']':
-	if(bytecell) { I; printf("$m[$p] &= 255;\n"); }
+	if (count > 0) {
+            I; printf("$p += %d;\n", count);
+        } else if (count < 0) {
+            I; printf("$p -= %d;\n", -count);
+        }
+	if(bytecell) { I; printf("%s &= 255;\n", mc); }
 	ind--; I; printf("}\n");
 	break;
-    case '.': I; printf("print chr($m[$p]&255);\n"); break;
-    case ',': I; printf("$s = fread(STDIN, 1); if(strlen($s)) $m[$p] = ord($s);\n"); break;
+    case '.': I; printf("print chr(%s&255);\n", mc); break;
+    case ',': I; printf("$s = fread(STDIN, 1); if(strlen($s)) %s = ord($s);\n", mc); break;
     case '"': print_cstring(); break;
     }
 }

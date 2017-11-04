@@ -819,6 +819,8 @@ outcmd(int ch, int count)
         return;
     }
 
+    if (ch == '[' || ch == ']' || ch == '.' || ch == ',') count = 1;
+
     switch (L_BASE) {
     case L_WORDS:
     case L_JNWORD:
