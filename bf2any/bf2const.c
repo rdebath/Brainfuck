@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include "bf2any.h"
 #include "bf2const.h"
+#include "ov_int.h"
 
 /*
  *  Simple constant folding.
@@ -30,12 +32,13 @@ static int first_run = 0;
 struct mem *tape = 0;
 static struct mem *tapezero = 0, *freelist = 0;
 static int curroff = 0;
-static int reg_known = 0, reg_val;
 
 static char * sav_str_str = 0;
 static unsigned int sav_str_maxlen = 0, sav_str_len = 0;
 
 static int deadloop = 0;
+
+static void be_codegen_failure(void);
 
 static void
 new_n(struct mem *p) {
@@ -213,8 +216,6 @@ flush_tape(int no_output, int keep_knowns)
 	    freelist = tape->n;
 	    tape->n = 0;
 	}
-	reg_known = 0;
-	reg_val = 0;
     }
 
     tapezero = tape;
@@ -238,7 +239,7 @@ void outopt(int ch, int count)
 
     switch(ch)
     {
-    default:
+    case '[': case ']': case '!': case '~': case 'X': case '#':
 	if (ch == '!') {
 	    flush_tape(1,0);
 	    tape->cleaned = tape->is_set = first_run = !disable_init_optim;
@@ -266,13 +267,16 @@ void outopt(int ch, int count)
 	return;
 
     case '.':
-	if (tape->is_set && tape->v > 0 && tape->v < 128) {
-	    add_string(tape->v);
+	if (tape->is_set) {
+	    if (bytecell && tape->v < -127) tape->v &= 0xFF;
+	    if (tape->v > 0 && tape->v < 128) {
+		add_string(tape->v);
 
-	    /* Limit the buffer size. */
-	    if (sav_str_len >= 128*1024 - (tape->v=='\n')*1024)
-		flush_string();
-	    break;
+		/* Limit the buffer size. */
+		if (sav_str_len >= 128*1024 - (tape->v=='\n')*1024)
+		    flush_string();
+		break;
+	    }
 	}
 	flush_tape(0,1);
 	outcmd(ch, count);
@@ -286,32 +290,47 @@ void outopt(int ch, int count)
 
     case '>': while(count-->0) { if (tape->n == 0) new_n(tape); tape=tape->n; curroff++; } break;
     case '<': while(count-->0) { if (tape->p == 0) new_p(tape); tape=tape->p; curroff--; } break;
-    case '+': tape->v += count; break;
-    case '-': tape->v -= count; break;
+    case '+':
+	if (cells_are_ints || bytecell) {
+	    tape->v += count;
+	    if (bytecell) tape->v %= 256; /* -255..255 */
+	} else {
+	    int ov=0, res;
+	    res = ov_iadd(tape->v, count, &ov);
+	    if (!ov)
+		tape->v = res;
+	    else {
+		fprintf(stderr, "Overflow!\n");
+		flush_tape(0,1);
+		clear_cell(tape);
+		outcmd(ch, count);
+	    }
+	}
+	break;
+    case '-':
+	if (cells_are_ints || bytecell) {
+	    tape->v -= count;
+	    if (bytecell) tape->v %= 256; /* -255..255 */
+	} else {
+	    int ov=0, res;
+	    res = ov_isub(tape->v, count, &ov);
+	    if (!ov)
+		tape->v = res;
+	    else {
+		fprintf(stderr, "Overflow!\n");
+		flush_tape(0,1);
+		clear_cell(tape);
+		outcmd(ch, count);
+	    }
+	}
+	break;
 
     case '=': tape->v = count; tape->is_set = 1; break;
 
     case 'B':
-	if (tape->is_set)
-	{
-	    if (bytecell) tape->v %= 256; /* Note: preserves sign but limits range. */
-	    /* Some BE are not 32 bits, try to avoid cell size mistakes */
-	    if (!cells_are_ints && (tape->v > 65536 || tape->v < -65536))
-		;
-	    else {
-		reg_known = 1;
-		reg_val = tape->v;
-		break;
-	    }
-	}
-
 	flush_tape(0,1);
-	reg_known = 0; reg_val = 0;
-	if (!disable_be_optim) {
-	    outcmd(ch, count);
-	} else {
-	    outcmd('[', 0);
-	}
+	if (disable_be_optim) be_codegen_failure();
+	outcmd(ch, count);
 	return;
 
     case 'M':
@@ -322,55 +341,26 @@ void outopt(int ch, int count)
     case 'n':
     case 's':
     case 'E':
-	if (!reg_known) {
-	    flush_tape(0,1);
-	    clear_cell(tape);
-	    if (!disable_be_optim) {
-		outcmd(ch, count);
-	    } else switch(ch) {
-		case 'M': case 'm':
-		    outcmd('+', count);
-		    break;
-		case 'N': case 'n':
-		    outcmd('-', count);
-		    break;
-		case 'S': case 's':
-		    outcmd('+', 1);
-		    break;
-		case 'Q':
-		    outcmd('[', 0);
-		    outcmd('-', 1);
-		    outcmd(']', 0);
-		    if (count)
-			outcmd('+', count);
-		    break;
-		case 'E':
-		    outcmd(']', 0);
-		    break;
-	    }
-	    return;
-	}
-	switch(ch) {
-	case 'm':
-	case 'M':
-	    tape->v += reg_val * count;
-	    break;
-	case 'n':
-	case 'N':
-	    tape->v -= reg_val * count;
-	    break;
-	case 's':
-	case 'S':
-	    tape->v += reg_val;
-	    break;
+	flush_tape(0,1);
+	clear_cell(tape);
+	if (disable_be_optim) be_codegen_failure();
+	outcmd(ch, count);
+	return;
 
-	case 'Q':
-	    if (reg_val != 0) {
-		tape->v = count;
-		tape->is_set = 1;
-	    }
-	    break;
-	}
-	if (bytecell) tape->v %= 256; /* Note: preserves sign but limits range. */
+    default:
+	if (disable_be_optim) be_codegen_failure();
+	if (ch>=0 && ch<256)
+	    fprintf(stderr, "Unknown token in bf2const.c (%d)\n", ch);
+	flush_tape(0,0);
+	outcmd(ch, count);
+	return;
     }
 }
+
+static void
+be_codegen_failure(void)
+{
+    fprintf(stderr, "Limited backend code generator failure\n");
+    exit(1);
+}
+
