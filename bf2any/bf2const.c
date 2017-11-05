@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "bf2any.h"
+#include "bf2const.h"
 
 /*
  *  Simple constant folding.
@@ -24,10 +25,10 @@
  *  convert '-' commands into '+' commands as a matter of routine.
  */
 
-struct mem { struct mem *p, *n; int is_set; int v; int cleaned, cleaned_val;};
 static int first_run = 0;
 
-static struct mem *tape = 0, *tapezero = 0, *freelist = 0;
+struct mem *tape = 0;
+static struct mem *tapezero = 0, *freelist = 0;
 static int curroff = 0;
 static int reg_known = 0, reg_val;
 

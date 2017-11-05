@@ -14,16 +14,17 @@
 INSTALL=install -p -s
 INSTALLDIR=/usr/local/bin
 INSTALLEXT=
-ALLEXE=\
+ALLEXE=bf2run \
 	bf2asmjs bf2awk bf2bas bf2bf bf2bn bf2cgmp bf2clojure bf2cmd \
 	bf2cobol bf2crun bf2cs bf2csh bf2d bf2dc bf2dump bf2elf bf2f90 \
 	bf2gas32 bf2gas64 bf2go bf2java bf2julia bf2ksh bf2ksh88 bf2lua \
 	bf2nav bf2neko bf2oldsh bf2pas bf2perl bf2php bf2ps1 bf2py bf2rb \
-	bf2rc bf2run bf2semi bf2sh bf2slang bf2swift bf2tcl bf2tomm \
-	bf2tsql bf2whitespace
+	bf2rc bf2semi bf2sh bf2slang bf2swift bf2tcl bf2tomm bf2tsql \
+	bf2whitespace
 
 TOOLDIR=../tools
 LDLIBS=
+COREOBJ=bf2any.o bf2loop.o bf2const.o
 
 ifneq ($(MAKECMDGOALS),clean)
 # Need this early
@@ -37,8 +38,7 @@ ALLEXE+=bf2jit
 endif
 endif
 
-# .o files here so we build them first.
-all:	bf2any.o bf2const.o $(ALLEXE)
+all:	$(ALLEXE)
 
 clean:
 	-rm -f .build-opts.*
@@ -75,7 +75,9 @@ MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 # Delete the direct to exe rule to make sure %.o files are used.
 % : %.c
 
-$(ALLEXE): bf2any.o bf2const.o
+$(ALLEXE): $(COREOBJ)
+$(COREOBJ): bf2any.h bf2const.h bf2loop.h
+$(patsubst %.c,%.o,$(wildcard *.c)): bf2any.h
 
 #-------------------------------------------------------------------------------
 # Special cases and configuration
@@ -137,7 +139,7 @@ TCLDEP=libtcl.lib-on
 endif
 endif
 
-bf2tcl: bf2tcl.o bf2any.o bf2const.o
+bf2tcl: bf2tcl.o $(COREOBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(TCLLIBS)
 
 bf2tcl.o: bf2tcl.c $(TCLDEP)
@@ -168,7 +170,7 @@ PYLIBLIBS=$(shell $(PKGCONF) --libs $(HAVE_PYLIB))
 PYLIBDEP=libpy.lib-on
 endif
 
-bf2py: bf2py.o bf2any.o bf2const.o
+bf2py: bf2py.o $(COREOBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(PYLIBLIBS)
 
 bf2py.o: bf2py.c $(PYLIBDEP)
@@ -199,7 +201,7 @@ LUALIBLIBS=$(shell $(PKGCONF) --libs $(HAVE_LUALIB))
 LUALIBDEP=liblua.lib-on
 endif
 
-bf2lua: bf2lua.o bf2any.o bf2const.o
+bf2lua: bf2lua.o $(COREOBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(LUALIBLIBS)
 
 bf2lua.o: bf2lua.c $(LUALIBDEP)
@@ -263,7 +265,7 @@ TCCDEP=libtcc.lib-on
 endif
 endif
 
-bf2crun: bf2crun.o bf2any.o bf2const.o
+bf2crun: bf2crun.o $(COREOBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(TCCLIBS) $(LIBDL)
 
 bf2crun.o: bf2crun.c $(TCCDEP)

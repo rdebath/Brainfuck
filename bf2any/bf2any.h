@@ -7,11 +7,9 @@ extern const char * current_file;
 extern char * extra_commands;
 
 void outcmd(int ch, int count);
-void outopt(int ch, int count);
-
 char * get_string(void);
 
-/* Commons */
+/* Commons BE may override init value */
 typedef int (check_arg_t)(const char * arg);
 struct be_interface_s { check_arg_t *check_arg; } be_interface;
 int disable_be_optim;
@@ -19,7 +17,7 @@ int cells_are_ints;
 int bytecell;
 int nobytecell;
 
-/* Add default so that code is valid without special compile options */
+/* This can be changed by the Makefile but everything must be recompiled. */
 #ifndef BOFF
 #define BOFF 256
 #endif
