@@ -6,6 +6,7 @@
 %{
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 
 #define STFU(expression) (expression)	/* Make GCC ... */
 
@@ -14,7 +15,7 @@ static void pc(int);
 static void commentch(int);
 static void pcr(int, int);
 static int countch(char *, int);
-static void pcs(int, int);
+static void wordlist();
 
 static int uncomment_mode = 0;
 static int bfcomment = 0;
@@ -37,7 +38,6 @@ size_t bf_prefilter(char * buf, size_t maxsize);
 %s OOK
 %s BLUB
 %s POG
-%s ALWORD
 %s FK
 %x CCOMMENT
 %x BFCOMMENT
@@ -48,6 +48,9 @@ size_t bf_prefilter(char * buf, size_t maxsize);
 %x TROLL
 %x CUPID
 %x TERNARY
+%x BEWBS
+%x LISP
+%x WORDLIST
 
 w	[\t ]*
 ws	[\t ]+
@@ -190,6 +193,7 @@ ook	B?[Oo]ok
     "z+z"	pc('[');
     "z-z"	pc(']');
 
+    \001.*	|
     [ \t\n]+	{int i; for(i=0; i<yyleng; i++) commentch(yytext[i]);}
     .		commentch(yytext[0]);
 }
@@ -284,66 +288,44 @@ ook	B?[Oo]ok
     .		commentch(yytext[0]);
 }
 
-<ALWORD>{
-    /* Simple "words". These sets don't interfere with each-other. */
+<BEWBS>{
+    "(.)(.)"		pc('>');
+    "(.){.}"		pc('<');
+    "(.)[.]"		pc('+');
+    "[.](.)"		pc('-');
+    "[.][.]"		pc('.');
+    "{.}{.}"		pc(',');
+    "{.}[.]"		pc('[');
+    "[.]{.}"		pc(']');
 
-    right		pcs('>', 0);
-    left		pcs('<', 0);
-    up			pcs('+', 0);
-    down		pcs('-', 0);
-    out			pcs('.', 0);
-    in			pcs(',', 0);
-    begin		pcs('[', 0);
-    end			pcs(']', 0);
-
-    fnord		pcs('>', 1);	/* BrainFNORD */
-    pineal		pcs('<', 1);
-    hail		pcs('+', 1);
-    eris		pcs('-', 1);
-    kallisti		pcs('.', 1);
-    chaos		pcs(',', 1);
-    23			pcs('[', 1);
-    5			pcs(']', 1);
-
-    pipi		pcs('>', 2);	/* Pikalang */
-    pichu		pcs('<', 2);
-    pi			pcs('+', 2);
-    ka			pcs('-', 2);
-    pikachu		pcs('.', 2);
-    pikapi		pcs(',', 2);
-    pika		pcs('[', 2);
-    chu			pcs(']', 2);
-
-    there		pcs('<', 3);	/* There Once was a Fish Named Fred */
-    once		pcs('>', 3);
-    was			pcs('+', 3);
-    a			pcs('-', 3);
-    fish		pcs('.', 3);
-    named		pcs('[', 3);
-    fred		pcs(']', 3);
-
-    "(.)(.)"		pcs('>', 4);
-    "(.){.}"		pcs('<', 4);
-    "(.)[.]"		pcs('+', 4);
-    "[.](.)"		pcs('-', 4);
-    "[.][.]"		pcs('.', 4);
-    "{.}{.}"		pcs(',', 4);
-    "{.}[.]"		pcs('[', 4);
-    "[.]{.}"		pcs(']', 4);
-
-    "(("		pcs('>', 5);
-    "))"		pcs('<', 5);
-    "()("		pcs('+', 5);
-    "())"		pcs('-', 5);
-    ")())"		pcs('.', 5);
-    ")((("		pcs(',', 5);
-    ")()("		pcs('[', 5);
-    ")(()"		pcs(']', 5);
-
+    \001.*	|
+    [ \t\n]+	{int i; for(i=0; i<yyleng; i++) commentch(yytext[i]);}
+    .		commentch(yytext[0]);
 }
 
-\001.*		{int i; for(i=1; i<yyleng; i++) commentch(yytext[i]);}
+<LISP>{
+    "(("		pc('>');
+    "))"		pc('<');
+    "()("		pc('+');
+    "())"		pc('-');
+    ")())"		pc('.');
+    ")((("		pc(',');
+    ")()("		pc('[');
+    ")(()"		pc(']');
 
+    [ \t\n]+	{int i; for(i=0; i<yyleng; i++) commentch(yytext[i]);}
+    .		commentch(yytext[0]);
+}
+
+<WORDLIST>{
+    [A-Za-z0-9\200-\377]+	wordlist();
+
+    \001.*	|
+    [ \t\n]+	{int i; for(i=0; i<yyleng; i++) commentch(yytext[i]);}
+    .		commentch(yytext[0]);
+}
+
+\001.*		|
 [A-Za-z0-9]+	|
 [ \t\n]+	{int i; for(i=0; i<yyleng; i++) commentch(yytext[i]);}
 .		commentch(yytext[0]);
@@ -358,7 +340,6 @@ int jmp = -1, cp = -1, pp = -1;
 int on_eof = 1, runit = 0, debug = 0;
 
 int sof = 1, cln = 0, col = 0, ccol = 0;
-int alset = 0;
 
 int quiet = 1;
 
@@ -369,6 +350,8 @@ char * character_conversion = 0;
 int line_cc = EOF;
 
 char bf[] = "><+-.,[]#";
+char *bflist = 0;
+int bflist_ic = 1;
 
 size_t (*custom_prefilter)(char *, size_t) = 0;
 size_t tiny_bf_to_bf(char * buf, size_t max_size);
@@ -413,12 +396,24 @@ int main(int argc, char ** argv)
 	    else if (!strcmp(argv[1], "-fk")) mode = FK;
 	    else if (!strcmp(argv[1], "-zzz")) mode = ZZZ;
 
-	    else if (!strcmp(argv[1], "-nice")) { mode = ALWORD; alset = 0; }
-	    else if (!strcmp(argv[1], "-eris")) { mode = ALWORD; alset = 1; }
-	    else if (!strcmp(argv[1], "-pika")) { mode = ALWORD; alset = 2; }
-	    else if (!strcmp(argv[1], "-fish")) { mode = ALWORD; alset = 3; }
-	    else if (!strcmp(argv[1], "-bewbs")) { mode = ALWORD; alset = 4; }
-	    else if (!strcmp(argv[1], "-lisp")) { mode = ALWORD; alset = 5; character_prefilter="()"; }
+	    else if (!strcmp(argv[1], "-nice")) {
+		mode = WORDLIST;
+		bflist = "right,left,up,down,out,in,begin,end";
+	    }
+	    else if (!strcmp(argv[1], "-eris")) {
+		mode = WORDLIST;
+		bflist = "fnord,pineal,hail,eris,kallisti,chaos,23,5";
+	    }
+	    else if (!strcmp(argv[1], "-pika")) {
+		mode = WORDLIST;
+		bflist = "pipi,pichu,pi,ka,pikachu,pikapi,pika,chu";
+	    }
+	    else if (!strcmp(argv[1], "-fish")) {
+		mode = WORDLIST;
+		bflist = "once,there,was,a,fish,dead,named,fred";
+	    }
+	    else if (!strcmp(argv[1], "-bewbs")) { mode = BEWBS; }
+	    else if (!strcmp(argv[1], "-lisp")) { mode = LISP; character_prefilter="()"; }
 
 	    else if (!strcmp(argv[1], "-mini")) {
 		mode = INITIAL;
@@ -447,6 +442,14 @@ int main(int argc, char ** argv)
 		character_prefilter = argv[1]+4;
 		character_conversion = bf;
 		custom_prefilter = utf8_conversion;
+	    }
+	    else if (!strncmp(argv[1], "-al=", 4)) {
+		char * s;
+		mode = WORDLIST;
+		bflist = strdup(argv[1]+4);
+		for(s=bflist; *s; s++)
+		    if (isupper(*s))
+			*s = tolower(*s);
 	    }
 	    else if (!strcmp(argv[1], "-petooh")) {
 		mode = PETOOH;
@@ -566,6 +569,10 @@ Usage(void)
     fprintf(stderr, "            Input using any single character substitution.\n");
     fprintf(stderr, "            Note: Uses UTF8 codepoints.\n");
     fprintf(stderr, "\n");
+    fprintf(stderr, "   -al=right,left,up,down,out,in,begin,end\n");
+    fprintf(stderr, "            Input using any simple word substitution.\n");
+    fprintf(stderr, "            Note: Uses order: '><+-.,[]'\n");
+    fprintf(stderr, "\n");
     fprintf(stderr, "   -blub    Input using blub.\n");
     fprintf(stderr, "   -pog     Input using pogaack.\n");
     fprintf(stderr, "   -fk      Input using fuck fuck.\n");
@@ -590,18 +597,6 @@ Usage(void)
 
 //  fprintf(stderr, "--------------------------------------------------------------------------------\n");
 
-}
-
-static void
-pcs(int ch, int inset)
-{
-    if (inset != alset)
-    {
-	int i;
-	for(i=0; i<yyleng; i++)
-	    commentch(yytext[i]);
-    } else
-	pc(ch);
 }
 
 static void
@@ -665,6 +660,34 @@ static int countch(char * s, int ch)
     int rv = 0;
     if(s) while(*s) rv += (*s++ == ch);
     return rv;
+}
+
+static void wordlist()
+{
+    char *s = bflist, *e;
+    int c = 0;
+    if (bflist_ic)
+    {
+        int i;
+        for(i=0; i<yyleng; i++)
+            if (isupper(yytext[i]))
+		yytext[i] = tolower(yytext[i]);
+    }
+    for(;;)
+    {
+	for(e = s; *e && *e != ',';) e++;
+	if (e-s == yyleng && !strncmp(yytext, s, yyleng)) {
+	    pc(bf[c]);
+	    return;
+	}
+	if (!*e) break;
+	s = e+1; c++;
+    }
+    {
+        int i;
+        for(i=0; i<yyleng; i++)
+            commentch(yytext[i]);
+    }
 }
 
 /*
