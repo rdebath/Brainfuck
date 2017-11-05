@@ -201,12 +201,10 @@ outcmd(int ch, int count)
 	    pr("#define PUTC(x) putchar(x)");
 	}
 
-	pr("#ifndef MEMSZ");
-	prv("#define MEMSZ %d", tapesz-tapeinit);
+	pr("#ifndef TAPELEN");
+	prv("#define TAPELEN %d", tapelen);
 	pr("#endif");
-	pr("#ifndef TAPEOFF");
 	prv("#define TAPEOFF %d", tapeinit);
-	pr("#endif");
 
 	if (enable_debug) {
 	    pr("#ifndef do_dump");
@@ -238,11 +236,11 @@ outcmd(int ch, int count)
 	    ind++;
 	}
 	if (bytecell) {
-	    pr("static char mem[MEMSZ+TAPEOFF];");
+	    pr("static char mem[TAPELEN+TAPEOFF];");
 	    pr("register char *m = mem + TAPEOFF;");
 	    pr("register int v;");
 	} else {
-	    pr("static int mem[MEMSZ+TAPEOFF];");
+	    pr("static int mem[TAPELEN+TAPEOFF];");
 	    pr("register int v, *m = mem + TAPEOFF;");
 	}
 	if (runmode == no_run && !use_unistd)
