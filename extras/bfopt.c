@@ -165,8 +165,7 @@ main(int argc, char ** argv)
 		if (qstring == 2) {
 		    qstring = 0;
 		} else {
-		    outrun('[', 1); outrun('-', 1); outrun(']', 1);
-		    outrun('+', ch); outrun('.', 1);
+		    outrun('=', ch); outrun('.', 1);
 		    lastch = '.'; c = 0;
 		    continue;
 		}
@@ -220,7 +219,7 @@ main(int argc, char ** argv)
     if(c) outrun(lastch, c);
     if(b>0) {
 	fprintf(stderr, "Warning: closing unbalanced '[' command.\n");
-	outrun('[', 1); outrun('-', 1); outrun(']', 1);
+	outrun('=', 0);
 	while(b>0){ outrun(']', 1); b--;} /* Not enough ']', add some. */
     }
     outrun('~', 0);
@@ -239,20 +238,14 @@ static int zstate = 0;
     {
     case 1:
 	if (count == 1 && ch == '-') { zstate=2; return; }
-	if (count == 1 && ch == '+') { zstate=3; return; }
 	outopt('[', 1);
 	break;
     case 2:
-	if (count == 1 && ch == ']') { zstate=4; return; }
+	if (count == 1 && ch == ']') { zstate=3; return; }
 	outopt('[', 1);
 	outopt('-', 1);
 	break;
     case 3:
-	if (count == 1 && ch == ']') { zstate=4; return; }
-	outopt('[', 1);
-	outopt('+', 1);
-	break;
-    case 4:
 	if (ch == '+') { outopt('=', count); zstate=0; return; }
 	if (ch == '-') { outopt('=', -count); zstate=0; return; }
 	outopt('=', 0);
