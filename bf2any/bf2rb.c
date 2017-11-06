@@ -12,6 +12,7 @@
 int ind = 0;
 #define I printf("%*s", ind*4, "")
 int safetapeoff = 0, curtapeoff = 0;
+int init_done = 0;
 
 static void print_cstring(void);
 
@@ -46,13 +47,11 @@ outcmd(int ch, int count)
     int mov = 0;
     char * cm;
 
-    move_opt(&ch, &count, &mov);
+    if (tapelen>0) move_opt(&ch, &count, &mov);
     if (ch == 0) return;
 
-    cm = cell(mov);
-    switch(ch) {
-    case '!':
-	puts("#!/usr/bin/ruby");
+    if (!init_done && ch != '!' && ch != '"' && ch != '~')
+    {
 	/* Using push is about 20% slower, using a Hash is a LOT slower! */
 	if (tapelen > 0)
 	    printf("m = Array.new(%d, 0)\n",tapesz);
@@ -62,6 +61,13 @@ outcmd(int ch, int count)
 	printf("%s%d%s", "p = ", tapeinit, "\n");
 	if (tapelen <= 0)
 	    puts("m.push(0) while p>=m.length");
+	init_done = 1;
+    }
+
+    cm = cell(mov);
+    switch(ch) {
+    case '!':
+	puts("#!/usr/bin/ruby");
 	break;
 
     case '=': I; printf("%s = %d\n", cm, count); break;
