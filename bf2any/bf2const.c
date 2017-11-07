@@ -174,7 +174,9 @@ flush_tape(int no_output, int keep_knowns)
 		    if (tapeoff > outoff) { outcmd('>', tapeoff-outoff); outoff=tapeoff; }
 		    if (tapeoff < outoff) { outcmd('<', outoff-tapeoff); outoff=tapeoff; }
 		    if (p->is_set) {
-			outcmd('=', p->v);
+			int c = p->v;
+			if (bytecell) c &= 0xFF;
+			outcmd('=', c);
 		    } else {
 			if (p->v > 0) outcmd('+', p->v);
 			if (p->v < 0) outcmd('-', -p->v);
@@ -268,9 +270,10 @@ void outopt(int ch, int count)
 
     case '.':
 	if (tape->is_set) {
-	    if (bytecell && tape->v < -127) tape->v &= 0xFF;
-	    if (tape->v > 0 && tape->v < 128) {
-		add_string(tape->v);
+	    int c = tape->v;
+	    if (bytecell) c &= 0xFF;
+	    if (c > 0 && c < 128) {
+		add_string(c);
 
 		/* Limit the buffer size. */
 		if (sav_str_len >= 128*1024 - (tape->v=='\n')*1024)
