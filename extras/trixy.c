@@ -1,6 +1,7 @@
-/* This is the deadbeef brainfuck interpreter.
+/* This is the was the brainfuck interpreter.
+ * It's now called Trixy (gollum, gollum)
  *
- * Robert de Bath (c) 2014 GPL v2 or later.
+ * Robert de Bath (c) 2014-2017 GPL v2 or later.
  */
 #include <stdio.h>
 #include <stdlib.h>
