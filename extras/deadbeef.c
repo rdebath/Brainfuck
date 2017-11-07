@@ -1,7 +1,6 @@
 /* This is the deadbeef brainfuck interpreter.
- *
- * Robert de Bath (c) 2014 GPL v2 or later.
- */
+ * Robert de Bath (c) 2014-2017 GPL v2 or later.  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +9,6 @@
 void run(void);
 struct bfi { int mov; int cmd; int arg; } *pgm = 0;
 int pgmlen = 0, on_eof = 1, debug = 0;
-
 int main(int argc, char **argv)
 {
    FILE * ifd;
@@ -69,8 +67,13 @@ int main(int argc, char **argv)
 
 void run(void)
 {
-static unsigned char t[(sizeof(int)>sizeof(short))+USHRT_MAX];
+#if ((__UINTPTR_MAX__+0) > UINT_MAX) && (UINT_MAX > 65535)
+   static unsigned char t[UINT_MAX+1L];
+   unsigned int m = 0;
+#else
+   static unsigned char t[(sizeof(int)>sizeof(short))+USHRT_MAX];
    unsigned short m = 0;
+#endif
    int n, ch;
    for(n=0; ; n++) {
       m += pgm[n].mov;
