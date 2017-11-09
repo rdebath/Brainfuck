@@ -285,7 +285,7 @@ void LongUsage(FILE * fd, const char * errormsg)
 #endif
     printf("   -H   Remove headers in output code\n");
     printf("        Also prevents optimiser assuming the tape starts blank.\n");
-    printf("   -#   Use '#' as a debug symbol. Note: Selects the tree interpreter.\n");
+    printf("   -#   Use '#' as a debug symbol and append one to end.\n");
     printf("\n");
     printf("   -a   Ascii I/O, filters CR from input%s\n", iostyle==0?" (enabled)":"");
 #ifdef __STDC_ISO_10646__
@@ -820,6 +820,13 @@ static int dld, inp, rle = 0, num = 1, ov_flg;
     }
 
     if (!is_last) return;
+
+    if (debug_mode) {
+	n = tcalloc(1, sizeof*n);
+	n->inum = bfi_num++;
+	if (p) { p->next = n; n->prev = p; } else bfprog = n;
+	n->type = T_DUMP; p = n;
+    }
 
     /* I could make this close the loops, Better? */
     while (jst) { n = jst; jst = jst->jmp; n->type = T_ERR; n->jmp = 0; }
