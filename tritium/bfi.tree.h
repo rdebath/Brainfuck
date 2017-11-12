@@ -83,7 +83,7 @@ extern int total_nodes;
 extern int max_indent;
 
 /* How far to search for constants. */
-#define SEARCHDEPTH     10
+#define SEARCHDEPTH     16
 #define SEARCHRANGE     1000
 
 void print_banner(FILE * fd, char const * program);

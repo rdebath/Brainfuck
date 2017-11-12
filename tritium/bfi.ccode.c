@@ -39,6 +39,7 @@ static int use_goto = 0;
 static int use_functions = -1;
 static int libtcc_specials = 0;
 static int knr_c_ok = 1;
+static int tiny_tape = 0;
 
 #if defined(DISABLE_DLOPEN)
 static const int use_dlopen = 0;
@@ -59,7 +60,9 @@ void run_gccode(void);
 #endif
 
 static void pt(FILE* ofd, int indent, struct bfi * n);
-static char * pcell(int offset);
+static char * rvalmsk(int offset);
+static char * rval(int offset);
+static char * lval(int offset);
 static void print_c_header(FILE * ofd);
 
 int
@@ -136,22 +139,73 @@ pt(FILE* ofd, int indent_to, struct bfi * n)
     }
 }
 
+static
 char *
-pcell(int offset)
+bijective_hexavigesimal(unsigned int a)
+{
+    unsigned int c = 0, x = 1, i;
+    static char buf[sizeof(int)*171/100+3];
+    while (a >= x) {
+	c++;
+	a -= x;
+	x *= 26;
+    }
+
+    for (i = 0; i < c; i++) {
+	buf[c-i-1] = 'a' + (a % 26);
+	a = a/26;
+    }
+    buf[c] = 0;
+
+    return buf;
+}
+
+char *
+rvalmsk(int offset)
 {
 static char namebuf[64];
 
     if (mask_defined) {
-	if (offset)
+	if (tiny_tape)
+	    sprintf(namebuf, "M(%s)", bijective_hexavigesimal(offset+1));
+	else if (offset)
 	    sprintf(namebuf, "M(m[%d])", offset);
 	else
 	    strcpy(namebuf, "M(*m)");
     } else {
-	if (offset)
+	if (tiny_tape)
+	    sprintf(namebuf, "%s", bijective_hexavigesimal(offset+1));
+	else if (offset)
 	    sprintf(namebuf, "m[%d]", offset);
 	else
 	    strcpy(namebuf, "*m");
     }
+    return namebuf;
+}
+
+char *
+rval(int offset)
+{
+static char namebuf[64];
+    if (tiny_tape)
+	sprintf(namebuf, "%s", bijective_hexavigesimal(offset+1));
+    else if (offset)
+	sprintf(namebuf, "m[%d]", offset);
+    else
+	strcpy(namebuf, "*m");
+    return namebuf;
+}
+
+char *
+lval(int offset)
+{
+static char namebuf[64];
+    if (tiny_tape)
+	sprintf(namebuf, "%s", bijective_hexavigesimal(offset+1));
+    else if (offset)
+	sprintf(namebuf, "m[%d]", offset);
+    else
+	strcpy(namebuf, "*m");
     return namebuf;
 }
 
@@ -256,7 +310,7 @@ print_c_header(FILE * ofd)
 	    fprintf(ofd, "#endif\n\n");
 
 	    fprintf(ofd, "#ifndef M\n");
-	    fprintf(ofd, "#define M(v) v\n");
+	    fprintf(ofd, "#define M(V) V\n");
 	    fprintf(ofd, "#endif\n\n");
 	} else {
 	    if (cell_type_iso)
@@ -265,7 +319,7 @@ print_c_header(FILE * ofd)
 	}
 
     } else if(fixed_mask>0)
-	fprintf(ofd, "#define M(v) ((v) & 0x%x)\n\n", fixed_mask);
+	fprintf(ofd, "#define M(V) ((V) & 0x%x)\n\n", fixed_mask);
     else
 	mask_defined = 0;
 
@@ -464,7 +518,17 @@ print_c_header(FILE * ofd)
 	}
 
 	if (node_type_counts[T_MOV] == 0 && memoffset == 0) {
-	    fprintf(ofd, "static %s m[%d];\n", cell_type, max_pointer+1);
+	    if (!use_functions && max_pointer<100) {
+		int i;
+		/* NB: "do" is a keyword, so this breaks soon after 100 */
+		fprintf(ofd, "static %s", cell_type);
+		for(i=0; i<max_pointer+1; i++)
+		    fprintf(ofd, "%s %s",
+			i?",":"", bijective_hexavigesimal(i+1));
+		fprintf(ofd, ";\n");
+		tiny_tape = 1;
+	    } else
+		fprintf(ofd, "static %s m[%d];\n", cell_type, max_pointer+1);
 	    fprintf(ofd, "int main(){\n");
 	    if (enable_trace)
 		fprintf(ofd, "#define mem m\n");
@@ -585,33 +649,20 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 
 	case T_ADD:
 	    if (!disable_indent) pt(ofd, indent,n);
-	    if(n->offset == 0) {
-		if (n->count == 1)
-		    fprintf(ofd, "++*m;\n");
-		else if (n->count == -1)
-		    fprintf(ofd, "--*m;\n");
-		else if (n->count == INT_MIN)
-		    fprintf(ofd, "*m -= 0x%x;\n", -n->count);
-		else if (n->count < 0)
-		    fprintf(ofd, "*m -= %d;\n", -n->count);
-		else if (n->count > 0)
-		    fprintf(ofd, "*m += %d;\n", n->count);
-		else
-		    fprintf(ofd, "; /* *m += 0; */\n");
-	    } else {
-		if (n->count == 1)
-		    fprintf(ofd, "++m[%d];\n", n->offset);
-		else if (n->count == -1)
-		    fprintf(ofd, "--m[%d];\n", n->offset);
-		else if (n->count == INT_MIN)
-		    fprintf(ofd, "m[%d] -= 0x%x;\n", n->offset, -n->count);
-		else if (n->count < 0)
-		    fprintf(ofd, "m[%d] -= %d;\n", n->offset, -n->count);
-		else if (n->count > 0)
-		    fprintf(ofd, "m[%d] += %d;\n", n->offset, n->count);
-		else
-		    fprintf(ofd, "; /* m[%d] += 0; */\n", n->offset);
-	    }
+
+	    if (n->count == 1)
+		fprintf(ofd, "++%s;\n", lval(n->offset));
+	    else if (n->count == -1)
+		fprintf(ofd, "--%s;\n", lval(n->offset));
+	    else if (n->count == INT_MIN)
+		fprintf(ofd, "%s -= 0x%x;\n", lval(n->offset), -n->count);
+	    else if (n->count < 0)
+		fprintf(ofd, "%s -= %d;\n", lval(n->offset), -n->count);
+	    else if (n->count > 0)
+		fprintf(ofd, "%s += %d;\n", lval(n->offset), n->count);
+	    else
+		fprintf(ofd, "; /* %s += 0; */\n", lval(n->offset));
+
 	    if (enable_trace) {
 		pt(ofd, indent,0);
 		fprintf(ofd, "t(%d,%d,\"\",m+ %d)\n", n->line, n->col, n->offset);
@@ -621,15 +672,13 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	case T_SET:
 	    if (!disable_indent) pt(ofd, indent,n);
 	    if (cell_size <= 0 && (n->count < -128 || n->count >= 256)) {
-		fprintf(ofd, "m[%d] = (%s) %d;\n",
-		    n->offset, cell_type, n->count);
+		fprintf(ofd, "%s = (%s) %d;\n",
+		    lval(n->offset), cell_type, n->count);
 	    } else
 	    if (n->count == INT_MIN)
-		fprintf(ofd, "m[%d] = 0x%x;\n", n->offset, n->count);
-	    else if(n->offset == 0)
-		fprintf(ofd, "*m = %d;\n", n->count);
+		fprintf(ofd, "%s = 0x%x;\n", lval(n->offset), n->count);
 	    else
-		fprintf(ofd, "m[%d] = %d;\n", n->offset, n->count);
+		fprintf(ofd, "%s = %d;\n", lval(n->offset), n->count);
 	    if (enable_trace) {
 		pt(ofd, indent,0);
 		fprintf(ofd, "t(%d,%d,\"\",m+ %d)\n", n->line, n->col, n->offset);
@@ -643,74 +692,74 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		    if (n->offset == n->offset2 && n->count2 == 1)
 		    {
 			if (n->count3 == 1) {
-			    fprintf(ofd, "m[%d] += m[%d];\n",
-				    n->offset, n->offset3);
+			    fprintf(ofd, "%s += %s;\n",
+				    lval(n->offset), rval(n->offset3));
 			    break;
 			}
 
 			if (n->count3 == -1) {
-			    fprintf(ofd, "m[%d] -= m[%d];\n",
-				    n->offset, n->offset3);
+			    fprintf(ofd, "%s -= %s;\n",
+				    rval(n->offset), lval(n->offset3));
 			    break;
 			}
 
 			if (n->count3 != 0) {
-			    fprintf(ofd, "m[%d] += m[%d]*%d;\n",
-				    n->offset, n->offset3, n->count3);
+			    fprintf(ofd, "%s += %s*%d;\n",
+				    rval(n->offset), lval(n->offset3), n->count3);
 			    break;
 			}
 		    }
 
 		    if (n->count3 == 0 && n->count2 != 0) {
 			if (n->count2 == 1) {
-			    fprintf(ofd, "m[%d] = m[%d];\n",
-				n->offset, n->offset2);
+			    fprintf(ofd, "%s = %s;\n",
+				lval(n->offset), rval(n->offset2));
 			} else if (n->count2 == -1) {
-			    fprintf(ofd, "m[%d] = -m[%d];\n",
-				n->offset, n->offset2);
+			    fprintf(ofd, "%s = -%s;\n",
+				lval(n->offset), rval(n->offset2));
 			} else {
-			    fprintf(ofd, "m[%d] = m[%d]*%d;\n",
-				n->offset, n->offset2, n->count2);
+			    fprintf(ofd, "%s = %s*%d;\n",
+				lval(n->offset), rval(n->offset2), n->count2);
 			}
 			break;
 		    }
 
 		    if (n->count3 == 1 && n->count2 != 0) {
-			fprintf(ofd, "m[%d] = m[%d]*%d + m[%d];\n",
-			    n->offset, n->offset2, n->count2, n->offset3);
+			fprintf(ofd, "%s = %s*%d + %s;\n",
+			    lval(n->offset), rvalmsk(n->offset2), n->count2, rval(n->offset3));
 			break;
 		    }
 		}
 
 		if (n->offset == n->offset2 && n->count2 == 1) {
 		    if (n->count3 == 1) {
-			fprintf(ofd, "m[%d] += m[%d] + %d;\n",
-				n->offset, n->offset3, n->count);
+			fprintf(ofd, "%s += %s + %d;\n",
+				lval(n->offset), rval(n->offset3), n->count);
 			break;
 		    }
-		    fprintf(ofd, "m[%d] += m[%d]*%d + %d;\n",
-			    n->offset, n->offset3, n->count3, n->count);
+		    fprintf(ofd, "%s += %s*%d + %d;\n",
+			    lval(n->offset), rval(n->offset3), n->count3, n->count);
 		    break;
 		}
 
 		if (n->count3 == 0) {
 		    if (n->count2 == 1) {
-			fprintf(ofd, "m[%d] = m[%d] + %d;\n",
-			    n->offset, n->offset2, n->count);
+			fprintf(ofd, "%s = %s + %d;\n",
+			    lval(n->offset), rval(n->offset2), n->count);
 			break;
 		    }
 		    if (n->count2 == -1) {
-			fprintf(ofd, "m[%d] = -m[%d] + %d;\n",
-			    n->offset, n->offset2, n->count);
+			fprintf(ofd, "%s = -%s + %d;\n",
+			    lval(n->offset), rval(n->offset2), n->count);
 			break;
 		    }
 
-		    fprintf(ofd, "m[%d] = %d + m[%d]*%d;\n",
-			n->offset, n->count, n->offset2, n->count2);
+		    fprintf(ofd, "%s = %d + %s*%d;\n",
+			lval(n->offset), n->count, rval(n->offset2), n->count2);
 		} else {
-		    fprintf(ofd, "m[%d] = %d + m[%d]*%d + m[%d]*%d; /*T_CALC*/\n",
-			n->offset, n->count, n->offset2, n->count2,
-			n->offset3, n->count3);
+		    fprintf(ofd, "%s = %d + %s*%d + %s*%d; /*T_CALC*/\n",
+			lval(n->offset), n->count, rval(n->offset2), n->count2,
+			rvalmsk(n->offset3), n->count3);
 		}
 	    } while(0);
 
@@ -727,7 +776,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	case T_PRT:
 	    if (!use_functions) {
 		if (!disable_indent) pt(ofd, indent,n);
-		fprintf(ofd, "%s(%s);\n", putname, pcell(n->offset));
+		fprintf(ofd, "%s(%s);\n", putname, rvalmsk(n->offset));
 	    } else {
 		int pcount = 1;
 		while (n->next && n->next->type == T_PRT && n->offset == n->next->offset) {
@@ -736,18 +785,18 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		}
 		if (pcount == 1) {
 		    if (!disable_indent) pt(ofd, indent,n);
-		    fprintf(ofd, "%s(%s);\n", putname, pcell(n->offset));
+		    fprintf(ofd, "%s(%s);\n", putname, rvalmsk(n->offset));
 		} else if (pcount < 3) {
 		    int cn;
 		    for(cn=0;cn<pcount;cn++) {
 			pt(ofd, indent, cn?0:n);
-			fprintf(ofd, "%s(%s);\n", putname, pcell(n->offset));
+			fprintf(ofd, "%s(%s);\n", putname, rvalmsk(n->offset));
 		    }
 		} else {
 		    pt(ofd, indent, n);
 		    fprintf(ofd, "{\n");
 		    pt(ofd, indent+1, 0);
-		    fprintf(ofd, "int cn, ch = %s;\n", pcell(n->offset));
+		    fprintf(ofd, "int cn, ch = %s;\n", rvalmsk(n->offset));
 		    pt(ofd, indent+1, 0);
 		    fprintf(ofd, "for(cn=0;cn<%d;cn++)\n", pcount);
 		    pt(ofd, indent+2, 0);
@@ -820,15 +869,10 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 
 	case T_INP:
 	    if (!disable_indent) pt(ofd, indent,n);
-	    if (use_direct_getchar) {
-		if (n->offset == 0)
-		    fprintf(ofd, "*m = getchar();\n");
-		else
-		    fprintf(ofd, "m[%d] = getchar();\n", n->offset);
-	    } else if (n->offset == 0)
-		fprintf(ofd, "*m = getch(*m);\n");
+	    if (use_direct_getchar)
+		fprintf(ofd, "%s = getchar();\n", lval(n->offset));
 	    else
-		fprintf(ofd, "m[%d] = getch(m[%d]);\n", n->offset, n->offset);
+		fprintf(ofd, "%s = getch(%s);\n", lval(n->offset), rval(n->offset));
 
 	    if (enable_trace) {
 		pt(ofd, indent,0);
@@ -861,13 +905,13 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 #endif
 
 	    if (n->next->next && n->next->next->jmp == n && !enable_trace) {
-		fprintf(ofd, "if(%s) ", pcell(n->offset));
+		fprintf(ofd, "if(%s) ", rvalmsk(n->offset));
 		disable_indent = 1;
 	    } else if (!use_goto) {
-		fprintf(ofd, "if(%s) ", pcell(n->offset));
+		fprintf(ofd, "if(%s) ", rvalmsk(n->offset));
 		fprintf(ofd, "{\n");
 	    } else {
-		fprintf(ofd, "if(%s == 0) ", pcell(n->offset));
+		fprintf(ofd, "if(%s == 0) ", rvalmsk(n->offset));
 		fprintf(ofd, "goto E%d;\n", n->count);
 	    }
 	    break;
@@ -884,7 +928,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    if (found_rail_runner && !do_run && use_dynmem && n->next->count>0) {
 		pt(ofd, indent,n);
 		fprintf(ofd, "while(%s) m += %d;\n",
-			pcell(n->offset), n->next->count);
+			rvalmsk(n->offset), n->next->count);
 		pt(ofd, indent,n);
 		fprintf(ofd, "m = move_ptr(m,0);\n");
 		n=n->jmp;
@@ -903,15 +947,15 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		fprintf(ofd, "#if !defined(__i386__) || !defined(__TINYC__)\n");
 		pt(ofd, indent,n);
                 if (n->next->count == 1) {
-                    fprintf(ofd, "while(m[%d]) ++m;\n", n->offset);
+                    fprintf(ofd, "while(%s) ++m;\n", rval(n->offset));
                 } else if (n->next->count == -1) {
-                    fprintf(ofd, "while(m[%d]) --m;\n", n->offset);
+                    fprintf(ofd, "while(%s) --m;\n", rval(n->offset));
                 } else if (n->next->count < 0) {
-                    fprintf(ofd, "while(m[%d]) m -= %d;\n",
-                        n->offset, -n->next->count);
+                    fprintf(ofd, "while(%s) m -= %d;\n",
+                        rval(n->offset), -n->next->count);
                 } else {
-                    fprintf(ofd, "while(m[%d]) m += %d;\n",
-                        n->offset, n->next->count);
+                    fprintf(ofd, "while(%s) m += %d;\n",
+                        rval(n->offset), n->next->count);
                 }
 		fprintf(ofd, "#else /* Use i386 assembler */\n");
 		pt(ofd, indent,n);
@@ -943,11 +987,11 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    if (found_rail_runner && cell_size == CHAR_BIT && libtcc_specials &&
 		fixed_mask == 0 && n->next->count == 1) {
 		pt(ofd, indent,n);
-		fprintf(ofd, "if(m[%d]) {\n", n->offset);
+		fprintf(ofd, "if(%s) {\n", rval(n->offset));
 		pt(ofd, indent+1,n);
 		fprintf(ofd, "m++;\n");
 		pt(ofd, indent+1,n);
-		fprintf(ofd, "if(m[%d]) {\n", n->offset);
+		fprintf(ofd, "if(%s) {\n", rval(n->offset));
 		pt(ofd, indent+2,n);
 		fprintf(ofd, "m++;\n");
 		pt(ofd, indent+2,n);
@@ -968,7 +1012,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	case T_MULT:
 	    if (!use_goto) {
 		pt(ofd, indent,n);
-		fprintf(ofd, "while(%s) ", pcell(n->offset));
+		fprintf(ofd, "while(%s) ", rvalmsk(n->offset));
 		if (n->next->next && n->next->next->jmp == n && !enable_trace)
 		    disable_indent = 1;
 		else
@@ -977,11 +1021,11 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		if (n->next->next && n->next->next->jmp == n && !enable_trace) {
 		    disable_indent = 1;
 		    pt(ofd, indent,n);
-		    fprintf(ofd, "while(%s) ", pcell(n->offset));
+		    fprintf(ofd, "while(%s) ", rvalmsk(n->offset));
 		    break;
 		}
 		pt(ofd, indent,n);
-		fprintf(ofd, "if(%s == 0) ", pcell(n->offset));
+		fprintf(ofd, "if(%s == 0) ", rvalmsk(n->offset));
 		fprintf(ofd, "goto E%d;\n", n->count);
 		pt(ofd, indent,0);
 		fprintf(ofd, "L%d:;\n", n->count);
@@ -1000,7 +1044,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    } else {
 		if (n->type == T_END) {
 		    pt(ofd, indent,n);
-		    fprintf(ofd, "if(%s != 0) ", pcell(n->jmp->offset));
+		    fprintf(ofd, "if(%s != 0) ", rvalmsk(n->jmp->offset));
 		    fprintf(ofd, "goto L%d;\n", n->jmp->count);
 		    pt(ofd, indent,0);
 		} else
@@ -1012,9 +1056,9 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	case T_STOP:
 	    if (!disable_indent) pt(ofd, indent,n);
 	    if (e)
-		fprintf(ofd, "exit(1);\n");
+		fprintf(ofd, "exit(fprintf(stderr, \"STOP Command executed.\\n\"),1);\n");
 	    else
-		fprintf(ofd, "return 1;\n");
+		fprintf(ofd, "return fprintf(stderr, \"STOP Command executed.\\n\"),1;\n");
 	    break;
 
 	case T_DUMP:
