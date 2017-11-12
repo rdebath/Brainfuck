@@ -136,10 +136,20 @@ void process_loop()
 	return;
     }
 
-    if (mov				/* Unbalanced loop -- Nope. */
-	|| (loopz != 0 && inc != 0)	/* Um, infinite loop? */
+    if (mov) { outtxn(0, 0); return; }  /* Unbalanced loop -- Nope. */
+
+    if (   (loopz != 0 && inc != 0)	/* Um, infinite loop? */
 	|| (loopz == 0 && inc == 0)	/* This too */
-	) { outtxn(0, 0); return; }
+	)
+    {
+	qcmd[qcnt] = qcmd[qcnt-1];
+	qrep[qcnt] = qrep[qcnt-1];
+	qcmd[qcnt-1] = 'X';
+	qcnt++;
+	outtxn(0, 0);
+	return;
+    }
+
 
     if (tape->is_set) {
 	/* We might be able to do the calculation. */
