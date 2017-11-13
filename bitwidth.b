@@ -140,6 +140,32 @@ Multiply by 256 again to get 65536
 	======= DEMO CODE =======
 	Back out and print the last two characters
 
+	[<[[<[[<[[<[,]]]<]<]<]<][ Deep nesting non-comment comment loop ]]
+
+	Check that an offset of 128 will work
+	+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>-[+<-]
+
+	This is a simple multiply loop that looks like it goes off the
+	start of the tape
+	+[>]<- [-
+	    <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+	    <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+	    <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+	    <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+	    ++++
+	    >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	    >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	    >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	    >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	]
+
+	[ Check there are enough cells. This takes 18569597 steps. ]
+	[
+	    >++++++[<+++>-]<+[>+++++++++<-]>+[[->+>+<<]>>
+	    [-<<+>>]<[<[->>+<<]+>[->>+<<]+[>]<-]<-]<[-<]
+	]
+
 	This loop is a bug check for handling of nested loops; it goes
 	round the outer loop twice and the inner loop is skipped on the
 	first pass but run on the second
@@ -157,7 +183,13 @@ Multiply by 256 again to get 65536
 	    <[-]>[-]]+<]
 	<
 
-	[<[[<[[<[[<[,]]]<]<]<]<][ Deep nesting non-comment comment loop ]]
+	Clean up any debris
+	++++++++[[>]+[<]>-]>[>]<[[-]<]
+
+	This is a hard optimisation barrier
+	It contains several difficult to 'prove' constructions close together
+	and is likely to prevent almost all forms of optimisation
+	+[[>]<-[,]+[>]<-]
 
 	This part finds the actual value that the cell wraps at; even
 	if it's not one of the standard ones; but it gets bored after
@@ -193,38 +225,6 @@ Multiply by 256 again to get 65536
 	    [-]>[-]++++++++[<++++++++>-]<[>++++<-]+>[<->[-]]<[>[-]<[-]++++[-
 	    >++++++++<]>.---[-<+++>]<.---.--------------.[-->+<]>--.[-]<]
 	]<
-
-	This is a hard optimisation barrier
-	It contains several difficult to 'prove' constructions close together
-	and is likely to prevent almost all forms of optimisation
-	+[[>]<-[,]+[>]<-]
-
-	Clean up any debris
-	>++++++++[[>]+[<]>-]>[>]<[[-]<]<
-
-	Check that an offset of 128 will work
-	+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>-[+<-]
-
-	[ Check there are enough cells. This takes 18569597 steps. ]
-	[
-	    >++++++[<+++>-]<+[>+++++++++<-]>+[[->+>+<<]>>
-	    [-<<+>>]<[<[->>+<<]+>[->>+<<]+[>]<-]<-]<[-<]
-	]
-
-	This is a simple multiply loop that looks like it goes off the
-	start of the tape
-	+[>]<- [-
-	    <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-	    <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-	    <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-	    <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-	    ++++
-	    >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	    >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	    >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	    >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	]
 
 	One last thing: an exclamation point is not a valid BF instruction!
 
