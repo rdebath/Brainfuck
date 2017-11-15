@@ -246,11 +246,6 @@ print_c_header(FILE * ofd)
 	}
     }
 
-    if (!do_run && node_type_counts[T_INP] != 0 && l_iostyle == 3) {
-	fprintf(stderr, "Standalone C code for integer input not implemented.\n");
-	exit(1);
-    }
-
     fprintf(ofd, "/* Code generated from %s */\n\n", bfname);
     fprintf(ofd, "#include <stdio.h>\n");
 
@@ -312,6 +307,9 @@ print_c_header(FILE * ofd)
 	    fprintf(ofd, "#ifndef M\n");
 	    fprintf(ofd, "#define M(V) V\n");
 	    fprintf(ofd, "#endif\n\n");
+	    if (knr_c_ok) fprintf(ofd, "#ifdef __STDC__\n");
+	    fprintf(ofd, "enum { MaskTooSmall=1/(M(0x80)) };\n");
+	    if (knr_c_ok) fprintf(ofd, "#endif\n\n");
 	} else {
 	    if (cell_type_iso)
 		fprintf(ofd, "#include <stdint.h>\n\n");
@@ -344,30 +342,52 @@ print_c_header(FILE * ofd)
 	    "\n"    "}"
 	    "\n");
 
-	fprintf(ofd, "%s%s%s\n",
-		    "static void trace(char tag, int line, int col, "
-		    "char * desc, ",cell_type," * mp) {"
-	    "\n"    "    int i;"
-	    "\n"    "    fprintf(stderr, \"%c(%d,%d)\", tag, line, col);"
-	    "\n"    "    if (desc && *desc)"
-	    "\n"    "\tfprintf(stderr, \"=%s\", desc);"
-	    "\n"    "    fprintf(stderr, \" mem[%d]=\", (int)(mp-imem));"
-	    "\n"    "    if (mp>=imem) {"
-	    "\n"    "\tprtnum(*mp);"
-	    "\n"    "\tif (tag == 'D') for(i=1; i<10; i++) {"
-	    "\n"    "\t    fprintf(stderr, \", \");"
-	    "\n"    "\t    prtnum(mp[i]);"
-	    "\n"    "\t}"
-	    "\n"    "    } else fprintf(stderr, \"?\");"
-	    "\n"    "    fprintf(stderr, \"\\n\");"
-	    "\n"    "}"
-	    "\n");
+	if (enable_trace) {
+	    fputs(  "#define t(p1,p2,p3,p4) trace(p1,p2,p3,p4) ;\n", ofd);
 
-	if (node_type_counts[T_DUMP] != 0)
-	    fputs(  "#define t_dump(p4,p1,p2) trace('D',p1,p2,0,p4)\n", ofd);
+	    fprintf(ofd, "%s%s%s\n",
+			"static void trace(int line, int col, "
+			"char * desc, ",cell_type," * mp) {"
+		"\n"    "    int i;"
+		"\n"    "    fprintf(stderr, \"P(%d,%d)\", line, col);"
+		"\n"    "    if (desc && *desc)"
+		"\n"    "\tfprintf(stderr, \"=%s\", desc);"
+		"\n"    "    else"
+		"\n"    "\tfprintf(stderr, \" \");"
+		"\n"    "    fprintf(stderr, \"mem[%d]=\", (int)(mp-imem));"
+		"\n"    "    if (mp>=imem)"
+		"\n"    "\tprtnum(*mp);"
+		"\n"    "    else fprintf(stderr, \"?\");"
+		"\n"    "    fprintf(stderr, \"\\n\");"
+		"\n"    "}"
+		"\n");
+	}
 
-	if (enable_trace)
-	    fputs(  "#define t(p1,p2,p3,p4) trace('P',p1,p2,p3,p4) ;\n", ofd);
+	if (node_type_counts[T_DUMP] != 0) {
+
+	    fprintf(ofd, "%s%s%s\n",
+			"void t_dump(",cell_type," * mp, int line, int col)"
+		"\n"	"{"
+		"\n"	"    int i, doff, off = mp-imem;"
+		"\n"	"    fflush(stdout);\t\t\t/* Keep in sequence if merged */"
+		"\n"	"    fprintf(stderr, \"P(%d,%d):\", line, col);"
+		"\n"	"    doff = off - 8;"
+		"\n"	"    doff &= -4;"
+		"\n"	"    if (doff < 0) doff = 0;"
+		"\n"	"    fprintf(stderr, \"ptr=%d, mem[%d]= \", off, doff);"
+		"\n"	"    for(i = 0; i < 16; i++) {");
+
+	    fprintf(ofd, "%s%d%s\n", "\tif (doff+i>=",memsize,") break;");
+	    fputs(
+		"\n"	"\tfprintf(stderr, \"%s%s\","
+		"\n"	"\t\ti ? \", \" : \"\","
+		"\n"	"\t\tdoff+i == off ? \">\" : \"\");"
+		"\n"	"\tprtnum(imem[doff+i]);"
+		"\n"	"    }"
+		"\n"	"    fprintf(stderr, \"\\n\");"
+		"\n"	"}", ofd);
+
+	}
 
 	fputs("\n", ofd);
     }
@@ -517,7 +537,8 @@ print_c_header(FILE * ofd)
 	    memoffset = -most_neg_maad_loop;
 	}
 
-	if (node_type_counts[T_MOV] == 0 && memoffset == 0) {
+	if (node_type_counts[T_MOV] == 0 && memoffset == 0 &&
+		    !enable_trace && node_type_counts[T_DUMP] == 0) {
 	    if (!use_functions && max_pointer<100) {
 		int i;
 		/* NB: "do" is a keyword, so this breaks soon after 100 */
@@ -1123,6 +1144,16 @@ print_ccode(FILE * ofd)
 
     if (verbose)
 	fprintf(stderr, "Generating C Code.\n");
+
+    if (!do_run && node_type_counts[T_INP] != 0 && iostyle == 3) {
+	fprintf(stderr, "Standalone C code for integer input not implemented.\n");
+	exit(1);
+    }
+
+    if (use_dynmem && (do_run || enable_trace || node_type_counts[T_DUMP] != 0)) {
+	fprintf(stderr, "Note: Option -dynmem ignored in run/debug/trace modes.\n");
+	use_dynmem = 0;
+    }
 
     indent = 0;
     disable_indent = 0;

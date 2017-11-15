@@ -734,7 +734,7 @@ load_file(FILE * ifd, int is_first, int is_last, char * bfstring)
     struct bfi *p=0, *n=bfprog;
 
 static struct bfi *jst;
-static int dld, inp, rle = 0, num = 1, ov_flg;
+static int dld, inp, out, rle = 0, num = 1, ov_flg;
 
     if (is_first) { jst = 0; dld = 0; }
     if (n) { while(n->next) n=n->next; p = n;}
@@ -769,7 +769,7 @@ static int dld, inp, rle = 0, num = 1, ov_flg;
 	case '-': ch = T_ADD; c= -num; break;
 	case '[': ch = T_WHL; break;
 	case ']': ch = T_END; break;
-	case '.': ch = T_PRT; break;
+	case '.': ch = T_PRT; out = 1; break;
 	case ',':
 	    if (eofcell == 5) ch = T_NOP;
 	    else if (eofcell == 6) ch = T_STOP;
@@ -821,9 +821,10 @@ static int dld, inp, rle = 0, num = 1, ov_flg;
 
     if (!is_last) return;
 
-    if (debug_mode) {
+    if (debug_mode && (p && p->type != T_DUMP)) {
 	n = tcalloc(1, sizeof*n);
 	n->inum = bfi_num++;
+	n->line = curr_line;
 	if (p) { p->next = n; n->prev = p; } else bfprog = n;
 	n->type = T_DUMP; p = n;
     }
@@ -1083,6 +1084,7 @@ process_file(void)
 
 #ifdef NO_EXT_BE
     if (do_run) {
+	setbuf(stdout, 0);
 	run_tree();
 	if (verbose>2) {
 	    print_tree_stats();
@@ -1102,7 +1104,8 @@ process_file(void)
     if (do_codestyle == c_default) {
 	if (do_run) {
 	    if (verbose>2 || debug_mode || enable_trace ||
-		total_nodes == node_type_counts[T_CHR]) {
+		total_nodes == node_type_counts[T_CHR] ||
+		node_type_counts[T_DUMP] != 0) {
 
 		if (total_nodes != node_type_counts[T_CHR] && cell_size <= 0) {
 		    fprintf(stderr, "ERROR: cannot run combination: "
@@ -1457,7 +1460,8 @@ run_tree(void)
 			n->type, n->offset, n->count);
 		exit(1);
 	}
-	if (enable_trace && n->type != T_PRT && n->type != T_CHR && n->type != T_ENDIF) {
+	if (enable_trace && n->type != T_PRT && n->type != T_DUMP &&
+		n->type != T_CHR && n->type != T_ENDIF) {
 	    int off = (p+n->offset) - oldp;
 	    fflush(stdout); /* Keep in sequence if merged */
 	    fprintf(stderr, "P(%d,%d):", n->line, n->col);
@@ -2231,7 +2235,7 @@ find_known_value_recursion(struct bfi * n, int v_offset,
     n_used = 1;
 
 break_break:
-    if (const_found && cell_size == 0
+    if (const_found && cell_size == 0 && cell_length <= sizeof(int)*CHAR_BIT
 	&& known_value != 0 && (known_value&0xFF) == 0) {
 	/* Only known if we know the final cell size so ... */
 	non_zero_unsafe = 1;
