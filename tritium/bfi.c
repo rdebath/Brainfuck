@@ -56,6 +56,9 @@ characters after your favorite comment marker in a very visible form.
 #include <langinfo.h>
 #include <wchar.h>
 #endif
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 /* LLONG_MAX came in after inttypes.h, limits.h is very old. */
 #if _POSIX_VERSION >= 199506L || defined(LLONG_MAX)
@@ -225,6 +228,10 @@ void Usage(const char * why) __attribute__ ((__noreturn__));
 void UsageOptError(char * why) __attribute__ ((__noreturn__));
 void UsageInt64(void) __attribute__ ((__noreturn__));
 int checkarg(char * opt, char * arg);
+#ifdef _WIN32
+int SetupVT100Console(int);
+void oututf8(int input_chr);
+#endif
 
 void LongUsage(FILE * fd, const char * errormsg)
 {
@@ -288,7 +295,7 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("   -#   Use '#' as a debug symbol and append one to end.\n");
     printf("\n");
     printf("   -a   Ascii I/O, filters CR from input%s\n", iostyle==0?" (enabled)":"");
-#ifdef __STDC_ISO_10646__
+#if defined(__STDC_ISO_10646__) || defined(_WIN32)
     printf("   -u   Wide character (unicode) I/O%s\n", iostyle==1?" (enabled)":"");
 #endif
     printf("   -B   Binary I/O, unmodified I/O%s\n", iostyle==2?" (enabled)":"");
@@ -488,10 +495,12 @@ checkarg(char * opt, char * arg)
 
 	case 'a': iostyle=0; default_io=0; break;
 	case 'B': iostyle=2; default_io=0; break;
-#ifdef __STDC_ISO_10646__
+#if defined(__STDC_ISO_10646__) || defined(_WIN32)
 	case 'u':
+#ifndef __WIN32
 	    if (!libc_allows_utf8 && verbose)
 		fprintf(stderr, "WARNING: POSIX compliant libc has 'fixed' UTF-8.\n");
+#endif
 	    iostyle=1;
 	    default_io=0;
 	    break;
@@ -604,6 +613,9 @@ main(int argc, char ** argv)
     else if (libc_allows_utf8) iostyle = 1;
     else iostyle = 0;
 #endif
+#ifdef _WIN32
+    SetupVT100Console(0);
+#endif
 
     {
 	int x, flg = sizeof(int) * 8;
@@ -657,6 +669,10 @@ main(int argc, char ** argv)
 	} else
 	    filelist[filecount++] = argv[ar];
     }
+
+#ifdef _WIN32
+    SetupVT100Console(iostyle);
+#endif
 
     if(help_flag)
 	LongUsage(stdout, 0);
@@ -713,6 +729,10 @@ main(int argc, char ** argv)
     }
 
     process_file();
+
+#ifdef _WIN32
+    SetupVT100Console(2);
+#endif
 
     delete_tree();
     exit(0);
@@ -3797,6 +3817,7 @@ void
 putch(int ch)
 {
     pause_runclock();
+#ifndef _WIN32
 #ifdef __STDC_ISO_10646__
     if (iostyle == 1 && cell_mask>0 &&
        (cell_size > 21 || (cell_size == 21 && SM(ch) >= -128)))
@@ -3813,6 +3834,18 @@ putch(int ch)
     else
 #endif
 	putchar(ch);
+#else
+    if (iostyle == 3) {
+	printf("%d\n", ch);
+    } else if (iostyle == 2 || iostyle == 0) {
+	putchar(ch & 0xFF);
+    } else {
+	if (cell_mask>0 && cell_size > 21)
+	    oututf8(SM(ch));
+	else
+	    oututf8(UM(ch));
+    }
+#endif
 
     if (only_uses_putch) only_uses_putch = 2-(ch == '\n' || iostyle == 3);
 
@@ -3899,3 +3932,100 @@ set_cell_size(int cell_bits)
     } else
 	cell_type = "unsigned int";
 }
+
+#ifdef _WIN32
+#ifndef ENABLE_WRAP_AT_EOL_OUTPUT
+#define ENABLE_WRAP_AT_EOL_OUTPUT 2
+#endif
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 4
+#endif
+#ifndef DISABLE_NEWLINE_AUTO_RETURN
+#define DISABLE_NEWLINE_AUTO_RETURN 8
+#endif
+
+int
+SetupVT100Console(int l_iostyle)
+{
+    // Set output mode to handle virtual terminal sequences
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD dwMode = 0, dwDelta;
+
+    if (l_iostyle > 2) { iostyle = l_iostyle; return; }
+    iostyle = 2;
+
+    if (hOut == INVALID_HANDLE_VALUE)
+        return GetLastError();
+
+    if (!GetConsoleMode(hOut, &dwMode))
+        return GetLastError();
+
+    dwDelta = ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN;
+    if (l_iostyle == 2)
+	dwMode &= ~dwDelta;
+    else
+	dwMode |= dwDelta;
+
+    if (!SetConsoleMode(hOut, dwMode))
+        return GetLastError();
+
+    switch(l_iostyle) {
+    case 2:
+	if (!SetConsoleOutputCP(GetOEMCP()))
+	    return GetLastError();
+	if (!SetConsoleCP(GetOEMCP()))
+	    return GetLastError();
+	break;
+    case 1:
+	if (!SetConsoleOutputCP(65001))
+	    return GetLastError();
+	if (!SetConsoleCP(65001))
+	    return GetLastError();
+	break;
+    case 0:
+	if (!SetConsoleOutputCP(GetACP()))
+	    return GetLastError();
+	if (!SetConsoleCP(GetACP()))
+	    return GetLastError();
+	break;
+    }
+
+    iostyle = l_iostyle;
+
+    return 0;
+}
+
+/* Output a UTF-8 codepoint. */
+void
+oututf8(int input_chr)
+{
+    if (input_chr < 0x80) {            /* one-byte character */
+	putchar(input_chr);
+    } else if (input_chr < 0x800) {    /* two-byte character */
+	putchar(0xC0 | (0x1F & (input_chr >>  6)));
+	putchar(0x80 | (0x3F & (input_chr      )));
+    } else if (input_chr < 0x10000) {  /* three-byte character */
+	putchar(0xE0 | (0x0F & (input_chr >> 12)));
+	putchar(0x80 | (0x3F & (input_chr >>  6)));
+	putchar(0x80 | (0x3F & (input_chr      )));
+    } else if (input_chr < 0x200000) { /* four-byte character */
+	putchar(0xF0 | (0x07 & (input_chr >> 18)));
+	putchar(0x80 | (0x3F & (input_chr >> 12)));
+	putchar(0x80 | (0x3F & (input_chr >>  6)));
+	putchar(0x80 | (0x3F & (input_chr      )));
+    } else if (input_chr < 0x4000000) {/* five-byte character */
+	putchar(0xF8 | (0x03 & (input_chr >> 24)));
+	putchar(0x80 | (0x3F & (input_chr >> 18)));
+	putchar(0x80 | (0x3F & (input_chr >> 12)));
+	putchar(0x80 | (0x3F & (input_chr >>  6)));
+	putchar(0x80 | (0x3F & (input_chr      )));
+    } else {                           /* six-byte character */
+	putchar(0xFC | (0x01 & (input_chr >> 30)));
+	putchar(0x80 | (0x3F & (input_chr >> 24)));
+	putchar(0x80 | (0x3F & (input_chr >> 18)));
+	putchar(0x80 | (0x3F & (input_chr >> 12)));
+	putchar(0x80 | (0x3F & (input_chr >>  6)));
+	putchar(0x80 | (0x3F & (input_chr      )));
+    }
+}
+#endif
