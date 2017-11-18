@@ -31,7 +31,7 @@
  *
  *  In addition the search may include a manually chosen init string.
  *
- *  NOTE: Null bytes are ignored.
+ *  NOTE: Null bytes are ignored and CR is normally converted.
  *
  *  Also:
  *	+++++++++[>++++++++++>+++++>>+<<<<-]>+>>>+<
@@ -52,7 +52,7 @@
 
 void find_best_conversion(char * linebuf);
 
-void gen_print(char * buf, int init_offset);
+int gen_print(char * buf, int init_offset);
 void check_if_best(char * buf, char * name);
 
 void gen_subrange(char * buf, int subrange, int flg_zoned);
@@ -60,6 +60,7 @@ void gen_ascii(char * buf);
 void gen_multonly(char * buf);
 void gen_multbyte(char * buf);
 void gen_nestloop(char * buf);
+void gen_nestloop8(char * buf);
 void gen_slipnest(char * buf);
 void gen_special(char * buf, char * initcode, char * name, int usercode);
 void gen_twoflower(char * buf);
@@ -71,7 +72,7 @@ int runbf(char * prog, int longrun);
 
 #define MAX_CELLS 512
 #define MAX_STEPS 1000000
-#define PREV_BEST 16
+#define PREV_FOUND 32
 
 /* These setup strings have, on occasion, given good results */
 
@@ -315,6 +316,7 @@ int flg_fliptwocell = 0;
 int flg_lookahead = 0;
 int flg_zoned = 0;
 int flg_optimisable = 0;
+int flg_morefound = 0;
 
 int verbose = 0;
 int bytewrap = 0;
@@ -340,9 +342,9 @@ int best_cells = 1;
 int best_mark = 0;
 char * best_name = 0;
 
-char * best_init[PREV_BEST];
-char * best_nmid[PREV_BEST];
-int best_initid = 0;
+char * found_init[PREV_FOUND];
+char * found_nmid[PREV_FOUND];
+int found_len[PREV_FOUND];
 
 char * special_init = 0;
 
@@ -428,6 +430,9 @@ main(int argc, char ** argv)
 	    argc--; argv++;
 	} else if (strcmp(argv[1], "-rerun") == 0) {
 	    enable_rerun = 1;
+	    argc--; argv++;
+	} else if (strcmp(argv[1], "-F") == 0) {
+	    flg_morefound = flg_morefound*2+1;
 	    argc--; argv++;
 	} else if (strcmp(argv[1], "-zoned") == 0) {
 	    flg_zoned = 1;
@@ -621,12 +626,16 @@ main(int argc, char ** argv)
 
 	} else if (strcmp(argv[1], "-N") == 0) {
 	    wipe_config();
-	    enable_nestloop = !enable_nestloop;
+	    enable_nestloop ++;
+	    argc--; argv++;
+
+	} else if (strcmp(argv[1], "-NN") == 0) {
+	    wipe_config();
+	    enable_nestloop +=2;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-tri") == 0) {
 	    wipe_config();
-	    enable_nestloop = 1;
 	    enable_trislipnest = 1;
 	    argc--; argv++;
 
@@ -859,21 +868,24 @@ find_best_conversion(char * linebuf)
     if(enable_nestloop) {
 	if (verbose>2) fprintf(stderr, "Trying 'nested loop' routine @%"PRIdMAX".\n", patterns_searched);
 	reinit_state();
-	gen_nestloop(linebuf);
+	if (enable_nestloop>1)
+	    gen_nestloop(linebuf);
+	else
+	    gen_nestloop8(linebuf);
     }
 
     if (enable_rerun && !flg_lookahead && !flg_zoned) {
 	int i;
 	char *newname;
-	if (verbose>1) fprintf(stderr, "Rerunning with lookahead on found list\n");
+	if (verbose>1) fprintf(stderr, "Rerunning with lookahead on saved list\n");
 	flg_lookahead = 1;
 
-	for(i=0; i<PREV_BEST; i++)
-	    if (best_init[i] && best_nmid[i]) {
-		newname = malloc(strlen(best_nmid[i]) + 32);
-		strcpy(newname, best_nmid[i]);
+	for(i=0; i<PREV_FOUND; i++)
+	    if (found_init[i] && found_nmid[i]) {
+		newname = malloc(strlen(found_nmid[i]) + 32);
+		strcpy(newname, found_nmid[i]);
 		strcat(newname, " (rerun)");
-		gen_special(linebuf, best_init[i], newname, 1);
+		gen_special(linebuf, found_init[i], newname, 1);
 		free(newname);
 	    }
 
@@ -993,49 +1005,69 @@ check_if_best(char * buf, char * name)
 	best_len = str_next;
 	best_mark = str_mark;
 	best_cells = str_cells_used;
+    }
 
-	if (best_mark) {
-	    int i, got_it = 0;
+    if (best_len+flg_morefound >= str_next) {
+	if (!enable_rerun || !str_mark) {
+	    if (best_len != str_next) ; else
+	    if (verbose>2 || (verbose == 2 && str_next < 63))
+		fprintf(stderr, "Found '%s' len=%d, cells=%d, '%s'\n",
+			name, str_next, str_cells_used, str_start);
+	    else if (verbose>1) {
+		if (str_mark)
+		    fprintf(stderr, "Found '%s' len=%d, cells=%d, '%.*s' ...\n",
+			name, str_next, str_cells_used, str_mark, str_start);
+		else
+		    fprintf(stderr, "Found '%s' len=%d, cells=%d, '%.60s ...\n",
+			name, str_next, str_cells_used, str_start);
+	    }
+	} else if (str_mark) {
+	    int i, skip_it = 0;
 	    char * str;
+	    int use = 0, use_len = found_len[use];
 
-	    str = malloc(best_mark+1);
-	    memcpy(str, best_str, best_mark);
-	    str[best_mark] = 0;
+	    str = malloc(str_mark+1);
+	    memcpy(str, str_start, str_mark);
+	    str[str_mark] = 0;
 
-	    for(i=0; i<PREV_BEST; i++) {
-		if (best_init[i] != 0 && strcmp(best_init[i], str) == 0) {
-		    got_it = 1;
+	    for(i=0; i<PREV_FOUND; i++) {
+		if (found_init[i] == 0) {
+		    use = i;
+		    use_len = 0;
+		    break;
+		}
+		if (found_len[i] > use_len) {
+		    use = i;
+		    use_len = found_len[use];
+		}
+	    }
+
+	    for(i=0; i<PREV_FOUND; i++) {
+		if (found_init[i] != 0 && strcmp(found_init[i], str) == 0) {
+		    skip_it = 1;
 		    break;
 		}
 	    }
-	    if (got_it) {
+	    if (skip_it || (use_len != 0 && use_len <= str_next)) {
 		/* Duplicates can happen due to zoned vs unzoned. */
 		free(str);
 	    } else {
-		if (best_init[best_initid] != 0) free(best_init[best_initid]);
-		if (best_nmid[best_initid] != 0) free(best_nmid[best_initid]);
-		best_nmid[best_initid] = malloc(strlen(best_name)+1);
-		strcpy(best_nmid[best_initid], best_name);
+		if (found_init[use] != 0) free(found_init[use]);
+		if (found_nmid[use] != 0) free(found_nmid[use]);
+		found_nmid[use] = malloc(strlen(name)+1);
+		strcpy(found_nmid[use], name);
 
-		best_init[best_initid] = str;
+		found_init[use] = str;
+		found_len[use] = str_next;
 
-		best_initid = (best_initid + 1) % PREV_BEST;
+		if (verbose>2 || (verbose == 2 && str_next < 63))
+		    fprintf(stderr, "Saved '%s' len=%d, cells=%d, '%s'\n",
+			    name, str_next, str_cells_used, str_start);
+		else if (verbose>1) {
+		    fprintf(stderr, "Saved '%s' len=%d, cells=%d, '%.*s' ...\n",
+			name, str_next, str_cells_used, str_mark, str_start);
+		}
 	    }
-	}
-    }
-
-    if (best_len == str_next) {
-	/* Note this also shows strings of same length */
-	if (verbose>2 || (verbose == 2 && str_next < 63))
-	    fprintf(stderr, "Found '%s' len=%d, cells=%d, '%s'\n",
-		    name, str_next, str_cells_used, str_start);
-	else if (verbose>1) {
-	    if (str_mark)
-		fprintf(stderr, "Found '%s' len=%d, cells=%d, '%.*s' ...\n",
-		    name, str_next, str_cells_used, str_mark, str_start);
-	    else
-		fprintf(stderr, "Found '%s' len=%d, cells=%d, '%.60s'...\n",
-		    name, str_next, str_cells_used, str_start);
 	}
     }
 }
@@ -1178,7 +1210,7 @@ gen_subrange(char * buf, int subrange, int flg_subzone)
     int currcell=0, usecell=0;
     int maxcell = 0;
     char * p;
-    int i, j;
+    int i, j, rv = 0;
     char name[256];
 
     sprintf(name, "Subrange %d%s", subrange, flg_subzone?", zoned":"");
@@ -1298,7 +1330,7 @@ gen_subrange(char * buf, int subrange, int flg_subzone)
      * Either could end up better by the end of the string.
      */
     if (!flg_subzone) {
-	gen_print(buf, currcell);
+	rv = gen_print(buf, currcell);
     } else {
 	/* Set the translation table */
 	int txn[256] = {};
@@ -1324,7 +1356,8 @@ gen_subrange(char * buf, int subrange, int flg_subzone)
 	currcell = clear_tape(currcell);
     }
 
-    check_if_best(buf, name);
+    if (rv>=0)
+	check_if_best(buf, name);
 }
 
 /******************************************************************************/
@@ -1457,9 +1490,8 @@ return_to_top:
 	if (verbose>3)
 	    fprintf(stderr, "Trying multiply: %s\n", str_start);
 
-	gen_print(buf, 0);
-
-	check_if_best(buf, "multiply loop");
+	if (gen_print(buf, 0) >=0 )
+	    check_if_best(buf, "multiply loop");
     }
 }
 
@@ -1614,9 +1646,8 @@ static int loopcnt[256][256];
 	    cells[i-1] = (0xFF & ( cellincs2[i] * cnt )) ;
 	}
 
-	gen_print(buf, 0);
-
-	check_if_best(buf, "byte multiply loop");
+	if (gen_print(buf, 0) >= 0)
+	    check_if_best(buf, "byte multiply loop");
     }
 }
 
@@ -1629,14 +1660,20 @@ static int loopcnt[256][256];
 
    The text is then generated using a closest next function.
 
-   This currently searches 1891142967 patterns, this is far too many.
+   This currently searches far too many patterns.
  */
-#define ADDINDEX 3
-#define MAXCELLINCS 7
+#define ADDINDEX 5
+#define MAXCELLINCS 8
+#define MAXCELLVALA 11
+#define MAXCELLVALB 5
+#define MAXCELLVALC 4
+#define MAXCELLBASE 128
 void
 gen_nestloop(char * buf)
 {
-    int cellincs[MAXCELLINCS+2] = {0};
+    int cellincs[16] = {0};
+    int cellinner[16] = {0};
+    int cellouter[16] = {0};
     int maxcell = 0;
     int currcell=0;
     int i,j;
@@ -1648,12 +1685,26 @@ return_to_top:
 	    for(i=0; ; i++) {
 		if (i == MAXCELLINCS) return;
 		cellincs[i]++;
-		if (cellincs[i] <= MAXCELLINCS*ADDINDEX) break;
+		if (i == 0 && cellincs[i] <= MAXCELLVALA) break;
+		if (i == 1 && cellincs[i] <= MAXCELLVALB) break;
+		if (i >= 2 && cellincs[i] < (MAXCELLVALC+1)*ADDINDEX) break;
 		cellincs[i] = 1;
+		if (i==0) cellincs[i] = 4;
+		if (i==1) cellincs[i] = 2;
 	    }
 
-	    for(maxcell=0; cellincs[maxcell] != 0; )
-		maxcell++;
+	    for(maxcell=0; cellincs[maxcell] != 0; ) {
+		i = maxcell++;
+
+		if (i>=2) {
+		    cellinner[i] = (cellincs[i])/ADDINDEX;
+		    cellouter[i] = (cellincs[i])%ADDINDEX - (ADDINDEX/2);
+		    j = cellincs[0]*(cellincs[1]*cellinner[i]+cellouter[i]);
+
+		    if (j >= MAXCELLBASE || j < -128 || j == 0)
+			goto return_to_top;
+		}
+	    }
 
 	    maxcell--; currcell=0;
 	}
@@ -1673,13 +1724,24 @@ return_to_top:
 	    }
 	}
 
+	for(i=2; i<=maxcell; i++) {
+	    cells[i] = cellincs[0]*(cellincs[1]*cellinner[i]+cellouter[i]);
+	    if (cells[i] > 255) goto return_to_top;
+	}
+
 	str_cells_used = maxcell+1;
 
-	if (verbose>3)
-	    fprintf(stderr, "Trying nestloop: %d * [%d %d %d %d %d %d %d %d]\n",
-		cellincs[0], cellincs[1], cellincs[2],
-		cellincs[3], cellincs[4], cellincs[5],
-		cellincs[6], cellincs[7], cellincs[8]);
+	if (verbose>3 || (verbose>2 && patterns_searched%10000000 == 0))
+	    fprintf(stderr, "Trying nestloop[%" PRIdMAX "]: "
+			    "%d*(%d*[%d,%d %d,%d %d,%d %d,%d %d,%d %d,%d]\n",
+		patterns_searched,
+		cellincs[0], cellincs[1],
+		cellinner[2], cellouter[2],
+		cellinner[3], cellouter[3],
+		cellinner[4], cellouter[4],
+		cellinner[5], cellouter[5],
+		cellinner[6], cellouter[6],
+		cellinner[7], cellouter[7]);
 
 	for(j=0; j<cellincs[0]; j++)
 	    add_chr('+');
@@ -1691,7 +1753,7 @@ return_to_top:
 
 	for(i=2; i<=maxcell; i++) {
 	    add_chr('>');
-	    for(j=0; j<cellincs[i]/ADDINDEX; j++)
+	    for(j=0; j<cellinner[i]; j++)
 		add_chr('+');
 	}
 
@@ -1702,7 +1764,7 @@ return_to_top:
 
 	currcell=1;
 	for(i=2; i<=maxcell; i++) {
-	    j = cellincs[i]%ADDINDEX - (ADDINDEX/2);
+	    j = cellouter[i];
 	    if (j) {
 		while (currcell<i) {
 		    add_chr('>');
@@ -1713,7 +1775,7 @@ return_to_top:
 	    }
 	}
 
-	if (currcell <= 4) {
+	if (currcell <= 4 || flg_optimisable) {
 	    while(currcell > 0) {
 		add_chr('<');
 		currcell--;
@@ -1723,26 +1785,135 @@ return_to_top:
 	}
 	add_str("-]");
 
-	if (verbose>3)
-	    fprintf(stderr, "Running nestloop: %s\n", str_start);
-
 	if (best_len>0 && str_next > best_len) goto return_to_top;	/* Too big already */
-
-	/* This is the most reliable way of making sure we have the correct
-	 * cell values as produced by the string we've built so far.
-	 */
-	if (runbf(str_start, 0)) {
-	    if (verbose>3)
-		fprintf(stderr, "FAILED nestloop: %s\n", str_start);
-	    continue;
-	}
 
 	if (verbose>3)
 	    fprintf(stderr, "Counting nestloop\n");
 
-	gen_print(buf, 0);
+	if (gen_print(buf, 0) >= 0)
+	    check_if_best(buf, "nested loop");
+    }
+}
 
-	check_if_best(buf, "nested loop");
+/*
+   This searches through double multipler loops, with an extra addition or
+   subtraction on each cell round the outer loop.
+
+   The text is then generated using a closest next function.
+
+   The initial two cells are fixed to 8 and 4 and the ranges of the other
+   increments are set so that all multiples of 8 are available for all
+   the cells used from 2..N.
+
+   This seem to give a good collection of starters that can be searched
+   in a few seconds.
+ */
+
+void
+gen_nestloop8(char * buf)
+{
+    int cellincs[8] = {0};
+    int cellinner[8] = {0};
+    int cellouter[8] = {0};
+    int maxcell = 0;
+    int currcell=0;
+    int i,j;
+
+    for(;;)
+    {
+return_to_top:
+	{
+	    for(i=0; ; i++) {
+		if (i == 6) return;
+		cellincs[i]++;
+		if (cellincs[i] < 17) break;
+		cellincs[i] = 1;
+	    }
+
+	    for(maxcell=0; cellincs[maxcell] != 0; ) {
+		i= maxcell++;
+		cellinner[i] = (cellincs[i]+1)/4;
+		cellouter[i] = (cellincs[i]+1)%4-1;
+	    }
+
+	    maxcell++; currcell=0;
+	}
+
+	if (maxcell>cell_limit) continue;
+
+	patterns_searched++;
+
+	reinit_state();
+	if (flg_init) {
+	    /* Clear the working cells */
+	    for(i=maxcell; i>=0; i--) {
+		while(currcell < i) { add_chr('>'); currcell++; }
+		while(currcell > i) { add_chr('<'); currcell--; }
+		add_str("[-]");
+		cells[i] = 0;
+	    }
+	}
+
+	for(i=2; i<=maxcell; i++) {
+	    cells[i] = 8*(4*cellinner[i-2]+cellouter[i-2]);
+	    if (cells[i] > 255) goto return_to_top;
+	}
+
+	str_cells_used = maxcell+1;
+
+	if (verbose>3)
+	    fprintf(stderr, "Trying nestloop8: "
+			    "8*(4*[%d,%d %d,%d %d,%d %d,%d %d,%d %d,%d]\n",
+		cellinner[0], cellouter[0],
+		cellinner[1], cellouter[1],
+		cellinner[2], cellouter[2],
+		cellinner[3], cellouter[3],
+		cellinner[4], cellouter[4],
+		cellinner[5], cellouter[5]);
+
+	add_str("++++++++[>++++[");
+
+	for(i=2; i<=maxcell; i++) {
+	    add_chr('>');
+	    for(j=0; j<cellinner[i-2]; j++)
+		add_chr('+');
+	}
+
+	for(i=2; i<=maxcell; i++)
+	    add_chr('<');
+	add_chr('-');
+	add_chr(']');
+
+	currcell=1;
+	for(i=2; i<=maxcell; i++) {
+	    j = cellouter[i-2];
+	    if (j) {
+		while (currcell<i) {
+		    add_chr('>');
+		    currcell++;
+		}
+		while (j>0) {add_chr('+'); j--; }
+		while (j<0) {add_chr('-'); j++; }
+	    }
+	}
+
+	if (currcell <= 4 || flg_optimisable) {
+	    while(currcell > 0) {
+		add_chr('<');
+		currcell--;
+	    }
+	} else {
+	    add_str("[<]<");
+	}
+	add_str("-]");
+
+	if (best_len>0 && str_next > best_len) goto return_to_top;	/* Too big already */
+
+	if (verbose>3)
+	    fprintf(stderr, "Counting nestloop8\n");
+
+	if (gen_print(buf, 0) >= 0)
+	    check_if_best(buf, "nested loop8");
     }
 }
 
@@ -1816,9 +1987,8 @@ return_to_top:
 	if (verbose>3)
 	    fprintf(stderr, "Counting sliploop\n");
 
-	gen_print(buf, 0);
-
-	check_if_best(buf, "slipping loop");
+	if (gen_print(buf, 0) >= 0)
+	    check_if_best(buf, "slipping loop");
     }
 }
 
@@ -1970,9 +2140,8 @@ gen_special(char * buf, char * initcode, char * name, int usercode)
     if (best_len>0 && str_next > best_len) return;	/* Too big already */
 
     if (bytewrap_override) bytewrap = 1;
-    gen_print(buf, remaining_offset);
-
-    check_if_best(buf, name);
+    if (gen_print(buf, remaining_offset) >= 0)
+	check_if_best(buf, name);
     if (bytewrap_override) bytewrap = 0;
 }
 
@@ -1985,7 +2154,7 @@ gen_special(char * buf, char * initcode, char * name, int usercode)
  * below about 10 and even then for multiple characters it may be better
  * to accept a poor early choice for better results later.
  */
-void
+int
 gen_unzoned(char * buf, int init_offset)
 {
     char * p;
@@ -2069,10 +2238,11 @@ gen_unzoned(char * buf, int init_offset)
 
 	add_chr('.');
 
-	if (best_len>0 && str_next > best_len) return;	/* Too big already */
+	if (best_len>0 && str_next > best_len+flg_morefound) return -1; /* Too big already */
     }
 
     currcell = clear_tape(currcell);
+    return 0;
 }
 
 /*******************************************************************************
@@ -2080,7 +2250,7 @@ gen_unzoned(char * buf, int init_offset)
  * does a lookahead to see if this single 'wrong' choice gives a better
  * result at the end.
  */
-void
+int
 gen_lookahead(char * buf, int init_cell)
 {
     char * p;
@@ -2183,10 +2353,11 @@ gen_lookahead(char * buf, int init_cell)
 
 	add_chr('.');
 
-	if (best_len>0 && str_next > best_len) return;	/* Too big already */
+	if (best_len>0 && str_next > best_len+flg_morefound) return -1; /* Too big already */
     }
 
     currcell = clear_tape(currcell);
+    return 0;
 }
 
 /*******************************************************************************
@@ -2197,7 +2368,7 @@ gen_lookahead(char * buf, int init_cell)
  * The result is that the character set is divided into zones and each is
  * assigned to a cell.
  */
-void
+int
 gen_zoned(char * buf, int init_cell)
 {
     char * p;
@@ -2246,21 +2417,22 @@ gen_zoned(char * buf, int init_cell)
 
 	add_chr('.');
 
-	if (best_len>0 && str_next > best_len) return;	/* Too big already */
+	if (best_len>0 && str_next > best_len+flg_morefound) return -1; /* Too big already */
     }
 
     currcell = clear_tape(currcell);
+    return 0;
 }
 
-void
+int
 gen_print(char * buf, int init_offset)
 {
     if (flg_zoned)
-	gen_zoned(buf, init_offset);
+	return gen_zoned(buf, init_offset);
     else if (flg_lookahead)
-	gen_lookahead(buf, init_offset);
+	return gen_lookahead(buf, init_offset);
     else
-	gen_unzoned(buf, init_offset);
+	return gen_unzoned(buf, init_offset);
 }
 
 /*******************************************************************************
