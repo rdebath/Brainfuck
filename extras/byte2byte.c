@@ -46,7 +46,7 @@ int cell_unsigned = 0;
 int textmode = 0;
 int dump_table = 0;
 
-struct {
+struct s_bftab {
     int len;
     char * code;
 } bytebftab[256][256];
@@ -59,6 +59,7 @@ void Usage(void);
 void initbytebftab(void);
 void write_tail(void);
 void write_byte(int ch);
+void dump_tables(void);
 
 int
 main(int argc, char ** argv)
@@ -88,24 +89,7 @@ main(int argc, char ** argv)
 	else
 	    filelist[filecount++] = argv[ar];
 
-    initbytebftab();
-
-    if (dump_table)
-    {
-	int from,to;
-	printf("{\n");
-	for(from=0; from<256; from++) {
-	    printf("{\n");
-	    for(to=0; to<256; to++) {
-		printf("/* bftab[%3d][%3d] */ \"%s\"%s\n",
-			from, to, bytebftab[from][to].code,
-			to==255?"":",");
-	    }
-	    printf("}%s\n", from==255?"":",");
-	}
-	printf("};\n");
-	exit(0);
-    }
+    if (dump_table) dump_tables();
 
     if (filecount>0) {
 	for(ar=0; ar<filecount; ar++) {
@@ -401,4 +385,78 @@ initbytebftab()
     }
 
     mergecodes();
+}
+
+void do_dump()
+{
+    int from,to, mtype = 's';
+    if (cell_unsigned) mtype = 'u';
+    if (cell_wrap) mtype = 'b';
+
+    printf("char * bftable_%c[256][256] =\n", mtype);
+    printf("{\n");
+    for(from=0; from<256; from++) {
+	printf("{\n");
+	for(to=0; to<256; to++) {
+	    printf("/* bf_%c[%3d][%3d] */ \"%s\"%s\n", mtype,
+		    from, to, bytebftab[from][to].code,
+		    to==255?"":",");
+	}
+	printf("}%s\n", from==255?"":",");
+    }
+    printf("};\n");
+}
+
+void dump_tables()
+{
+    int from, to;
+    struct s_bftab u_bftab[256][256];
+
+
+    cell_wrap = cell_unsigned = 0;
+    initbytebftab();
+    do_dump();
+
+    for(from=0; from<256; from++)
+        for(to=0; to<256; to++)
+	{
+	    if (bytebftab[from][to].code)
+		free(bytebftab[from][to].code);
+	    bytebftab[from][to].code = 0;
+	    bytebftab[from][to].len = 0;
+	}
+
+    cell_unsigned = 1;
+    initbytebftab();
+    do_dump();
+
+    for(from=0; from<256; from++)
+        for(to=0; to<256; to++)
+	{
+	    u_bftab[from][to].code = bytebftab[from][to].code;
+	    u_bftab[from][to].len = bytebftab[from][to].len;
+	    bytebftab[from][to].code = 0;
+	    bytebftab[from][to].len = 0;
+	}
+
+    cell_unsigned = 0;
+    cell_wrap = 1;
+    initbytebftab();
+
+    for(from=0; from<256; from++)
+        for(to=0; to<256; to++)
+	{
+	    if (u_bftab[from][to].len <= bytebftab[from][to].len) {
+		if (bytebftab[from][to].code)
+		    free(bytebftab[from][to].code);
+		bytebftab[from][to].code = u_bftab[from][to].code;
+		bytebftab[from][to].len = u_bftab[from][to].len;
+		u_bftab[from][to].len = 0;
+		u_bftab[from][to].code = 0;
+	    }
+	}
+
+    do_dump();
+
+    exit(0);
 }

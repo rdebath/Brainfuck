@@ -50,15 +50,7 @@ lightning: lightning.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ $(LIBS_LIGHTNING) -o $@
 
 qtable.h: byte2byte.tmp
-	echo 'char * bftable_s[256][256] =' > qtable.tmp
-	./byte2byte.tmp -d >> qtable.tmp
-
-	echo 'char * bftable_u[256][256] =' >> qtable.tmp
-	./byte2byte.tmp -d -u >> qtable.tmp
-
-	echo 'char * bftable_b[256][256] =' >> qtable.tmp
-	./byte2byte.tmp -d -b >> qtable.tmp
-
+	./byte2byte.tmp -d > qtable.tmp
 	mv qtable.tmp qtable.h
 
 byte2byte.tmp: byte2byte.c
