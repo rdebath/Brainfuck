@@ -65,7 +65,7 @@ LOGDEV=/dev/null
 MARK := $(shell echo Configuration start >$(LOGDEV))
 ################################################################################
 
-HOSTCC := $(shell ( which 2>/dev/null clang gcc pcc ; echo cc ) | head -1 | sed 's:.*/::')
+HOSTCC := $(shell ( which 2>/dev/null clang gcc pcc ; echo /cc ) | sed -n '/^\// s:.*/::p' | head -1)
 CC := $(HOSTCC)
 
 # LEX := $(shell ( which 2>/dev/null flex ; echo lex ) | head -1 | sed 's:.*/::')

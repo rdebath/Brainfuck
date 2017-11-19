@@ -115,7 +115,8 @@ MARK := $(shell echo Configuration start >$(LOGDEV))
 # Always running the version check script.
 VERSTRING := $(shell sh version.sh bfi.version.h $(VERSION) $(VERSIONID))
 #
-CC := $(shell ( which 2>/dev/null clang gcc pcc ; echo cc ) | head -1 | sed 's:.*/::')
+CC := $(shell ( which 2>/dev/null clang gcc pcc ; echo /cc ) | sed -n '/^\// s:.*/::p' | head -1)
+*/::p' | head -1)
 
 ifneq ($(CC),cc)
 OPTFLG=-O2
