@@ -583,13 +583,15 @@ main(int argc, char ** argv)
 
 	} else if (strcmp(argv[1], "-Q+") == 0) {
 	    wipe_config();
-	    enable_twocell = !enable_twocell;
-	    flg_fliptwocell = enable_twocell;
+	    flg_fliptwocell = !flg_fliptwocell;
+	    if (flg_fliptwocell) enable_twocell = 1;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-q") == 0) {
 	    wipe_config();
 	    enable_twincell = !enable_twincell;
+	    if (enable_twincell && !enable_twocell)
+		flg_fliptwocell = enable_twocell = 1;
 	    argc--; argv++;
 
 	} else if (strcmp(argv[1], "-X") == 0) {
