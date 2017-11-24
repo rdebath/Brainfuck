@@ -210,16 +210,25 @@ print_string(void)
 	    outlen = 0;
 	}
 	if (badchar) {
-	    prv("o %d", badchar);
+	    if (badchar == 10)
+		pr("echo");
+	    else {
+		prv("o %d", badchar);
+		do_output++;
+	    }
 	    badchar = 0;
-	    do_output++;
 	}
 	if (!*str) break;
 
 	if (*str == '-' && outlen == 0) {
 	    badchar = (*str & 0xFF);
-	} else if (*str >= ' ' && *str <= '~' && *str != '\\' && *str != '\'') {
+	} else if (*str >= ' ' && *str <= '~' && *str != '\'') {
 	    buf[outlen++] = *str;
+	} else if (*str == '\'') {
+	    buf[outlen++] = '\'';
+	    buf[outlen++] = '\\';
+	    buf[outlen++] = *str;
+	    buf[outlen++] = '\'';
 	} else {
 	    badchar = (*str & 0xFF);
 	}

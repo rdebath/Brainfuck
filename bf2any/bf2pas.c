@@ -188,12 +188,18 @@ print_string(char * str)
 	    outlen = 0;
 	}
 	if (badchar) {
-	    prv("write(chr(%d));", badchar);
+	    if (badchar == 10)
+		pr("writeln('');");
+	    else
+		prv("write(chr(%d));", badchar);
 	    badchar = 0;
 	}
 	if (!*str) break;
 
 	if (*str >= ' ' && *str <= '~' && *str != '\\' && *str != '\'') {
+	    buf[outlen++] = *str;
+	} else if (*str == '\'') {
+	    buf[outlen++] = *str;
 	    buf[outlen++] = *str;
 	} else {
 	    badchar = (*str & 0xFF);
