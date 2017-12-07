@@ -355,6 +355,7 @@ static int cells[MAX_CELLS];
 #define intmax_t double
 #define INTMAX_MAX	4503599627370496.0
 #define PRIdMAX		".0f"
+#define FAKE_INTMAX	1
 #endif
 intmax_t patterns_searched = 0;
 
@@ -1733,6 +1734,7 @@ return_to_top:
 
 	str_cells_used = maxcell+1;
 
+#ifndef FAKE_INTMAX
 	if (verbose>3 || (verbose>2 && patterns_searched%10000000 == 0))
 	    fprintf(stderr, "Trying nestloop[%" PRIdMAX "]: "
 			    "%d*(%d*[%d,%d %d,%d %d,%d %d,%d %d,%d %d,%d]\n",
@@ -1744,6 +1746,7 @@ return_to_top:
 		cellinner[5], cellouter[5],
 		cellinner[6], cellouter[6],
 		cellinner[7], cellouter[7]);
+#endif
 
 	for(j=0; j<cellincs[0]; j++)
 	    add_chr('+');
