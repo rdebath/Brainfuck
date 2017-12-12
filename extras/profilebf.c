@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include <limits.h>
 #if _POSIX_VERSION >= 199506L || defined(LLONG_MAX)
@@ -31,6 +32,11 @@ void run(void);
 void optimise(void);
 void print_summary(void);
 void hex_output(FILE * ofd, int ch);
+void start_runclock(void);
+void finish_runclock(double * prun_time, double *pwait_time);
+void pause_runclock(void);
+void unpause_runclock(void);
+
 int hex_bracket = -1;
 
 struct bfi { int cmd; int arg; } *pgm = 0;
@@ -58,6 +64,9 @@ int do_optimise = 1;
 char bf[] = "+-><[].,";
 intmax_t profile[256*4];
 int program_len;	/* Number of BF command characters */
+
+static struct timeval run_start, paused, run_pause;
+static double run_time, wait_time;
 
 int main(int argc, char **argv)
 {
@@ -216,7 +225,11 @@ int main(int argc, char **argv)
 
     if (do_optimise) optimise();
 
+    start_runclock();
+
     run();
+
+    finish_runclock(&run_time, &wait_time);
 
     print_summary();
     return 0;
@@ -387,9 +400,12 @@ void run(void)
 	case ',':
 	    profile[pgm[n].cmd*4+1 + !!mem[m]]++;
 
+	    pause_runclock();
 	    { int a = suppress_io?EOF:getchar();
 	      if(a != EOF) mem[m] = a;
 	      else if (on_eof != 1) mem[m] = on_eof; }
+
+	    unpause_runclock();
 	    break;
 	case '#':
 	    if (all_cells && cell_mask == 0xFF) {
@@ -691,7 +707,14 @@ print_summary()
 	    if (n == 3)
 		fprintf(stderr, "\n");
 	}
-	fprintf(stderr, "\nTotal:         %-12"PRIdMAX"\n", total_count);
+	fprintf(stderr, "\nTotal:         %-12"PRIdMAX"", total_count);
+
+	if (run_time != 0.0 ) {
+	    fprintf(stderr, " run: %0.3fs", run_time);
+	    if (wait_time != 0.0)
+		fprintf(stderr, ", wait: %0.3fs", wait_time);
+	}
+	fprintf(stderr, "\n");
     }
     else
     {
@@ -772,4 +795,55 @@ hex_output(FILE * ofd, int ch)
 	    addr += 16;
 	}
     }
+}
+
+void
+start_runclock(void)
+{
+    gettimeofday(&run_start, 0);
+    paused.tv_sec = 0;
+    paused.tv_usec = 0;
+}
+
+void
+finish_runclock(double * prun_time, double *pwait_time)
+{
+    struct timeval run_end;
+    gettimeofday(&run_end, 0);
+
+    run_end.tv_sec -= run_start.tv_sec;
+    run_end.tv_usec -= run_start.tv_usec;
+    if (run_end.tv_usec < 0)
+        { run_end.tv_usec += 1000000; run_end.tv_sec -= 1; }
+
+    run_end.tv_sec -= paused.tv_sec;
+    run_end.tv_usec -= paused.tv_usec;
+    if (run_end.tv_usec < 0)
+        { run_end.tv_usec += 1000000; run_end.tv_sec -= 1; }
+
+    if (prun_time)
+        *prun_time = (run_end.tv_sec + run_end.tv_usec/1000000.0);
+    if (pwait_time)
+        *pwait_time = (paused.tv_sec + paused.tv_usec/1000000.0);
+}
+
+void
+pause_runclock(void)
+{
+    gettimeofday(&run_pause, 0);
+}
+
+void
+unpause_runclock(void)
+{
+    struct timeval run_end;
+
+    gettimeofday(&run_end, 0);
+    paused.tv_sec += run_end.tv_sec - run_pause.tv_sec;
+    paused.tv_usec += run_end.tv_usec - run_pause.tv_usec;
+
+    if (paused.tv_usec < 0)
+        { paused.tv_usec += 1000000; paused.tv_sec -= 1; }
+    if (paused.tv_usec >= 1000000)
+        { paused.tv_usec -= 1000000; paused.tv_sec += 1; }
 }
