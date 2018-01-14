@@ -30,7 +30,7 @@ static int use_utf8 = 0;
 static void print_cstring(void);
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg};
+struct be_interface_s be_interface = {.check_arg=fn_check_arg,.ifcmd=1};
 
 static int
 fn_check_arg(const char * arg)
@@ -116,6 +116,14 @@ outcmd(int ch, int count)
 	break;
     case ']':
 	if(bytecell) { I; oputs("lset d $dc [expr {[lindex $d $dc] % 256}]"); }
+	ind--; I; fprintf(ofd, "}\n");
+	break;
+    case 'I':
+	if(bytecell) { I; oputs("lset d $dc [expr {[lindex $d $dc] % 256}]"); }
+	I; fprintf(ofd, "if {[lindex $d $dc] != 0} {\n");
+	ind++;
+	break;
+    case 'E':
 	ind--; I; fprintf(ofd, "}\n");
 	break;
     case '.':
