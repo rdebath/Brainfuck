@@ -15,6 +15,8 @@ static int ind = 0;
 static int in_arith = 0;
 static int curr_offset = -1;
 
+struct be_interface_s be_interface = {.ifcmd = 1};
+
 static void print_string(void);
 
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
@@ -108,6 +110,14 @@ outcmd(int ch, int count)
 	ind++;
 	break;
     case ']': shcode(); ind--; pr("done"); break;
+
+    case 'I':
+	shcode();
+	if(bytecell) { pr("if (( (M[P]&=255) != 0)) ; then"); }
+	else { pr("if ((M[P])) ; then"); }
+	ind++;
+	break;
+    case 'E': shcode(); ind--; pr("fi"); break;
 
     case '~':
 	shcode();
