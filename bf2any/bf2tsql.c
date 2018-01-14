@@ -11,6 +11,8 @@
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
+struct be_interface_s be_interface = {.ifcmd = 1};
+
 void
 outcmd(int ch, int count)
 {
@@ -101,6 +103,14 @@ outcmd(int ch, int count)
 	break;
     case ']':
 	if(bytecell) { I; printf("set @ccell = @ccell & 255\n"); }
+	ind--; I; printf("END\n");
+	break;
+    case 'I':
+	if(bytecell) { I; printf("set @ccell = @ccell & 255\n"); }
+	I; printf("IF @ccell != 0 BEGIN\n");
+	ind++;
+	break;
+    case 'E':
 	ind--; I; printf("END\n");
 	break;
     case '.':
