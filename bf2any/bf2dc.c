@@ -40,7 +40,7 @@ static int outputmode = 2;
 static int inputmode = 2;
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg};
+struct be_interface_s be_interface = {.check_arg=fn_check_arg,.ifcmd=1};
 
 static int
 fn_check_arg(const char * arg)
@@ -135,6 +135,14 @@ outcmd(int ch, int count)
 	    pr("lmx0!=b]Sblmx0!=bLbc");
 	else
 	    pr("lp;a0!=b]Sblp;a0!=bLbc");
+	break;
+
+    case 'I': pr("["); break;
+    case 'E':
+	if(bytecell)
+	    pr("]Sblmx0!=bLbc");
+	else
+	    pr("]Sblp;a0!=bLbc");
 	break;
 
     case ',': if (inputmode != 2) { pr("lix"); do_input=1; } break;
