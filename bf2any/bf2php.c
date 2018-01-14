@@ -12,6 +12,8 @@
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
+struct be_interface_s be_interface = {.ifcmd = 1};
+
 static void print_cstring(void);
 
 static char *
@@ -75,6 +77,19 @@ outcmd(int ch, int count)
             I; printf("$p -= %d;\n", -count);
         }
 	if(bytecell) { I; printf("%s &= 255;\n", mc); }
+	ind--; I; printf("}\n");
+	break;
+    case 'I':
+	if(bytecell) { I; printf("%s &= 255;\n", mc); }
+	I; printf("if(%s != 0){\n", mc);
+	ind++;
+	break;
+    case 'E':
+	if (count > 0) {
+            I; printf("$p += %d;\n", count);
+        } else if (count < 0) {
+            I; printf("$p -= %d;\n", -count);
+        }
 	ind--; I; printf("}\n");
 	break;
     case '.': I; printf("print chr(%s&255);\n", mc); break;
