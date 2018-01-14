@@ -12,6 +12,8 @@ static int ind = 0;
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
 
+struct be_interface_s be_interface = { .ifcmd=1 };
+
 static void print_string(void);
 
 void
@@ -83,6 +85,16 @@ outcmd(int ch, int count)
 	if(bytecell) pr("@ M[$P] = ($M[$P] %% 256 + 256) %% 256");
 	ind--;
 	pr("end");
+	break;
+
+    case 'I':
+	if(bytecell) pr("@ M[$P] = ($M[$P] %% 256 + 256) %% 256");
+	pr("if ( $M[$P] != 0 ) then");
+	ind++;
+	break;
+    case 'E':
+	ind--;
+	pr("endif");
 	break;
 
     case '~':
