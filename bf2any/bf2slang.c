@@ -11,6 +11,8 @@
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
+struct be_interface_s be_interface = {.ifcmd = 1};
+
 static void print_cstring(void);
 
 void
@@ -47,6 +49,8 @@ outcmd(int ch, int count)
     case '>': I; printf("p += %d;\n", count); break;
     case '[': I; printf("while(m[p]!=0){\n"); ind++; break;
     case ']': ind--; I; printf("}\n"); break;
+    case 'I': I; printf("if(m[p]!=0){\n"); ind++; break;
+    case 'E': ind--; I; printf("}\n"); break;
 
     case '~': break;
 
