@@ -16,7 +16,7 @@ static FILE * ofd;
 static void print_dstring(void);
 
 /* Assume same machine, same int */
-struct be_interface_s be_interface = { .cells_are_ints=1 };
+struct be_interface_s be_interface = { .cells_are_ints=1, .ifcmd=1 };
 
 void
 outcmd(int ch, int count)
@@ -69,6 +69,9 @@ outcmd(int ch, int count)
 
     case '[': pr("while(mem[m]) {"); ind++; break;
     case ']': ind--; pr("}"); break;
+
+    case 'I': pr("if(mem[m]) {"); ind++; break;
+    case 'E': ind--; pr("}"); break;
     }
 }
 
