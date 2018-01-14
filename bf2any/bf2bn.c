@@ -33,7 +33,7 @@ static int use_macro = 0;
 static int bpc = 0;
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {.check_arg=fn_check_arg,.nobytecell=1};
+struct be_interface_s be_interface = {.check_arg=fn_check_arg,.nobytecell=1,.ifcmd=1};
 
 static int
 fn_check_arg(const char * arg)
@@ -256,6 +256,17 @@ outcmd(int ch, int count)
 
     case ']':
 	I; printf("BN_mask_BPC(*p);\n");
+	ind--;
+	I; printf("}\n");
+	break;
+
+    case 'I':
+	I; printf("BN_mask_BPC(*p);\n");
+	I; printf("if(!BN_is_zero(*p)){\n");
+	ind++;
+	break;
+
+    case 'E':
 	ind--;
 	I; printf("}\n");
 	break;
