@@ -37,7 +37,7 @@ static size_t pycodesize = 0;
 static void print_string(void);
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg};
+struct be_interface_s be_interface = {.check_arg=fn_check_arg,.ifcmd=1};
 
 static int
 fn_check_arg(const char * arg)
@@ -284,6 +284,18 @@ outcmd(int ch, int count)
 
 	if(bytecell) {
 	    I; fprintf(ofd, "%s &= 255\n", mc);
+	}
+	ind--;
+	break;
+
+    case 'I':
+	if(bytecell) { I; fprintf(ofd, "%s &= 255\n", mc); }
+	I; fprintf(ofd, "if %s :\n", mc); ind++; break;
+    case 'E':
+        if (count > 0) {
+            I; fprintf(ofd, "p += %d\n", count);
+        } else if (count < 0) {
+            I; fprintf(ofd, "p -= %d\n", -count);
 	}
 	ind--;
 	break;
