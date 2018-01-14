@@ -24,6 +24,8 @@ static int ind = 0;
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
 
+struct be_interface_s be_interface = {.ifcmd = 1};
+
 static void print_string(void);
 
 void
@@ -78,6 +80,13 @@ outcmd(int ch, int count)
 	ind++;
 	break;
     case ']': ind--; pr("done"); break;
+
+    case 'I':
+	if(bytecell) { pr("if [ $((M$P&=255)) != 0 ] ; then"); }
+	else { pr("if [ $((M$P)) != 0 ] ; then"); }
+	ind++;
+	break;
+    case 'E': ind--; pr("fi"); break;
 
     case '~':
 	ind--;
