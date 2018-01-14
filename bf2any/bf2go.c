@@ -14,6 +14,8 @@
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
+struct be_interface_s be_interface = {.ifcmd = 1};
+
 static const char * ctype = "int";
 static int vmask = -1;
 
@@ -70,6 +72,13 @@ outcmd(int ch, int count)
 	ind++;
 	break;
     case ']':
+	ind--; I; printf("}\n");
+	break;
+    case 'I':
+	I; printf("if m[p] != 0 {\n");
+	ind++;
+	break;
+    case 'E':
 	ind--; I; printf("}\n");
 	break;
     case '.': I; printf("fmt.Print(string(m[p]))\n"); break;
