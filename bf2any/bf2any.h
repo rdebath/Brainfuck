@@ -15,11 +15,11 @@ struct be_interface_s {
     check_arg_t *check_arg;
     int ifcmd;
     int cells_are_ints;
+    int nobytecell;
 } be_interface;
 
 int disable_be_optim;
 int bytecell;
-int nobytecell;
 
 /* This can be changed by the Makefile but everything must be recompiled. */
 #ifndef BOFF

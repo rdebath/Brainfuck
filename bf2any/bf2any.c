@@ -62,7 +62,7 @@ check_arg(const char * arg) {
 int
 check_argv(const char * arg)
 {
-    if (bytecell >= 0 && !nobytecell && strcmp(arg, "-b") == 0) {
+    if (bytecell >= 0 && !be_interface.nobytecell && strcmp(arg, "-b") == 0) {
 	bytecell = 1;
 
     } else if (strcmp(arg, "-m") == 0) {
