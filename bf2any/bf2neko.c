@@ -14,6 +14,8 @@
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
+struct be_interface_s be_interface = {.ifcmd = 1};
+
 static void print_cstring(void);
 
 void
@@ -57,6 +59,14 @@ outcmd(int ch, int count)
 	break;
     case ']':
 	if(bytecell) { I; printf("m[p] &= 255\n"); }
+	ind--; I; printf("}\n");
+	break;
+    case 'I':
+	if(bytecell) { I; printf("m[p] &= 255\n"); }
+	I; printf("if m[p] != 0 {\n");
+	ind++;
+	break;
+    case 'E':
 	ind--; I; printf("}\n");
 	break;
     case '.': I; printf("$sset(s,0,m[p]) $print(s)\n"); break;
