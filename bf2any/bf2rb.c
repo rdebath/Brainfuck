@@ -17,7 +17,7 @@ static int init_done = 0;
 static void print_cstring(void);
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg};
+struct be_interface_s be_interface = {.check_arg=fn_check_arg,.ifcmd = 1};
 
 static int
 fn_check_arg(const char * arg)
@@ -113,6 +113,21 @@ outcmd(int ch, int count)
 	}
 
 	if(bytecell) { I; printf("%s &= 255\n", cm); }
+	ind--; I; printf("end\n");
+	curtapeoff = safetapeoff = 0;
+	break;
+    case 'I':
+	if(bytecell) { I; printf("%s &= 255\n", cm); }
+	I; printf("if %s != 0\n", cm);
+	ind++;
+	curtapeoff = safetapeoff = 0;
+	break;
+    case 'E':
+	if (count > 0) {
+            I; printf("p += %d\n", count);
+        } else if (count < 0) {
+            I; printf("p -= %d\n", -count);
+	}
 	ind--; I; printf("end\n");
 	curtapeoff = safetapeoff = 0;
 	break;
