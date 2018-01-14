@@ -12,6 +12,8 @@ static int ind = 0;
 /* NB: f90 has a maximum line length */
 #define I printf("%*s", (ind>40?40:ind)*2, "")
 
+struct be_interface_s be_interface = {.ifcmd = 1};
+
 static void print_cstring(void);
 
 void
@@ -59,7 +61,14 @@ outcmd(int ch, int count)
 	if(bytecell) { I; printf("m(p) = MOD(m(p), 256)\n"); }
 	ind--; I; printf("END DO\n");
 	break;
-    /* This write does an &255 on the argument. */
+    case 'I':
+	if(bytecell) { I; printf("m(p) = MOD(m(p), 256)\n"); }
+	I; printf("IF (m(p) .NE. 0) THEN\n");
+	ind++;
+	break;
+    case 'E':
+	ind--; I; printf("END IF\n");
+	break;
     case '.': I; printf("WRITE (*,'(A)',advance='no') CHAR(m(p))\n"); break;
     case '"': print_cstring(); break;
     case ',': I; printf("READ (*, '(A)',advance='no',iostat=r) ch\n");
