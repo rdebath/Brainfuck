@@ -27,11 +27,12 @@ struct instruction {
     struct instruction * next;
     struct instruction * loop;
     char * cstr;
-} *pgm = 0, *last = 0, *jmpstack = 0;
+};
+static struct instruction *pgm = 0, *last = 0, *jmpstack = 0;
 
-void loutcmd(int ch, int count, struct instruction *n);
+static void loutcmd(int ch, int count, struct instruction *n);
 
-int ind = 0;
+static int ind = 0;
 #define I printf("%*s", ind*4, "")
 static int lblcount = 0;
 static int icount = 0;
@@ -138,7 +139,7 @@ outcmd(int ch, int count)
     }
 }
 
-void
+static void
 loutcmd(int ch, int count, struct instruction *n)
 {
     switch(ch) {

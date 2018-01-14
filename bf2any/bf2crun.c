@@ -27,10 +27,10 @@
  *	bcc -ansi -Ml -z -o bf bf.c
  */
 
-int ind = 0;
-int use_unistd = 0;
-enum { no_run, run_libtcc, run_dll } runmode = run_libtcc;
-FILE * ofd;
+static int ind = 0;
+static int use_unistd = 0;
+static enum { no_run, run_libtcc, run_dll } runmode = run_libtcc;
+static FILE * ofd;
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
 #define prv2(s,v,v2)    fprintf(ofd, "%*s" s "\n", ind*4, "", (v), (v2))
@@ -59,8 +59,8 @@ static char pic_opt[8] = " -fpic";
 #endif
 
 #ifndef DISABLE_LIBTCC
-char * ccode = 0;
-size_t ccodesize = 0;
+static char * ccode = 0;
+static size_t ccodesize = 0;
 #endif
 
 static check_arg_t fn_check_arg;

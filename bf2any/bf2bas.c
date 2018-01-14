@@ -17,34 +17,34 @@
  *
  */
 
-int ind = 0;
-int lineno = 0;
-int lineinc = 1;
+static int ind = 0;
+static int lineno = 0;
+static int lineinc = 1;
 
-int enable_linenos = 0;
-int open_doloop = 0; /* So we don't get an "unused variable" warning in VB. */
-int do_input = 0;
+static int enable_linenos = 0;
+static int open_doloop = 0; /* So we don't get an "unused variable" warning in VB. */
+static int do_input = 0;
 
-char tapecell[16]="M(P)";
-char tapeptr[16]="P";
-char tempcell[16]="V";
-char tapename[16]="M";
+static char tapecell[16]="M(P)";
+static char tapeptr[16]="P";
+static char tempcell[16]="V";
+static char tapename[16]="M";
 
-enum { loop_wend, loop_endw, loop_while, loop_do, loop_goto }
+static enum { loop_wend, loop_endw, loop_while, loop_do, loop_goto }
     loop_style = loop_do;
-enum { init_none, init_dim, init_global, init_main, init_fbas }
+static enum { init_none, init_dim, init_global, init_main, init_fbas }
     init_style = init_dim;
-enum { end_none, end_end, end_system, end_vb }
+static enum { end_none, end_end, end_system, end_vb }
     end_style = end_end;
-enum { io_basic, io_bbc, io_vb, io_fbas }
+static enum { io_basic, io_bbc, io_vb, io_fbas }
     io_style = io_basic;
 
-struct stkdat { struct stkdat * up; int id; } *sp = 0;
+static struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
 static check_arg_t fn_check_arg;
 struct be_interface_s be_interface = {fn_check_arg};
 
-void
+static void
 line_no_indent(void)
 #define I   line_no_indent()
 {

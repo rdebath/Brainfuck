@@ -17,15 +17,15 @@
  * Tcl translation from BF, runs at about 24,000,000 instructions per second.
  */
 
-int ind = 0;
+static int ind = 0;
 #define I fprintf(ofd, "%*s", ind*4, "")
 #define oputs(str) fprintf(ofd, "%s\n", (str))
-int do_dump = 0;
+static int do_dump = 0;
 
-FILE * ofd;
-char * tclcode = 0;
-size_t tclcodesize = 0;
-int use_utf8 = 0;
+static FILE * ofd;
+static char * tclcode = 0;
+static size_t tclcodesize = 0;
+static int use_utf8 = 0;
 
 static void print_cstring(void);
 

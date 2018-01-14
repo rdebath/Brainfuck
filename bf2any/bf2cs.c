@@ -8,7 +8,7 @@
  * C Sharp translation from BF, runs at about 1,400,000,000 instructions per second.
  */
 
-int ind = 0;
+static int ind = 0;
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
 

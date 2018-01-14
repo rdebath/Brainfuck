@@ -26,18 +26,18 @@
  *      run length encoding is possible. (divmod by 256^N)
  */
 
-int do_input = 0;
-int do_output = 0;
-int ind = 0;
+static int do_input = 0;
+static int do_output = 0;
+static int ind = 0;
 #define I printf("%*s", ind*4, "")
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
 
 static void print_dcstring(void);
 
-FILE * ofd;
-int outputmode = 2;
-int inputmode = 2;
+static FILE * ofd;
+static int outputmode = 2;
+static int inputmode = 2;
 
 static check_arg_t fn_check_arg;
 struct be_interface_s be_interface = {fn_check_arg};
@@ -80,7 +80,7 @@ fn_check_arg(const char * arg)
 
 #ifndef _WIN32
 /* Note: calling exit() isn't posix */
-void endprog(int s) { exit(s != SIGCHLD); }
+static void endprog(int s) { exit(s != SIGCHLD); }
 #endif
 
 static char *

@@ -41,6 +41,7 @@ void outcmd(int ch, int count) {
 }
 #else
 
+#define DASM_FDEF static
 #include "dynasm/dasm_proto.h"
 #include "dynasm/dasm_x86.h"
 
@@ -114,25 +115,25 @@ void outcmd(int ch, int count) {
  * states available you must redefine this identifier. It is not safe
  * to put any _code_generating_ assembly before this point. */
 #define Dst &Dstate
-dasm_State *Dstate;
+static dasm_State *Dstate;
 
 /* These are the named global labels prefixed in the assembler by the "->"
  * sequence. The "GLOB_" prefix is from the .globals identifier above.
  * Each label can only appear once in the generated machine code.
  */
-void* global_labels[GLOB__MAX];
+static void* global_labels[GLOB__MAX];
 
 /* A stack for a pair of labels for each open while loop. */
-struct stkdat { struct stkdat * up; int id; } *sp = 0;
+static struct stkdat { struct stkdat * up; int id; } *sp = 0;
 /* This is the highest allocated dynamically generated label number */
-int maxpc = 0;
+static int maxpc = 0;
 
-void link_and_run(dasm_State **state);
-size_t tape_step = sizeof(int);
+static void link_and_run(dasm_State **state);
+static size_t tape_step = sizeof(int);
 typedef int (*fnptr)(char * memory);
-fnptr code = 0;
-size_t codelen;
-char * tapemem;
+static fnptr code = 0;
+static size_t codelen;
+static char * tapemem;
 
 static int acc_loaded = 0;
 static int acc_offset = 0;
@@ -549,7 +550,7 @@ outcmd(int ch, int count)
 #define MAP_FAILED (-1)
 #endif
 
-void
+static void
 link_and_run(dasm_State ** state)
 {
     /* dasm_link is the second pass of the assembler, the first phase of the
@@ -569,6 +570,8 @@ link_and_run(dasm_State ** state)
 	fprintf(stderr, "Process dasm_link() failed\n");
 	exit(1);
     }
+
+    (void)dasm_getpclabel;	/* Unused */
 
 #ifndef _WIN32
 #ifdef MAP_ANONYMOUS

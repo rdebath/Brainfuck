@@ -26,8 +26,6 @@
  * But it doesn't use a true ELF library like the elfkickers page.
  */
 
-int ind = 0;
-
 /*
  * The bits of machine language that, together, make up a compiled
  * program.
@@ -39,9 +37,9 @@ int ind = 0;
  * With the references.
  */
 
-const size_t base_address = 0x08048000;
-const size_t p_filesz = 68;
-const size_t p_memsz = 72;
+static const size_t base_address = 0x08048000;
+static const size_t p_filesz = 68;
+static const size_t p_memsz = 72;
 
 MLBIT(84) elfheader = {{
   0x7f, 0x45, 0x4c, 0x46, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -85,7 +83,7 @@ MLBIT(5)
 			0x31, 0xDB,			/* xor  ebx, ebx   */
 			0xCD, 0x80 } };			/* int  0x80       */
 
-const size_t prolog_meminit_offset = 1;
+static const size_t prolog_meminit_offset = 1;
 MLBIT(5) prolog_ex = { { 0xB9, 0, 0, 0, 0 } };		/* mov  ecx, ???   */
 
 

@@ -9,9 +9,9 @@
 #include "bf2any.h"
 #include "bf2loop.h"
 
-int opt_cellsize = 0;
+static int opt_optim = 0;
+
 int tapelen = TAPELEN;
-int opt_optim = 0;
 int enable_optim = 0;
 int disable_init_optim = 0;
 int enable_debug;
@@ -47,20 +47,20 @@ char * extra_commands = 0;
  * The tokens are passed to the backend for conversion into the final code.
  */
 
-void outrun(int ch, int count);
+static void outrun(int ch, int count);
 
 /*
  *  Decode arguments.
  */
-int enable_rle = 0;
+static int enable_rle = 0;
 
-int
+static int
 check_arg(const char * arg) {
     if (be_interface.check_arg == 0) return 0;
     return (*be_interface.check_arg)(arg);
 }
 
-int
+static int
 check_argv(const char * arg)
 {
     if (!be_interface.nobytecell && strcmp(arg, "-b") == 0) {
@@ -275,7 +275,7 @@ main(int argc, char ** argv)
     calls the outtxn function after finding '=' commands otherwise the
     commands are just pass to the BE.
 */
-void
+static void
 outrun(int ch, int count)
 {
 static int zstate = 0;

@@ -18,9 +18,9 @@
 /* Do this by default as getch() is rare. */
 #define INLINEGETCH
 
-int do_input = 0;
-int ind = 0;
-int use_functions = 0;
+static int do_input = 0;
+static int ind = 0;
+static int use_functions = 0;
 #define I printf("%*s", ind*4, "")
 
 static void print_cstring(void);

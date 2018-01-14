@@ -383,8 +383,8 @@ static int bf_multi = 0, tmp_clean = 1;
 static struct instruction *pgm = 0, *last = 0;
 
 /* Default double and quad to the easiest to prove algorithms. */
-const char ** doubler = doubler_copy;
-const char ** bfquad = bfquadz;
+static const char ** doubler = doubler_copy;
+static const char ** bfquad = bfquadz;
 
 static void risbf(int ch, int count);
 static void tinybf(int ch, int count);

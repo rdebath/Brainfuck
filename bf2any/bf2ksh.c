@@ -9,11 +9,11 @@
  * Bash translation from BF, runs at about 420,000 instructions per second.
  */
 
-int do_input = 0;
-int do_output = 0;
-int ind = 0;
-int in_arith = 0;
-int curr_offset = -1;
+static int do_input = 0;
+static int do_output = 0;
+static int ind = 0;
+static int in_arith = 0;
+static int curr_offset = -1;
 
 static void print_string(void);
 

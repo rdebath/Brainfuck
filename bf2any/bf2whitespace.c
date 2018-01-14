@@ -8,12 +8,12 @@
  * Whitespace translation
  */
 
-int ind = 0;
-int loopid = 1;
-int embed_tokens = 0;
-int signed_label_bug = 0;
+static int ind = 0;
+static int loopid = 1;
+static int embed_tokens = 0;
+static int signed_label_bug = 0;
 
-struct stkdat { struct stkdat * up; int id; } *sp = 0;
+static struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
 static void print_string(void);
 static void prttok(char *, char *);

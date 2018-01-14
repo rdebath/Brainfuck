@@ -17,13 +17,13 @@
  * This is maximum line length that can be read. */
 #define MAXINPLINE	132
 
-int ind = 7;
+static int ind = 7;
 /* NB: Cobol too has a maximum line length (a really tiny one) */
 #define I printf("%*s", (ind>27?27:ind), "")
 
-int use_decimal = 0;
-int do_input = 0;
-int maxinpline = MAXINPLINE;
+static int use_decimal = 0;
+static int do_input = 0;
+static int maxinpline = MAXINPLINE;
 
 static void print_cstring(void);
 

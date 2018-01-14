@@ -18,9 +18,9 @@
  * slowest at about 180,000.
  */
 
-int do_input = 0;
-int do_output = 0;
-int ind = 0;
+static int do_input = 0;
+static int do_output = 0;
+static int ind = 0;
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
 

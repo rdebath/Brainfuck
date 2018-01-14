@@ -21,18 +21,18 @@
  * There is a limit on the number of nested loops was 20 now 100.
  */
 
-int ind = 0;
+static int ind = 0;
 #define I fprintf(ofd, "%*s", ind*4, "")
 
-int do_dump = 0;
-int use_oslib = 0;
-int use_putcell = 0;
-int use_putstr = 0;
-int use_getcell = 0;
+static int do_dump = 0;
+static int use_oslib = 0;
+static int use_putcell = 0;
+static int use_putstr = 0;
+static int use_getcell = 0;
 
-FILE * ofd;
-char * pycode = 0;
-size_t pycodesize = 0;
+static FILE * ofd;
+static char * pycode = 0;
+static size_t pycodesize = 0;
 
 static void print_string(void);
 

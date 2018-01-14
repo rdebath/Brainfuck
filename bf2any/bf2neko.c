@@ -11,7 +11,7 @@
  *      "Uncaught exception - load.c(393) : Invalid module : ..."
  */
 
-int ind = 0;
+static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
 static void print_cstring(void);

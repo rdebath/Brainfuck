@@ -8,8 +8,7 @@
  * S-Lang translation from BF, runs at about 8,000,000 instructions per second.
  */
 
-int do_input = 0;
-int ind = 0;
+static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
 static void print_cstring(void);

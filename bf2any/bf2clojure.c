@@ -8,8 +8,7 @@
  * Clojure translation from BF, runs at about 140,000 instructions per second.
  */
 
-int do_input = 0;
-int ind = 0;
+static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
 struct be_interface_s be_interface = {.disable_be_optim=1};

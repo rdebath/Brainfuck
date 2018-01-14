@@ -28,11 +28,12 @@ struct instruction {
     struct instruction * prev;
     struct instruction * loop;
     char * cstr;
-} *pgm = 0, *last = 0, *jmpstack = 0;
+};
+static struct instruction *pgm = 0, *last = 0, *jmpstack = 0;
 
 static int icount = 0;
 
-int ind = 0;
+static int ind = 0;
 #define I        printf("%*s", ind*4, "")
 #define prv(s,v) printf("%*s" s "\n", ind*4, "", (v))
 

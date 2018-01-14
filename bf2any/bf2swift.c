@@ -8,8 +8,8 @@
  * Apple Swift translation From BF, runs at about ? instructions per second.
  */
 
-int ind = 0;
-FILE * ofd;
+static int ind = 0;
+static FILE * ofd;
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
 

@@ -11,8 +11,7 @@
  *
  */
 
-int do_input = 0;
-int do_dump = 0;
+static int do_dump = 0;
 
 #ifndef icell
 typedef int icell;
@@ -32,17 +31,17 @@ static size_t tapealloc;
 #define GEN_TOK_ENUM(NAME) T_ ## NAME,
 enum token { TOKEN_LIST(GEN_TOK_ENUM) TCOUNT};
 #define GEN_TOK_STRING(NAME) #NAME,
-const char* tokennames[] = { TOKEN_LIST(GEN_TOK_STRING) };
+static const char* tokennames[] = { TOKEN_LIST(GEN_TOK_STRING) };
 
-struct stkdat { struct stkdat * up; int id; } *sp = 0;
-int imov = 0;
-int prevtk = 0;
-int checklimits = 0;
+static struct stkdat { struct stkdat * up; int id; } *sp = 0;
+static int imov = 0;
+static int prevtk = 0;
+static int checklimits = 0;
 
-void runprog(int * p, int *ep);
-void debugprog(int * p, int *ep);
-void dumpprog(int * p, int *ep);
-void dumpmem(int *tp);
+static void runprog(int * p, int *ep);
+static void debugprog(int * p, int *ep);
+static void dumpprog(int * p, int *ep);
+static void dumpmem(int *tp);
 
 static check_arg_t fn_check_arg;
 struct be_interface_s be_interface = { .check_arg=fn_check_arg, .cells_are_ints=1 };
@@ -183,7 +182,7 @@ outcmd(int ch, int count)
     }
 }
 
-void
+static void
 dumpmem(int *mp)
 {
     size_t i, j = 0;
@@ -195,7 +194,7 @@ dumpmem(int *mp)
     fprintf(stderr, "\n");
 }
 
-void
+static void
 dumpprog(int * p, int * ep)
 {
     for(;p<ep;){
@@ -229,14 +228,14 @@ dumpprog(int * p, int * ep)
 #endif
 
 #ifdef PART2
-void
+static void
 debugprog(register int * p, register icell *mp)
 #else
 #if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
 /* Tell GNU C to think really hard about this function! */
 __attribute__((optimize(3),hot,aligned(64)))
 #endif
-void
+static void
 runprog(register int * p, register icell *mp)
 #endif
 {

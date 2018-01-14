@@ -10,11 +10,11 @@
  * For ANSI.SYS replacement see: https://github.com/adoxa/ansicon
  */
 
-int do_input = 0;
-int do_output = 0;
-int loopid = 0;
+static int do_input = 0;
+static int do_output = 0;
+static int loopid = 0;
 
-struct stkdat { struct stkdat * up; int id; } *sp = 0;
+static struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
 void
 outcmd(int ch, int count)

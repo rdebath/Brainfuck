@@ -16,9 +16,10 @@ struct instruction {
     int has_inp;
     struct instruction * next;
     struct instruction * loop;
-} *pgm = 0, *last = 0, *jmpstack = 0;
+};
+static struct instruction *pgm = 0, *last = 0, *jmpstack = 0;
 
-void loutcmd(int ch, int count, struct instruction *n);
+static void loutcmd(int ch, int count, struct instruction *n);
 
 static int do_input = 0;
 static int ind = 2;

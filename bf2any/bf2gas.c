@@ -14,7 +14,7 @@
  * Add -m32 or -m64 option if it's not your default target arch.
  */
 
-int ind = 0;
+static int ind = 0;
 
 #if defined(__FreeBSD__) && !defined(GLABELS)
 #define GLABELS

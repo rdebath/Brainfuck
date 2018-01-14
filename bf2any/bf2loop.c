@@ -15,8 +15,8 @@ static int qcmd[128];
 static int qrep[128];
 static int qcnt = 0;
 
-void process_loop(void);
-int try_constant_loop(int loopz, int inc, int mov);
+static void process_loop(void);
+static int try_constant_loop(int loopz, int inc, int mov);
 
 static int madd_offset[32];
 static int madd_inc[32];
@@ -94,7 +94,7 @@ outtxn(int ch, int repcnt)
 	process_loop();
 }
 
-void process_loop()
+static void process_loop()
 {
     int i;
     int mov = 0;	/* Total movement of <> in the loop */
@@ -274,7 +274,7 @@ void process_loop()
     outtxn(0, 0);
 }
 
-int
+static int
 try_constant_loop(int loopz, int inc, int mov)
 {
     int i;

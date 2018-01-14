@@ -8,7 +8,7 @@
  * MS T-SQL translation from BF, runs at about 48,000 instructions per second.
  */
 
-int ind = 0;
+static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
 void

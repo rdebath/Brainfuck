@@ -25,9 +25,9 @@
 
 #define MAXPRLE	128
 
-int do_input = 0;
-int do_output = 0;
-int ind = 0;
+static int do_input = 0;
+static int do_output = 0;
+static int ind = 0;
 
 struct be_interface_s be_interface = {.bytesonly=1,.disable_be_optim=1};
 

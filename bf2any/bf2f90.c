@@ -8,7 +8,7 @@
  * Fortran translation from BF, runs at about 1,000,000,000 instructions per second.
  */
 
-int ind = 0;
+static int ind = 0;
 /* NB: f90 has a maximum line length */
 #define I printf("%*s", (ind>40?40:ind)*2, "")
 

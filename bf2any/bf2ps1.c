@@ -8,9 +8,9 @@
  * MS Power shell translation from BF, runs at about 1,200,000 instructions per second.
  */
 
-int do_input = 0;
-int do_batfile = 0, do_unbuffered = 0;
-int ind = 0;
+static int do_input = 0;
+static int do_batfile = 0, do_unbuffered = 0;
+static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
 static void print_string(char*s);

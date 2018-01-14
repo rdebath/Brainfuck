@@ -9,10 +9,10 @@
  * Ruby translation from BF, runs at about 31,000,000 instructions per second.
  */
 
-int ind = 0;
+static int ind = 0;
 #define I printf("%*s", ind*4, "")
-int safetapeoff = 0, curtapeoff = 0;
-int init_done = 0;
+static int safetapeoff = 0, curtapeoff = 0;
+static int init_done = 0;
 
 static void print_cstring(void);
 

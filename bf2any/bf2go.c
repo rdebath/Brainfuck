@@ -11,7 +11,7 @@
  * But it is very slow to compile.
  */
 
-int ind = 0;
+static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
 static const char * ctype = "int";
