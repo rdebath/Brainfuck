@@ -15,6 +15,7 @@ int opt_optim = 0;
 int enable_optim = 0;
 int disable_init_optim = 0;
 int enable_debug;
+int bytecell = 0;
 const char * current_file;
 char * extra_commands = 0;
 
@@ -62,7 +63,7 @@ check_arg(const char * arg) {
 int
 check_argv(const char * arg)
 {
-    if (bytecell >= 0 && !be_interface.nobytecell && strcmp(arg, "-b") == 0) {
+    if (!be_interface.nobytecell && strcmp(arg, "-b") == 0) {
 	bytecell = 1;
 
     } else if (strcmp(arg, "-m") == 0) {
@@ -177,7 +178,7 @@ main(int argc, char ** argv)
     if (disable_init_optim)
 	lastch = 0;
 
-    if (bytecell != 0) bytecell = 1;
+    if (be_interface.bytesonly) bytecell = 1;
 
     if (filecount == 0)
 	filelist[filecount++] = "-";

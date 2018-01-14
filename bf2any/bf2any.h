@@ -3,6 +3,7 @@ extern int tapelen;
 extern int enable_optim;
 extern int disable_init_optim;
 extern int enable_debug;
+extern int bytecell;
 extern const char * current_file;
 extern char * extra_commands;
 
@@ -16,10 +17,9 @@ struct be_interface_s {
     int ifcmd;
     int cells_are_ints;
     int nobytecell;
+    int bytesonly;
+    int disable_be_optim;
 } be_interface;
-
-int disable_be_optim;
-int bytecell;
 
 /* This can be changed by the Makefile but everything must be recompiled. */
 #ifndef BOFF

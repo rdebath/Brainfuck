@@ -333,7 +333,7 @@ void outopt(int ch, int count)
 
     case 'B':
 	flush_tape(0,1);
-	if (disable_be_optim) be_codegen_failure();
+	if (be_interface.disable_be_optim) be_codegen_failure();
 	outcmd(ch, count);
 	return;
 
@@ -346,12 +346,12 @@ void outopt(int ch, int count)
     case 's':
 	flush_tape(0,1);
 	clear_cell(tape);
-	if (disable_be_optim) be_codegen_failure();
+	if (be_interface.disable_be_optim) be_codegen_failure();
 	outcmd(ch, count);
 	return;
 
     default:
-	if (disable_be_optim) be_codegen_failure();
+	if (be_interface.disable_be_optim) be_codegen_failure();
 	if (ch>=0 && ch<256)
 	    fprintf(stderr, "Unknown token in bf2const.c (%d)\n", ch);
 	flush_tape(0,0);

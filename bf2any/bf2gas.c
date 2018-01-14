@@ -58,8 +58,7 @@ int ind = 0;
 struct stkdat { struct stkdat * up; int id; } *sp = 0;
 #endif
 
-int disable_be_optim = 1;
-int bytecell = -1;
+struct be_interface_s be_interface = {.bytesonly=1,.disable_be_optim=1};
 
 void
 outcmd(int ch, int count)

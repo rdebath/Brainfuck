@@ -30,7 +30,7 @@ static char * boilerplate;
 #define prv(s,v)        printf("%*s" s "\n", ind*2, "", (v))
 #define prv2(s,v,v2)    printf("%*s" s "\n", ind*2, "", (v), (v2))
 
-int bytecell = -1;
+struct be_interface_s be_interface = {.bytesonly=1};
 
 void
 outcmd(int ch, int count)

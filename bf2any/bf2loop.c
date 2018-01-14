@@ -73,7 +73,7 @@ outtxn(int ch, int repcnt)
 
     if (ch == '[')
     {
-	if (disable_be_optim)
+	if (be_interface.disable_be_optim)
 	{
 	    if (tape->is_set)
 	    {
@@ -162,7 +162,7 @@ void process_loop()
     }
 
     /* Sigh, must have been an overflow */
-    if (disable_be_optim) { outtxn(0, 0); return; }
+    if (be_interface.disable_be_optim) { outtxn(0, 0); return; }
 
     /* Last check for not simple. */
     if (loopz == 0 && inc != -1 && inc != 1) { outtxn(0, 0); return; }
