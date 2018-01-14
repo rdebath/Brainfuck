@@ -15,8 +15,8 @@ int main (int argc, char *argv[]) {
     else if(b&&r>0)for(p=b;*p;p++)switch(*p) {
 	case '>': if((unsigned short)(m+1)) m++; else return 1; break;
 	case '<': if(m) m--; else return 1; break;
-	case '+': if((char)(t[m]+1)) t[m]++;break;
-	case '-': if(t[m]!=0) t[m]--;break;
+	case '+': if((char)(t[m]+1)) t[m]++; else return 2; break;
+	case '-': if(t[m]!=0) t[m]--; else return 2; break;
 	case '.': putchar(t[m]);break;
 	case ',': {int c=getchar();if(c!=EOF)t[m]=c;}break;
 	case '[': if(t[m]==0)while((i+=(*p=='[')-(*p==']'))&&p[1])p++;break;
