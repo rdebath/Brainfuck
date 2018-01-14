@@ -13,6 +13,8 @@ static FILE * ofd;
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
 
+struct be_interface_s be_interface = {.ifcmd = 1};
+
 static void print_string(void);
 
 void
@@ -90,6 +92,15 @@ outcmd(int ch, int count)
 	ind++;
 	break;
     case ']': ind--; pr("}"); break;
+    case 'I':
+	if (bytecell) {
+	    pr("if mem[m] != CChar(0) {");
+	} else {
+	    pr("if mem[m] != 0 {");
+	}
+	ind++;
+	break;
+    case 'E': ind--; pr("}"); break;
     }
 }
 
