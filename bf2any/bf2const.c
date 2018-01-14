@@ -295,7 +295,7 @@ void outopt(int ch, int count)
     case '>': while(count-->0) { if (tape->n == 0) new_n(tape); tape=tape->n; curroff++; } break;
     case '<': while(count-->0) { if (tape->p == 0) new_p(tape); tape=tape->p; curroff--; } break;
     case '+':
-	if (cells_are_ints || bytecell) {
+	if (be_interface.cells_are_ints || bytecell) {
 	    tape->v += count;
 	    if (bytecell) tape->v %= 256; /* -255..255 */
 	} else {
@@ -312,7 +312,7 @@ void outopt(int ch, int count)
 	}
 	break;
     case '-':
-	if (cells_are_ints || bytecell) {
+	if (be_interface.cells_are_ints || bytecell) {
 	    tape->v -= count;
 	    if (bytecell) tape->v %= 256; /* -255..255 */
 	} else {

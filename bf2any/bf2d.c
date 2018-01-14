@@ -15,7 +15,8 @@ FILE * ofd;
 
 static void print_dstring(void);
 
-int cells_are_ints = 1;	/* Assume same machine, same int */
+/* Assume same machine, same int */
+struct be_interface_s be_interface = { .cells_are_ints=1 };
 
 void
 outcmd(int ch, int count)

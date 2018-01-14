@@ -14,10 +14,10 @@ typedef int (check_arg_t)(const char * arg);
 struct be_interface_s {
     check_arg_t *check_arg;
     int ifcmd;
+    int cells_are_ints;
 } be_interface;
 
 int disable_be_optim;
-int cells_are_ints;
 int bytecell;
 int nobytecell;
 

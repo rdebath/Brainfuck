@@ -315,7 +315,7 @@ try_constant_loop(int loopz, int inc, int mov)
     if (ninc == -1)
     {
 	int ov = 0;
-	if (!cells_are_ints)
+	if (!be_interface.cells_are_ints)
 	    for(i=0; i<madd_count; i++)
 	    {
 		int res;

@@ -44,10 +44,8 @@ void debugprog(int * p, int *ep);
 void dumpprog(int * p, int *ep);
 void dumpmem(int *tp);
 
-int cells_are_ints = 1;
-
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg};
+struct be_interface_s be_interface = { .check_arg=fn_check_arg, .cells_are_ints=1 };
 
 static int
 fn_check_arg(const char * arg)

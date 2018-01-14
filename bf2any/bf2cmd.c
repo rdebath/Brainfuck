@@ -16,8 +16,6 @@ int loopid = 0;
 
 struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
-int cells_are_ints = sizeof(int)==4;
-
 void
 outcmd(int ch, int count)
 {
