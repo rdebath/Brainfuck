@@ -644,7 +644,7 @@ char ** argv;
 	if (sizeof(unsigned long) == bytes_needed) { printf("unsigned long\n"); return 0; }
 	return 1;
     } else {
-#ifdef SCHAR_MAX
+#if defined(SCHAR_MAX) && defined(__STDC__)
 	if (sizeof(signed char) == bytes_needed) { printf("signed char\n"); return 0; }
 #endif
 	if (sizeof(char) == bytes_needed) { printf("char\n"); return 0; }
