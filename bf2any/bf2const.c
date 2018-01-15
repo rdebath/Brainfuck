@@ -242,6 +242,7 @@ void outopt(int ch, int count)
     switch(ch)
     {
     case '[': case ']': case '!': case '~': case 'X': case '#':
+    case 'I': case 'E':
 	if (ch == '!') {
 	    flush_tape(1,0);
 	    tape->cleaned = tape->is_set = first_run = !disable_init_optim;
@@ -343,7 +344,6 @@ void outopt(int ch, int count)
     case 'm':
     case 'n':
     case 's':
-    case 'E':
 	flush_tape(0,1);
 	clear_cell(tape);
 	if (disable_be_optim) be_codegen_failure();

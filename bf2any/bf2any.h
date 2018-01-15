@@ -11,7 +11,11 @@ char * get_string(void);
 
 /* Commons BE may override init value */
 typedef int (check_arg_t)(const char * arg);
-struct be_interface_s { check_arg_t *check_arg; } be_interface;
+struct be_interface_s {
+    check_arg_t *check_arg;
+    int ifcmd;
+} be_interface;
+
 int disable_be_optim;
 int cells_are_ints;
 int bytecell;

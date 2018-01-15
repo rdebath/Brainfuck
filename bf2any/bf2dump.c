@@ -5,6 +5,17 @@
 #include "bf2any.h"
 #include "move_opt.h"
 
+static check_arg_t fn_check_arg;
+struct be_interface_s be_interface = { .check_arg = fn_check_arg, .ifcmd = 1};
+
+static int
+fn_check_arg(const char * arg)
+{
+    if (strcmp(arg, "-no_if") == 0) { be_interface.ifcmd = 0; return 1; }
+    if (strcmp(arg, "-#") == 0) return 1;
+    return 0;
+}
+
 static char *
 cell(int mov)
 {
@@ -36,7 +47,7 @@ static int ind = 0;
     move_opt(&ch, &count, &mov);
     if (ch == 0) { putchar('\n'); return; }
 
-    if (ch == ']' || ch == '~') ind--;
+    if (ch == ']' || ch == '~' || ch == 'E') ind--;
     printf("%*s", ind*2, "");
 
     switch(ch) {
@@ -67,6 +78,18 @@ static int ind = 0;
 	break;
 
     case ']':
+	if (count > 0)
+	    printf("  m += %d;\n%10s\t%*s", count, "", ind*2, "");
+	else if (count < 0)
+	    printf("  m -= %d;\n%10s\t%*s", -count, "", ind*2, "");
+	printf("} /* %s */\n", cell(mov));
+	break;
+
+    case 'I':
+	printf("if (%s!=0) {\n", cell(mov));
+	ind++;
+	break;
+    case 'E':
 	if (count > 0)
 	    printf("  m += %d;\n%10s\t%*s", count, "", ind*2, "");
 	else if (count < 0)

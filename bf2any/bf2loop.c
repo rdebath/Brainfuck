@@ -11,8 +11,8 @@
 /* Brainfuck loop optimiser
  *
  */
-static int qcmd[64];
-static int qrep[64];
+static int qcmd[128];
+static int qrep[128];
 static int qcnt = 0;
 
 void process_loop(void);
@@ -33,7 +33,7 @@ outtxn(int ch, int repcnt)
     if ((ch != '>' && ch != '<' && ch != '+' && ch != '-' &&
 	 ch != '=' && ch != '[' && ch != ']') ||
 	(qcnt == 0 && ch != '[') ||
-	(qcnt >= sizeof(qcmd)/sizeof(*qcmd)-1)) {
+	(qcnt >= sizeof(qcmd)/sizeof(*qcmd)-16)) {
 
 	/* If it's not a new loop add the current one too */
 	if(ch != '[' && ch != 0) {
@@ -101,6 +101,10 @@ void process_loop()
     int inc = 0;	/* Total added to loop index */
     int loopz = 0;	/* Was the loop index zeroed with [-] */
 
+    int use_v_var = 0;	/* Generate mult-v instructions */
+    int doneif = 0;	/* Added if command ? */
+    int donezap = 0;	/* Added loopcnt=0 ? */
+
     madd_count = 0;
     for(i=1; i<qcnt-1; i++) {
 	int j;
@@ -151,7 +155,7 @@ void process_loop()
     }
 
 
-    if (tape->is_set) {
+    if (tape && tape->is_set) {
 	/* We might be able to do the calculation. */
 	if (try_constant_loop(loopz, inc, mov))
 	    return;
@@ -167,52 +171,103 @@ void process_loop()
     qcnt = 0;
 
     /* Start new */
-    qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
     if (loopz) {
 	inc = -1;
-	qcmd[qcnt] = 'Q'; qrep[qcnt] = 1; qcnt ++;
+	if (!be_interface.ifcmd) {
+	    qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
+	    qcmd[qcnt] = 'Q'; qrep[qcnt] = 1; qcnt ++;
+	    qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
+	} else {
+	    qcmd[qcnt] = 'I'; qrep[qcnt] = 0; qcnt ++;
+	    qcmd[qcnt] = '='; qrep[qcnt] = 0; qcnt ++;
+	    donezap = 1;
+	    doneif = 1;
+	}
+    } else {
 	qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
     }
-    qcmd[qcnt] = '='; qrep[qcnt] = 0; qcnt ++;
 
-    for (i=0; i<madd_count; i++) {
-	if (!madd_zmode[i] && madd_inc[i] == 0) continue; /* NOP */
-	if (mov != madd_offset[i]) {
-	    qcmd[qcnt] = '>'; qrep[qcnt] = madd_offset[i] - mov; qcnt ++;
-	    mov = madd_offset[i];
-	}
-	if (madd_zmode[i]) {
-	    qcmd[qcnt] = 'Q'; qrep[qcnt] = madd_inc[i]; qcnt ++;
-	} else {
-	    qcmd[qcnt] = 'M'; qrep[qcnt] = madd_inc[i] * -inc;
-	    if (qrep[qcnt] == 1) qcmd[qcnt] = 'S';
-	    if (qrep[qcnt] < 0) {
-		qcmd[qcnt] = 'N';
-		qrep[qcnt] = -qrep[qcnt];
+    for (use_v_var=0; use_v_var<2; use_v_var++)
+    {
+	for (i=0; i<madd_count; i++) {
+	    if (!madd_zmode[i] && madd_inc[i] == 0) continue; /* NOP */
+
+	    if (!use_v_var) {
+		if (!be_interface.ifcmd) continue;
+		if (	(!madd_zmode[i] || madd_count<2) &&
+			!loopz &&
+			(!(madd_offset[i] < -BOFF) || madd_count<2) )
+		    continue;
 	    }
 
-	    /*
-	     * Note the 'BOFF' define; this is an optimisation
-	     * tweak that allows loops, that may be skipped over, to
-	     * be converted into move/add instructions even if the
-	     * references inside the loop may be converted so they
-	     * 'Add zero' to cells before the start of the tape. The
-	     * start of the tape will be shifted by this count so the
-	     * 'add zero' doesn't cause a segfault.
-	     *
-	     * Any reference that is further back than this range
-	     * cannot be proven to be after the physical start of
-	     * the tape so it must keep the 'if non-zero' condition
-	     * to avert the possible segfault.
-	     */
+	    if (be_interface.ifcmd && (use_v_var == doneif)) {
+		if (mov != 0) {
+		    qcmd[qcnt] = '>'; qrep[qcnt] = 0 - mov; qcnt ++;
+		    mov = 0;
+		}
+		if (!use_v_var && !doneif) {
+		    qcmd[qcnt] = 'I'; qrep[qcnt] = 0; qcnt ++;
+		    doneif = 1;
+		}
+	    }
 
-	    if (mov < -BOFF) qcmd[qcnt] = qcmd[qcnt] - 'A' + 'a';
-	    qcnt++;
+	    if (mov != madd_offset[i]) {
+		qcmd[qcnt] = '>'; qrep[qcnt] = madd_offset[i] - mov; qcnt ++;
+		mov = madd_offset[i];
+	    }
+
+	    if (doneif && (loopz || madd_zmode[i])) {
+		if (madd_zmode[i]) {
+		    qcmd[qcnt] = '='; qrep[qcnt] = madd_inc[i]; qcnt ++;
+		} else {
+		    qcmd[qcnt] = '+'; qrep[qcnt] = madd_inc[i] * -inc;
+		    qcnt++;
+		}
+	    } else if (madd_zmode[i]) {
+		qcmd[qcnt] = 'Q'; qrep[qcnt] = madd_inc[i]; qcnt ++;
+	    } else {
+		qcmd[qcnt] = 'M'; qrep[qcnt] = madd_inc[i] * -inc;
+		if (qrep[qcnt] == 1) qcmd[qcnt] = 'S';
+		if (qrep[qcnt] < 0) {
+		    qcmd[qcnt] = 'N';
+		    qrep[qcnt] = -qrep[qcnt];
+		}
+
+		/*
+		 * Note the 'BOFF' define; this is an optimisation
+		 * tweak that allows loops, that may be skipped over, to
+		 * be converted into move/add instructions even if the
+		 * references inside the loop may be converted so they
+		 * 'Add zero' to cells before the start of the tape. The
+		 * start of the tape will be shifted by this count so the
+		 * 'add zero' doesn't cause a segfault.
+		 *
+		 * Any reference that is further back than this range
+		 * cannot be proven to be after the physical start of
+		 * the tape so it must keep the 'if non-zero' condition
+		 * to avert the possible segfault.
+		 */
+
+		if (mov < -BOFF && !doneif)
+		    qcmd[qcnt] = qcmd[qcnt] - 'A' + 'a';
+		qcnt++;
+	    }
+	    madd_zmode[i] = madd_inc[i] = 0; /* Done this one */
 	}
     }
 
     if (mov != 0) {
 	qcmd[qcnt] = '>'; qrep[qcnt] = 0 - mov; qcnt ++;
+    }
+
+    if (doneif) {
+	qcmd[qcnt] = 'E'; qrep[qcnt] = 0; qcnt ++;
+	doneif = 0;
+    }
+
+    if (!donezap) {
+	qcmd[qcnt] = '='; qrep[qcnt] = 0; qcnt ++;
+	donezap = 1;
     }
 
     /* And forward the converted loop */

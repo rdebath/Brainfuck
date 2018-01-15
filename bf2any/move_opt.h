@@ -19,12 +19,12 @@ move_opt(int *pch, int *pcount, int *pmov)
 
 	*pmov = imov;
 
-	if (ch == '[') {
+	if (ch == '[' || ch == 'I') {
 	    struct ostack * np = malloc(sizeof(struct ostack));
 	    np->p = sp;
 	    np->d = imov;
 	    sp = np;
-	} else if (ch == ']') {
+	} else if (ch == ']' || ch == 'E') {
 	    struct ostack * np = sp;
 	    sp = sp->p;
 	    *pcount = imov - np->d;
