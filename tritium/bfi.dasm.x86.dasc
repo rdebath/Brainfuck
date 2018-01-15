@@ -299,17 +299,35 @@ run_dynasm(void)
 	case T_MOV:
 	    clean_acc();
 	    if (acc_loaded) acc_offset -= count;
-	    | add REG_P, count*tape_step
+	    if (tape_step == 1) {
+		if (count == 1) {
+		    | inc REG_P
+		} else if (count == -1) {
+		    | dec REG_P
+		} else if (count == 2) {
+		    | inc REG_P
+		    | inc REG_P
+		} else if (count == -2) {
+		    | dec REG_P
+		    | dec REG_P
+		} else if (count < 0 && count != -128) {
+		    | sub REG_P, -count
+		} else {
+		    | add REG_P, count
+		}
+	    } else {
+		| add REG_P, count*tape_step
+	    }
 	    break;
 
         case T_ADD:
 	    load_acc_offset(offset);
 	    set_acc_offset(offset);
-	    if (opt_level < 2 && count == 1) {
+	    if (count == 1) {
 		| inc REG_A
 		break;
 	    }
-	    if (opt_level < 2 && count == -1) {
+	    if (count == -1) {
 		| dec REG_A
 		break;
 	    }
