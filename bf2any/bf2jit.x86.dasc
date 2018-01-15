@@ -21,7 +21,7 @@
  * dasm64 translation from BF, runs at about 5,000,000,000 instructions per second.
  */
 
-struct be_interface_s be_interface = { .cells_are_ints=1 };
+struct be_interface_s be_interface = { .ifcmd=1, .cells_are_ints=1 };
 
 #if defined(__x86_64__) || defined(__amd64__) || defined(_M_AMD64)
 #define CPUCHECK 64
@@ -456,6 +456,51 @@ outcmd(int ch, int count)
 	    }
 	    | jne   =>(setpc-1)
 	    | =>(setpc-2):
+	}
+	break;
+
+    case 'I':
+	{
+	    struct stkdat * n = malloc(sizeof*n);
+	    n->up = sp;
+	    sp = n;
+
+	    maxpc += 1;
+	    n->id = maxpc;
+
+	    dasm_growpc(Dst, maxpc);
+
+	    clean_acc();
+	    move_tape();
+	    load_acc_offset(0);
+	    clean_acc();
+	    if (bytecell) {
+		| cmp   REG_AL, 0
+	    } else {
+		| cmp   REG_A, 0
+	    }
+	    | jz   =>(maxpc-1)
+
+	    /* The "=>" style labels are the most useful form, they give you
+	     * an indefinite set of normal labels for use as jump targets.
+	     * You MUST allocate space for a label with "dasm_growpc" before
+	     * you process the assembler that references it.
+	     */
+	}
+	break;
+
+    case 'E':
+	{
+	    struct stkdat * n = sp;
+	    int setpc;
+	    sp = n->up;
+	    setpc = n->id;
+	    free(n);
+
+	    clean_acc();
+	    move_tape();
+	    acc_loaded = 0;
+	    | =>(setpc-1):
 	}
 	break;
 
