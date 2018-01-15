@@ -28,7 +28,7 @@ static int maxinpline = MAXINPLINE;
 static void print_cstring(void);
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg};
+struct be_interface_s be_interface = {.check_arg=fn_check_arg,.ifcmd=1};
 
 static int
 fn_check_arg(const char * arg)
@@ -162,6 +162,14 @@ outcmd(int ch, int count)
 	break;
     case ']':
 	ind-=2; I; printf("END-PERFORM\n");
+	break;
+
+    case 'I':
+	I; printf("IF NOT m(p) EQUALS ZERO THEN\n");
+	ind+=2;
+	break;
+    case 'E':
+	ind-=2; I; printf("END-IF\n");
 	break;
 
     case '.': I; printf("MOVE m(p) TO chr\n");
