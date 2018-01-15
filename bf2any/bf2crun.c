@@ -65,7 +65,7 @@ size_t ccodesize = 0;
 
 int cells_are_ints = 1;
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg};
+struct be_interface_s be_interface = { .check_arg = fn_check_arg, .ifcmd=1 };
 
 static int
 fn_check_arg(const char * arg)
@@ -247,6 +247,16 @@ outcmd(int ch, int count)
 
     case '[': prv("while(m[%d]) {", mov); ind++; break;
     case ']':
+	if (count > 0)
+            prv("m += %d;", count);
+        else if (count < 0)
+            prv("m -= %d;", -count);
+	ind--;
+	pr("}");
+	break;
+
+    case 'I': prv("if(m[%d]) {", mov); ind++; break;
+    case 'E':
 	if (count > 0)
             prv("m += %d;", count);
         else if (count < 0)
