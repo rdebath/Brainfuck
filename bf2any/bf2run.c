@@ -1,4 +1,4 @@
-#ifndef PART2
+#ifndef PART
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,14 +13,11 @@
 
 static int do_dump = 0;
 
-#ifndef icell
-typedef int icell;
-#endif
+typedef unsigned int icell;
 
 static int *mem = 0, *mptr = 0;
 static size_t memlen = 0;
 static icell * tape = 0;
-
 static size_t tapealloc;
 
 #define TOKEN_LIST(Mac) \
@@ -38,10 +35,11 @@ static int imov = 0;
 static int prevtk = 0;
 static int checklimits = 0;
 
-static void runprog(int * p, int *ep);
-static void debugprog(int * p, int *ep);
+static void runprog_byte(register int * p, register unsigned char *mp);
+static void runprog_int(register int * p, register unsigned int *mp);
+static void debugprog(int * p, icell *ep);
 static void dumpprog(int * p, int *ep);
-static void dumpmem(int *tp);
+static void dumpmem(icell *tp);
 
 static check_arg_t fn_check_arg;
 struct be_interface_s be_interface = { .check_arg=fn_check_arg, .cells_are_ints=1 };
@@ -116,19 +114,27 @@ outcmd(int ch, int count)
     case '#': *mptr++ = t = T_DUMP; break;
     case '~':
 	*mptr++ = t = T_STOP;
-	tapealloc = tapelen + BOFF;
 	if (do_dump) {
 	    dumpprog(mem, mptr);
 	    return;
 	}
 	setbuf(stdout, 0);
 
-	tape = calloc(tapealloc, sizeof(icell));
-
-	if(!enable_debug && !checklimits)
-	    runprog(mem, tape+BOFF);
-	else
+	tapealloc = tapelen + BOFF;
+	if(!enable_debug && !checklimits) {
+	    if (bytecell) {
+		unsigned char * btape;
+		btape = calloc(tapealloc, sizeof(unsigned char));
+		runprog_byte(mem, btape+BOFF);
+	    } else {
+		unsigned int * itape;
+		itape = calloc(tapealloc, sizeof(unsigned int));
+		runprog_int(mem, itape+BOFF);
+	    }
+	} else {
+	    tape = calloc(tapealloc, sizeof(icell));
 	    debugprog(mem, tape+BOFF);
+	}
 	break;
 
     case '[':
@@ -183,7 +189,7 @@ outcmd(int ch, int count)
 }
 
 static void
-dumpmem(int *mp)
+dumpmem(icell *mp)
 {
     size_t i, j = 0;
     const icell msk = (bytecell)?0xFF:-1;
@@ -227,23 +233,43 @@ dumpprog(int * p, int * ep)
 }
 #endif
 
-#ifdef PART2
+#ifndef PART
+#define AM(_x) ((_x)&=msk)
+#define M(_x) ((_x)&msk)
 static void
 debugprog(register int * p, register icell *mp)
 #else
+#undef AM
+#undef M
+#define AM(_x) (_x)
+#define M(_x) (_x)
+
 #if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
 /* Tell GNU C to think really hard about this function! */
 __attribute__((optimize(3),hot,aligned(64)))
 #endif
+
+#undef tcell
+#if PART == 2
+#define tcell unsigned char
 static void
-runprog(register int * p, register icell *mp)
+runprog_byte(register int * p, register tcell *mp)
+#else
+#define tcell unsigned int
+static void
+runprog_int(register int * p, register tcell *mp)
+#endif
 #endif
 {
+#ifdef PART
+    register tcell a = 1;
+#else
     register icell a = 1;
     const icell msk = (bytecell)?0xFF:-1;
+#endif
     for(;;){
 	mp += p[0];
-#ifdef PART2
+#ifndef PART
 	if (mp>=tape+tapealloc || (mp<tape+BOFF && (a || mp<tape)))
 	{
 	    fprintf(stderr,
@@ -255,28 +281,31 @@ runprog(register int * p, register icell *mp)
 	switch(p[1]) {
 	case T_ADD: *mp += p[2]; p+=3; break;
 	case T_SET: *mp = p[2]; p+=3; break;
-	case T_END: if ((*mp&=msk)!=0) p+= p[2]; p+=3; break;
-	case T_WHL: if ((*mp&=msk)==0) p+= p[2]; p+=3; break;
-	case T_BEG: a = (*mp&=msk); p+=2; break;
+	case T_END: if (AM(*mp)!=0) p+= p[2]; p+=3; break;
+	case T_WHL: if (AM(*mp)==0) p+= p[2]; p+=3; break;
+	case T_BEG: a = AM(*mp); p+=2; break;
 	case T_MUL1: *mp += a; p+=2; break;
-	case T_ZFIND: while((*mp&msk)) mp += p[2]; p+=3; break;
-	case T_RAILC: while((*mp&msk)) {*mp -=1; mp += p[2]; } p+=3; break;
-	case T_RAILZ: while((*mp&msk)) {*mp =0; mp += p[2]; } p+=3; break;
+	case T_ZFIND: while(M(*mp)) mp += p[2]; p+=3; break;
+	case T_RAILC: while(M(*mp)) {*mp -=1; mp += p[2]; } p+=3; break;
+	case T_RAILZ: while(M(*mp)) {*mp =0; mp += p[2]; } p+=3; break;
 	case T_PRT: putchar(*mp); p+=2; break;
-	case T_INP: if((a=getchar()) != EOF) *mp = a; p+=2; break;
+	case T_INP: {int i; if((i=getchar()) != EOF) *mp = i; } p+=2; break;
 	case T_MUL: *mp += p[2] * a; p+=3; break;
 	case T_QSET: if(a) *mp = p[2]; p+=3; break;
 	case T_QMUL: if(a) *mp += p[2]*a; p+=3; break;
 	case T_QMUL1: if(a) *mp += a; p+=2; break;
 	case T_STOP: return;
-#ifdef PART2
+#ifndef PART
 	case T_DUMP: dumpmem(mp); p+=2; break;
 #endif
 	}
     }
 }
 
-#ifndef PART2
-#define PART2
+#ifndef PART
+#define PART 2
+#include __FILE__
+#undef PART
+#define PART 3
 #include __FILE__
 #endif
