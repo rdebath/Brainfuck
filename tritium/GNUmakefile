@@ -121,9 +121,11 @@ CC := $(shell ( which 2>/dev/null clang gcc pcc ; echo /cc ) | sed -n '/^\// s:.
 ifneq ($(CC),cc)
 OPTFLG=-O2
 CFLAGS=$(OPTFLG) -Wall -Wshadow $(FUNSAFE) $(DEFS) $(CONF)
+CVER := $(shell $(CC) --version 2>/dev/null)
 else
 OPTFLG=-O
 CFLAGS=$(OPTFLG) $(DEFS) $(CONF)
+CVER :=
 endif
 LDFLAGS=
 
@@ -380,7 +382,7 @@ endif
 endif
 
 ################################################################################
-BUILDOPT=$(CC) $(CFLAGS) $(LDFLAGS) $(LDLIBS) $(TARGET_ARCH)
+BUILDOPT=$(CC) $(CFLAGS) $(LDFLAGS) $(LDLIBS) $(TARGET_ARCH) $(CVER)
 BUILDFLG :=.build-opts.$(shell echo '$(BUILDOPT)' | sum | tr -d '\040\055' )
 $(OBJECTS) bfi.dasm.c: $(BUILDFLG)
 $(BUILDFLG):

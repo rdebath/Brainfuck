@@ -895,7 +895,7 @@ link_and_run(dasm_State ** state)
 }
 
 #ifndef __SSE4_2__
-#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
+#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=2))
 #include <cpuid.h>
 #endif
 #endif
