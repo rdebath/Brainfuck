@@ -7,11 +7,14 @@
 
 static check_arg_t fn_check_arg;
 struct be_interface_s be_interface = { .check_arg = fn_check_arg, .ifcmd = 1};
+static int c_header = 0;
 
 static int
 fn_check_arg(const char * arg)
 {
     if (strcmp(arg, "-no_if") == 0) { be_interface.ifcmd = 0; return 1; }
+    if (strcmp(arg, "-int") == 0) { be_interface.cells_are_ints = 1; return 1; }
+    if (strcmp(arg, "-c") == 0) { c_header = 1; return 1; }
     if (strcmp(arg, "-#") == 0) return 1;
     return 0;
 }
@@ -31,18 +34,25 @@ outcmd(int ch, int count)
 static int ind = 0;
     int mov = 0;
 
-#ifdef CHEADER
-    if (ch == '!')
+    if (ch == '!' && c_header && bytecell)
 	printf("%s\n",  "#include<stdio.h>"
 		"\n"	"#define I(a,b)"
 		"\n"	"#define putch(x) putchar(x)"
-		"\n"	"#define getch(x) v=getchar();if(v!=EOF) x=v;"
-		"\n"	"unsigned char mem[30000], *m=mem, v;"
+		"\n"	"#define getch(x) {int a; a=getchar();if(a!=EOF) x=a;}"
+		"\n"	"static unsigned char mem[30000], *m=mem, v;"
 		"\n"	"int"
 		"\n"	"main()");
-#endif
 
-    printf("I('%c', %d) \t", ch, count);
+    if (ch == '!' && c_header && !bytecell)
+	printf("%s\n",  "#include<stdio.h>"
+		"\n"	"#define I(a,b)"
+		"\n"	"#define putch(x) putchar((char)x)"
+		"\n"	"#define getch(x) {int a; a=getchar();if(a!=EOF) x=a;}"
+		"\n"	"static unsigned int mem[30000], *m=mem, v;"
+		"\n"	"int"
+		"\n"	"main()");
+
+    printf("I('%c', %d)\t", ch, count);
 
     move_opt(&ch, &count, &mov);
     if (ch == 0) { putchar('\n'); return; }
@@ -79,9 +89,9 @@ static int ind = 0;
 
     case ']':
 	if (count > 0)
-	    printf("  m += %d;\n%10s\t%*s", count, "", ind*2, "");
+	    printf("  m += %d;\n%9s\t%*s", count, "", ind*2, "");
 	else if (count < 0)
-	    printf("  m -= %d;\n%10s\t%*s", -count, "", ind*2, "");
+	    printf("  m -= %d;\n%9s\t%*s", -count, "", ind*2, "");
 	printf("} /* %s */\n", cell(mov));
 	break;
 
@@ -91,9 +101,9 @@ static int ind = 0;
 	break;
     case 'E':
 	if (count > 0)
-	    printf("  m += %d;\n%10s\t%*s", count, "", ind*2, "");
+	    printf("  m += %d;\n%9s\t%*s", count, "", ind*2, "");
 	else if (count < 0)
-	    printf("  m -= %d;\n%10s\t%*s", -count, "", ind*2, "");
+	    printf("  m -= %d;\n%9s\t%*s", -count, "", ind*2, "");
 	printf("} /* %s */\n", cell(mov));
 	break;
 
