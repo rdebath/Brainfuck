@@ -14,10 +14,10 @@
     +>>[-<<
 	[->++++++++++++++++<]>[-<++++++++++++++++>]<
 	[->++++++++++++++++<]>[-<++++++++++++++++>]<
-    >>]<+<
+    >>]<<
 
-    // If X and X plus one are the same we have a float type
-    [->+>+<<] >> [-<->] +<
+    // If X and X minus one are the same we have a float type
+    [->+>+<<] >>- [-<->] +<
 
     [[-]>
 
