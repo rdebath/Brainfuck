@@ -109,7 +109,7 @@ int
 main(int argc, char ** argv)
 {
     char * pgm = argv[0];
-    int ch, lastch=']', c=0, m, b=0, lc=0, ar, inp=0;
+    int ch, lastch=']', c=0, m, b=0, lc=0, ar, mm=0, inp=0;
     FILE * ifd;
     int digits = 0, number = 0, multi = 1;
     int qstring = 0;
@@ -120,7 +120,7 @@ main(int argc, char ** argv)
     filelist = calloc(argc, sizeof*filelist);
 
     for(ar=1;ar<argc;ar++) {
-	if (argv[ar][0] != '-' || argv[ar][1] == '\0') {
+	if (argv[ar][0] != '-' || argv[ar][1] == '\0' || mm) {
 	    filelist[filecount++] = argv[ar];
 
 	} else if (strcmp(argv[ar], "-h") == 0) {
@@ -146,9 +146,8 @@ main(int argc, char ** argv)
 	} else if (check_argv(argv[ar])) {
 	    ;
 	} else if (strcmp(argv[ar], "--") == 0) {
-	    ;
-	    break;
-	} else if (argv[ar][0] == '-') {
+	    mm = 1;
+	} else {
 	    char * ap = argv[ar]+1;
 	    static char buf[4] = "-X";
 	    while(*ap) {
@@ -162,8 +161,7 @@ main(int argc, char ** argv)
 			argv[ar]);
 		exit(1);
 	    }
-	} else
-	    filelist[filecount++] = argv[ar];
+	}
     }
 
     if (check_arg("+init")) {	/* For bf2bf to choose optimisation method */
