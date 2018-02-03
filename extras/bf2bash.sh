@@ -14,6 +14,9 @@
  #      It's too big and too slow.
  #
 
+# FreeBSD uses csh
+(exit $?0) || exec sh "$0" "$*"
+
 # Nothing failed yet.
 FAILED=
 
@@ -180,7 +183,7 @@ do  ll=${#line}
 
 	if ((m==0))
 	then
-	    [ "$pc" = "[" -a "$ni" = "]" ] && addcmd "X" 1
+	    [[ "$pc" = "[" && "$ni" = "]" ]] && addcmd "X" 1
 	    addcmd $ni 1
 	    i=''
 	else
@@ -260,7 +263,7 @@ getch() {
     ch="${line:0:1}"
     line="${line#?}"
 
-    M[P]=`printf %d "'$ch"`
+    M[P]=$(printf %d "'$ch")
 }
 
 runbf "$@"
