@@ -49,13 +49,14 @@ int disable_be_optim = 1;
 
 #define L_TOKENS        0x10    /* token(token, count); */
 #define L_RISBF         0x11    /* risbf(token, count); */
-#define L_HEADSECKS     0x12    /* headsecks(token, count); */
-#define L_BFRLE         0x13    /* bfrle(token, count); */
-#define L_BFXML         0x14    /* bfxml(token, count); */
-#define L_UGLYBF        0x15    /* bfugly(token, count); */
-#define L_MALBRAIN      0x16    /* malbrain(token, count); */
-#define L_HANOILOVE     0x17    /* hanoilove(token, count); */
-#define L_DOWHILE       0x18    /* bfdowhile(token, count); */
+#define L_TINYBF        0x12    /* tinybf(token, count); */
+#define L_HEADSECKS     0x13    /* headsecks(token, count); */
+#define L_BFRLE         0x14    /* bfrle(token, count); */
+#define L_BFXML         0x15    /* bfxml(token, count); */
+#define L_UGLYBF        0x16    /* bfugly(token, count); */
+#define L_MALBRAIN      0x17    /* malbrain(token, count); */
+#define L_HANOILOVE     0x18    /* hanoilove(token, count); */
+#define L_DOWHILE       0x19    /* bfdowhile(token, count); */
 #define L_QQQ           0x1E    /* qqq(token, count); */
 
 static const char bf[] = "><+-.,[]";
@@ -387,6 +388,7 @@ const char ** doubler = doubler_copy;
 const char ** bfquad = bfquadz;
 
 static void risbf(int ch, int count);
+static void tinybf(int ch, int count);
 static void headsecks(int ch, int count);
 static void bfrle(int ch, int count);
 static void bfxml(int ch, int count);
@@ -619,7 +621,10 @@ fn_check_arg(const char * arg)
     } else
 
     if (strcmp(arg, "-risbf") == 0) {
-	lang = 0; langclass = L_RISBF; return 1;
+    lang = 0; langclass = L_RISBF; return 1;
+    } else
+    if (strcmp(arg, "-tinybf") == 0) {
+	lang = 0; langclass = L_TINYBF; return 1;
     } else
     if (strcmp(arg, "-rle") == 0) {
 	lang = bc; langclass = L_CRLE; return 1;
@@ -676,7 +681,8 @@ fn_check_arg(const char * arg)
 	"\n\t"  "-:      Dotty"
 	"\n\t"  "-lisp   Lisp Zero"
 	"\n\t"  "-bewbs  BEWBS"
-	"\n\t"  "-risbf  RISBF"
+    "\n\t"  "-risbf  RISBF"
+	"\n\t"  "-tinybf TINYBF"
 	"\n\t"  "-xml    XML"
 	"\n\t"  "-uglybf Ugly BF"
 	"\n\t"  "-dump   Token dump"
@@ -862,7 +868,8 @@ outcmd(int ch, int count)
 	break;
 
     case L_TOKENS:	printf("%c %d\n", ch, count); break;
-    case L_RISBF:	risbf(ch, count); break;
+    case L_RISBF:   risbf(ch, count); break;
+    case L_TINYBF:	tinybf(ch, count); break;
     case L_HEADSECKS:	headsecks(ch, count); break;
     case L_BF:		bftranslate(ch, count); break;
     case L_BFRLE:	bfrle(ch, count); break;
@@ -1138,25 +1145,61 @@ risbf(int ch, int count)
 {
     while(count-->0) switch(ch) {
     case '>':
-	if (state!=1) pc('*'); state=1;
-	pc('+');
-	break;
+    if (state!=1) pc('*'); state=1;
+    pc('+');
+    break;
     case '<':
-	if (state!=1) pc('*'); state=1;
-	pc('-');
-	break;
+    if (state!=1) pc('*'); state=1;
+    pc('-');
+    break;
     case '+':
-	if (state!=0) pc('*'); state=0;
-	pc('+');
-	break;
+    if (state!=0) pc('*'); state=0;
+    pc('+');
+    break;
     case '-':
-	if (state!=0) pc('*'); state=0;
-	pc('-');
-	break;
+    if (state!=0) pc('*'); state=0;
+    pc('-');
+    break;
     case '.': pc('/'); pc('/'); break;
     case ',': pc('/'); pc('*'); break;
     case '[': pc('/'); pc('+'); break;
     case ']': pc('/'); pc('-'); break;
+    }
+}
+
+static void
+tinybf(int ch, int count)
+{
+    while(count-->0) switch(ch) {
+    case '>':
+	if (state!=0) pc('='); state=0;
+	pc('>');
+	break;
+    case '<':
+	if (state!=1) pc('='); state=1;
+	pc('>');
+	break;
+    case '+':
+	if (state!=0) pc('='); state=0;
+	pc('+');
+	break;
+    case '-':
+	if (state!=1) pc('='); state=1;
+	pc('+');
+	break;
+    case '.': pc('='); pc('='); break;
+    case ',':
+    if (state!=0) pc('='); state=0;
+    pc('+');
+    break;
+    case '[':
+    if (state!=0) pc('='); state=0;
+    pc('|');
+    break;
+    case ']':
+    if (state!=1) pc('='); state=1;
+    pc('|');
+    break;
     }
 }
 
