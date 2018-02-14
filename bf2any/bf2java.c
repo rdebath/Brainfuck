@@ -20,6 +20,8 @@
  */
 #define MAXINSTR (12+65536/80)
 
+struct be_interface_s be_interface = { .ifcmd=1 };
+
 struct instruction {
     int ch;
     int count;
@@ -32,6 +34,8 @@ struct instruction {
 static struct instruction *pgm = 0, *last = 0, *jmpstack = 0;
 
 static int icount = 0;
+static int do_input = 0;
+static int do_output = 0;
 
 static int ind = 0;
 #define I        printf("%*s", ind*4, "")
@@ -70,12 +74,14 @@ outcmd(int ch, int count)
     }
     last = n;
 
-    if (n->ch == '[') {
+    if (n->ch == '[' || n->ch == 'I') {
         n->loop = jmpstack; jmpstack = n;
-    } else if (n->ch == ']') {
+    } else if (n->ch == ']' || n->ch == 'E') {
         n->loop = jmpstack; jmpstack = jmpstack->loop; n->loop->loop = n;
     }
 
+    if (ch == '.') do_output = 1;
+    if (ch == ',') do_input = 1;
     if (ch != '~') return;
 
     last->ch = '}';	/* Make the end an end function */
@@ -189,17 +195,23 @@ reformat()
      */
     for (i=0; i<nfunc; i++)
     {
-	int flen = 0;
+	int flen = 0, nst = 0;
 	n = functions[i];
 	while(n) {flen++; n=n->next; }
 	if (flen > MAXINSTR) {
 	    /* It's too big, chop it in half. */
-	    n = functions[i];
-	    while(flen>1) { n=n->next; flen-=2; }
+	    t = n = functions[i];
+	    nst = (n->ch == '[' || n->ch == 'I');
+	    while((flen>1 || nst) && n->next) {
+		if (n->ch == ']' || n->ch == 'E')
+		    nst--;
+		n=n->next;
+		if (n->ch == '[' || n->ch == 'I')
+		    nst++;
+		if (flen>1) flen-=2;
+	    }
 
-	    /* We can't slice a loop */
-	    if (n->ch == '[') n=n->prev;
-	    if (n->next->ch == ']') n=n->next;
+	    if (n->next == 0) continue;
 
 	    if (nfunc>=functions_len) {
 		functions = realloc(functions,
@@ -263,7 +275,7 @@ loutcmd(int ch, int count, struct instruction *n)
     case '!':
 
 	if (bytecell) {
-	    printf("%s%d%s%d%s",
+	    printf("%s\n",
 			"import java.io.InputStream;"
 		"\n"	"import java.io.OutputStream;"
 		"\n"	"import java.io.IOException;"
@@ -271,28 +283,26 @@ loutcmd(int ch, int count, struct instruction *n)
 		"\n"	"public class fuck {"
 		"\n"	"    static byte[] m;"
 		"\n"	"    static int p;"
-		"\n"	"    static byte v;"
-		"\n"
+		"\n"	"    static byte v;");
+	    if (do_input) printf("%s\n",
 		"\n"	"    private static void i() {"
 		"\n"	"        try {"
 		"\n"	"            System.in.read(m,p,1);"
 		"\n"	"        } catch (IOException e) {}"
-		"\n"	"    }"
-		"\n"
+		"\n"	"    }");
+	    if (do_output) printf("%s\n",
 		"\n"	"    private static void o() {"
-		"\n"	"//        try {"
-		"\n"	"            System.out.write(m[p]);"
-		"\n"	"            System.out.flush();"
-		"\n"	"//        } catch (IOException e) {}"
-		"\n"	"    }"
-		"\n"
+		"\n"	"        System.out.write(m[p]);"
+		"\n"	"        System.out.flush();"
+		"\n"	"    }");
+	    printf("%s%d%s%d%s",
 		"\n"	"    public static void main(String[] args) {"
 		"\n"	"        m=new byte[",tapesz,"];"
 		"\n"	"        p=",tapeinit,";"
 		"\n");
 
 	} else {
-	    printf("%s%d%s%d%s",
+	    printf("%s\n",
 			"import java.io.InputStream;"
 		"\n"	"import java.io.OutputStream;"
 		"\n"	"import java.io.IOException;"
@@ -301,21 +311,21 @@ loutcmd(int ch, int count, struct instruction *n)
 		"\n"	"    static int[] m;"
 		"\n"	"    static int p;"
 		"\n"	"    static int v;"
-		"\n"	"    static byte ch;"
-		"\n"
+		"\n"	"    static byte ch;");
+	    if (do_input) printf("%s\n",
 		"\n"	"    private static void i() {"
 		"\n"	"        try {"
 		"\n"	"            v = System.in.read();"
 		"\n"	"            if (v>=0) m[p] = v;"
 		"\n"	"        } catch (IOException e) {}"
-		"\n"	"    }"
-		"\n"
+		"\n"	"    }");
+	    if (do_output) printf("%s\n",
 		"\n"	"    private static void o() {"
 		"\n"	"        ch = (byte) m[p];"
 		"\n"	"        System.out.write(ch);"
 		"\n"	"        System.out.flush();"
-		"\n"	"    }"
-		"\n"
+		"\n"	"    }");
+	    printf("%s%d%s%d%s",
 		"\n"	"    public static void main(String[] args) {"
 		"\n"	"        m=new int[",tapesz,"];"
 		"\n"	"        p=",tapeinit,";"
@@ -363,11 +373,17 @@ loutcmd(int ch, int count, struct instruction *n)
     case '<': I; printf("p -= %d;\n", count); break;
     case '>': I; printf("p += %d;\n", count); break;
 
+    case 'I':
+	I; printf("if(m[p] != 0) {\n");
+	ind++;
+	break;
+
     case '[':
 	I; printf("while(m[p] != 0) {\n");
 	ind++;
 	break;
 
+    case 'E':
     case ']':
 	ind--;
 	I; printf("}\n");
