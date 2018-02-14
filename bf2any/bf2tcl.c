@@ -23,9 +23,11 @@ static int ind = 0;
 static int do_dump = 0;
 
 static FILE * ofd;
+static int use_utf8 = 0;
+#ifndef DISABLE_LIBTCL
 static char * tclcode = 0;
 static size_t tclcodesize = 0;
-static int use_utf8 = 0;
+#endif
 
 static void print_cstring(void);
 

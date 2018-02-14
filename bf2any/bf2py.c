@@ -31,8 +31,10 @@ static int use_putstr = 0;
 static int use_getcell = 0;
 
 static FILE * ofd;
+#ifndef DISABLE_LIBPY
 static char * pycode = 0;
 static size_t pycodesize = 0;
+#endif
 
 static void print_string(void);
 
