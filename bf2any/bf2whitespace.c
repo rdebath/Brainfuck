@@ -8,7 +8,6 @@
  * Whitespace translation
  */
 
-static int ind = 0;
 static int loopid = 1;
 static int embed_tokens = 0;
 static int signed_label_bug = 0;
@@ -90,7 +89,7 @@ static void putlabel(unsigned long num);
 #define PRTTOK(s)	prttok("(" #s ")", CMD_##s);
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg};
+struct be_interface_s be_interface = {fn_check_arg, .ifcmd=1};
 
 static int
 fn_check_arg(const char * arg)
@@ -340,11 +339,11 @@ outcmd(int ch, int count)
             n->id = loopid;
             loopid+=2;
 
-	    if(bytecell) do_bytewrap();
-	    ind++;
-
 	    PRTTOK(LABEL);
 	    putlabel(n->id);
+
+	    if(bytecell) do_bytewrap();
+
 	    PRTTOK(DUP);
 	    PRTTOK(FETCH);
 
@@ -358,13 +357,39 @@ outcmd(int ch, int count)
             struct stkdat * n = sp;
             sp = n->up;
 
-	    if(bytecell) do_bytewrap();
-	    ind--;
-
 	    PRTTOK(JMP);
 	    putlabel(n->id);
 	    PRTTOK(LABEL);
 	    putlabel(n->id+1);
+            free(n);
+        }
+        break;
+
+    case 'I':
+        {
+            struct stkdat * n = malloc(sizeof*n);
+            n->up = sp;
+            sp = n;
+            n->id = loopid;
+            loopid++;
+
+	    if(bytecell) do_bytewrap();
+
+	    PRTTOK(DUP);
+	    PRTTOK(FETCH);
+
+	    PRTTOK(JZ);
+	    putlabel(n->id);
+        }
+        break;
+
+    case 'E':
+        {
+            struct stkdat * n = sp;
+            sp = n->up;
+
+	    PRTTOK(LABEL);
+	    putlabel(n->id);
             free(n);
         }
         break;
