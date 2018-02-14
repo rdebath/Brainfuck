@@ -22,8 +22,8 @@ static size_t tapealloc;
 
 #define TOKEN_LIST(Mac) \
     Mac(STOP) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
-    Mac(SET) Mac(BEG) Mac(MUL) Mac(MUL1) Mac(QSET) Mac(QMUL) Mac(QMUL1) \
-    Mac(ZFIND) Mac(RAILC) Mac(RAILZ) Mac(DUMP)
+    Mac(SET) Mac(BEG) Mac(MUL) Mac(MUL1) Mac(QSET) Mac(QMUL) \
+    Mac(ZFIND) Mac(RAILC) Mac(RAILZ) Mac(DUMP) Mac(NOP)
 
 #define GEN_TOK_ENUM(NAME) T_ ## NAME,
 enum token { TOKEN_LIST(GEN_TOK_ENUM) TCOUNT};
@@ -42,7 +42,7 @@ static void dumpprog(int * p, int *ep);
 static void dumpmem(icell *tp);
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = { .check_arg=fn_check_arg, .cells_are_ints=1 };
+struct be_interface_s be_interface = { .check_arg=fn_check_arg, .cells_are_ints=1, .ifcmd=1 };
 
 static int
 fn_check_arg(const char * arg)
@@ -102,7 +102,7 @@ outcmd(int ch, int count)
     case 'Q': *mptr++ = t = T_QSET; *mptr++ = count; break;
     case 'm': *mptr++ = t = T_QMUL; *mptr++ = count; break;
     case 'n': *mptr++ = t = T_QMUL; *mptr++ = -count; break;
-    case 's': *mptr++ = t = T_QMUL1; break;
+    case 's': *mptr++ = t = T_QMUL; *mptr++ = 1; break;
 
     case '+': *mptr++ = t = T_ADD; *mptr++ = count; break;
     case '-': *mptr++ = t = T_ADD; *mptr++ = -count; break;
@@ -134,6 +134,32 @@ outcmd(int ch, int count)
 	} else {
 	    tape = calloc(tapealloc, sizeof(icell));
 	    debugprog(mem, tape+BOFF);
+	}
+	break;
+
+    case 'I':
+	{
+	    struct stkdat * n = malloc(sizeof*n);
+	    n->up = sp;
+	    sp = n;
+	    *mptr++ = t = T_WHL;
+	    n->id = mptr-mem;
+	    *mptr++ = 0;	/* Default to NOP */
+	}
+	break;
+
+    case 'E':
+	{
+	    int offt;
+	    if (mptr[-1]) offt = 1; else offt = 3;
+	    *mptr++ = T_NOP;
+	    if (sp) {
+		struct stkdat * n = sp;
+		sp = n->up;
+		mem[n->id] = (mptr-mem) - n->id - offt;
+		free(n);
+	    }
+	    if (offt != 1) mptr-=2;
 	}
 	break;
 
@@ -212,8 +238,8 @@ dumpprog(int * p, int * ep)
 	switch(*p++) {
 	case T_STOP:
 	case T_PRT: case T_INP:
-	case T_BEG: case T_MUL1: case T_QMUL1:
-	case T_DUMP:
+	case T_BEG: case T_MUL1:
+	case T_DUMP: case T_NOP:
 	    break;
 	case T_WHL: case T_END:
 	    printf(" %d (%06d)", *p, (int)(p-mem + *p+1));
@@ -293,7 +319,7 @@ runprog_int(register int * p, register tcell *mp)
 	case T_MUL: *mp += p[2] * a; p+=3; break;
 	case T_QSET: if(a) *mp = p[2]; p+=3; break;
 	case T_QMUL: if(a) *mp += p[2]*a; p+=3; break;
-	case T_QMUL1: if(a) *mp += a; p+=2; break;
+	case T_NOP: p += 2; break;
 	case T_STOP: return;
 #ifndef PART
 	case T_DUMP: dumpmem(mp); p+=2; break;
