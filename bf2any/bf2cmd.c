@@ -16,6 +16,8 @@ static int loopid = 0;
 
 static struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
+struct be_interface_s be_interface = {.ifcmd = 1};
+
 void
 outcmd(int ch, int count)
 {
@@ -107,6 +109,28 @@ outcmd(int ch, int count)
 	    printf( "SET /A M=MEMORY%%PTR%%\r\n");
 	    printf( "IF NOT %%M%% == 0 GOTO LOOP%dB\r\n", n->id);
 	    printf( ":LOOP%dE\r\n", n->id);
+	    free(n);
+	}
+	break;
+
+    case 'I':
+	{
+	    struct stkdat * n = malloc(sizeof*n);
+	    n->up = sp;
+	    sp = n;
+	    n->id = ++loopid;
+
+	    if(bytecell) { puts("SET /A MEMORY%PTR%=MEMORY%PTR%^&255\r"); }
+	    printf( "SET /A M=MEMORY%%PTR%%\r\n");
+	    printf( "IF %%M%% == 0 GOTO IFCMD%dE\r\n", n->id);
+	}
+	break;
+    case 'E':
+	{
+	    struct stkdat * n = sp;
+	    sp = n->up;
+
+	    printf( ":IFCMD%dE\r\n", n->id);
 	    free(n);
 	}
 	break;
