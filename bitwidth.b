@@ -196,7 +196,7 @@ Multiply by 256 again to get 65536
 	This is a hard optimisation barrier
 	It contains several difficult to 'prove' constructions close together
 	and is likely to prevent almost all forms of optimisation
-	+[[>]<-[,]+[>]<-]
+	+[[>]<-[,]+[>]<-[]]
 
 	This part finds the actual value that the cell wraps at; even
 	if it's not one of the standard ones; but it gets bored after

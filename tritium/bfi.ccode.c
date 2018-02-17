@@ -1076,8 +1076,8 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 
 	case T_STOP:
 	    if (!disable_indent) pt(ofd, indent,n);
-	    if (e)
-		fprintf(ofd, "exit(fprintf(stderr, \"STOP Command executed.\\n\"),1);\n");
+	    if (use_functions)
+		fprintf(ofd, "exit((fprintf(stderr, \"STOP Command executed.\\n\"),1));\n");
 	    else
 		fprintf(ofd, "return fprintf(stderr, \"STOP Command executed.\\n\"),1;\n");
 	    break;
