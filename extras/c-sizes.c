@@ -626,14 +626,12 @@ char ** argv;
 
     if (bytes_needed == 1) {
 #if defined(SCHAR_MAX) && defined(CHAR_MAX)
-#if SCHAR_MAX == CHAR_MAX
-	if(!is_unsigned) { printf("char\n"); return 0; }
-#endif
+	if (SCHAR_MAX == CHAR_MAX)
+	    if(!is_unsigned) { printf("char\n"); return 0; }
 #endif
 #if defined(UCHAR_MAX) && defined(CHAR_MAX)
-#if UCHAR_MAX == CHAR_MAX
-	if(is_unsigned) { printf("char\n"); return 0; }
-#endif
+	if (UCHAR_MAX == CHAR_MAX)
+	    if(is_unsigned) { printf("char\n"); return 0; }
 #endif
     }
 
