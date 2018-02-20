@@ -493,6 +493,13 @@ checkarg(char * opt, char * arg)
 	case 'm': opt_level= -1; break;
 	case 'T': enable_trace=1; break;
 
+	case '8':
+	    iostyle=2;
+	    default_io=0;
+	    set_cell_size(8);
+	    eofcell = 4;
+	    break;
+
 	case 'a': iostyle=0; default_io=0; break;
 	case 'B': iostyle=2; default_io=0; break;
 #if defined(__STDC_ISO_10646__) || defined(_WIN32)
