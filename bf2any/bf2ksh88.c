@@ -25,7 +25,7 @@ outcmd(int ch, int count)
     case '!':
 	pr("#!/bin/ksh");
 
-	pr("if ( eval 'typeset -i M P V ; M[1]=3 && : $((M[500]+=1)) &&");
+	pr("if ( eval 'typeset -i M P V ; M[1]=3 && : $((M[500]+=(1))) &&");
 	pr("   ((M[1]+=1)) && (( M[1] == 4 && M[500] == 1 ))' ) 2>/dev/null");
 	pr("then :");
 	pr("else");

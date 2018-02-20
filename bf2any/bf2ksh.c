@@ -54,7 +54,7 @@ outcmd(int ch, int count)
 	pr("#!/bin/ksh");
 	pr("(eval 'set -o sh +o sh') 2>/dev/null && set +o sh 2>/dev/null");
 	pr("(eval 'set -o posix +o posix') 2>/dev/null && set +o posix 2>/dev/null");
-	pr("if (eval 'typeset -i M P V && M[1]=3 && ((M[500]+=1,1)) &&");
+	pr("if (eval 'typeset -i M P V && M[1]=3 && ((M[500]+=(1),1)) &&");
 	pr("   ((M[1]+=1)) && [[ ${M[1]} -eq 4 && ${M[500]} -eq 1 ]]' ) 2>/dev/null");
 	pr("then :");
 	pr("else");
