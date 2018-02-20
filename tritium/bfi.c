@@ -2583,16 +2583,47 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 			n->type = T_NOP;
 			return 1;
 		    }
-#endif
 
-#if 0
 		    /* Of course it's unlikely that the programmer zero'd
 		     * the temp first! */
 		    if (n && n->type == T_CALC && n->count == 0 &&
 			n->count2 == 1 && n->offset2 == n->offset &&
 			n->count3 != 0 &&
 			n->offset3 == v->jmp->offset &&
-			n->offset != n->offset3) {
+			n->offset != n->offset3 &&
+			v->jmp->next && v->jmp->next->next == n) {
+			/* TODO:
+			    Check that n->offset3 is not changed within
+			    the loop rather than checking for a tiny
+			    loop that doesn't have enough room.
+
+				  m[3] = 0;
+				  *m = 1;
+				  ++m[1];
+				  if(M(m[1])) {
+					*m = 0;
+					m[3] = m[1];
+				  }
+				  m[1] = m[3];
+				  m[3] = 0;
+				  m[2] += *m;
+				  *m = 0;
+
+
+				  m[3] = 0;
+				  *m = 1;
+				  ++m[1];
+				  if(M(m[1])) *m = 0;
+				  m[2] += *m;
+				  *m = 0;
+
+
+				  m[0] = 0;
+				  ++m[1];
+				  m[2] += !M(m[1]);
+				  m[3] = 0;
+			*/
+
 			/* T_CALC: temp += loopidx*N */
 			/* Also need to know that the temp will be zero before
 			 * the loop so the calculation is okay for zero too. */
