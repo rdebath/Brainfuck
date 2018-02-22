@@ -39,11 +39,11 @@ script:
   - make CC="$CC" -C tritium
   - make CC="$CC" HAVE_TCL_H= -C bf2any
   - make CC="$CC" -C extras
-  - test ! -x tritium/bfi || tritium/bfi -v bitwidth.b
-  - test ! -x tritium/bfi || tritium/bfi -v -rc bitwidth.b
+  - test ! -x tritium/bfi.out || tritium/bfi.out -v bitwidth.b
+  - test ! -x tritium/bfi.out || tritium/bfi.out -v -rc bitwidth.b
   - test ! -x bf2any/bf2jit || bf2any/bf2jit bitwidth.b
   - test ! -x bf2any/bf2crun || bf2any/bf2crun -v bitwidth.b
   - test ! -x bf2any/bf2run || bf2any/bf2run bitwidth.b
-  - test ! -x tritium/bfi || tritium/bfi testing/Mandelbrot.b
-  - test ! -x tritium/bfi || tritium/bfi testing/Prime.b < testing/Prime.in
-  - test ! -x tritium/bfi || tritium/bfi -h || true
+  - test ! -x tritium/bfi.out || tritium/bfi.out testing/Mandelbrot.b
+  - test ! -x tritium/bfi.out || tritium/bfi.out testing/Prime.b < testing/Prime.in
+  - test ! -x tritium/bfi.out || tritium/bfi.out -h || true
