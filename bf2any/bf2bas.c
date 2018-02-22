@@ -42,7 +42,7 @@ static enum { io_basic, io_bbc, io_vb, io_fbas }
 static struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg};
+struct be_interface_s be_interface = {fn_check_arg, .noifcmd=1};
 
 static void
 line_no_indent(void)

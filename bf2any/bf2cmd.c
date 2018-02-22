@@ -16,7 +16,7 @@ static int loopid = 0;
 
 static struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
-struct be_interface_s be_interface = {.ifcmd = 1};
+struct be_interface_s be_interface = {};
 
 void
 outcmd(int ch, int count)

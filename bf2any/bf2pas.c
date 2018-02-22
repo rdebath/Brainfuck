@@ -35,6 +35,8 @@ static int icount = 0;
 
 static void print_string(char *);
 
+struct be_interface_s be_interface = {.noifcmd = 1};
+
 void
 outcmd(int ch, int count)
 {

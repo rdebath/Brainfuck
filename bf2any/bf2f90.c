@@ -12,7 +12,7 @@ static int ind = 0;
 /* NB: f90 has a maximum line length */
 #define I printf("%*s", (ind>40?40:ind)*2, "")
 
-struct be_interface_s be_interface = {.ifcmd = 1};
+struct be_interface_s be_interface = {};
 
 static void print_cstring(void);
 

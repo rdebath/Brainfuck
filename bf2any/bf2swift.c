@@ -13,7 +13,7 @@ static FILE * ofd;
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
 
-struct be_interface_s be_interface = {.ifcmd = 1};
+struct be_interface_s be_interface = {};
 
 static void print_string(void);
 

@@ -60,7 +60,7 @@ static size_t luacodesize = 0;
 #endif
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg};
+struct be_interface_s be_interface = {fn_check_arg, .noifcmd=1};
 
 static int
 fn_check_arg(const char * arg)

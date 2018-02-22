@@ -64,7 +64,7 @@ static size_t ccodesize = 0;
 #endif
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = { .check_arg = fn_check_arg, .cells_are_ints=1, .ifcmd=1 };
+struct be_interface_s be_interface = { .check_arg = fn_check_arg, .cells_are_ints=1};
 
 static int
 fn_check_arg(const char * arg)

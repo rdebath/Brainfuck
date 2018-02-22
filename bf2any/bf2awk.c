@@ -26,7 +26,7 @@ static int use_functions = 0;
 static void print_cstring(void);
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {.check_arg=fn_check_arg,.ifcmd=1};
+struct be_interface_s be_interface = {.check_arg=fn_check_arg};
 
 static int
 fn_check_arg(const char * arg)

@@ -6,13 +6,13 @@
 #include "move_opt.h"
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = { .check_arg = fn_check_arg, .ifcmd = 1};
+struct be_interface_s be_interface = { .check_arg = fn_check_arg};
 static int c_header = 0;
 
 static int
 fn_check_arg(const char * arg)
 {
-    if (strcmp(arg, "-no_if") == 0) { be_interface.ifcmd = 0; return 1; }
+    if (strcmp(arg, "-no_if") == 0) { be_interface.noifcmd = 1; return 1; }
     if (strcmp(arg, "-int") == 0) { be_interface.cells_are_ints = 1; return 1; }
     if (strcmp(arg, "-c") == 0) { c_header = 1; return 1; }
     if (strcmp(arg, "-#") == 0) return 1;

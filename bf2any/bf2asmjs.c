@@ -56,6 +56,8 @@ static int tapealloc = 32768;
 #define I printf("%*s", ind*4, "")
 #define IO(d) printf("%*s", (ind+(d))*4, "")
 
+struct be_interface_s be_interface = {.noifcmd = 1};
+
 void
 outcmd(int ch, int count)
 {

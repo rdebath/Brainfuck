@@ -9,7 +9,7 @@
 #include "bf2any.h"
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = { .check_arg = fn_check_arg,.disable_be_optim=1};
+struct be_interface_s be_interface = { .check_arg = fn_check_arg,.disable_be_optim=1,.noifcmd=1};
 
 /*
  * BF translation to BF. This isn't an identity translation because even

@@ -14,7 +14,7 @@ char * get_string(void);
 typedef int (check_arg_t)(const char * arg);
 struct be_interface_s {
     check_arg_t *check_arg;
-    int ifcmd;
+    int noifcmd;
     int cells_are_ints;
     int nobytecell;
     int bytesonly;

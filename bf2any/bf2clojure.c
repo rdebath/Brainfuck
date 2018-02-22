@@ -11,7 +11,7 @@
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
-struct be_interface_s be_interface = {.disable_be_optim=1};
+struct be_interface_s be_interface = {.disable_be_optim=1,.noifcmd=1};
 
 void
 outcmd(int ch, int count)

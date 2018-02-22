@@ -21,7 +21,7 @@
  * dasm64 translation from BF, runs at about 5,000,000,000 instructions per second.
  */
 
-struct be_interface_s be_interface = { .ifcmd=1, .cells_are_ints=1 };
+struct be_interface_s be_interface = {.cells_are_ints=1 };
 
 #if defined(__x86_64__) || defined(__amd64__) || defined(_M_AMD64)
 #define CPUCHECK 64

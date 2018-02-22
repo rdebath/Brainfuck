@@ -173,7 +173,7 @@ static void process_loop()
     /* Start new */
     if (loopz) {
 	inc = -1;
-	if (!be_interface.ifcmd) {
+	if (be_interface.noifcmd) {
 	    qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
 	    qcmd[qcnt] = 'Q'; qrep[qcnt] = 1; qcnt ++;
 	    qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
@@ -193,14 +193,14 @@ static void process_loop()
 	    if (!madd_zmode[i] && madd_inc[i] == 0) continue; /* NOP */
 
 	    if (!use_v_var) {
-		if (!be_interface.ifcmd) continue;
+		if (be_interface.noifcmd) continue;
 		if (	(!madd_zmode[i] || madd_count<2) &&
 			!loopz &&
 			(!(madd_offset[i] < -BOFF) || madd_count<2) )
 		    continue;
 	    }
 
-	    if (be_interface.ifcmd && (use_v_var == doneif)) {
+	    if (!be_interface.noifcmd && (use_v_var == doneif)) {
 		if (mov != 0) {
 		    qcmd[qcnt] = '>'; qrep[qcnt] = 0 - mov; qcnt ++;
 		    mov = 0;

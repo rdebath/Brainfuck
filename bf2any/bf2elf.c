@@ -133,7 +133,7 @@ static size_t  stack[1024];
 static size_t *st;
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {.check_arg=fn_check_arg,.bytesonly=1,.disable_be_optim=1};
+struct be_interface_s be_interface = {.check_arg=fn_check_arg,.bytesonly=1,.disable_be_optim=1,.noifcmd=1};
 
 static int
 fn_check_arg(const char * arg)

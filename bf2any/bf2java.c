@@ -20,7 +20,7 @@
  */
 #define MAXINSTR (12+65536/80)
 
-struct be_interface_s be_interface = { .ifcmd=1 };
+struct be_interface_s be_interface = {};
 
 struct instruction {
     int ch;

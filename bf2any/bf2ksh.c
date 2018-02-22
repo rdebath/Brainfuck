@@ -15,7 +15,7 @@ static int ind = 0;
 static int in_arith = 0;
 static int curr_offset = -1;
 
-struct be_interface_s be_interface = {.ifcmd = 1};
+struct be_interface_s be_interface = {};
 
 static void print_string(void);
 

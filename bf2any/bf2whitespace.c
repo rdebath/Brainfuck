@@ -89,7 +89,7 @@ static void putlabel(unsigned long num);
 #define PRTTOK(s)	prttok("(" #s ")", CMD_##s);
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg, .ifcmd=1};
+struct be_interface_s be_interface = {fn_check_arg};
 
 static int
 fn_check_arg(const char * arg)

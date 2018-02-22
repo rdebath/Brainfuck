@@ -14,7 +14,7 @@
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
-struct be_interface_s be_interface = {.ifcmd = 1};
+struct be_interface_s be_interface = {};
 
 static const char * ctype = "int";
 static int vmask = -1;
