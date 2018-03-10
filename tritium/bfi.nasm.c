@@ -36,8 +36,8 @@ static int loop_class = 3;
 
 /* Intel GAS translation and linkable objects. */
 static int intel_gas = 0;
-static void print_nasm_header(void);
-static void print_gas_header(void);
+static void print_nasm_elf_header(void);
+static void print_as_header(void);
 
 int
 checkarg_nasm(char * opt, char * arg UNUSED)
@@ -416,13 +416,13 @@ static void
 print_asm_header(void)
 {
     if (link_main)
-	print_gas_header();
+	print_as_header();
     else
-	print_nasm_header();
+	print_nasm_elf_header();
 }
 
 static void
-print_nasm_header(void)
+print_nasm_elf_header(void)
 {
     char const *np =0, *ep;
     if (bfname && *bfname) {
@@ -435,85 +435,84 @@ print_nasm_header(void)
 	ep = np + strlen(np);
 
     printf("; asmsyntax=nasm\n");
-    printf("; %sasm %.*s.s && chmod +x %.*s\n",
-	    hello_world?"n":"y",
+    printf("; yasm %.*s.s && chmod +x %.*s\n",
 	    (int)(ep-np), np, (int)(ep-np), np);
     printf("\n");
     printf("BITS 32\n");
     printf("\n");
-    if (!hello_world)
-	printf("memsize\tequ\t%d\n", memsize);
-    printf("orgaddr\tequ\t0x08048000\n");
-    printf("\torg\torgaddr\n");
-    printf("\n");
-    printf("; A nice legal ELF header here, bit short, but that's okay.\n");
-    printf("; I chose this as the smallest completely legal one from ...\n");
-    printf("; http://www.muppetlabs.com/~breadbox/software/tiny/teensy.html\n");
-    printf("; See also ...\n");
-    printf("; http://blog.markloiseau.com/2012/05/tiny-64-bit-elf-executables\n");
-    printf("\n");
-    printf("ehdr:\t\t\t\t\t\t; Elf32_Ehdr\n");
-    printf("\tdb\t0x7F, \"ELF\", 1, 1, 1, 0\t\t;   e_ident\n");
-    printf("\ttimes 8 db\t0\n");
-    printf("\tdw\t2\t\t\t\t;   e_type\n");
-    printf("\tdw\t3\t\t\t\t;   e_machine\n");
-    printf("\tdd\t1\t\t\t\t;   e_version\n");
-    printf("\tdd\t_start\t\t\t\t;   e_entry\n");
-    printf("\tdd\tphdr - $$\t\t\t;   e_phoff\n");
-    printf("\tdd\t0\t\t\t\t;   e_shoff\n");
-    printf("\tdd\t0\t\t\t\t;   e_flags\n");
-    printf("\tdw\tehdrsize\t\t\t;   e_ehsize\n");
-    printf("\tdw\tphdrsize\t\t\t;   e_phentsize\n");
-    printf("\tdw\t1\t\t\t\t;   e_phnum\n");
-    printf("\tdw\t0\t\t\t\t;   e_shentsize\n");
-    printf("\tdw\t0\t\t\t\t;   e_shnum\n");
-    printf("\tdw\t0\t\t\t\t;   e_shstrndx\n");
-    printf("\n");
-    printf("ehdrsize\tequ\t$ - ehdr\n");
-    printf("\n");
-    printf("phdr:\t\t\t\t\t\t; Elf32_Phdr\n");
-    printf("\tdd\t1\t\t\t\t;   p_type\n");
-    printf("\tdd\t0\t\t\t\t;   p_offset\n");
-    printf("\tdd\t$$\t\t\t\t;   p_vaddr\n");
-    printf("\tdd\t$$\t\t\t\t;   p_paddr\n");
-    printf("\tdd\tfilesize\t\t\t;   p_filesz\n");
-    if (hello_world)
-	printf("\tdd\tfilesize\t\t\t;   p_memsz\n");
-    else
-	printf("\tdd\tfilesize+memsize\t\t;   p_memsz\n");
-    printf("\tdd\t7\t\t\t\t;   p_flags\n");
-    printf("\tdd\t0x1000\t\t\t\t;   p_align\n");
-    printf("\n");
-    printf("phdrsize\tequ\t$ - phdr\n");
-    printf("\n");
+    printf("memsize\tequ\t%d\n", memsize);
 
-    if (hello_world) {
-	printf("; The program prolog.\n");
-	printf("; This is a special version for a 'Hello World' program.\n");
-	printf("filesize equ\tmsgend-orgaddr\n");
-	return;
-    }
+    printf("%s\n",
+		"orgaddr equ     0x08048000"
+	"\n"	"        org     orgaddr"
+	"\n"
+	"\n"	"; A nice legal ELF header here, bit short, but that's okay."
+	"\n"	"; Based on the headers from ..."
+	"\n"	"; http://www.muppetlabs.com/~breadbox/software/tiny/teensy.html"
+	"\n"	"; but with RX and RW segments. See also ..."
+	"\n"	"; http://blog.markloiseau.com/2012/05/tiny-64-bit-elf-executables"
+	"\n"
+	"\n"	"ehdr:                                   ; Elf32_Ehdr"
+	"\n"	"        db      0x7F, \"ELF\", 1, 1, 1, 0 ;   e_ident"
+	"\n"	"        times 8 db      0"
+	"\n"	"        dw      2                       ;   e_type"
+	"\n"	"        dw      3                       ;   e_machine"
+	"\n"	"        dd      1                       ;   e_version"
+	"\n"	"        dd      _start                  ;   e_entry"
+	"\n"	"        dd      phdr - $$               ;   e_phoff"
+	"\n"	"        dd      0                       ;   e_shoff"
+	"\n"	"        dd      0                       ;   e_flags"
+	"\n"	"        dw      ehdrsize                ;   e_ehsize"
+	"\n"	"        dw      phdrsize                ;   e_phentsize"
+	"\n"	"        dw      2                       ;   e_phnum"
+	"\n"	"        dw      0                       ;   e_shentsize"
+	"\n"	"        dw      0                       ;   e_shnum"
+	"\n"	"        dw      0                       ;   e_shstrndx"
+	"\n"
+	"\n"	"ehdrsize        equ     $ - ehdr"
+	"\n"
+	"\n"	"phdr:                                   ; Elf32_Phdr"
+	"\n"	"        dd      1                       ;   p_type"
+	"\n"	"        dd      0                       ;   p_offset"
+	"\n"	"        dd      $$                      ;   p_vaddr"
+	"\n"	"        dd      0                       ;   p_paddr"
+	"\n"	"        dd      filesize                ;   p_filesz"
+	"\n"	"        dd      filesize                ;   p_memsz"
+	"\n"	"        dd      5                       ;   p_flags"
+	"\n"	"        dd      0x1000                  ;   p_align"
+	"\n"
+	"\n"	"phdrsize        equ     $ - phdr"
+	"\n"
+	"\n"	"        dd      1                       ;   p_type"
+	"\n"	"        dd      0                       ;   p_offset"
+	"\n"	"        dd      section..bss.start      ;   p_vaddr"
+	"\n"	"        dd      0                       ;   p_paddr"
+	"\n"	"        dd      0                       ;   p_filesz"
+	"\n"	"        dd      memsize                 ;   p_memsz"
+	"\n"	"        dd      6                       ;   p_flags"
+	"\n"	"        dd      0x1000                  ;   p_align"
+	"\n"
+	"\n"	"; The program prolog, a few register inits and some NASM"
+	"\n"	"; segments so I can put the library routines inline at their"
+	"\n"	"; first use but have them collected at the start in the binary."
+	"\n"
+	"\n"	"        section .text"
+	"\n"	"        section .rodata"
+	"\n"	"        section .textlib align=64"
+	"\n"	"        section .bftext align=64"
+	"\n"	"        section .bftail align=1"
+	"\n"
+	"\n"	"exit_prog:"
+	"\n"	"        mov     bl, 0           ; Exit status"
+	"\n"	"        xor     eax, eax"
+	"\n"	"        inc     eax             ; syscall 1, exit"
+	"\n"	"        int     0x80            ; exit(0)"
+	"\n"
+	"\n"	"        section .bss align=4096"
+	"\n"	"filesize equ    section..bss.start-orgaddr"
+	"\n"	"putchbuf: resb 1"
+	);
 
-    printf("; The program prolog, a few register inits and some NASM\n");
-    printf("; segments so I can put the library routines inline at their\n");
-    printf("; first use but have them collected at the start in the binary.\n");
-    printf("\n");
-    printf("\tsection\t.text\n");
-    printf("\tsection\t.rodata\n");
-    printf("\tsection\t.textlib align=64\n");
-    printf("\tsection\t.bftext align=64\n");
-    printf("\tsection\t.bftail align=1\n");
-    printf("\n");
-    printf("exit_prog:\n");
-    printf("\tmov\tbl, 0\t\t; Exit status\n");
-    printf("\txor\teax, eax\n");
-    printf("\tinc\teax\t\t; syscall 1, exit\n");
-    printf("\tint\t0x80\t\t; exit(0)\n");
-    printf("\n");
-    printf("\tsection\t.data align=4096\n");
-    printf("\tsection\t.bss align=4096\n");
-    printf("filesize equ\tsection..bss.start-orgaddr\n");
-    printf("putchbuf: resb 1\n");
     if (most_neg_maad_loop<0)
 	printf("\tresb %d\n", -most_neg_maad_loop);
     printf("mem:\n");
@@ -532,7 +531,7 @@ print_nasm_header(void)
 }
 
 static void
-print_gas_header(void)
+print_as_header(void)
 {
     if (intel_gas) {
 	printf("# This is for gcc's 'gas' assembler running in 'intel' mode\n");
@@ -759,9 +758,59 @@ static void
 print_hello_world(void)
 {
     struct bfi * n = bfprog;
-    int i, bytecount = 0;;
+    int i, bytecount = 0;
 
-    print_asm_header();
+    if (link_main)
+	print_as_header();
+    else
+	printf("%s\n",
+		"; asmsyntax=nasm"
+	"\n"	"; nasm hello_world.s && chmod +x hello_world"
+	"\n"
+	"\n"	"BITS 32"
+	"\n"
+	"\n"	"orgaddr equ     0x08048000"
+	"\n"	"        org     orgaddr"
+	"\n"
+	"\n"	"; A nice legal ELF header here, bit short, but that's okay."
+	"\n"	"; I chose this as the smallest completely legal one from ..."
+	"\n"	"; http://www.muppetlabs.com/~breadbox/software/tiny/teensy.html"
+	"\n"
+	"\n"	"ehdr:                                   ; Elf32_Ehdr"
+	"\n"	"        db      0x7F, \"ELF\", 1, 1, 1, 0 ;   e_ident"
+	"\n"	"        times 8 db      0"
+	"\n"	"        dw      2                       ;   e_type"
+	"\n"	"        dw      3                       ;   e_machine"
+	"\n"	"        dd      1                       ;   e_version"
+	"\n"	"        dd      _start                  ;   e_entry"
+	"\n"	"        dd      phdr - $$               ;   e_phoff"
+	"\n"	"        dd      0                       ;   e_shoff"
+	"\n"	"        dd      0                       ;   e_flags"
+	"\n"	"        dw      ehdrsize                ;   e_ehsize"
+	"\n"	"        dw      phdrsize                ;   e_phentsize"
+	"\n"	"        dw      1                       ;   e_phnum"
+	"\n"	"        dw      0                       ;   e_shentsize"
+	"\n"	"        dw      0                       ;   e_shnum"
+	"\n"	"        dw      0                       ;   e_shstrndx"
+	"\n"
+	"\n"	"ehdrsize        equ     $ - ehdr"
+	"\n"
+	"\n"	"phdr:                                   ; Elf32_Phdr"
+	"\n"	"        dd      1                       ;   p_type"
+	"\n"	"        dd      0                       ;   p_offset"
+	"\n"	"        dd      $$                      ;   p_vaddr"
+	"\n"	"        dd      0                       ;   p_paddr"
+	"\n"	"        dd      filesize                ;   p_filesz"
+	"\n"	"        dd      filesize                ;   p_memsz"
+	"\n"	"        dd      5                       ;   p_flags"
+	"\n"	"        dd      0x1000                  ;   p_align"
+	"\n"
+	"\n"	"phdrsize        equ     $ - phdr"
+	"\n"
+	"\n"	"; The program prolog."
+	"\n"	"; This is a special version for a 'Hello World' program."
+	"\n"	"filesize equ    msgend-orgaddr"
+	);
 
     printf("\tsection\t.text\n");
     printf("\tsection\t.rodata align=1\n");
