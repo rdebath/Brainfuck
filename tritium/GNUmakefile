@@ -166,6 +166,7 @@ cc-option = $(shell set -e;               \
 WERROR := $(call cc-option,-Werror,-Werror)
 UNSAFE +=$(call cc-option,$(WERROR) -Wextra,-Wextra)
 UNSAFE +=$(call cc-option,$(WERROR) -fno-delete-null-pointer-checks,-fno-delete-null-pointer-checks)
+UNSAFE +=$(call cc-option,$(WERROR) -Wno-null-pointer-arithmetic,-Wno-null-pointer-arithmetic)
 
 # -fwrapv and -fno-strict-overflow may conflict (clang)
 ifeq ($(call cc-option,$(WERROR) -fwrapv,ok,fail),ok)
