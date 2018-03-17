@@ -179,10 +179,6 @@ else
 UNSAFE += $(call cc-option,$(WERROR) -fno-strict-overflow,-fno-strict-overflow)
 endif
 
-# Optimise for this machine, set MARCH if you want different.
-MARCH =$(call cc-option,$(WERROR) -march=native,-march=native)
-UNSAFE += $(MARCH)
-
 # This appears to be an amplifier not itself unsafe.
 #   -fno-aggressive-loop-optimizations
 
@@ -190,9 +186,6 @@ UNSAFE += $(MARCH)
 GNULGT := $(call cc-option,-Wno-unused-value,-Wno-unused-value,-w)
 GNULGT += $(call cc-option,-fno-strict-aliasing,-fno-strict-aliasing)
 GNULGT += $(call cc-option,-Wno-sign-compare,-Wno-sign-compare,-w)
-
-# Only check the flags once.
-FUNSAFE := $(UNSAFE)
 
 ################################################################################
 
@@ -203,6 +196,25 @@ try-run = $(shell set -e;               \
 	else echo "$(3)";               \
 	fi;                             \
 	rm -f $(TMP) $(TMP).o $(TMP).c  )
+
+################################################################################
+
+MNATIVE := $(call try-run,\
+        { echo 'int main(){return 0;}'; } > $(TMP).c ; \
+	$(CC) $(TARGET_ARCH) -march=native $(TMP).c -o $(TMP),1)
+
+ifneq ($(MNATIVE),)
+# Optimise for this machine, set MARCH if you want different.
+MARCH = -march=native
+UNSAFE += $(MARCH)
+endif
+
+################################################################################
+
+# Only check the flags once.
+FUNSAFE := $(UNSAFE)
+
+################################################################################
 
 TRYCC=$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c $(TMP).c
 TRYCC2=$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) $(TARGET_ARCH) $(TMP).c
