@@ -20,6 +20,9 @@
 #include "bfi.run.h"
 #include "clock.h"
 
+/* Configure the generator */
+#define DASM_FDEF static
+
 #include "dynasm/dasm_proto.h"
 #include "dynasm/dasm_x86.h"
 
@@ -113,10 +116,9 @@ checkarg_dynasm(char * opt, char * arg UNUSED)
 #endif
 
 #define Dst &Dstate
-dasm_State *Dstate;
-void* global_labels[GLOB__MAX];
-int maxpc = 0;
-struct stkdat { struct stkdat * up; int id; } *sp = 0;
+static dasm_State *Dstate;
+static void* global_labels[GLOB__MAX];
+static int maxpc = 0;
 
 static void link_and_run(dasm_State **state);
 static void failout(void) __attribute__ ((__noreturn__));
@@ -784,8 +786,8 @@ run_dynasm(void)
 #endif
 
 typedef int (*fnptr)(char* memory);
-fnptr code = 0;
-size_t codelen;
+static fnptr code = 0;
+static size_t codelen;
 
 static void
 link_and_run(dasm_State ** state)
@@ -845,6 +847,8 @@ link_and_run(dasm_State ** state)
     codeptr = malloc(size);
 #endif
     codelen = size;
+
+    (void)dasm_getpclabel;      /* Unused */
 
     dasm_encode(state, codeptr);
     dasm_free(state);
