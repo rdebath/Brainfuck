@@ -24,6 +24,7 @@
 #define MINALLOC 1024
 #define SAFE_CELL_MAX	((1<<30) -1)
 
+char * progname = "";
 CELL * mem = 0;
 int memsize = 0;
 int memshift = 0;
@@ -68,91 +69,115 @@ int program_len;	/* Number of BF command characters */
 static struct timeval run_start, paused, run_pause;
 static double run_time, wait_time;
 
+int
+option(char *arg)
+{
+    if (!strcmp(arg, "-e")) {
+	on_eof = -1; return 1;
+    } else if (!strcmp(arg, "-z")) {
+	on_eof = 0; return 1;
+    } else if (!strcmp(arg, "-n")) {
+	on_eof = 1; return 1;
+    } else if (!strcmp(arg, "-N")) {
+	suppress_io = 1; return 1;
+    } else if (!strcmp(arg, "-d")) {
+	debug = 1; return 1;
+    } else if (!strcmp(arg, "-p")) {
+	physical_overflow=1; return 1;
+    } else if (!strcmp(arg, "-s")) {
+	physical_min = -1; return 1;
+    } else if (!strcmp(arg, "-u")) {
+	physical_min = 0; return 1;
+    } else if (!strcmp(arg, "-q")) {
+	quick_summary=1; return 1;
+    } else if (!strcmp(arg, "-Q")) {
+	quick_summary=1; quick_with_counts=1; return 1;
+    } else if (!strcmp(arg, "-a")) {
+	all_cells++; return 1;
+    } else if (!strcmp(arg, "-Z")) {
+	do_optimise=0; return 1;
+    } else if (!strcmp(arg, "-sc")) {
+	cell_mask = (1<<8)-1;
+	physical_min = -1;
+	return 1;
+    } else if (!strcmp(arg, "-w")) {
+	cell_mask = (1<<16)-1; return 1;
+    } else if (!strcmp(arg, "-h") || !strcmp(arg, "--help")) {
+	printf("Usage: %s [options] [file]\n", progname);
+	puts("    Runs the brainfuck program provided.");
+	puts("    Multiple statistics are output once the program completes.");
+
+	puts(   "    Default operation uses 8 bit cells and no change on EOF."
+	"\n"    "    The stats will display the number of logical overflows,"
+	"\n"    "    these are overflows that alter the flow of control."
+	"\n"
+	"\n"    "Options:"
+	"\n"    "    -e  Return EOF (-1) on end of file."
+	"\n"    "    -z  Return zero on end of file."
+	"\n"    "    -n  Do not change the current cell on end of file (Default)."
+	"\n"    "    -N  Disable ALL I/O from the BF program; just output the stats."
+	"\n"    "    -d  Use the '#' command to output the current tape."
+	"\n"    "    -p  Count physical overflows not logical ones."
+	"\n"    "    -q  Output a quick summary of the run."
+	"\n"    "    -Q  Output a quick summary of the run (variant)."
+	"\n"    "    -a  Output all calls that have been used."
+	"\n"    "    -sc Use 'signed character' (8bit) cells."
+	"\n"    "    -s  Use signed cells."
+	"\n"    "    -w  Use 'WORD' (16bit) cells instead of 8 bit."
+	"\n"    "    -7..16 Use 7..16 bit cells instead of 8 bit."
+	);
+
+	exit(1);
+    }
+
+    if((arg[1] >= '7' && arg[1] <= '9' && arg[2] == 0) ||
+       (arg[1] == '1' && arg[2] >= '0' && arg[2] <= '6' && arg[3] == 0)) {
+
+	cell_mask = (1<<atoi(arg+1))-1;
+	return 1;
+    }
+
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     FILE * ifd;
-    int ch;
+    int ch, ar;
     int p = -1, n = -1, j = -1;
-    char * progname = argv[0];
     char * datafile = 0;
+    progname = argv[0];
 
-    while (argc>1) {
-	if (argv[1][0] != '-' || !strcmp(argv[1], "-")) {
+    for(ar=1; ar<argc; ar++)
+    {
+	char * op, obuf[4];
+	if (argv[ar][0] != '-' || !strcmp(argv[ar], "-")) {
 	    if (datafile) {
 		fprintf(stderr, "Only one file allowed\n");
 		exit(1);
 	    }
-	    datafile = argv[1]; argc--; argv++;
-	} else if (!strcmp(argv[1], "-e")) {
-	    on_eof = -1; argc--; argv++;
-	} else if (!strcmp(argv[1], "-z")) {
-	    on_eof = 0; argc--; argv++;
-	} else if (!strcmp(argv[1], "-n")) {
-	    on_eof = 1; argc--; argv++;
-	} else if (!strcmp(argv[1], "-N")) {
-	    suppress_io = 1; argc--; argv++;
-	} else if (!strcmp(argv[1], "-d")) {
-	    debug = 1; argc--; argv++;
-	} else if (!strcmp(argv[1], "-p")) {
-	    physical_overflow=1; argc--; argv++;
-	} else if (!strcmp(argv[1], "-q")) {
-	    quick_summary=1; argc--; argv++;
-	} else if (!strcmp(argv[1], "-Q")) {
-	    quick_summary=1; quick_with_counts=1; argc--; argv++;
-	} else if (!strcmp(argv[1], "-a")) {
-	    all_cells++; argc--; argv++;
-	} else if (!strcmp(argv[1], "-Z")) {
-	    do_optimise=0; argc--; argv++;
-	} else if (!strcmp(argv[1], "-w")) {
-	    cell_mask = (1<<16)-1;
-	    physical_min = 0;
-	    physical_max = cell_mask;
-	    argc--; argv++;
-	} else if (!strcmp(argv[1], "-sc")) {
-	    cell_mask = (1<<8)-1;
-	    physical_max = (cell_mask>>1);
-	    physical_min = -1 - physical_max;
-	    argc--; argv++;
-	} else if (!strcmp(argv[1], "-12")) {
-	    cell_mask = (1<<12)-1;
-	    physical_min = 0;
-	    physical_max = cell_mask;
-	    argc--; argv++;
-	} else if (!strcmp(argv[1], "-7")) {
-	    cell_mask = (1<<7)-1;
-	    physical_min = 0;
-	    physical_max = cell_mask;
-	    argc--; argv++;
-	} else if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")) {
-	    printf("Usage: %s [options] [file]\n", progname);
-	    puts("    Runs the brainfuck program provided.");
-	    puts("    Multiple statistics are output once the program completes.");
-
-	    puts(   "    Default operation uses 8 bit cells and no change on EOF."
-	    "\n"    "    The stats will display the number of logical overflows,"
-	    "\n"    "    these are overflows that alter the flow of control."
-	    "\n"
-	    "\n"    "Options:"
-	    "\n"    "    -e  Return EOF (-1) on end of file."
-	    "\n"    "    -z  Return zero on end of file."
-	    "\n"    "    -n  Do not change the current cell on end of file (Default)."
-	    "\n"    "    -N  Disable ALL I/O from the BF program; just output the stats."
-	    "\n"    "    -d  Use the '#' command to output the current tape."
-	    "\n"    "    -p  Count physical overflows not logical ones."
-	    "\n"    "    -q  Output a quick summary of the run."
-	    "\n"    "    -Q  Output a quick summary of the run (variant)."
-	    "\n"    "    -a  Output all calls that have been used."
-	    "\n"    "    -sc Use 'signed character' (8bit) cells."
-	    "\n"    "    -w  Use 'WORD' (16bit) cells instead of 8 bit."
-	    "\n"    "    -12 Use 12bit cells instead of 8 bit."
-	    "\n"    "    -7  Use 7bit cells instead of 8 bit."
-	    );
-
-	    exit(1);
-	} else {
-	    fprintf(stderr, "Unknown option '%s'\n", argv[1]);
-	    exit(1);
+	    datafile = argv[ar];
+	    continue;
 	}
+	if(option(argv[ar])) continue;
+
+	for(op=argv[ar]+1; *op; op++) {
+	    obuf[0] = '-';
+	    obuf[1] = *op;
+	    obuf[2] = 0;
+	    if (!option(obuf)) {
+		fprintf(stderr, "Unknown option '%s', try -h\n", argv[ar]);
+		exit(1);
+	    }
+	}
+    }
+
+    if (physical_min == 0) {
+	physical_max = cell_mask;
+	physical_min = 0;
+    } else {
+	physical_max = (cell_mask>>1);
+	physical_min = -1 - physical_max;
     }
 
     ifd = datafile && strcmp(datafile, "-") ? fopen(datafile, "r") : stdin;
