@@ -34,8 +34,8 @@ outcmd(int ch, int count)
     switch(ch) {
     case '!':
 	pr("#!/bin/sh");
-	pr("if (eval 'P=1 && : $((M$P=(3))) && Q=500 && : $((M$Q+=1)) &&");
-	pr("   : $((M$P+=1)) && [ $((M$P)) = 4 -a $((M$Q)) = 1 ]' ) 2>/dev/null");
+	pr("if (eval 'P=1 && : $((M$P=(3))) && Q=500 && : $((M$Q+=1)) && : $((M$P+=1)) &&");
+	pr("    [ $((M$P)) = 4 -a $((M$Q)) = 1 -a $((M2)) = 0 ]') 2>/dev/null");
 	pr("then :");
 	pr("else");
 	pr("    echo 'ERROR: The shell must be POSIX compatible' >&2");
