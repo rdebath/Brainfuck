@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "bf2any.h"
+#include "move_opt.h"
 
 /*
  * MAWK translation from BF, runs at about 23,000,000 instructions per second.
@@ -43,9 +44,28 @@ fn_check_arg(const char * arg)
     return 0;
 }
 
+static char *
+cell(int mov)
+{
+    static char buf[6+3+sizeof(mov)*3];
+    if (mov == 0) return "m[p]";
+    if (mov < 0)
+	sprintf(buf, "m[p-%d]", -mov);
+    else
+	sprintf(buf, "m[p+%d]", mov);
+    return buf;
+}
+
 void
 outcmd(int ch, int count)
 {
+    int mov = 0;
+    char * cm;
+
+    move_opt(&ch, &count, &mov);
+    if (ch == 0) return;
+
+    cm = cell(mov);
     switch(ch) {
     case '!':
 	printf("#!/usr/bin/awk -f\n");
@@ -53,41 +73,53 @@ outcmd(int ch, int count)
 	I; printf("p=%d\n",tapeinit); break;
 	break;
 
-    case '=': I; printf("m[p] = %d\n", count); break;
+    case '=': I; printf("%s = %d\n", cm, count); break;
     case 'B':
-	if(bytecell) { I; printf("m[p]=m[p]%%256\n"); }
-	I; printf("v = m[p]\n");
+	if(bytecell) { I; printf("%s %%= 256\n", cm); }
+	I; printf("v = %s\n", cm);
 	break;
-    case 'M': I; printf("m[p] = m[p]+v*%d\n", count); break;
-    case 'N': I; printf("m[p] = m[p]-v*%d\n", count); break;
-    case 'S': I; printf("m[p] = m[p]+v\n"); break;
-    case 'Q': I; printf("if (v != 0) m[p] = %d;\n", count); break;
-    case 'm': I; printf("if (v != 0) m[p] = m[p]+v*%d;\n", count); break;
-    case 'n': I; printf("if (v != 0) m[p] = m[p]-v*%d;\n", count); break;
-    case 's': I; printf("if (v != 0) m[p] = m[p]+v;\n"); break;
+    case 'M': I; printf("%s += v*%d\n", cm, count); break;
+    case 'N': I; printf("%s -= v*%d\n", cm, count); break;
+    case 'S': I; printf("%s += v\n", cm); break;
+    case 'Q': I; printf("if (v != 0) %s = %d\n", cm, count); break;
+    case 'm': I; printf("if (v != 0) %s += v*%d\n", cm, count); break;
+    case 'n': I; printf("if (v != 0) %s -= v*%d\n", cm, count); break;
+    case 's': I; printf("if (v != 0) %s += v\n", cm); break;
 
     case 'X': I; printf("print \"Abort: Infinite Loop.\\n\" >\"/dev/stderr\"; exit;\n"); break;
 
-    case '+': I; printf("m[p] += %d\n", count); break;
-    case '-': I; printf("m[p] -= %d\n", count); break;
+    case '+': I; printf("%s += %d\n", cm, count); break;
+    case '-': I; printf("%s -= %d\n", cm, count); break;
     case '<': I; printf("p -= %d\n", count); break;
     case '>': I; printf("p += %d\n", count); break;
     case '[':
-	if(bytecell) { I; printf("m[p]=m[p]%%256\n"); }
-	I; printf("while(m[p]!=0){\n");
+	if(bytecell) { I; printf("%s %%= 256\n", cm); }
+	I; printf("while(%s!=0){\n", cm);
 	ind++;
 	break;
     case ']':
-	if(bytecell) { I; printf("m[p]=m[p]%%256\n"); }
+	if (count > 0) {
+	    I; printf("p += %d\n", count);
+	} else if (count < 0) {
+	    I; printf("p -= %d\n", -count);
+	}
+
+	if(bytecell) { I; printf("%s %%= 256\n", cm); }
 	ind--;
 	I; printf("}\n");
 	break;
     case 'I':
-	if(bytecell) { I; printf("m[p]=m[p]%%256\n"); }
-	I; printf("if(m[p]!=0){\n");
+	if(bytecell) { I; printf("%s %%= 256\n", cm); }
+	I; printf("if(%s!=0){\n", cm);
 	ind++;
 	break;
     case 'E':
+	if (count > 0) {
+	    I; printf("p += %d\n", count);
+	} else if (count < 0) {
+	    I; printf("p -= %d\n", -count);
+	}
+
 	ind--;
 	I; printf("}\n");
 	break;
@@ -99,7 +131,7 @@ outcmd(int ch, int count)
 
 	if (do_input) {
 	    printf("\n");
-	    printf("function getch() {\n");
+	    printf("function getch(mov) {\n");
 	    printf("    if (goteof) return;\n");
 	    printf("    if (!gotline) {\n");
 	    printf("        gotline = getline line\n");
@@ -108,7 +140,7 @@ outcmd(int ch, int count)
 	    printf("    }\n");
 	    printf("    if (line == \"\") {\n");
 	    printf("        gotline=0\n");
-	    printf("        m[p]=10\n");
+	    printf("        m[p+mov]=10\n");
 	    printf("        return\n");
 	    printf("    }\n");
 	    printf("    if (!genord) {\n");
@@ -118,20 +150,20 @@ outcmd(int ch, int count)
 	    printf("    }\n");
 	    printf("    c = substr(line, 1, 1)\n");
 	    printf("    line=substr(line, 2)\n");
-	    printf("    m[p] = ord[c]\n");
+	    printf("    m[p+mov] = ord[c]\n");
 	    printf("}\n");
 	}
 	break;
 
     case '.':
-	if(bytecell) { I; printf("m[p]=m[p]%%256\n"); }
-	I; printf("printf \"%%c\",m[p]\n");
+	if(bytecell) { I; printf("%s %%= 256\n", cm); }
+	I; printf("printf \"%%c\",%s\n", cm);
 	break;
     case '"': print_cstring(); break;
 
     case ',':
 	if (use_functions) {
-	    I; printf("getch()\n"); do_input++;
+	    I; printf("getch(%d)\n", mov); do_input++;
 	    break;
 	}
 
@@ -145,7 +177,7 @@ outcmd(int ch, int count)
 	I; printf("    }\n");
 	I; printf("    if (line == \"\") {\n");
 	I; printf("        gotline=0\n");
-	I; printf("        m[p]=10\n");
+	I; printf("        %s=10\n", cm);
 	I; printf("        break\n");
 	I; printf("    }\n");
 	I; printf("    if (!genord) {\n");
@@ -155,7 +187,7 @@ outcmd(int ch, int count)
 	I; printf("    }\n");
 	I; printf("    c = substr(line, 1, 1)\n");
 	I; printf("    line=substr(line, 2)\n");
-	I; printf("    m[p] = ord[c]\n");
+	I; printf("    %s = ord[c]\n", cm);
 	I; printf("    break\n");
 	I; printf("}\n");
 	break;
