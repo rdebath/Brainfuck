@@ -47,6 +47,7 @@ new_n(struct mem *p) {
 	freelist = freelist->n;
     } else
 	p->n = calloc(1, sizeof*p);
+    if (!p->n) { perror("bf2any: new_n()"); exit(1); }
     p->n->p = p;
     p->n->n = 0;
     p->n->is_set = first_run;
@@ -60,6 +61,7 @@ new_p(struct mem *p) {
 	freelist = freelist->n;
     } else
 	p->p = calloc(1, sizeof*p);
+    if (!p->p) { perror("bf2any: new_p()"); exit(1); }
     p->p->n = p;
     p->p->p = 0;
     p->p->is_set = first_run;
@@ -304,7 +306,6 @@ void outopt(int ch, int count)
 	    if (!ov)
 		tape->v = res;
 	    else {
-		fprintf(stderr, "Overflow!\n");
 		flush_tape(0,1);
 		clear_cell(tape);
 		outcmd(ch, count);
@@ -321,7 +322,6 @@ void outopt(int ch, int count)
 	    if (!ov)
 		tape->v = res;
 	    else {
-		fprintf(stderr, "Overflow!\n");
 		flush_tape(0,1);
 		clear_cell(tape);
 		outcmd(ch, count);

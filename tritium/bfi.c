@@ -785,9 +785,16 @@ static int dld, inp, out, rle = 0, num = 1, ov_flg;
 	    continue;
 	}
 	rle = 0;
-	/* A long run of digits is a comment */
-	if (ov_flg) num = 1;
 	if (ch == ' ' || ch == '\n' || ch == '\t') continue;
+
+	/* A long run of digits is ignored. */
+	if (ov_flg) {
+	    num = 1; ov_flg = 0;
+	    if (rle_input)
+		fprintf(stderr,
+		    "Warning: numeric overflow in prefix at Line %d, Col %d\n",
+		    curr_line, curr_col);
+	}
 
 	switch(ch) {
 	case '>': ch = T_MOV; c=  num; break;
@@ -804,6 +811,9 @@ static int dld, inp, out, rle = 0, num = 1, ov_flg;
 	    break;
 	case '#':
 	    if(debug_mode) ch = T_DUMP; else ch = T_NOP;
+	    break;
+	case '=':
+	    if(rle_input) ch = T_SET; else ch = T_NOP;
 	    break;
 	default:  ch = T_NOP; break;
 	}

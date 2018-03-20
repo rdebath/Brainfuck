@@ -7,12 +7,14 @@
 #include "bfi.tree.h"
 #include "bfi.bf.h"
 
-int BFBasic = 0;
+static int BFBasic = 0;
+static int bfrle = 0;
 
 int
 checkarg_bf(char * opt, char * arg UNUSED)
 {
     if (!strcmp(opt, "-fbfbasic")) { BFBasic = 1; return 1; }
+    if (!strcmp(opt, "-bfrle")) { bfrle = 1; return 1; }
     return 0;
 }
 
@@ -39,7 +41,7 @@ print_bf(void)
     int last_offset = 0;
     int i, nocr = 0;
 
-    printf("[ BF regenerated from %s ]\n", bfname);
+    printf("[ BF%s regenerated from %s ]\n", bfrle?"-RLE":"", bfname);
 
     while(n)
     {
@@ -93,6 +95,13 @@ print_bf(void)
 	}
 
 	if (n->offset!=last_offset) {
+	    if (bfrle && (n->offset>last_offset+1 || n->offset<last_offset-1)) {
+		if(n->offset>last_offset)
+		    printf("%d>", n->offset-last_offset);
+		if(n->offset<last_offset)
+		    printf("%d>", last_offset-n->offset);
+		last_offset = n->offset;
+	    }
 	    while(n->offset>last_offset) { putchar('>'); last_offset++; };
 	    while(n->offset<last_offset) { putchar('<'); last_offset--; };
 	    if (!nocr)
@@ -102,14 +111,24 @@ print_bf(void)
 	switch(n->type)
 	{
 	case T_SET:
-	    printf("[-]");
+	    if (bfrle) putchar('='); else printf("[-]");
 	    i = n->count;
+	    if (bfrle && (i>1 || i<-1)) {
+		if(i>0) printf("%d+", i);
+		if(i<0) printf("%d-", -i);
+		i=0;
+	    }
 	    while(i>0) { putchar('+'); i--; }
 	    while(i<0) { putchar('-'); i++; }
 	    break;
 
 	case T_ADD:
 	    i = n->count;
+	    if (bfrle && (i>1 || i<-1)) {
+		if(i>0) printf("%d+", i);
+		if(i<0) printf("%d-", -i);
+		i=0;
+	    }
 	    while(i>0) { putchar('+'); i--; }
 	    while(i<0) { putchar('-'); i++; }
 	    break;

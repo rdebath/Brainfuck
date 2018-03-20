@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #ifndef TAPELEN
 #define TAPELEN 0x100000
@@ -8,6 +9,7 @@
 
 #include "bf2any.h"
 #include "bf2loop.h"
+#include "ov_int.h"
 
 static int opt_optim = 0;
 
@@ -112,7 +114,7 @@ main(int argc, char ** argv)
     char * pgm = argv[0];
     int ch, lastch=']', c=0, m, b=0, lc=0, ar, mm=0, inp=0;
     FILE * ifd;
-    int digits = 0, number = 0, multi = 1;
+    int digits = 0, number = 0, ov_flg = 0, multi = 1;
     int qstring = 0;
     char * xc = 0;
     char ** filelist = 0;
@@ -215,11 +217,11 @@ main(int argc, char ** argv)
 	    /* Source RLE decoding */
 	    if (ch >= '0' && ch <= '9') {
 		digits = 1;
-		number = number*10 + ch-'0';
+		number = ov_iadd(ov_imul(number, 10, &ov_flg), ch-'0', &ov_flg);
 		continue;
 	    }
 	    if (ch == ' ' || ch == '\t') continue;
-	    if (!digits) number = 1; digits=0;
+	    if (!digits || ov_flg) number = 1; digits=ov_flg=0;
 	    multi = enable_rle?number:1; number = 0;
 	    /* These chars are RLE */
 	    m = (ch == '>' || ch == '<' || ch == '+' || ch == '-');
@@ -234,7 +236,11 @@ main(int argc, char ** argv)
 	    }
 	    if (lc) continue;
 	    /* Do the RLE */
-	    if (m && ch == lastch) { c+=multi; continue; }
+	    if (m && ch == lastch) {
+		int ov=0, res;
+		res = ov_iadd(c, multi, &ov);
+		if (!ov) { c = res; continue; }
+	    }
 	    /* Post the RLE token onward */
 	    if (c) { outrun(lastch, c); c=0; }
 	    if (!m) {
