@@ -1191,10 +1191,10 @@ print_ccode(FILE * ofd)
 	    indent = 0;
 
 	    if (!knr_c_ok)
-		fprintf(ofd, "%s * bf%d(register %s * m)\n{\n",
+		fprintf(ofd, "static %s * bf%d(register %s * m)\n{\n",
 		    cell_type, n->jmp->count, cell_type);
 	    else
-		fprintf(ofd, "%s * bf%d FD((register %s * m),(m) register %s * m;)\n{\n",
+		fprintf(ofd, "static %s * bf%d FD((register %s * m),(m) register %s * m;)\n{\n",
 		    cell_type, n->jmp->count, cell_type, cell_type);
 	    print_c_body(ofd, n->jmp, n->next);
 	    fprintf(ofd, "  return m;\n}\n\n");
