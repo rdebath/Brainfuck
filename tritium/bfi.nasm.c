@@ -465,7 +465,7 @@ print_nasm_elf_header(void)
 	"\n"	"        dw      ehdrsize                ;   e_ehsize"
 	"\n"	"        dw      phdrsize                ;   e_phentsize"
 	"\n"	"        dw      2                       ;   e_phnum"
-	"\n"	"        dw      0                       ;   e_shentsize"
+	"\n"	"        dw      40                      ;   e_shentsize"
 	"\n"	"        dw      0                       ;   e_shnum"
 	"\n"	"        dw      0                       ;   e_shstrndx"
 	"\n"
@@ -477,7 +477,7 @@ print_nasm_elf_header(void)
 	"\n"	"        dd      $$                      ;   p_vaddr"
 	"\n"	"        dd      0                       ;   p_paddr"
 	"\n"	"        dd      filesize                ;   p_filesz"
-	"\n"	"        dd      filesize                ;   p_memsz"
+	"\n"	"        dd      ramsize                 ;   p_memsz"
 	"\n"	"        dd      5                       ;   p_flags"
 	"\n"	"        dd      0x1000                  ;   p_align"
 	"\n"
@@ -508,8 +508,10 @@ print_nasm_elf_header(void)
 	"\n"	"        inc     eax             ; syscall 1, exit"
 	"\n"	"        int     0x80            ; exit(0)"
 	"\n"
+	"\n"	"        section .bflast align=1"
 	"\n"	"        section .bss align=4096"
-	"\n"	"filesize equ    section..bss.start-orgaddr"
+	"\n"	"ramsize equ     section..bss.start-orgaddr"
+	"\n"	"filesize equ    section..bflast.start-orgaddr"
 	"\n"	"putchbuf: resb 1"
 	);
 
@@ -789,7 +791,7 @@ print_hello_world(void)
 	"\n"	"        dw      ehdrsize                ;   e_ehsize"
 	"\n"	"        dw      phdrsize                ;   e_phentsize"
 	"\n"	"        dw      1                       ;   e_phnum"
-	"\n"	"        dw      0                       ;   e_shentsize"
+	"\n"	"        dw      40                      ;   e_shentsize"
 	"\n"	"        dw      0                       ;   e_shnum"
 	"\n"	"        dw      0                       ;   e_shstrndx"
 	"\n"
@@ -814,6 +816,12 @@ print_hello_world(void)
 
     printf("\tsection\t.text\n");
     printf("\tsection\t.rodata align=1\n");
+    for(n = bfprog; n; n=n->next) {
+	if (n->next && (n->count & 0xFF) == '\n') {
+	    printf("\tdb\t0x0a\n");
+	    break;
+	}
+    }
     printf("msg:\n");
     for(i=0, n = bfprog; n; n=n->next) {
 	if (i == 0) printf("\tdb\t"); else printf(", ");
