@@ -28,8 +28,10 @@ static int ulines = 0;
 static int ulines = 1;
 #endif
 static int outp_line;
+static int lib_getch = 0;
 
 static int hello_world = 0;
+static int qmagic = 0, omagic = 0;
 
 /* loop_class: condition at 1=> end, 2=>start, 3=>both */
 static int loop_class = 3;
@@ -37,6 +39,8 @@ static int loop_class = 3;
 /* Intel GAS translation and linkable objects. */
 static int intel_gas = 0;
 static void print_nasm_elf_header(void);
+static void print_nasm_qmagic_header(void);
+static void print_nasm_omagic_header(void);
 static void print_as_header(void);
 
 int
@@ -49,6 +53,8 @@ checkarg_nasm(char * opt, char * arg UNUSED)
     if (!strcmp(opt, "-fwin32n")) { intel_gas = 0; link_main = 1; ulines = 1; return 1; }
     if (!strcmp(opt, "-fuline")) { ulines = 1; return 1; }
     if (!strcmp(opt, "-fno-uline")) { ulines = 0; return 1; }
+    if (!strcmp(opt, "-qmagic")) { intel_gas = link_main = 0; qmagic = 1; return 1; }
+    if (!strcmp(opt, "-omagic")) { intel_gas = link_main = 0; omagic = 1; return 1; }
     return 0;
 }
 
@@ -77,7 +83,7 @@ print_nasm(void)
     outp_line = -1;
 
     hello_world = (total_nodes == node_type_counts[T_CHR] &&
-		    !noheader && !link_main);
+		    !noheader && !link_main && !qmagic && !omagic);
 
     if (hello_world) {
 	print_hello_world();
@@ -304,21 +310,34 @@ print_nasm(void)
 	    break;
 
 	case T_INP:
-
-	    if (n->offset != 0 || link_main) {
-		printf("\tpush ecx\n");
-		printf("\tadd ecx,%d\n", n->offset);
-	    }
-	    if (!link_main) {
+	    if (!link_main && !lib_getch) {
+		lib_getch = 1;
+		printf("section .textlib\n");
+		printf("getch:\n");
 		printf("\txor eax,eax\n");
 		printf("\tmov ebx,eax\n");
 		printf("\tcdq\n");
 		printf("\tinc edx\n");
 		printf("\tmov al, 3\n");
 		printf("\tint 0x80\t; read(ebx, ecx, edx);\n");
-	    } else {
-		printf("\tcall getch\n");
+		if (eofcell > 1) {
+		    printf("\tcmp eax,0\n");
+		    printf("\tjg .noeof\n");
+		    if (eofcell == 3)
+			printf("\tmov byte ptr [ecx], 0\n");
+		    else
+			printf("\tmov byte ptr [ecx], 0xFF\n");
+		    printf(".noeof:\n");
+		}
+		printf("\tret\n");
+		printf("section .bftext\n");
 	    }
+
+	    if (n->offset != 0 || link_main) {
+		printf("\tpush ecx\n");
+		printf("\tadd ecx,%d\n", n->offset);
+	    }
+	    printf("\tcall getch\n");
 	    if (n->offset != 0 || link_main)
 		printf("\tpop ecx\n");
 	    break;
@@ -417,6 +436,10 @@ print_asm_header(void)
 {
     if (link_main)
 	print_as_header();
+    else if (omagic)
+	print_nasm_omagic_header();
+    else if (qmagic)
+	print_nasm_qmagic_header();
     else
 	print_nasm_elf_header();
 }
@@ -440,7 +463,6 @@ print_nasm_elf_header(void)
     printf("\n");
     printf("BITS 32\n");
     printf("\n");
-    printf("memsize\tequ\t%d\n", memsize);
 
     printf("%s\n",
 		"orgaddr equ     0x08048000"
@@ -517,6 +539,7 @@ print_nasm_elf_header(void)
 
     if (most_neg_maad_loop<0)
 	printf("\tresb %d\n", -most_neg_maad_loop);
+    printf("memsize\tequ\t%d\n", memsize);
     printf("mem:\n");
 
     printf("\n");
@@ -527,6 +550,164 @@ print_nasm_elf_header(void)
     printf("\tinc\tedx\t\t; EDX = 1 ;ARG4 for system calls\n");
     printf("\tmov\tecx,mem\n");
     printf("\n");
+    printf("%%define ptr\t\t; I'm putting these in for dumber assemblers.\n");
+    printf("%%define .byte\tdb\t; Sigh\n");
+    printf("\n");
+}
+
+static void
+print_nasm_qmagic_header(void)
+{
+    char const *np =0, *ep;
+    if (bfname && *bfname) {
+        np = strrchr(bfname, '/');
+        if (np) np++; else np = bfname;
+    }
+    if (!np || !*np) np = "brainfuck";
+    ep = strrchr(np, '.');
+    if (!ep || (strcmp(ep, ".bf") && strcmp(ep, ".b")))
+        ep = np + strlen(np);
+
+    printf("; asmsyntax=nasm\n");
+    printf("; nasm %.*s.s && chmod +x %.*s\n",
+            (int)(ep-np), np, (int)(ep-np), np);
+
+    printf("%s\n",
+		"; Beware this needs the a.out binformat loaded AND"
+	"\n"	"; may need the the limit in /proc/sys/vm/mmap_min_addr"
+	"\n"	"; to be no higher than 4096."
+	"\n"	"BITS 32"
+	"\n"
+	"\n"	"orgaddr equ     0x0001000"
+	"\n"	"        org     orgaddr"
+	"\n"
+	"\n"	"        dd      0x006400CC      ; a_info"
+	"\n"	"        dd      a_text          ; a_text"
+	"\n"	"        dd      a_data          ; a_data"
+	"\n"	"        dd      a_bss           ; a_bss"
+	"\n"	"        dd      0               ; a_syms"
+	"\n"	"        dd      _start          ; a_entry"
+	"\n"	"        dd      0               ; a_trsize"
+	"\n"	"        dd      0               ; a_drsize"
+	"\n"
+	"\n"	"        section .text"
+	"\n"	"        section .rodata"
+	"\n"	"        section .textlib align=32"
+	"\n"	"        section .bftext align=32"
+	"\n"	"        section .bftail align=1"
+	"\n"
+	"\n"	"exit_prog:"
+	"\n"	"        mov     bl, 0           ; Exit status"
+	"\n"	"        xor     eax, eax"
+	"\n"	"        inc     eax             ; syscall 1, exit"
+	"\n"	"        int     0x80            ; exit(0)"
+	"\n"
+	"\n"	"        section .data align=4096"
+	"\n"	"putchbuf:"
+	"\n"	"        db      0xFF"
+	"\n"
+	"\n"	"datapad equ     4096-(($-$$)&4095)"
+	"\n"	"a_text  equ     $$-orgaddr"
+	"\n"	"a_data  equ     $-$$"
+	"\n"	"a_bss   equ     memsize+datapad"
+	"\n"	"        section .datapad align=1 nobits"
+	"\n"	"        resb    datapad"
+	"\n"
+	"\n"	"        section .bss align=4096"
+	"\n"	"mem:"
+	"\n"	"        section .bftext"
+	"\n"	"_start:"
+	"\n"	"        xor     eax, eax        ; EAX = 0 ;don't change high bits."
+	"\n"	"        cdq                     ; EDX = 0 ;sign bit of EAX"
+	"\n"	"        inc     edx             ; EDX = 1 ;ARG4 for system calls"
+	"\n"	"        mov     ecx,mem"
+	);
+
+    if (most_neg_maad_loop<-2048) {
+	printf("\tadd ecx,%d\n", -most_neg_maad_loop);
+	printf("memsize\tequ\t%d\n", memsize-most_neg_maad_loop);
+    } else
+	printf("memsize\tequ\t%d\n", memsize);
+    printf("\n");
+
+    printf("%%define ptr\t\t; I'm putting these in for dumber assemblers.\n");
+    printf("%%define .byte\tdb\t; Sigh\n");
+    printf("\n");
+}
+
+static void
+print_nasm_omagic_header(void)
+{
+    char const *np =0, *ep;
+    if (bfname && *bfname) {
+        np = strrchr(bfname, '/');
+        if (np) np++; else np = bfname;
+    }
+    if (!np || !*np) np = "brainfuck";
+    ep = strrchr(np, '.');
+    if (!ep || (strcmp(ep, ".bf") && strcmp(ep, ".b")))
+        ep = np + strlen(np);
+
+    printf("; asmsyntax=nasm\n");
+    printf("; nasm %.*s.s && chmod +x %.*s\n",
+            (int)(ep-np), np, (int)(ep-np), np);
+
+    printf("%s\n",
+		"; Beware this needs the a.out binformat loaded AND"
+	"\n"	"; may need the the limit in /proc/sys/vm/mmap_min_addr"
+	"\n"	"; to be zero. Also current Linux amd64 versions will"
+	"\n"	"; not run OMAGIC executables correctly."
+	"\n"	"BITS 32"
+	"\n"
+	"\n"	"orgaddr equ     -32"
+	"\n"	"        org     orgaddr"
+	"\n"
+	"\n"	"        dd      0x00640107      ; a_info"
+	"\n"	"        dd      a_text          ; a_text"
+	"\n"	"        dd      a_data          ; a_data"
+	"\n"	"        dd      a_bss           ; a_bss"
+	"\n"	"        dd      0               ; a_syms"
+	"\n"	"        dd      _start          ; a_entry"
+	"\n"	"        dd      0               ; a_trsize"
+	"\n"	"        dd      0               ; a_drsize"
+	"\n"
+	"\n"	"        section .text"
+	"\n"	"        section .rodata"
+	"\n"	"        section .textlib align=32"
+	"\n"	"        section .bftext align=32"
+	"\n"	"        section .bftail align=1"
+	"\n"
+	"\n"	"exit_prog:"
+	"\n"	"        mov     bl, 0           ; Exit status"
+	"\n"	"        xor     eax, eax"
+	"\n"	"        inc     eax             ; syscall 1, exit"
+	"\n"	"        int     0x80            ; exit(0)"
+	"\n"
+	"\n"	"        section .data align=1"
+	"\n"	"putchbuf:"
+	"\n"	"        db      0xFF"
+	"\n"
+	"\n"	"a_text  equ     $$"
+	"\n"	"a_data  equ     $-$$"
+	"\n"	"a_bss   equ     memsize"
+	"\n"
+	"\n"	"        section .bss align=1"
+	"\n"	"mem:"
+	"\n"	"        section .bftext"
+	"\n"	"_start:"
+	"\n"	"        xor     eax, eax        ; EAX = 0 ;don't change high bits."
+	"\n"	"        cdq                     ; EDX = 0 ;sign bit of EAX"
+	"\n"	"        inc     edx             ; EDX = 1 ;ARG4 for system calls"
+	"\n"	"        mov     ecx,mem"
+	);
+
+    if (most_neg_maad_loop<-2048) {
+	printf("\tadd ecx,%d\n", -most_neg_maad_loop);
+	printf("memsize\tequ\t%d\n", memsize-most_neg_maad_loop);
+    } else
+	printf("memsize\tequ\t%d\n", memsize);
+    printf("\n");
+
     printf("%%define ptr\t\t; I'm putting these in for dumber assemblers.\n");
     printf("%%define .byte\tdb\t; Sigh\n");
     printf("\n");
@@ -831,16 +1012,16 @@ print_hello_world(void)
 	if (i == 0|| n->next == 0) printf("\n");
     }
     printf("msgend:\n");
-    printf("%%ifdef __YASM_MAJOR__\n");
-    printf("%%define msgsz\t%d\n", bytecount);
-    printf("%%else\n");
-    printf("%%define msgsz\tmsgend-msg\n");
-    printf("%%endif\n");
-
-    printf("\tsection .text\n");
-    printf("_start:\n");
-
     if (total_nodes > 0) {
+	printf("%%ifdef __YASM_MAJOR__\n");
+	printf("%%define msgsz\t%d\n", bytecount);
+	printf("%%else\n");
+	printf("%%define msgsz\tmsgend-msg\n");
+	printf("%%endif\n");
+
+	printf("\tsection .text\n");
+	printf("_start:\n");
+
 
 	/* printf("\txor\teax,eax\n");	Linux is zero */
 	/* printf("\txor\tebx,ebx\n");	Linux is zero */
@@ -851,14 +1032,21 @@ print_hello_world(void)
 	printf("\tmov\tecx,msg\n");
 	printf("%%if msgsz < 128\n");
 	    printf("\tmov\tdl,msgsz\n");
+	    printf("\tint\t0x80\t\t; write(ebx, ecx, edx);\n");
+	    printf("\tmov\tal,1\n");
 	printf("%%else\n");
 	    printf("\tmov\tedx,msgsz\n");
+	    printf("\tint\t0x80\t\t; write(ebx, ecx, edx);\n");
+	    printf("\txor\teax,eax\n");
+	    printf("\tinc\teax\n");
 	printf("%%endif\n");
-	printf("\tint\t0x80\t\t; write(ebx, ecx, edx);\n");
-	printf("\txor\teax,eax\n");
-	printf("\txor\tebx,ebx\n");
+	printf("\tdec\tebx\n");
+	printf("\tint\t0x80\t\t; exit(0)\n");
+    } else {
+	printf("\tsection .text\n");
+	printf("_start:\n");
+	printf("\tinc\teax\t\t; syscall 1, exit\n");
+	printf("\tint\t0x80\t\t; exit(0)\n");
     }
-    printf("\tinc\teax\t\t; syscall 1, exit\n");
-    printf("\tint\t0x80\t\t; exit(0)\n");
     return;
 }
