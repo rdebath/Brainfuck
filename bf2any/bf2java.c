@@ -271,6 +271,15 @@ reformat()
 void
 loutcmd(int ch, int count, struct instruction *n)
 {
+    if (bytecell) {
+	switch(ch) {
+	case '+': case '-': case '=':
+	case 'M': case 'N': case 'Q':
+	case 'm': case 'n':
+	    count = (signed char) count;
+	}
+    }
+
     switch(ch) {
     case '!':
 
