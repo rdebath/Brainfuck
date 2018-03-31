@@ -61,6 +61,7 @@ struct be_interface_s be_interface = {
 #define L_MALBRAIN      0x17    /* malbrain(token, count); */
 #define L_HANOILOVE     0x18    /* hanoilove(token, count); */
 #define L_DOWHILE       0x19    /* bfdowhile(token, count); */
+#define L_BINRLE        0x1A    /* bfbinrle(token, count); */
 #define L_QQQ           0x1E    /* qqq(token, count); */
 
 static const char bf[] = "><+-.,[]";
@@ -401,6 +402,7 @@ static void malbrain(int ch, int count);
 static void hanoilove(int ch, int count);
 static void qqq(int ch, int count);
 static void bfdowhile(int ch, int count);
+static void bfbinrle(int ch, int count);
 static void bftranslate(int ch, int count);
 static void bfreprint(void);
 static void bfpackprint(void);
@@ -625,6 +627,9 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-dowhile") == 0) {
 	lang = 0; langclass = L_DOWHILE; return 1;
     } else
+    if (strcmp(arg, "-binrle") == 0) {
+	lang = 0; langclass = L_BINRLE; return 1;
+    } else
     if (strcmp(arg, "-petooh") == 0) {
 	lang = petooh; langclass = L_WORDS; return 1;
     } else
@@ -687,6 +692,7 @@ fn_check_arg(const char * arg)
 	"\n\t"  "-malbrain Malbrain translation"
 	"\n\t"  "-hanoilove Hanoi Love translation"
 	"\n\t"  "-dowhile Do ... while translataion."
+	"\n\t"  "-binrle Base 2 RLE BF"
 	"\n\t"  "-???    https://esolangs.org/wiki/%3F%3F%3F"
 	"\n\t"  "-dc     Convert to dc(1) using the first of below."
 	"\n\t"  "-dc1      Use an array and a pointer variable."
@@ -807,7 +813,7 @@ outcmd(int ch, int count)
     if (ch == '!' && (langclass & GEN_HEADER) != 0)
 	ps(lang[8]);
 
-    if (L_BASE != L_TOKENS && L_BASE != L_BFRLE)
+    if (L_BASE != L_TOKENS && L_BASE != L_BFRLE && L_BASE != L_BINRLE)
     {
 	if (ch == '=') {
 	    outcmd('[', 1);
@@ -865,6 +871,7 @@ outcmd(int ch, int count)
     case L_MALBRAIN:	malbrain(ch, count); break;
     case L_HANOILOVE:	hanoilove(ch, count); break;
     case L_DOWHILE:	bfdowhile(ch, count); break;
+    case L_BINRLE:	bfbinrle(ch, count); break;
     case L_QQQ:		qqq(ch, count); break;
     }
 
@@ -1241,6 +1248,47 @@ bfrle(int ch, int count)
 	sprintf(buf, "%d%c", count, ch);
 #endif
 	ps(buf);
+    } else if (count < 2)
+	pc(ch);
+    else while (count-- > 0)
+	pc(ch);
+}
+
+static void
+bfbinrle(int ch, int count)
+{
+    char buf[sizeof(int)*8+3];
+    char * p = buf;
+    unsigned int ucount = count;
+
+    if (ch == '=') {
+	pc(ch);
+	state = 0;
+	ch = '+';
+	if (count == 0) return;
+    } else if (! (p = strchr(bf,ch))) return;
+
+    if (ch == state) {
+	if (ch == '+') { pc('-'); ucount++; }
+	if (ch == '-') { pc('+'); ucount++; }
+	if (ch == '>') { pc('<'); ucount++; }
+	if (ch == '<') { pc('>'); ucount++; }
+    }
+
+    state = ch;
+    if (count > 1 && (p-bf) < 4) {
+	p = buf;
+	while (ucount) {
+	    if (ucount & 1)
+		*p++ = ch;
+	    else
+		*p++ = '*';
+	    ucount /= 2;
+	}
+	while(p>buf) {
+	    p--;
+	    pc(*p);
+	}
     } else if (count < 2)
 	pc(ch);
     else while (count-- > 0)
