@@ -13,9 +13,21 @@ static int
 fn_check_arg(const char * arg)
 {
     if (strcmp(arg, "-no_if") == 0) { be_interface.noifcmd = 1; return 1; }
+    if (strcmp(arg, "-no-beo") == 0) { be_interface.disable_be_optim = 1; return 1; }
     if (strcmp(arg, "-int") == 0) { be_interface.cells_are_ints = 1; return 1; }
     if (strcmp(arg, "-c") == 0) { c_header = 1; return 1; }
     if (strcmp(arg, "-#") == 0) return 1;
+
+    if (strcmp(arg, "-h") == 0) {
+        fprintf(stderr, "%s\n",
+        "\t"    "-no_if  Turn off 'IF' token."
+        "\n\t"  "-no-beo Turn off BE optimisation."
+        "\n\t"  "-int    Turn on cell==int flag."
+        "\n\t"  "-#      Enable debug flag."
+        "\n\t"  "-c      Add a C header for compiling."
+	);
+	return 1;
+    }
     return 0;
 }
 
@@ -108,6 +120,11 @@ static int ind = 0;
 	break;
 
     case '"':
+	if (be_interface.disable_be_optim) {
+	    puts("/* Ignored */");
+	    break;
+	}
+
 	{
 	    char * s = get_string(), *p=s;
 	    int percent = 0;

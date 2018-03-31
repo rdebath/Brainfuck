@@ -19,6 +19,7 @@ struct be_interface_s {
     int nobytecell;
     int bytesonly;
     int disable_be_optim;
+    int disable_fe_optim;
 } be_interface;
 
 /* This can be changed by the Makefile but everything must be recompiled. */

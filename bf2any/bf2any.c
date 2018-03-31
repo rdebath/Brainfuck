@@ -167,13 +167,12 @@ main(int argc, char ** argv)
 	}
     }
 
-    if (check_arg("+init")) {	/* For bf2bf to choose optimisation method */
-	if (!opt_optim && check_arg("+no-rle")) {
-	    opt_optim = disable_init_optim = 1;
-	}
-    }
+    check_arg("+init");	/* Callout to BE for soft init. */
 
     /* Defaults if not told */
+    if (!opt_optim && be_interface.disable_fe_optim)
+	opt_optim = disable_init_optim = 1;
+
     if (!opt_optim)
 	opt_optim = enable_optim = 1;
 
@@ -282,36 +281,41 @@ main(int argc, char ** argv)
     commands are just pass to the BE.
 */
 static void
+outopt(int ch, int count)
+{
+    if (!enable_optim) outcmd(ch, count);
+    else outtxn(ch, count);
+}
+
+static void
 outrun(int ch, int count)
 {
 static int zstate = 0;
 static int icount = 0;
-    if (!enable_optim) { outcmd(ch, count); return; }
-
     switch(zstate)
     {
     case 1:
 	if (count%2 == 1 && ch == '-') { zstate=2; icount = count; return; }
 	if (count%2 == 1 && ch == '+') { zstate=3; icount = count; return; }
-	outtxn('[', 0);
+	outopt('[', 0);
 	break;
     case 2:
 	if (ch == ']') { zstate=4; return; }
-	outtxn('[', 0);
-	outtxn('-', icount);
+	outopt('[', 0);
+	outopt('-', icount);
 	break;
     case 3:
 	if (ch == ']') { zstate=4; return; }
-	outtxn('[', 0);
-	outtxn('+', icount);
+	outopt('[', 0);
+	outopt('+', icount);
 	break;
     case 4:
-	if (ch == '+') { outtxn('=', count); zstate=0; return; }
-	if (ch == '-') { outtxn('=', -count); zstate=0; return; }
-	outtxn('=', 0);
+	if (ch == '+') { outopt('=', count); zstate=0; return; }
+	if (ch == '-') { outopt('=', -count); zstate=0; return; }
+	outopt('=', 0);
 	break;
     }
     zstate=0;
     if (ch == '[') { zstate++; return; }
-    outtxn(ch, count);
+    outopt(ch, count);
 }

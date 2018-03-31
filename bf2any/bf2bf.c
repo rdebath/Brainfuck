@@ -9,7 +9,12 @@
 #include "bf2any.h"
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = { .check_arg = fn_check_arg,.disable_be_optim=1,.noifcmd=1};
+struct be_interface_s be_interface = {
+    .check_arg = fn_check_arg,
+    .disable_be_optim=1,
+    .disable_fe_optim=1,
+    .noifcmd=1
+};
 
 /*
  * BF translation to BF. This isn't an identity translation because even
@@ -419,23 +424,6 @@ fn_check_arg(const char * arg)
 		enable_bf_mov = 1;
 	}
 
-	return 1;
-    }
-    if (strcmp(arg, "+no-rle") == 0) {
-	/*
-	 * Most of the translations in this collection don't have a
-	 * preference for RLE encoding but these output formats create
-	 * significantly shorter code for RLE strings.
-	 */
-	switch(L_BASE) {
-	case L_BFRLE:
-	case L_BFXML:
-	case L_HANOILOVE:
-	    return 0;
-	case L_JNWORD:
-	    if (langclass & C_ADDRLE)
-		return 0;
-	}
 	return 1;
     }
 
