@@ -400,12 +400,11 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("\n");
 #ifdef BE_NASM
     printf("Asm generation options, these adjust the '-s' option.\n");
-    printf("   -flinux (default)\n");
-    printf("        Code for NASM to directly generate a Linux executable.\n");
+    printf("   -fnasm (default)\n");
+    printf("        Code for NASM which can either be used to directly\n");
+    printf("        generate a Linux executable or can be linked by GCC.\n");
     printf("   -fgas\n");
     printf("        Generate code for 'gcc -m32 x.s'.\n");
-    printf("   -fnasm\n");
-    printf("        Generate code for NASM that can be linked by GCC.\n");
     printf("   -fwin32\n");
     printf("        Alter -fgas code for Windows.\n");
     printf("\n");

@@ -10,25 +10,20 @@
 static void print_asm_string(char * charmap, char * strbuf, int strsize);
 static void print_asm_header(void);
 static void print_asm_footer(void);
-static void print_hello_world(void);
+static void print_nasm_elf_hello_world(void);
 
 #ifdef __APPLE__
 /* Apple has old version of nasm so we must use maximums for sizes. */
 #define oldnasm
 #endif
 
-#ifdef __linux__
-static int link_main = 0;
-#else
-static int link_main = 1;
-#endif
 #ifdef __ELF__
 static int ulines = 0;
 #else
 static int ulines = 1;
 #endif
 static int outp_line;
-static int lib_getch = 0;
+static int lib_getch = 0, lib_putch = 0;
 
 static int hello_world = 0;
 static int qmagic = 0, omagic = 0;
@@ -41,18 +36,18 @@ static int intel_gas = 0;
 static void print_nasm_elf_header(void);
 static void print_nasm_qmagic_header(void);
 static void print_nasm_omagic_header(void);
-static void print_as_header(void);
+static void print_nasm_header(void);
+static void print_gas_header(void);
 
 int
 checkarg_nasm(char * opt, char * arg UNUSED)
 {
-    if (!strcmp(opt, "-fnasm")) { intel_gas = 0; link_main = 1; return 1; }
-    if (!strcmp(opt, "-flinux")) { intel_gas = link_main = 0; return 1; }
-    if (!strcmp(opt, "-qmagic")) { intel_gas = link_main = 0; qmagic = 1; return 1; }
-    if (!strcmp(opt, "-omagic")) { intel_gas = link_main = 0; omagic = 1; return 1; }
+    if (!strcmp(opt, "-fnasm")) { intel_gas = 0; return 1; }
+    if (!strcmp(opt, "-qmagic")) { intel_gas = 0; qmagic = 1; return 1; }
+    if (!strcmp(opt, "-omagic")) { intel_gas = 0; omagic = 1; return 1; }
 
-    if (!strcmp(opt, "-fgas")) { intel_gas = 1; link_main = 1; return 1; }
-    if (!strcmp(opt, "-fwin32")) { intel_gas = 1; link_main = 1; ulines = 1; return 1; }
+    if (!strcmp(opt, "-fgas")) { intel_gas = 1; return 1; }
+    if (!strcmp(opt, "-fwin32")) { intel_gas = 1; ulines = 1; return 1; }
     return 0;
 }
 
@@ -81,12 +76,7 @@ print_nasm(void)
     outp_line = -1;
 
     hello_world = (total_nodes == node_type_counts[T_CHR] &&
-		    !noheader && !link_main && !qmagic && !omagic);
-
-    if (hello_world) {
-	print_hello_world();
-	return;
-    }
+		    !noheader && !qmagic && !omagic);
 
 /* System calls used ...
     int 0x80: %eax is the syscall number; %ebx, %ecx, %edx, %esi, %edi and %ebp
@@ -308,36 +298,13 @@ print_nasm(void)
 	    break;
 
 	case T_INP:
-	    if (!link_main && !lib_getch) {
-		lib_getch = 1;
-		printf("section .textlib\n");
-		printf("getch:\n");
-		printf("\txor eax,eax\n");
-		printf("\tmov ebx,eax\n");
-		printf("\tcdq\n");
-		printf("\tinc edx\n");
-		printf("\tmov al, 3\n");
-		printf("\tint 0x80\t; read(ebx, ecx, edx);\n");
-		if (eofcell > 1) {
-		    printf("\tcmp eax,0\n");
-		    printf("\tjg .noeof\n");
-		    if (eofcell == 3)
-			printf("\tmov byte ptr [ecx], 0\n");
-		    else
-			printf("\tmov byte ptr [ecx], 0xFF\n");
-		    printf(".noeof:\n");
-		}
-		printf("\tret\n");
-		printf("section .bftext\n");
-	    }
+	    lib_getch = 1;
 
-	    if (n->offset != 0 || link_main) {
-		printf("\tpush ecx\n");
+	    printf("\tpush ecx\n");
+	    if (n->offset != 0)
 		printf("\tadd ecx,%d\n", n->offset);
-	    }
 	    printf("\tcall getch\n");
-	    if (n->offset != 0 || link_main)
-		printf("\tpop ecx\n");
+	    printf("\tpop ecx\n");
 	    break;
 
 	case T_MULT: case T_CMULT: case T_IF:
@@ -399,7 +366,10 @@ print_nasm(void)
 	    break;
 
 	case T_STOP:
-	    printf("\tjmp near exit_prog\n");
+	    if (intel_gas)
+		printf("\tjmp exit_prog\n");
+	    else
+		printf("\tjmp near exit_prog\n");
 	    break;
 
 	case T_NOP:
@@ -425,20 +395,30 @@ print_nasm(void)
 	print_asm_string(charmap, string_buffer, sp-string_buffer);
     }
 
-    if (link_main)
-	print_asm_footer();
+    print_asm_footer();
 }
 
 static void
 print_asm_header(void)
 {
-    if (link_main)
-	print_as_header();
-    else if (omagic)
+    if (intel_gas) {
+	print_gas_header();
+	return;
+    }
+
+    if (hello_world) {
+	print_nasm_elf_hello_world();
+
+	printf("\n\n; Below is the standard NASM code\n");
+	printf("\n\n%%ifnidn __OUTPUT_FORMAT__, bin\n");
+    }
+
+    print_nasm_header();
+    if (omagic)
 	print_nasm_omagic_header();
     else if (qmagic)
 	print_nasm_qmagic_header();
-    else
+    else if (!hello_world)
 	print_nasm_elf_header();
 }
 
@@ -459,6 +439,10 @@ print_nasm_elf_header(void)
     printf("; yasm %.*s.s && chmod +x %.*s\n",
 	    (int)(ep-np), np, (int)(ep-np), np);
     printf("\n");
+
+    printf("%%ifidn __OUTPUT_FORMAT__, bin\n");
+    printf("\n");
+
     printf("BITS 32\n");
     printf("\n");
 
@@ -548,9 +532,10 @@ print_nasm_elf_header(void)
 	"\n"	"        inc     edx             ; EDX = 1 ;ARG4 for system calls"
 	"\n"	"        mov     ecx,mem"
 	"\n"
-	"\n"	"%define ptr             ; I'm putting these in for dumber assemblers."
-	"\n"	"%define .byte   db      ; Sigh"
 	"\n");
+
+    printf("%%endif	; bin format\n");
+    printf("\n");
 }
 
 static void
@@ -569,6 +554,14 @@ print_nasm_qmagic_header(void)
     printf("; asmsyntax=nasm\n");
     printf("; nasm %.*s.s && chmod +x %.*s\n",
             (int)(ep-np), np, (int)(ep-np), np);
+
+    printf("%%ifidn __OUTPUT_FORMAT__, bin\n");
+    printf("\n");
+    if (most_neg_maad_loop<-2048)
+	printf("memsize\tequ\t%d\n", memsize-most_neg_maad_loop);
+    else
+	printf("memsize\tequ\t%d\n", memsize);
+    printf("\n");
 
     printf("%s\n",
 		"; Beware this needs the a.out binformat loaded AND"
@@ -621,15 +614,12 @@ print_nasm_qmagic_header(void)
 	"\n"	"        mov     ecx,mem"
 	);
 
-    if (most_neg_maad_loop<-2048) {
+    if (most_neg_maad_loop<-2048)
 	printf("\tadd ecx,%d\n", -most_neg_maad_loop);
-	printf("memsize\tequ\t%d\n", memsize-most_neg_maad_loop);
-    } else
-	printf("memsize\tequ\t%d\n", memsize);
+
     printf("\n");
 
-    printf("%%define ptr\t\t; I'm putting these in for dumber assemblers.\n");
-    printf("%%define .byte\tdb\t; Sigh\n");
+    printf("%%endif	; bin format\n");
     printf("\n");
 }
 
@@ -650,11 +640,19 @@ print_nasm_omagic_header(void)
     printf("; nasm %.*s.s && chmod +x %.*s\n",
             (int)(ep-np), np, (int)(ep-np), np);
 
+    printf("%%ifidn __OUTPUT_FORMAT__, bin\n");
+    printf("\n");
+    if (most_neg_maad_loop<-2048)
+	printf("memsize\tequ\t%d\n", memsize-most_neg_maad_loop);
+    else
+	printf("memsize\tequ\t%d\n", memsize);
+    printf("\n");
+
     printf("%s\n",
 		"; Beware this needs the a.out binformat loaded AND"
 	"\n"	"; may need the the limit in /proc/sys/vm/mmap_min_addr"
-	"\n"	"; to be zero. Also current Linux amd64 versions will"
-	"\n"	"; not run OMAGIC executables correctly."
+	"\n"	"; to be zero. Also some Linux amd64 kernel versions"
+	"\n"	"; will not run i386 OMAGIC executables correctly."
 	"\n"	"BITS 32"
 	"\n"
 	"\n"	"orgaddr equ     -32"
@@ -699,165 +697,139 @@ print_nasm_omagic_header(void)
 	"\n"	"        mov     ecx,mem"
 	);
 
-    if (most_neg_maad_loop<-2048) {
+    if (most_neg_maad_loop<-2048)
 	printf("\tadd ecx,%d\n", -most_neg_maad_loop);
-	printf("memsize\tequ\t%d\n", memsize-most_neg_maad_loop);
-    } else
-	printf("memsize\tequ\t%d\n", memsize);
     printf("\n");
 
-    printf("%%define ptr\t\t; I'm putting these in for dumber assemblers.\n");
-    printf("%%define .byte\tdb\t; Sigh\n");
+    printf("%%endif	; bin format\n");
     printf("\n");
 }
 
 static void
-print_as_header(void)
+print_nasm_header(void)
 {
-    if (intel_gas) {
-	printf("# This is for gcc's 'gas' assembler running in 'intel' mode\n");
-	printf("# The code is 32bit so you may need a -m32\n");
-	printf("# Assembler and link with libc using \"gcc -m32 -s -o bfpgm bfpgm.s\"\n");
-	if (ulines) {
-	    printf("# This uses underlines on the external variables so will probably\n");
-	    printf("# only compile for Windows.\n");
-	} else
-	    printf("# Works on Linux, NetBSD and probably any other x86 OS with GCC.\n");
-	printf("#\n");
-	printf(".intel_syntax noprefix\n");
-	printf(".text\n");
-    } else {
-	printf("; asmsyntax=nasm\n");
-	printf("; This is to be compiled using nasm to produce an elf32 object file\n");
-	printf(";   nasm -f elf32 bfprg.s\n");
-	printf("; Of a windows object file\n");
-	printf(";   nasm -f win32 bfprg.s\n");
-	printf("; Which is then linked with the system C compiler.\n");
-	printf(";   cc -m32 -s -o bfpgm bfpgm.o\n");
-	printf(";\n");
-	printf("%%define ptr\t\t; I'm putting these in for dumber assemblers.\n");
-	printf("%%define .byte\tdb\t; Sigh\n");
-	printf("\n");
+    printf("; asmsyntax=nasm\n");
+    printf("; This is to be compiled using nasm to produce an elf32 object file\n");
+    printf(";   nasm -f elf32 bfprg.s\n");
+    printf("; Or a windows object file\n");
+    printf(";   nasm -f win32 bfprg.s\n");
+    printf("; Which is then linked with the system C compiler.\n");
+    printf(";   cc -m32 -s -o bfpgm bfpgm.o\n");
+    printf(";\n");
+    printf("%%define ptr\t\t; I'm putting these in for dumber assemblers.\n");
+    printf("%%define .byte\tdb\t; Sigh\n");
+    printf("\n");
+    printf("%%ifnidn __OUTPUT_FORMAT__, bin\n");
+    printf("\n");
+    printf("\n");
 
-	printf("; For unix underscores used --prefix _\n");
-	printf("%%ifidn __OUTPUT_FORMAT__, win32\n");
-	printf("%%define use_prefix 1\n");
-	printf("%%endif\n");
-	printf("%%ifidn __OUTPUT_FORMAT__, win\n");
-	printf("%%define use_prefix 1\n");
-	printf("%%endif\n");
-	printf("%%ifidn __OUTPUT_FORMAT__, macho32\n");
-	printf("%%define use_prefix 1\n");
-	printf("%%endif\n");
-	printf("%%ifidn __OUTPUT_FORMAT__, macho\n");
-	printf("%%define use_prefix 1\n");
-	printf("%%endif\n");
-	printf("%%ifndef use_prefix\n");
-	printf("%%define use_prefix 0\n");
-	printf("%%endif\n");
-	printf("%%if use_prefix+0\n");
-	printf("  %%macro  cglobal 1 \n");
-	printf("    global  _%%1 \n");
-	printf("    %%define %%1 _%%1 \n");
-	printf("  %%endmacro \n");
-	printf("\n");
-	printf("  %%macro  cextern 1 \n");
-	printf("    extern  _%%1 \n");
-	printf("    %%define %%1 _%%1 \n");
-	printf("  %%endmacro\n");
-	printf("%%else\n");
-	printf("  %%define cglobal global\n");
-	printf("  %%define cextern extern\n");
-	printf("%%endif\n");
-	printf("\n");
+    printf("; For unix underscores used --prefix _\n");
+    printf("%%ifidn __OUTPUT_FORMAT__, win32\n");
+    printf("%%define use_prefix 1\n");
+    printf("%%endif\n");
+    printf("%%ifidn __OUTPUT_FORMAT__, win\n");
+    printf("%%define use_prefix 1\n");
+    printf("%%endif\n");
+    printf("%%ifidn __OUTPUT_FORMAT__, macho32\n");
+    printf("%%define use_prefix 1\n");
+    printf("%%endif\n");
+    printf("%%ifidn __OUTPUT_FORMAT__, macho\n");
+    printf("%%define use_prefix 1\n");
+    printf("%%endif\n");
+    printf("%%ifndef use_prefix\n");
+    printf("%%define use_prefix 0\n");
+    printf("%%endif\n");
+    printf("%%if use_prefix+0\n");
+    printf("  %%macro  cglobal 1 \n");
+    printf("    global  _%%1 \n");
+    printf("    %%define %%1 _%%1 \n");
+    printf("  %%endmacro \n");
+    printf("\n");
+    printf("  %%macro  cextern 1 \n");
+    printf("    extern  _%%1 \n");
+    printf("    %%define %%1 _%%1 \n");
+    printf("  %%endmacro\n");
+    printf("%%else\n");
+    printf("  %%define cglobal global\n");
+    printf("  %%define cextern extern\n");
+    printf("%%endif\n");
+    printf("\n");
 
-	printf("\tsection\t.bss\n");
-	printf("putchbuf: resb 1\n");
-	if (most_neg_maad_loop<0)
-	    printf("\tresb %d\n", -most_neg_maad_loop);
-	printf("mem:\n");
-	printf("\tresb %d\n", memsize);
-	printf("\tsection\t.text\n");
-	printf("\tcextern read\n");
-	printf("\tcextern write\n");
-	printf("\tcglobal main\n");
-	printf("\n");
-    }
+    printf("\tsection\t.bss\n");
+    printf("putchbuf: resb 1\n");
+    if (most_neg_maad_loop<0)
+	printf("\tresb %d\n", -most_neg_maad_loop);
+    printf("mem:\n");
+    printf("\tresb %d\n", memsize);
+    printf("\tsection\t.text\n");
+    printf("\tcextern read\n");
+    printf("\tcextern write\n");
+    printf("\tcglobal main\n");
+    printf("\n");
 
-    printf("getch:\n");
-    printf("\tsub esp, 28\n");
-    printf("\tmov dword ptr [esp+8], 1\n");
-    printf("\tmov dword ptr [esp+4], ecx\n");
-    printf("\tmov dword ptr [esp], 0\n");
-    printf("\tcall %sread\n", intel_gas&&ulines?"_":"");
-    printf("\tadd esp, 28\n");
-    printf("\txor edx,edx\n");
-    printf("\tret\n");
-
-    printf("putch:\n");
-    printf("\tsub esp, 32\n");
-    printf("\tmov dword ptr [esp+16], ecx\n");
-    printf("\tmov byte ptr [esp+12], al\n");
-    printf("\tmov dword ptr [esp+8], 1\n");
-    printf("\tlea eax, [esp+12]\n");
-    printf("\tmov dword ptr [esp+4], eax\n");
-    printf("\tmov dword ptr [esp], 1\n");
-    printf("\tcall %swrite\n", intel_gas&&ulines?"_":"");
-    printf("\tmov ecx, dword ptr [esp+16]\n");
-    printf("\tadd esp, 32\n");
-    printf("\txor edx,edx\n");
-    printf("\tret\n");
-
-    printf("prttext:\n");
-    printf("\tsub esp, 32\n");
-    printf("\tmov dword ptr [esp+12], ecx\n");
-    printf("\tmov dword ptr [esp+8], edx\n");
-    printf("\tmov dword ptr [esp+4], eax\n");
-    printf("\tmov dword ptr [esp], 1\n");
-    printf("\tcall %swrite\n", intel_gas&&ulines?"_":"");
-    printf("\tmov ecx, dword ptr [esp+12]\n");
-    printf("\tadd esp, 32\n");
-    printf("\txor edx,edx\n");
-    printf("\tret\n");
-
-    if (intel_gas) {
-	printf(".globl %smain\n", ulines?"_":"");
-	printf("%smain:\n", ulines?"_":"");
-    } else
-	printf("main:\n");
+    printf("main:\n");
     printf("\tpush ebp\n");
     printf("\tmov ebp, esp\n");
     printf("\tpush ebx\n");
-    printf("\tmov ecx, %smem\n", intel_gas?"offset flat:":"");
+    printf("\tmov ecx, mem\n");
     printf("\txor edx,edx\n");
     if ( most_neg_maad_loop != 0)
 	printf("\tadd ecx, %d\n", -most_neg_maad_loop);
 
-    if (intel_gas)
-	printf("\t.comm mem,%d,32\n", memsize - most_neg_maad_loop);
+    printf("%%endif	; !bin format\n");
 }
 
 static void
-print_asm_footer(void)
+print_nasm_footer(void)
 {
+    printf("\n");
+    printf("%%ifnidn __OUTPUT_FORMAT__, bin\n");
     printf("exit_prog:\n");
     printf("\tpop ebx\n");
     printf("\tleave\n");
     printf("\tret\n");
-}
+    printf("%%endif    ; !bin format\n");
 
-static void
-print_asm_string(char * charmap, char * strbuf, int strsize)
-{
-static int textno = -1;
-    int saved_line = outp_line;
+    if (lib_getch) {
+	printf("\n");
+	printf("%%ifidn __OUTPUT_FORMAT__, bin\n");
+	printf("section .textlib\n");
+	printf("getch:\n");
+	printf("\txor eax,eax\n");
+	printf("\tmov ebx,eax\n");
+	printf("\tcdq\n");
+	printf("\tinc edx\n");
+	printf("\tmov al, 3\n");
+	printf("\tint 0x80\t; read(ebx, ecx, edx);\n");
+	if (eofcell > 1) {
+	    printf("\tcmp eax,0\n");
+	    printf("\tjg .noeof\n");
+	    if (eofcell == 3)
+		printf("\tmov byte ptr [ecx], 0\n");
+	    else
+		printf("\tmov byte ptr [ecx], 0xFF\n");
+	    printf(".noeof:\n");
+	}
+	printf("\tret\n");
+	printf("section .bftext\n");
+	printf("%%endif    ; bin format\n");
 
-    if (textno == -1 && link_main)
-	textno ++;
-    if (textno == -1) {
-	textno++;
+	printf("%%ifnidn __OUTPUT_FORMAT__, bin\n");
+	printf("getch:\n");
+	printf("\tsub esp, 28\n");
+	printf("\tmov dword ptr [esp+8], 1\n");
+	printf("\tmov dword ptr [esp+4], ecx\n");
+	printf("\tmov dword ptr [esp], 0\n");
+	printf("\tcall read\n");
+	printf("\tadd esp, 28\n");
+	printf("\txor edx,edx\n");
+	printf("\tret\n");
+	printf("%%endif    ; !bin format\n");
+    }
 
-	if (enable_trace && !link_main)
+    if (lib_putch) {
+	printf("%%ifidn __OUTPUT_FORMAT__, bin\n");
+	if (enable_trace)
 	    printf("%%line 1 lib_string.s\n");
 	outp_line = -1;
 	printf("section .textlib\n");
@@ -883,49 +855,174 @@ static int textno = -1;
 	printf("\tpop ecx\n");
         printf("\tret\n");
 	printf("section .bftext\n");
+	printf("%%endif\n");
+
+	printf("%%ifnidn __OUTPUT_FORMAT__, bin\n");
+	printf("putch:\n");
+	printf("\tsub esp, 32\n");
+	printf("\tmov dword ptr [esp+16], ecx\n");
+	printf("\tmov byte ptr [esp+12], al\n");
+	printf("\tmov dword ptr [esp+8], 1\n");
+	printf("\tlea eax, [esp+12]\n");
+	printf("\tmov dword ptr [esp+4], eax\n");
+	printf("\tmov dword ptr [esp], 1\n");
+	printf("\tcall write\n");
+	printf("\tmov ecx, dword ptr [esp+16]\n");
+	printf("\tadd esp, 32\n");
+	printf("\txor edx,edx\n");
+	printf("\tret\n");
+
+	printf("prttext:\n");
+	printf("\tsub esp, 32\n");
+	printf("\tmov dword ptr [esp+12], ecx\n");
+	printf("\tmov dword ptr [esp+8], edx\n");
+	printf("\tmov dword ptr [esp+4], eax\n");
+	printf("\tmov dword ptr [esp], 1\n");
+	printf("\tcall write\n");
+	printf("\tmov ecx, dword ptr [esp+12]\n");
+	printf("\tadd esp, 32\n");
+	printf("\txor edx,edx\n");
+	printf("\tret\n");
+	printf("%%endif\n");
     }
 
+    if (hello_world && !intel_gas) {
+	printf("%%endif ; Hello world code\n");
+    }
+}
+
+static void
+print_gas_header(void)
+{
+    printf("# This is for gcc's 'gas' assembler running in 'intel' mode\n");
+    printf("# The code is 32bit so you may need a -m32\n");
+    printf("# Assembler and link with libc using \"gcc -m32 -s -o bfpgm bfpgm.s\"\n");
+    if (ulines) {
+	printf("# This uses underlines on the external variables so will probably\n");
+	printf("# only compile for Windows.\n");
+    } else
+	printf("# Works on Linux, NetBSD and probably any other x86 OS with GCC.\n");
+    printf("#\n");
+    printf(".intel_syntax noprefix\n");
+    printf(".text\n");
+
+    printf(".globl %smain\n", ulines?"_":"");
+    printf("%smain:\n", ulines?"_":"");
+    printf("\tpush ebp\n");
+    printf("\tmov ebp, esp\n");
+    printf("\tpush ebx\n");
+    printf("\tmov ecx, %smem\n", intel_gas?"offset flat:":"");
+    printf("\txor edx,edx\n");
+    if ( most_neg_maad_loop != 0)
+	printf("\tadd ecx, %d\n", -most_neg_maad_loop);
+
+    printf("\t.comm mem,%d,32\n", memsize - most_neg_maad_loop);
+}
+
+static void
+print_gas_footer(void)
+{
+    printf("exit_prog:\n");
+    printf("\tpop ebx\n");
+    printf("\tleave\n");
+    printf("\tret\n");
+
+    if (lib_getch) {
+	printf("getch:\n");
+	printf("\tsub esp, 28\n");
+	printf("\tmov dword ptr [esp+8], 1\n");
+	printf("\tmov dword ptr [esp+4], ecx\n");
+	printf("\tmov dword ptr [esp], 0\n");
+	printf("\tcall %sread\n", ulines?"_":"");
+	printf("\tadd esp, 28\n");
+	printf("\txor edx,edx\n");
+	printf("\tret\n");
+    }
+
+    if (lib_putch) {
+	printf("putch:\n");
+	printf("\tsub esp, 32\n");
+	printf("\tmov dword ptr [esp+16], ecx\n");
+	printf("\tmov byte ptr [esp+12], al\n");
+	printf("\tmov dword ptr [esp+8], 1\n");
+	printf("\tlea eax, [esp+12]\n");
+	printf("\tmov dword ptr [esp+4], eax\n");
+	printf("\tmov dword ptr [esp], 1\n");
+	printf("\tcall %swrite\n", ulines?"_":"");
+	printf("\tmov ecx, dword ptr [esp+16]\n");
+	printf("\tadd esp, 32\n");
+	printf("\txor edx,edx\n");
+	printf("\tret\n");
+
+	printf("prttext:\n");
+	printf("\tsub esp, 32\n");
+	printf("\tmov dword ptr [esp+12], ecx\n");
+	printf("\tmov dword ptr [esp+8], edx\n");
+	printf("\tmov dword ptr [esp+4], eax\n");
+	printf("\tmov dword ptr [esp], 1\n");
+	printf("\tcall %swrite\n", ulines?"_":"");
+	printf("\tmov ecx, dword ptr [esp+12]\n");
+	printf("\tadd esp, 32\n");
+	printf("\txor edx,edx\n");
+	printf("\tret\n");
+    }
+}
+
+static void
+print_asm_footer(void)
+{
+    if (intel_gas)
+	print_gas_footer();
+    else
+	print_nasm_footer();
+}
+
+static void
+print_asm_string(char * charmap, char * strbuf, int strsize)
+{
+static int textno = 0;
+    int saved_line = outp_line;
+    lib_putch = 1;
+
     if (strsize <= 0) return;
-    if (strsize == 1 && !link_main) {
+
+    if (strsize == 1 && !intel_gas) {
 	int ch = *strbuf & 0xFF;
-	if (charmap[ch] == 0) {
-	    charmap[ch] = 1;
+	int flg = (charmap[ch] == 0);
+	charmap[ch] = 1;
+
+	printf("%%ifidn __OUTPUT_FORMAT__, bin\n");
+
+	if (flg) {
 	    if (enable_trace && saved_line > 0)
 		printf("%%line 1 lib_putch_%02x.s\n", ch);
 	    printf("section .textlib\n");
 	    printf("litprt_%02x:\n", ch);
 	    printf("\tmov al,0x%02x\n", ch);
 	    printf("\tjmp putch\n");
-	    if (intel_gas)
-		printf(".text\n");
-	    else if (link_main)
-		printf("section .text\n");
-	    else
-		printf("section .bftext\n");
+	    printf("section .bftext\n");
 	    if (enable_trace && saved_line > 0)
 		printf("%%line %d+0 %s\n", saved_line, bfname);
 	    outp_line = saved_line;
 	}
 	printf("\tcall litprt_%02x\n", ch);
-    } else if (strsize == 1 && link_main) {
-	int ch = *strbuf & 0xFF;
-	if (charmap[ch] == 0) {
-	    charmap[ch] = 1;
-	    if (intel_gas)
-		printf(".section .rodata\n");
-	    else
-		printf("section .rodata\n");
+
+	printf("%%else\n");
+
+	if (flg) {
+	    printf("section .rodata\n");
 	    printf("text_x%02x:\n", ch);
 	    printf("\t.byte 0x%02x\n", ch);
-	    if (intel_gas)
-		printf(".text\n");
-	    else
-		printf("section .text\n");
+	    printf("section .text\n");
 	}
 	printf("\tmov eax, %stext_x%02x\n", intel_gas?"offset flat:":"", ch);
 	printf("\tmov edx,%d\n", strsize);
 	printf("\tcall prttext\n");
-    } else {
+
+	printf("%%endif\n");
+    }
+    else
+    {
 	int i;
 	textno++;
 	if (intel_gas)
@@ -950,10 +1047,13 @@ static int textno = -1;
 	printf("\n");
 	if (intel_gas)
 	    printf(".text\n");
-	else if (link_main)
+	else {
+	    printf("%%ifnidn __OUTPUT_FORMAT__, bin\n");
 	    printf("section .text\n");
-	else
+	    printf("%%else\n");
 	    printf("section .bftext\n");
+	    printf("%%endif\n");
+	}
 	printf("\tmov eax,%stext_%d\n", intel_gas?"offset flat:":"", textno);
 	printf("\tmov edx,%d\n", strsize);
 	printf("\tcall prttext\n");
@@ -972,18 +1072,16 @@ static int textno = -1;
  *  the registers at process startup. (Linux 2.0 and earlier won't work)
  */
 static void
-print_hello_world(void)
+print_nasm_elf_hello_world(void)
 {
     struct bfi * n = bfprog;
     int i, bytecount = 0;
 
-    if (link_main)
-	print_as_header();
-    else
-	printf("%s\n",
+    printf("%s\n",
 		"; asmsyntax=nasm"
 	"\n"	"; nasm hello_world.s && chmod +x hello_world"
 	"\n"
+	"\n"	"%ifidn __OUTPUT_FORMAT__, bin"
 	"\n"	"BITS 32"
 	"\n"
 	"\n"	"orgaddr equ     0x08048000"
@@ -1033,11 +1131,13 @@ print_hello_world(void)
     printf("\tsection\t.rodata align=1\n");
     for(n = bfprog; n; n=n->next) {
 	if (n->next && (n->count & 0xFF) == '\n') {
-	    printf("\tdb\t0x0a\n");
+	    printf("\tdb\t10\n");
 	    break;
 	}
     }
     printf("msg:\n");
+
+#if 0
     for(i=0, n = bfprog; n; n=n->next) {
 	if (i == 0) printf("\tdb\t"); else printf(", ");
 	printf("0x%02x", n->count & 0xFF);
@@ -1045,6 +1145,80 @@ print_hello_world(void)
 	i = ((i+1) & 7);
 	if (i == 0|| n->next == 0) printf("\n");
     }
+#endif
+
+    {
+	char txtbuf[80], *p=0;
+	int l = 0, instrn = 0;
+	for(i=0, n = bfprog; n; n=n->next) {
+	    int need;
+
+	    bytecount++;
+
+	    if (n->count >= ' ' && n->count <= '~' && n->count != '\'') {
+		if (instrn) need = 2; else need = 5;
+	    } else if (n->count == 10)
+		need = 4 + instrn;
+	    else
+		need = 6 + instrn;
+
+	    if (l+need>64) {
+		printf("%s\n", txtbuf);
+		l = 0;
+		instrn = 0;
+	    }
+
+	    if (l==0) {
+		strcpy(txtbuf, "\tdb\t");
+		p = txtbuf + strlen(txtbuf);
+	    }
+
+	    if (n->count >= ' ' && n->count <= '~' && n->count != '\'') {
+		if (!instrn) {
+		    if (l) {
+			strcpy(p, ", '");
+			p+=3;
+			l+=3;
+		    } else {
+			strcpy(p, "'");
+			p++;
+			l++;
+		    }
+		    instrn = 1;
+		}
+		l++;
+		*p++ = n->count;
+		*p = '\'';
+		p[1] = 0;
+	    } else {
+		if (instrn) { *p++ = '\''; l++; instrn=0; }
+		if (n->count == 10) {
+		    if (l) {
+			sprintf(p, ", %d", n->count & 0xFF);
+			p += 4;
+			l += 4;
+		    } else {
+			sprintf(p, "%d", n->count & 0xFF);
+			p += 2;
+			l += 2;
+		    }
+		} else {
+		    if (l) {
+			sprintf(p, ", 0x%02x", n->count & 0xFF);
+			p += 6;
+			l += 6;
+		    } else {
+			sprintf(p, "0x%02x", n->count & 0xFF);
+			p += 4;
+			l += 4;
+		    }
+		}
+
+	    }
+	}
+	if (l>0) printf("%s\n", txtbuf);
+    }
+
     printf("msgend:\n");
     if (total_nodes > 0) {
 	printf("%%ifdef __YASM_MAJOR__\n");
@@ -1082,5 +1256,6 @@ print_hello_world(void)
 	printf("\tinc\teax\t\t; syscall 1, exit\n");
 	printf("\tint\t0x80\t\t; exit(0)\n");
     }
+    printf("%%endif\n");
     return;
 }
