@@ -33,6 +33,10 @@ static int fixed_mask = 0;
 static int mask_defined = 1;
 static int indent = 0, disable_indent = 0;
 
+#define okay_for_cstr(xc) (((xc) >= ' ' && (xc) <= '~') || \
+	    (xc == '\n') || (xc == '\r') || (xc == '\a') || \
+	    (xc == '\b') || (xc == '\t'))
+
 static int use_direct_getchar = 0;
 static int use_dynmem = 0;
 static int use_goto = 0;
@@ -157,6 +161,8 @@ bijective_hexavigesimal(unsigned int a)
     }
     buf[c] = 0;
 
+    if (buf[1]) buf[0] = buf[0] + ('A' - 'a');
+
     return buf;
 }
 
@@ -224,9 +230,8 @@ print_c_header(FILE * ofd)
 	struct bfi * n = bfprog;
 	/* Check the string; be careful. */
 	while(n && okay) {
-	    if (n->type != T_CHR || n->count > '~'
-		|| (n->count < ' ' && n->count != '\n' && n->count != '\033')
-		)
+	    if (n->type != T_CHR ||
+		(!okay_for_cstr(n->count) && n->count != '\033'))
 		okay = 0;
 
 	    if (n->type == T_CHR && (n->count <= 0 || n->count > 127))
@@ -539,13 +544,17 @@ print_c_header(FILE * ofd)
 
 	if (node_type_counts[T_MOV] == 0 && memoffset == 0 &&
 		    !enable_trace && node_type_counts[T_DUMP] == 0) {
-	    if (!use_functions && max_pointer<100) {
+	    if (!use_functions) {
 		int i;
-		/* NB: "do" is a keyword, so this breaks soon after 100 */
 		fprintf(ofd, "static %s", cell_type);
-		for(i=0; i<max_pointer+1; i++)
-		    fprintf(ofd, "%s %s",
-			i?",":"", bijective_hexavigesimal(i+1));
+		for(i=0; i<max_pointer+1; i++) {
+		    fprintf(ofd, "%s", i?",":"");
+		    if ((i+1)%16 ==0)
+			fprintf(ofd, "\n\t");
+		    else
+			fprintf(ofd, " ");
+		    fprintf(ofd, "%s", bijective_hexavigesimal(i+1));
+		}
 		fprintf(ofd, ";\n");
 		tiny_tape = 1;
 	    } else
@@ -790,10 +799,6 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    }
 	    break;
 
-#define okay_for_cstr(xc) (((xc) >= ' ' && (xc) <= '~') || \
-	    (xc == '\n') || (xc == '\r') || (xc == '\a') || \
-	    (xc == '\b') || (xc == '\t'))
-
 	case T_PRT:
 	    if (!use_functions) {
 		if (!disable_indent) pt(ofd, indent,n);
@@ -886,7 +891,6 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		free(s);
 	    }
 	    break;
-#undef okay_for_cstr
 
 	case T_INP:
 	    if (!disable_indent) pt(ofd, indent,n);
