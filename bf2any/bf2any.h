@@ -9,6 +9,7 @@ extern char * extra_commands;
 
 void outcmd(int ch, int count);
 char * get_string(void);
+void add_string(int ch);
 
 /* Commons BE may override init value */
 typedef int (check_arg_t)(const char * arg);

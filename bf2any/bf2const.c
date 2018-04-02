@@ -74,7 +74,7 @@ static void clear_cell(struct mem *p)
     p->cleaned = p->cleaned_val = 0;
 }
 
-static void add_string(int ch)
+void add_string(int ch)
 {
     while (sav_str_len+2 > sav_str_maxlen) {
 	sav_str_str = realloc(sav_str_str, sav_str_maxlen += 512);

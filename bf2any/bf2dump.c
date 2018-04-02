@@ -7,24 +7,35 @@
 
 static check_arg_t fn_check_arg;
 struct be_interface_s be_interface = { .check_arg = fn_check_arg};
+
 static int c_header = 0;
+static int no_quote = 0;
+static int data_dump = 0;
+static int col = 0;
+static int maxcol = 76;
+
+static void ddump(int ch, int count);
 
 static int
 fn_check_arg(const char * arg)
 {
     if (strcmp(arg, "-no_if") == 0) { be_interface.noifcmd = 1; return 1; }
-    if (strcmp(arg, "-no-beo") == 0) { be_interface.disable_be_optim = 1; return 1; }
+    if (strcmp(arg, "-no-be") == 0) { be_interface.disable_be_optim = 1; return 1; }
+    if (strcmp(arg, "-no-q") == 0) { no_quote = 1; return 1; }
     if (strcmp(arg, "-int") == 0) { be_interface.cells_are_ints = 1; return 1; }
+    if (strcmp(arg, "-dd") == 0) { data_dump = 1; return 1; }
     if (strcmp(arg, "-c") == 0) { c_header = 1; return 1; }
     if (strcmp(arg, "-#") == 0) return 1;
 
     if (strcmp(arg, "-h") == 0) {
         fprintf(stderr, "%s\n",
         "\t"    "-no_if  Turn off 'IF' token."
-        "\n\t"  "-no-beo Turn off BE optimisation."
+        "\n\t"  "-no-be  Turn off BE optimisation."
+        "\n\t"  "-no-q   Turn off \" command."
         "\n\t"  "-int    Turn on cell==int flag."
         "\n\t"  "-#      Enable debug flag."
         "\n\t"  "-c      Add a C header for compiling."
+        "\n\t"  "-dd     Data dump mode."
 	);
 	return 1;
     }
@@ -45,6 +56,8 @@ outcmd(int ch, int count)
 {
 static int ind = 0;
     int mov = 0;
+
+    if (data_dump) { ddump(ch, count); return; }
 
     if (ch == '!' && c_header && bytecell)
 	printf("%s\n",  "#include<stdio.h>"
@@ -120,7 +133,7 @@ static int ind = 0;
 	break;
 
     case '"':
-	if (be_interface.disable_be_optim) {
+	if (be_interface.disable_be_optim || no_quote) {
 	    puts("/* Ignored */");
 	    break;
 	}
@@ -150,4 +163,70 @@ static int ind = 0;
 	printf("/* ? */\n");
 	break;
     }
+}
+
+static void
+ddump(int ch, int count)
+{
+    char ibuf[sizeof(int)*3+6];
+    int l;
+
+    if (ch == '"' && (no_quote || be_interface.disable_be_optim)) return;
+    if (ch == '!') return;
+
+    if (ch == '~') {
+	if (col)
+	    printf("\n");
+	col = 0;
+	return;
+    }
+
+    if (ch == '"') {
+	char * s = get_string();
+	if (!s || !*s) return;
+
+	if (col+3>maxcol) {
+	    printf("\n");
+	    col = 0;
+	}
+
+	putchar('"'); col++;
+	while (*s) {
+	    if (col > maxcol-(*s == '"')-2) {
+		printf("\"\n\"");
+		col = 1;
+	    }
+	    if (*s == '"') {
+		putchar(*s);
+		putchar(*s);
+		col+=2;
+	    } else if (*s == '\n') {
+		putchar(*s);
+		col = 0;
+	    } else {
+		putchar(*s);
+		col++;
+	    }
+	    s++;
+	}
+	col++;
+	putchar('"');
+	return;
+
+    } else if (ch == '=' && count < 0) {
+	l = sprintf(ibuf, "%d~=", ~count);
+    } else if (count == 0 || (ch != '=' && count == 1)) {
+	l = sprintf(ibuf, "%c", ch);
+    } else if (count > 0) {
+	l = sprintf(ibuf, "%d%c", count, ch);
+    } else {
+	l = sprintf(ibuf, "%d~%c", ~count, ch);
+    }
+
+    if (col + l > maxcol) {
+	printf("\n");
+	col = 0;
+    }
+    printf("%s", ibuf);
+    col += l;
 }

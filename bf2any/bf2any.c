@@ -50,11 +50,14 @@ char * extra_commands = 0;
  */
 
 static void outrun(int ch, int count);
+static void load_and_run(char ** filelist, int filecount);
+static void pipe_to_be(char ** filelist, int filecount);
 
 /*
  *  Decode arguments.
  */
 static int enable_rle = 0;
+static int backend_only = 0;
 
 static int
 check_arg(const char * arg) {
@@ -90,6 +93,11 @@ check_argv(const char * arg)
 	return 1;
     } else if (check_arg(arg)) {
 	;
+    } else if (strcmp(arg, "-be-pipe") == 0) {
+	if (be_interface.disable_be_optim) return 0;
+	backend_only = 1;
+	enable_rle++;
+	enable_debug = 1;
     }
     else return 0;
     return 1;
@@ -111,12 +119,8 @@ check_argv(const char * arg)
 int
 main(int argc, char ** argv)
 {
+    int ar, mm=0;
     char * pgm = argv[0];
-    int ch, lastch=']', c=0, m, b=0, lc=0, ar, mm=0, inp=0;
-    FILE * ifd;
-    int digits = 0, number = 0, ov_flg = 0, multi = 1;
-    int qstring = 0;
-    char * xc = 0;
     char ** filelist = 0;
     int filecount = 0;
 
@@ -176,13 +180,29 @@ main(int argc, char ** argv)
     if (!opt_optim)
 	opt_optim = enable_optim = 1;
 
-    if (disable_init_optim)
-	lastch = 0;
-
     if (be_interface.bytesonly) bytecell = 1;
 
     if (filecount == 0)
 	filelist[filecount++] = "-";
+
+    if (backend_only)
+	pipe_to_be(filelist, filecount);
+    else
+	load_and_run(filelist, filecount);
+    return 0;
+}
+
+void
+load_and_run(char ** filelist, int filecount)
+{
+    FILE * ifd;
+    int ch, lastch=']', c=0, m, b=0, lc=0, ar, inp=0;
+    int digits = 0, number = 0, ov_flg = 0, multi = 1;
+    int qstring = 0;
+    char * xc = 0;
+
+    if (disable_init_optim)
+	lastch = 0;
 
     /* Now we do it ... */
     outrun('!', 0);
@@ -272,7 +292,124 @@ main(int argc, char ** argv)
     }
     if (enable_debug && lastch != '#') outrun('#', 0);
     outrun('~', 0);
-    return 0;
+}
+
+void
+pipe_to_be(char ** filelist, int filecount)
+{
+    FILE * ifd;
+    int ch, m, m0, ar, inp=0, lc=0;
+    int digits = 0, number = 0, ov_flg = 0, multi = 1;
+    int qstring = 0;
+    char * xc = 0;
+
+    /* Now we do it ... */
+    outcmd('!', 0);
+    for(ar=0; ar<filecount; ar++) {
+
+	if (strcmp(filelist[ar], "-") == 0) {
+	    ifd = stdin;
+	    current_file = "stdin";
+	} else if((ifd = fopen(filelist[ar],"r")) == 0) {
+	    perror(filelist[ar]); exit(1);
+	} else
+	    current_file = filelist[ar];
+
+	while((ch = getc(ifd)) != EOF && (ifd!=stdin || ch != '!' ||
+		!inp || qstring)) {
+	    /* Quoted strings are printed. (And set current cell) */
+	    if (qstring) {
+		if (ch == '"') {
+		    qstring++;
+		    if (qstring == 2) continue;
+		    if (qstring == 3) qstring = 1;
+		}
+		if (qstring == 2) {
+		    qstring = 0;
+		    add_string(0);
+		    outcmd('"', 0);
+		    if ( get_string() ) {
+			fprintf(stderr, "Backend didn't process '\"' command.\n");
+			exit(99);
+		    }
+		} else {
+		    add_string(ch);
+		    continue;
+		}
+	    }
+
+	    /* Comments */
+	    if (lc || ch == '{') { lc += (ch=='{') - (ch=='}'); continue; }
+
+	    /* Source RLE decoding */
+	    if (ch >= '0' && ch <= '9') {
+		digits = 1;
+		number = ov_iadd(ov_imul(number, 10, &ov_flg), ch-'0', &ov_flg);
+		continue;
+	    }
+	    if (ch == '~' && digits) {
+		number = ov_ineg(number, &ov_flg);
+		number = ov_iadd(number, -1, &ov_flg);
+		continue;
+	    }
+	    if (ch == ' ' || ch == '\t') continue;
+	    if ( ov_flg ) number=digits=ov_flg=0;
+
+	    /* These chars have an argument. */
+	    m = (ch == '>' || ch == '<' || ch == '+' || ch == '-' ||
+		 ch == '=' || ch == 'N' || ch == 'M' || ch == 'Q' ||
+		 ch == 'm' || ch == 'n');
+
+	    /* These ones do not */
+	    m0 = (ch == '[' || ch == ']' || ch == '.' || ch == ',' ||
+		  ch == 'I' || ch == 'E' || ch == 'B' || ch == 'S' ||
+		  ch == 's' || ch == '"' || ch == 'X');
+
+	    if (be_interface.noifcmd) {
+		if (ch == 'I' || ch == 'E') {
+		    fprintf(stderr, "Backend doesn't have a IF command\n");
+		    exit(98);
+		}
+	    }
+
+	    if (extra_commands && (xc = strchr(extra_commands, ch)) != 0)
+		m0 = 1;
+
+	    if (!m) {
+		multi = 0;
+	    } else if (ch == '=') {
+		if (!digits) number = 0;
+		multi = number;
+	    } else {
+		if (!digits) number = 1;
+		multi = number;
+	    }
+
+	    number = 0; digits = 0;
+
+	    if (ch == '\n' || ch == '\f' || ch == '\a') continue;
+
+	    if(!m && !m0) {
+		if (ch > ' ' && ch <= '~')
+		    fprintf(stderr, "Command '%c' not supported\n", ch);
+		else
+		    fprintf(stderr, "Command 0x%02x not supported\n", ch);
+		exit(97);
+	    }
+
+	    if (xc) {
+		outcmd(256+(xc-extra_commands), multi);
+		xc = 0;
+		continue;
+	    }
+	    if (ch == '"') { qstring++; continue; }
+	    if (ch == ',') inp = 1;
+
+	    outcmd(ch, multi);
+	}
+	if (ifd != stdin) fclose(ifd);
+    }
+    outcmd('~', 0);
 }
 
 /*
