@@ -1,7 +1,7 @@
 #include <stdio.h>
 int main (int argc, char *argv[]) {
     char *b=0, *p;
-    short t[65536]={0};
+    int t[65536]={0};
     unsigned short m=0;
     int i=0;
     FILE *fp=argc>1?fopen(argv[1], "r"):stdin;
