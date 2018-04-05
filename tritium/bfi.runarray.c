@@ -209,7 +209,7 @@ convert_tree_to_runarray(void)
 	    }
 	    break;
 
-	case T_STOP:
+	case T_STOP: case T_NOP:
 	    break;
 
 	default:
