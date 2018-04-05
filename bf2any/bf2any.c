@@ -303,7 +303,6 @@ pipe_to_be(char ** filelist, int filecount)
     int qstring = 0;
     char * xc = 0;
 
-    /* Now we do it ... */
     outcmd('!', 0);
     for(ar=0; ar<filecount; ar++) {
 
@@ -317,7 +316,7 @@ pipe_to_be(char ** filelist, int filecount)
 
 	while((ch = getc(ifd)) != EOF && (ifd!=stdin || ch != '!' ||
 		!inp || qstring)) {
-	    /* Quoted strings are printed. (And set current cell) */
+	    /* Quoted strings are printed; do NOT set current cell) */
 	    if (qstring) {
 		if (ch == '"') {
 		    qstring++;

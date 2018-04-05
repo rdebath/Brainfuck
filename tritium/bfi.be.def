@@ -14,6 +14,7 @@ it to the list and fill in it's entry.
 #include "bfi.nasm.h"
 #include "bfi.bf.h"
 #include "bfi.dc.h"
+#include "bfi.dd.h"
 #include "bfi.dasm.h"
 #else
 
@@ -54,7 +55,8 @@ it to the list and fill in it's entry.
 
 #if XX == 6
     /* Generators normally generate code with a fixed cell size. */
-    if (cell_size == 0 && do_codestyle != c_default && do_codestyle != c_dc &&
+    if (cell_size == 0 && do_codestyle != c_default &&
+	    do_codestyle != c_dc && do_codestyle != c_dd &&
 	    do_codestyle != c_ccode && do_codestyle != c_bf)
 	set_cell_size(-1);
 #endif
@@ -217,6 +219,14 @@ X(dc,DC,
 	if (f) return f;
     }
 #endif
+
+/****************************************************************************/
+X(dd,DD,
+    printf("   -d   Code for be-pipe of bf2any\n");,
+    case 'd': do_codestyle = c_dd; break;			    ,
+    case c_dd: print_dd(); break;                                   ,
+    Nothing_Here                                                    )
+
 
 /****************************************************************************/
 

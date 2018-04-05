@@ -49,7 +49,7 @@ MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 	 -Wmissing-prototypes -Wold-style-definition -Wold-style-declaration
 
 OBJECTS=bfi.o bfi.version.o bfi.ccode.o bfi.nasm.o bfi.bf.o bfi.dc.o \
-	bfi.runarray.o bfi.runmax.o clock.o taperam.o
+	bfi.dd.o bfi.runarray.o bfi.runmax.o clock.o taperam.o
 
 CONF=-DCNF $(CONF_DYNASM) $(CONF_LIGHTNING) $(CONF_TCCLIB) $(CONF_BNLIB) $(CONF_LIBDL)
 LDLIBS=$(GNUSTK) $(LIBS_LIGHTNING) $(LIBS_TCCLIB) $(LIBS_BNLIB) $(GNUDYN) $(LIBS_LIBDL)
@@ -87,12 +87,13 @@ bfi.version.o: bfi.version.h
 
 bfi.o: \
     bfi.c bfi.tree.h bfi.run.h bfi.be.def bfi.ccode.h bfi.gnulit.h \
-    bfi.nasm.h bfi.bf.h bfi.dc.h clock.h ov_int.h \
+    bfi.nasm.h bfi.bf.h bfi.dc.h bfi.dd.h clock.h ov_int.h \
     bfi.runarray.h bfi.runmax.h
 bfi.bf.o: bfi.bf.c bfi.tree.h
 bfi.ccode.o: bfi.ccode.c bfi.tree.h bfi.run.h bfi.ccode.h
 bfi.dc.o: bfi.dc.c bfi.tree.h bfi.run.h
 bfi.nasm.o: bfi.nasm.c bfi.tree.h bfi.nasm.h
+bfi.dd.o: bfi.dd.c bfi.tree.h
 
 taperam.o: bfi.tree.h bfi.run.h
 
