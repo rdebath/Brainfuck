@@ -295,8 +295,11 @@ static int icount = 0;
     switch(zstate)
     {
     case 1:
-	if (count%2 == 1 && ch == '-') { zstate=2; icount = count; return; }
-	if (count%2 == 1 && ch == '+') { zstate=3; icount = count; return; }
+	if (count%2 == 1 && enable_optim) {
+	    if (ch == '-') { zstate=2; icount = count; return; }
+	    if (ch == '+') { zstate=3; icount = count; return; }
+	}
+	if (count == 1 && ch == '-') { zstate=2; icount = count; return; }
 	outopt('[', 0);
 	break;
     case 2:
