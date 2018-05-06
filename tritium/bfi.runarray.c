@@ -19,7 +19,7 @@ typedef int icell;
 #define icell	unsigned short
 #define M(x) x
 #elif MASK == -1
-#define icell	int
+#define icell	unsigned int
 #define M(x) (x)
 #elif MASK < 0xFF
 #define icell	char
@@ -82,6 +82,10 @@ convert_tree_to_runarray(void)
     last_offset = 0;
     while(n)
     {
+#ifdef ARRAY_DUMP
+	int * pp = p;
+#endif
+
 	if (n->type != T_MOV) {
 	    *p++ = (n->offset - last_offset);
 	    last_offset = n->offset;
@@ -107,51 +111,57 @@ convert_tree_to_runarray(void)
 	     * T_ADD instructions, but that will only happen if the optimiser
 	     * section is turned off.
 	     */
-	case T_IF:
-	    p[-1] = T_WHL;
 	    /*FALLTHROUGH*/
 
 	case T_WHL:
-	    if (n->next->type == T_MOV && n->next->count != 0 && opt_level>=1){
-		/* Look for [<<<], [-<<<] and [-<<<+] */
+	    if (opt_level>=1) {
 		struct bfi *n1, *n2=0, *n3=0, *n4=0;
 		n1 = n->next;
 		if (n1) n2 = n1->next;
 		if (n2) n3 = n2->next;
 		if (n3) n4 = n3->next;
 
-		if (n2->type == T_END) {
-		    p[-1] = T_ZFIND;
-		    *p++ = n1->count;
-		    n = n->jmp;
-		    break;
-		}
+		if (n1->type == T_MOV && n1->count != 0){
+		    /* Look for [<<<] */
 
-		if (n2->type == T_ADD && n3->type == T_END) {
-		    p[-1] = T_ADDWZ;
-		    *p++ = n2->offset - last_offset + n1->count;
-		    *p++ = n2->count;
-		    *p++ = n1->count;
-		    n = n->jmp;
-		    break;
-		}
-
-		if (n2->type == T_ADD && n3->type == T_ADD &&
-			n4->type == T_END) {
-		    if (    n2->count == -1 && n3->count == 1
-			 && n->offset == n3->offset
-			 && n->offset == n2->offset - n1->count ) {
-
-			p[-1] = T_MFIND;
+		    if (n2->type == T_END) {
+			p[-1] = T_ZFIND;
 			*p++ = n1->count;
 			n = n->jmp;
 			break;
 		    }
 		}
+
+		if (n1->type == T_ADD && n2->type == T_MOV && n3->type == T_END) {
+		    p[-1] = T_ADDWZ;
+		    *p++ = n1->offset - last_offset;
+		    *p++ = n1->count;
+		    *p++ = n2->count;
+		    n = n->jmp;
+		    break;
+		}
+
+		if (n1->type == T_ADD && n2->type == T_ADD &&
+		    n3->type == T_MOV && n4->type == T_END &&
+		    n1->count == -1 && n2->count == 1 &&
+		    n->offset == n1->offset &&
+		    n->offset == n2->offset - n3->count
+		) {
+		    p[-1] = T_MFIND;
+		    *p++ = n3->count;
+		    n = n->jmp;
+		    break;
+		}
 	    }
 
 	    /* Storing the location of the instruction in the T_END's count
 	     * field; it's not normally used */
+	    n->jmp->count = p-progarray;
+	    *p++ = 0;
+	    break;
+
+	case T_IF:
+	    p[-1] = T_WHL;
 	    n->jmp->count = p-progarray;
 	    *p++ = 0;
 	    break;
@@ -206,6 +216,27 @@ convert_tree_to_runarray(void)
 	    fprintf(stderr, "Invalid node type found = %s\n", tokennames[n->type]);
 	    exit(1);
 	}
+
+#ifdef ARRAY_DUMP
+	if (verbose>1)
+	{
+	    if (pp[0])
+		fprintf(stderr, "T_MOV(%d): ", pp[0]);
+
+	    if (pp[1] >= 0 && pp[1] < TCOUNT)
+		fprintf(stderr, "%s", tokennames[pp[1]]);
+	    else
+		fprintf(stderr, "TOKEN(%d)", pp[1]);
+
+	    for(pp+=2; pp<p; pp++) fprintf(stderr, " %d", pp[0]);
+
+	    if(n->line || n->col)
+		fprintf(stderr, " @(%d,%d)", n->line, n->col);
+
+	    fprintf(stderr, "\n");
+	}
+#endif
+
 	n = n->next;
     }
     *p++ = 0;
@@ -228,6 +259,9 @@ run_progarray(int * p, icell * m)
 #ifdef DYNAMIC_MASK
     const icell msk = (icell)cell_mask;
 #define M(x) ((x) &= msk)
+#define MS(x) ((x) & msk)
+#else
+#define MS(x) M(x)
 #endif
     for(;;) {
 	m += p[0];
@@ -294,11 +328,9 @@ run_progarray(int * p, icell * m)
 
 	case T_MFIND:
 	    /* Search along a rail for a minus 1 */
-	    while(M(*m)) {
-		*m -= 1;
-		m += p[2];
-		*m += 1;
-	    }
+            *m -= 1;
+            while(MS(*m+1) != 0) m += p[2];
+            *m += 1;
 	    p += 3;
 	    break;
 
