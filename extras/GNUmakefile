@@ -6,7 +6,7 @@ CLIST=$(filter-out cdowhile.c lightning.c,$(wildcard *.c))
 EXELIST := $(patsubst %.c,%,$(CLIST))
 OBJECTS := $(patsubst %.c,%.o,$(CLIST)) ook.o
 ILIST=qtable.h qtable.tmp byte2byte.tmp
-EXTRAS=bf1k bf0k bfas ook
+EXTRAS=bf1k bf0k bfas ook hydrogen16 hydrogen32 hydrogen64
 
 ALLEXE = $(EXELIST) $(MOREEXE) $(EXTRAS) $(LIBDL_EXE) $(LIGHTNINGEXE)
 
@@ -39,6 +39,15 @@ bf0k: hydrogen.c
 
 bfas: hydrogen.c
 	$(CC) -DMASK=126 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
+
+hydrogen16: hydrogen.c
+	$(CC) -DMASK=2 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
+
+hydrogen32: hydrogen.c
+	$(CC) -DMASK=4 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
+
+hydrogen64: hydrogen.c
+	$(CC) -DMASK=8 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
 
 cdowhile: cdowhile.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@ $(LIBS_LIBDL)
