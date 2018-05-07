@@ -859,9 +859,9 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    break;
 
 	case T_MFIND:
-	    (*m)--;
-	    while(M(*m+1) != 0) m += p[1];
-	    (*m)++;
+	    *m = M(*m -1);
+	    while(*m != M((icell)-1)) m += p[1];
+	    *m = M(*m +1);
 	    p += 3;
 	    break;
 
