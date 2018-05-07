@@ -80,6 +80,8 @@
     Mac(SET2c2) Mac(ADD2c2) Mac(SUB2c2) Mac(WHL2c2) Mac(END2c2) \
     Mac(SAVE2) Mac(MUL2) Mac(QSET2) \
     \
+    Mac(ZFIND2) Mac(MFIND2) Mac(ADDWZ2) \
+    \
     Mac(STOP) Mac(ERR) Mac(DATA) \
     Mac(RMOV) Mac(DEC)
 
@@ -313,6 +315,9 @@ int main(int argc, char **argv)
 		    p->type == T_SET2 ||
 		    p->type == T_WHL2 ||
 		    p->type == T_END2 ||
+		    p->type == T_ZFIND2 ||
+		    p->type == T_MFIND2 ||
+		    p->type == T_ADDWZ2 ||
 		    p->type == T_ZTEMP2)
 		    do_up = 1;
 		if (p->type == T_PRT) {
@@ -321,6 +326,9 @@ int main(int argc, char **argv)
 			p->type == T_SET2 ||
 			p->type == T_WHL2 ||
 			p->type == T_END2 ||
+			p->type == T_ZFIND2 ||
+			p->type == T_MFIND2 ||
+			p->type == T_ADDWZ2 ||
 			p->type == T_ZTEMP2)
 			do_up = 1;
 		}
@@ -444,9 +452,10 @@ int main(int argc, char **argv)
 		struct bfi *v;
 		int movsum = 0, incby = 0, idx_only = 1;
 		for(v=n->prev; v->type == T_ADD || v->type == T_SET || v->type == T_MOV; v=v->prev) {
-		    if (v->type == T_MOV)
+		    if (v->type == T_MOV) {
 			movsum += v->count;
-		    else if (movsum == 0) {
+			if (movsum>1024) break;
+		    } else if (movsum == 0) {
 			if (v->type == T_SET) break;
 			incby += v->count;
 		    } else
@@ -475,6 +484,65 @@ int main(int argc, char **argv)
 	    }
 
 #ifdef ENABLE_DOUBLE
+	    /* Identify double [>>>>] "zero search" and replace */
+	    if (n->type == T_END2 &&
+		n->prev->type == T_MOV &&
+		n->prev->prev->type == T_WHL2)
+	    {
+		// Make it the type we want.
+		n->type = T_ZFIND2;
+		n->count = n->prev->count;
+		n->jmp = 0;
+		// NOP the others.
+		n = n->prev;
+		n->type = T_NOP;
+		n = n->prev;
+		n->type = T_NOP;
+	    }
+
+	    /* Identify double [->>>>+] "minus one search" and replace */
+	    if (n->type == T_END2 &&
+		n->prev->type == T_ADD2 && n->prev->count == 1 &&
+		n->prev->prev->type == T_MOV &&
+		n->prev->prev->prev->type == T_ADD2 &&
+		    n->prev->prev->prev->count == -n->prev->count &&
+		n->prev->prev->prev->prev->type == T_WHL2)
+	    {
+		// Make it the type we want.
+		n->type = T_MFIND2;
+		n->count = n->prev->prev->count;
+		n->jmp = 0;
+		// NOP the others.
+		n = n->prev;
+		n->type = T_NOP;
+		n = n->prev;
+		n->type = T_NOP;
+		n = n->prev;
+		n->type = T_NOP;
+		n = n->prev;
+		n->type = T_NOP;
+	    }
+
+	    /* [-<<] [->>]  Run along a double rail clearing the flag column*/
+	    if (n->type == T_END2 &&
+		n->prev->type == T_MOV &&
+		n->prev->prev->type == T_ADD2 &&
+		n->prev->prev->count == -1 &&
+		n->prev->prev->prev->type == T_WHL2)
+	    {
+		// Make it the type we want.
+		n->type = T_ADDWZ2;
+		n->count = n->prev->count;
+		n->jmp = 0;
+		// NOP the others.
+		n = n->prev;
+		n->type = T_NOP;
+		n = n->prev;
+		n->type = T_NOP;
+		n = n->prev;
+		n->type = T_NOP;
+	    }
+
 	    /* [->>>+>>>+<<<<<<]   Multiple move or add loop (double byte). */
 	    if (n->type == T_END2) {
 		struct bfi *v;
@@ -485,9 +553,10 @@ int main(int argc, char **argv)
 			|| v->type == T_SET2
 			|| v->type == T_ZTEMP2 ; v=v->prev) {
 
-		    if (v->type == T_MOV)
+		    if (v->type == T_MOV) {
 			movsum += v->count;
-		    else if (movsum == 0) {
+			if (movsum>1024) break;
+		    } else if (movsum == 0) {
 			if (v->type == T_SET2) break;
 			if (v->type == T_ADD2 )
 			    incby += v->count;
@@ -699,6 +768,10 @@ run(void)
 	case T_ZTEMP2:
 	    arraylen += 2;
 	    break;
+
+	case T_ZFIND2: case T_MFIND2: case T_ADDWZ2:
+	    arraylen += 3;
+	    break;
 #endif
 #endif
 	case T_NOP:
@@ -764,6 +837,7 @@ run(void)
 	case T_MUL: case T_QSET:
 	case T_ZFIND: case T_MFIND:
 	case T_ADDWZ:
+	case T_ZFIND2: case T_MFIND2: case T_ADDWZ2:
 	    *p++ = n->count;
 	    break;
 
@@ -956,6 +1030,62 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	case T_ZTEMP2:
 	    m[-1] = m[2] = 0;
 	    p += 2;
+	    break;
+
+	case T_ZFIND2:
+	    m[-1] = m[2] = 0;
+	    while (m[0] != 0 || m[1] != 0) {
+		m += p[1];
+		m[-1] = m[2] = 0;
+	    }
+	    p += 3;
+	    break;
+
+	case T_MFIND2:
+	    m[-1] = m[2] = 0;
+#ifdef dcell
+	    *((dcell*)m) -= 1;
+#else
+	    {
+		unsigned int t = m[0] + (m[1]<<8);
+		t --;
+		m[0] = t; m[1] = (t>>8);
+	    }
+#endif
+	    while(m[0] != (icell)-1 || m[1] != (icell)-1) {
+		m += p[1];
+		m[-1] = m[2] = 0;
+	    }
+#ifdef dcell
+	    *((dcell*)m) += 1;
+#else
+	    {
+		unsigned int t = m[0] + (m[1]<<8);
+		t ++;
+		m[0] = t; m[1] = (t>>8);
+	    }
+#endif
+	    p += 3;
+	    break;
+
+	case T_ADDWZ2:
+	    m[-1] = m[2] = 0;
+	    while (m[0] != 0 || m[1] != 0)
+	    {
+    #ifdef dcell
+		*((dcell*)m) -= 1;
+    #else
+		{
+		    unsigned int t = m[0] + (m[1]<<8);
+		    t -= 1;
+		    m[0] = t; m[1] = (t>>8);
+		}
+    #endif
+		m += p[1];
+		m[-1] = m[2] = 0;
+	    }
+
+	    p += 3;
 	    break;
 
 /******************************************************************************/
