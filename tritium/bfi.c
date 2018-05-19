@@ -133,7 +133,6 @@ char * input_string = 0;
 char * program_string = 0;
 int libc_allows_utf8 = 0;
 int default_io = 1;
-static int insane_ints = 0;
 
 /*
  * The default values here make the compiler assume that the cell is
@@ -227,6 +226,7 @@ void LongUsage(FILE * fd, const char * errormsg) __attribute__ ((__noreturn__));
 void Usage(const char * why) __attribute__ ((__noreturn__));
 void UsageOptError(char * why) __attribute__ ((__noreturn__));
 void UsageInt64(void) __attribute__ ((__noreturn__));
+void UsageCheckInts(FILE *fd);
 int checkarg(char * opt, char * arg);
 #ifdef _WIN32
 int SetupVT100Console(int);
@@ -249,8 +249,7 @@ void LongUsage(FILE * fd, const char * errormsg)
 	fprintf(fd, "   -v   Verbose, repeat for more.\n");
 	fprintf(fd, "   -b   Use byte cells not integer.\n");
 	fprintf(fd, "   -z   End of file gives 0. -e=-1, -n=skip.\n");
-	if (insane_ints)
-	    fprintf(fd, "\nBEWARE: The C compiler does NOT use twos-complement arithmetic.\n");
+	UsageCheckInts(fd);
 	exit(1);
     }
 
@@ -418,10 +417,17 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("    Most code generators only support binary I/O.\n");
 #endif
 
-    if (insane_ints)
-	printf("\nBEWARE: The C compiler does NOT use twos-complement arithmetic.\n");
-
+    UsageCheckInts(stdout);
     exit(1);
+}
+
+void
+UsageCheckInts(FILE *fd)
+{
+    int x, flg = sizeof(int) * 8;
+    for(x=1;x+2>=x && --flg;x=(x|(x<<1))); /* -fwrapv must be enabled */
+    if (!flg)
+	fprintf(fd, "\nBEWARE: The C compiler does NOT use twos-complement arithmetic.\n");
 }
 
 void
@@ -622,12 +628,6 @@ main(int argc, char ** argv)
 #ifdef _WIN32
     SetupVT100Console(0);
 #endif
-
-    {
-	int x, flg = sizeof(int) * 8;
-	for(x=1;x+2>=x && --flg;x=(x|(x<<1))); /* -fwrapv must be enabled */
-	if (!flg) insane_ints =1;
-    }
 
 #if !defined(ALLOW_INSANITY) && defined(__GNUC__) \
     && (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ > 3)
