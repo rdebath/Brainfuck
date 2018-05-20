@@ -101,12 +101,14 @@ struct subst {
 #ifndef NO_XTRA
     { {T_SET,0},
 		"[+]" },
-    { {T_SET4, T_MOV, T_MOV, T_MOV, 0},
+    { {T_MOV, T_SET4, T_MOV, T_MOV, 0},
 		"[-]>[-]>[-]>[-]" },
 
 #ifdef ENABLE_DOUBLE
     { {T_MOV, T_ZTEMP2, T_MOV, T_MOV, 0},
 		"[-]>>>[-]" },
+
+/*  { {T_INP2, 0}, "[-]>[-]<," }, */
 
     { {T_SET2c2,0},
         "[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<[[-]>"
@@ -311,27 +313,18 @@ int main(int argc, char **argv)
 
 		int do_up = 0;
 		p = n->prev;
+		while(p->prev && (p->type == T_PRT || p->type == T_INP))
+		    p = p->prev;
 		if (p->type == T_ADD2 ||
 		    p->type == T_SET2 ||
 		    p->type == T_WHL2 ||
 		    p->type == T_END2 ||
+		    p->type == T_SET4 ||
 		    p->type == T_ZFIND2 ||
 		    p->type == T_MFIND2 ||
 		    p->type == T_ADDWZ2 ||
 		    p->type == T_ZTEMP2)
 		    do_up = 1;
-		if (p->type == T_PRT) {
-		    p = p->prev;
-		    if (p->type == T_ADD2 ||
-			p->type == T_SET2 ||
-			p->type == T_WHL2 ||
-			p->type == T_END2 ||
-			p->type == T_ZFIND2 ||
-			p->type == T_MFIND2 ||
-			p->type == T_ADDWZ2 ||
-			p->type == T_ZTEMP2)
-			do_up = 1;
-		}
 
 		if (do_up) {
 		    if (n->type == T_ADD2c2) n->type = T_ADD2;
@@ -398,10 +391,22 @@ int main(int argc, char **argv)
 		n->count = n->next->count;
 		n->jmp = 0;
 		// NOP the others.
-		n = n->next;
-		n->type = T_NOP;
-		n = n->next;
-		n->type = T_NOP;
+		//n = n->next;
+		n->next->type = T_NOP;
+		//n = n->next;
+		n->next->next->type = T_NOP;
+
+		if (n->prev && n->prev->prev)
+		{
+		    struct bfi *p1 = n->prev, *p2 = p1->prev;
+		    if (p1->type == T_MOV && p1->count == n->count &&
+			p2->type == T_ZFIND && p2->count == -n->count)
+		    {
+			n->type = T_NOP;
+			p2->type = T_NOP;
+			n = p2;
+		    }
+		}
 	    }
 
 	    /* Identify [->>>>+] "minus one search" and replace */
@@ -584,7 +589,7 @@ int main(int argc, char **argv)
 			    v->type = T_QSET2;
 			}
 		    }
-		    v->type = T_NOP;
+		    v->type = T_SET4;
 		}
 	    }
 #endif
@@ -598,7 +603,8 @@ int main(int argc, char **argv)
 		n = p;
 	    }
 	}
-	while (pgm && pgm->type == T_NOP) {
+	/* Trim any leftover NOP from the start of the program. */
+	if (pgm && pgm->type == T_NOP) {
 	    n = pgm;
 	    pgm = pgm->next;
 	    if (pgm) pgm->prev = 0;
@@ -948,12 +954,11 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	case T_MUL: *m = M(M(*m) + M(p[1] * a)); p += 3; break;
 	case T_QSET: if(a) *m = p[1]; p += 3; break;
 
-	case T_SET4: *m = 0; m[1] = 0; m[2] = 0; m[3] = 0; p += 2; break;
+	case T_SET4: *m = 0; m[1] = 0; m[2] = 0; m[-1] = 0; p += 2; break;
 
 #ifdef ENABLE_DOUBLE
 	case T_SAVE2:
 	    a = *m; a2 = (m[1]<<8) + a;
-	    *m = 0; m[1] = 0;
 	    m[-1] = m[2] = 0;
 	    p += 2;
 	    break;
