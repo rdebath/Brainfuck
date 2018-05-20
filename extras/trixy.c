@@ -1,4 +1,4 @@
-/* This is the was the brainfuck interpreter.
+/* This was the deadbeef brainfuck interpreter.
  * It's now called Trixy (gollum, gollum)
  *
  * Robert de Bath (c) 2014-2017 GPL v2 or later.
@@ -17,8 +17,10 @@ int pgmlen = 0, on_eof = 1, debug = 0, in_ascii = 0;
 
 int col = 0, maxcol = 72;
 
-enum outtype {L_ASCII, L_EXCON, L_ABCD, L_MINIMAL, L_BINERDY, L_TICK, L_MSF}
+enum outtype {L_ASCII, L_EXCON, L_ABCD, L_MINIMAL, L_BINERDY, L_TICK, L_MSF, L_DECIMAL}
     out_format = L_ASCII;
+
+int dump_code = 0, zcells = 0;
 
 int main(int argc, char **argv)
 {
@@ -40,6 +42,9 @@ int main(int argc, char **argv)
 	else if (!strcmp(argv[ar], "-binerdy")) out_format = L_BINERDY;
 	else if (!strcmp(argv[ar], "-tick")) out_format = L_TICK;
 	else if (!strcmp(argv[ar], "-msf")) out_format = L_MSF;
+	else if (!strcmp(argv[ar], "-decimal")) out_format = L_DECIMAL;
+	else if (!strcmp(argv[ar], "-dump")) dump_code = 1;
+	else if (!strcmp(argv[ar], "-zcells")) zcells = 1;
 	else if (argv[ar][0] == '-' && argv[ar][1] != '\0') {
 	    fprintf(stderr, "Unknown option '%s'\n", argv[ar]);
 	    fprintf(stderr, "Usage: %s [options] [file]\n", argv[0]);
@@ -54,6 +59,7 @@ int main(int argc, char **argv)
 	    fprintf(stderr, "    -binerdy Output in Binerdy.\n");
 	    fprintf(stderr, "    -tick    Output in Tick.\n");
 	    fprintf(stderr, "    -minimal Output in Minimal.\n");
+	    fprintf(stderr, "    -decimal Output in Decimal.\n");
 
 	    exit(1);
 	} else if (fn == 0)
@@ -94,11 +100,14 @@ int main(int argc, char **argv)
 		    }
 		} else if (pgm[n].cmd == ',') i = 1;
 	    }
-	    if (j<0 && !i && n>0 && pgm)
+	    if (j<0 && !i && n>0 && pgm && !dump_code)
 	       { pgm[n+1].cmd = 0; pgm[n+1].mov = 0; run(); n=p= -1; }
 	}
 	if (ifd != stdin) fclose(ifd);
-	if (pgm) { pgm[n+1].cmd = 0; run(); }
+	if (pgm) {
+	    pgm[n+1].cmd = 0;
+	    if (dump_code) dump(); else run();
+	}
     } else
 	while((ch = getc(ifd)) != EOF)
 	    putch(ch);
@@ -110,10 +119,37 @@ int main(int argc, char **argv)
 void run(void)
 {
     static unsigned char t[(sizeof(int) > sizeof(short))+USHRT_MAX];
+    static unsigned char z[(sizeof(int) > sizeof(short))+USHRT_MAX];
     static unsigned short m = 0;
     int n, ch;
     for(n = 0;; n++) {
 	m += pgm[n].mov;
+	if (zcells) {
+	    switch (pgm[n].cmd)
+	    {
+	    case '=': z[m] = 1; break;
+	    case '+': case '[': case ']': case '.': case ',': case '!':
+		if (!z[m]) {
+		    z[m] = 1;
+		    fprintf(stderr, "Cell %d\n", m);
+		}
+		break;
+
+	    case '?':
+		if (!z[m]) {
+		    z[m] = 1;
+		    fprintf(stderr, "Cell %d\n", m);
+		}
+		while(t[m]) {
+		    m += pgm[n].arg;
+		    if (!z[m]) {
+			z[m] = 1;
+			fprintf(stderr, "Cell %d\n", m);
+		    }
+		}
+		continue;
+	    }
+	}
 	switch(pgm[n].cmd)
 	{
 	case 0:    return;
@@ -158,8 +194,7 @@ putch(int v)
 
     switch(out_format)
     {
-    case L_ASCII:
-	putchar(v); break;
+    case L_ASCII: putchar(v); col = (v != '\n' && v != '\r'); break;
     case L_EXCON:
 	{
 	    int bit = 1;
@@ -241,6 +276,9 @@ putch(int v)
 	    pc('.');
 	}
 	break;
+    case L_DECIMAL:
+	printf("%d\n", v);
+	break;
     }
 }
 
@@ -248,9 +286,15 @@ void dump(void)
 {
     int n;
     for(n = 0; pgm[n].cmd; n++) {
-	if (pgm[n].cmd != '[' && pgm[n].cmd != ']')
-	    fprintf(stderr, "<%d>; %c %d\n", pgm[n].mov, pgm[n].cmd, pgm[n].arg);
+	if (pgm[n].mov > 0 ) printf(">%-4d:", pgm[n].mov);
+	else if (pgm[n].mov < 0) printf("<%-4d:", -pgm[n].mov);
+	else printf("     :");
+
+	if (pgm[n].cmd == '.' || pgm[n].cmd == ',')
+	    printf("%c\n", pgm[n].cmd);
+	else if (pgm[n].cmd != '[' && pgm[n].cmd != ']')
+	    printf("%c %d\n", pgm[n].cmd, pgm[n].arg);
 	else
-	    fprintf(stderr, "<%d>; %c %d\n", pgm[n].mov, pgm[n].cmd, pgm[n].arg-n);
+	    printf("%c %d\n", pgm[n].cmd, pgm[n].arg-n);
     }
 }
