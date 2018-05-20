@@ -41,12 +41,18 @@ INSTALLEXT=
 all: $(TARGETFILE)
 
 # for: make DEFS='$(MOREDEFS)'
+# Note: This turns on -fsanitize=integer and turns off -fwrapv
+#       so expect at least one message.
 MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 	 -Wstrict-prototypes -Wstrict-overflow=5 -Wwrite-strings \
 	 -Waggregate-return -Wcast-qual -Wswitch-enum -Wconversion \
-	 -Wunreachable-code -fno-common -Wpadded \
-	 -Wlarger-than=512 -Wstack-usage=512 -Wunsafe-loop-optimizations \
-	 -Wmissing-prototypes -Wold-style-definition -Wold-style-declaration
+	 -Wunreachable-code -fno-common -Wlarger-than=512 \
+	 -Wmissing-prototypes -Wold-style-definition \
+	 -fsanitize=address -fsanitize=undefined \
+	 -fno-wrapv -DALLOW_INSANITY
+
+MOREGCC=$(MOREDEFS) -Wstack-usage=512 -Wunsafe-loop-optimizations -Wold-style-declaration
+MORECLANG=$(MOREDEFS) -fsanitize=integer -Wpadded
 
 OBJECTS=bfi.o bfi.version.o bfi.ccode.o bfi.nasm.o bfi.bf.o bfi.dc.o \
 	bfi.dd.o bfi.runarray.o bfi.runmax.o clock.o taperam.o
