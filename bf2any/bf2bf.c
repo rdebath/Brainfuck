@@ -907,8 +907,8 @@ bftranslate(int ch, int count)
 	    if (!last) pgm = n; else last->next = n;
 	    last = n;
 	} else {
-	    if (ch == '>' || ch == '<') tmp_clean = 0;
-	    else if (ch == '.' || ch == ',' || ch == '#') ;
+	    if (ch == '>' || ch == '<' || ch == ',') tmp_clean = 0;
+	    else if (ch == '.' || ch == '#') ;
 	    else if (!tmp_clean && lang[8]) {
 		pmc(lang[8]); tmp_clean = 1;
 	    }
@@ -1045,8 +1045,8 @@ bfreprint(void)
 	int count = n->count;
 	char * p;
 	if ((p = strchr(bf,ch))) {
-	    if (ch == '>' || ch == '<') tmp_clean = 0;
-	    else if (ch == '.' || ch == ',') ;
+	    if (ch == '>' || ch == '<' || ch == ',') tmp_clean = 0;
+	    else if (ch == '.') ;
 	    else if (!tmp_clean && lang[8]) {
 		pmc(lang[8]); tmp_clean = 1;
 	    }
