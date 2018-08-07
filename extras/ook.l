@@ -357,6 +357,7 @@ size_t (*custom_prefilter)(char *, size_t) = 0;
 size_t tiny_bf_to_bf(char * buf, size_t max_size);
 size_t qqq_to_bf(char * buf, size_t max_size);
 size_t utf8_conversion(char * buf, size_t max_size);
+size_t headsecks_to_bf(char * buf, size_t max_size);
 
 int main(int argc, char ** argv)
 {
@@ -479,6 +480,11 @@ int main(int argc, char ** argv)
 	    else if (!strcmp(argv[1], "-ternary")) {
 		mode = TERNARY;
 		character_prefilter = "012";
+	    }
+
+	    else if (!strcmp(argv[1], "-head")) {
+		mode = INITIAL;
+		custom_prefilter = headsecks_to_bf;
 	    }
 
 	    else if (!strcmp(argv[1], "-tinybf")) {
@@ -861,7 +867,7 @@ utf8_conversion(char * buf, size_t max_size)
 	else if (c>=0 && c<' ' && c!='\t' && c!='\n') c = ' ';
 
 	c = (unsigned char)c;
-	if (c < 0x7f) {
+	if (c <= 0x7f) {
 	    char *m, *r;
 	    m = character_prefilter;
 	    r = character_conversion;
@@ -908,6 +914,40 @@ utf8_conversion(char * buf, size_t max_size)
 		}
 	    }
 	}
+    }
+    return n;
+}
+
+size_t
+headsecks_to_bf(char * buf, size_t max_size)
+{
+    size_t n;
+    int c = 0xDEADBEEF;
+    int bskip = 0;
+    static unsigned char UTFlen[] = {
+        0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+        4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        /*             4, 4, 4, 5, 5, 5, 5, 6, 6, 7, 8 // not in standard. */
+    };
+    static char hsbf[] = "+-<>.,[]";
+    /* static char hsbf[] = "<>-+.,[]"; // Konnichi wa (Kana dialect) */
+
+    for ( n = 0; n < max_size && (c = getc( yyin )) != EOF;) {
+	c = (unsigned char)c;
+
+	if (c>=0xC0) {
+	    bskip = UTFlen[c&0x3F]-2;
+	    continue;
+	} else if (bskip>0 && c>=0x80 && c<0xC0) {
+	    bskip--;
+	    continue;
+	}
+	bskip = 0;
+
+	c = hsbf[c&7];
+	buf[n++] = c;
     }
     return n;
 }
