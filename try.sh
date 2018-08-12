@@ -11,7 +11,7 @@ W=$(( ($(tput cols)-2)/3-8))
 for i in "$P"/proper-bf*.c "$P"/repeat-bf*.c "$P"/broken-bf?.c
 do  echo "$(basename "$i")" :"$(
     ( ulimit -t 2 ; tcc -run "$i" "$1" </dev/null |
-    xxd -g0 -l$W -c$W ) 2>&1 )"
+    tr -d '\0' | xxd -g0 -l$W -c$W ) 2>&1 )"
 done
 
 
