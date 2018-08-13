@@ -324,12 +324,22 @@ pipe_to_be(char ** filelist, int filecount)
 		    if (qstring == 3) qstring = 1;
 		}
 		if (qstring == 2) {
+		    char * gs;
 		    qstring = 0;
 		    add_string(0);
 		    outcmd('"', 0);
-		    if ( get_string() ) {
-			fprintf(stderr, "Backend didn't process '\"' command.\n");
-			exit(99);
+		    if ( (gs = get_string()) ) {
+			/* The backend doesn't know about '"', save the
+			 * current cell then use it to print the string
+			 * before restoring it.
+			 */
+			outcmd('B', 0);
+			while(*gs) {
+			    outcmd('=', *gs++);
+			    outcmd('.', 0);
+			}
+			outcmd('=', 0);
+			outcmd('S', 0);
 		    }
 		} else {
 		    add_string(ch);
@@ -364,13 +374,6 @@ pipe_to_be(char ** filelist, int filecount)
 		  ch == 'I' || ch == 'E' || ch == 'B' || ch == 'S' ||
 		  ch == 's' || ch == '"' || ch == 'X');
 
-	    if (be_interface.noifcmd) {
-		if (ch == 'I' || ch == 'E') {
-		    fprintf(stderr, "Backend doesn't have a IF command\n");
-		    exit(98);
-		}
-	    }
-
 	    if (extra_commands && (xc = strchr(extra_commands, ch)) != 0)
 		m0 = 1;
 
@@ -404,7 +407,16 @@ pipe_to_be(char ** filelist, int filecount)
 	    if (ch == '"') { qstring++; continue; }
 	    if (ch == ',') inp = 1;
 
-	    outcmd(ch, multi);
+	    if (be_interface.noifcmd && ch == 'I') {
+		outcmd('B', 0);
+		outcmd('[', 0);
+	    } else if (be_interface.noifcmd && ch == 'E') {
+		outcmd('B', 0);
+		outcmd('=', 0);
+		outcmd(']', 0);
+		outcmd('S', 0);
+	    } else
+		outcmd(ch, multi);
 	}
 	if (ifd != stdin) fclose(ifd);
     }
