@@ -62,6 +62,7 @@ int final_tape_pos = 0;	/* Where the tape pointer finished. */
 intmax_t overflows =0;	/* Number of detected overflows. */
 intmax_t underflows =0;	/* Number of detected underflows. */
 int hard_wrap = 0;	/* Have cell values gone outside 0..255 ? */
+int hard_max = 0, hard_min = 0;
 int do_optimise = 1;
 
 char bf[] = "+-><[].,";
@@ -336,6 +337,7 @@ void run(void)
 		}
 	    } else {
 		if (mem[m] > physical_max) hard_wrap = 1;
+		if (mem[m] > hard_max) hard_max = mem[m];
 		if (mem[m] > SAFE_CELL_MAX) {
 		    /* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
 		    overflows++;
@@ -355,6 +357,7 @@ void run(void)
 		}
 	    } else {
 		if (mem[m] < physical_min) hard_wrap = 1;
+		if (mem[m] < hard_min) hard_min = mem[m];
 		if (mem[m] < -SAFE_CELL_MAX) {
 		    /* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
 		    underflows++;
@@ -499,6 +502,7 @@ void run(void)
 		}
 	    } else {
 		if (mem[m] > physical_max) hard_wrap = 1;
+		if (mem[m] > hard_max) hard_max = mem[m];
 		if (mem[m] > SAFE_CELL_MAX) {
 		    /* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
 		    overflows++;
@@ -518,6 +522,7 @@ void run(void)
 		}
 	    } else {
 		if (mem[m] < physical_min) hard_wrap = 1;
+		if (mem[m] < hard_min) hard_min = mem[m];
 		if (mem[m] < -SAFE_CELL_MAX) {
 		    /* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
 		    underflows++;
@@ -709,8 +714,25 @@ print_summary()
 		fprintf(stderr, ", underflows: %"PRIdMAX"", underflows);
 	    fprintf(stderr, "\n");
 	} else if (!physical_overflow && hard_wrap) {
-	    fprintf(stderr, "Hard wrapping would occur for %s cells.\n",
-		physical_min<0?"signed":"unsigned");
+	    if (cell_mask == 255 && hard_min >= 0 && hard_max <= 255) {
+		fprintf(stderr, "Cell values fit in signed or unsigned bytes.\n");
+	    } else if (cell_mask == 255 && hard_min >= 0 && hard_max <= 255) {
+		fprintf(stderr, "Cell values fit in unsigned bytes.\n");
+	    } else if (cell_mask == 255 && hard_min >= -128 && hard_max <= 127) {
+		fprintf(stderr, "Cell values fit in signed bytes.\n");
+	    } else {
+		if (physical_min == 0 && physical_max == 255) {
+		    if (hard_min < 0 && hard_max > 127)
+			fprintf(stderr, "Hard wrapping would occur for byte");
+		    else
+			fprintf(stderr, "Hard wrapping would occur for unsigned byte");
+		} else if (physical_min == -128 && physical_max == 127)
+		    fprintf(stderr, "Hard wrapping would occur for signed byte");
+		else
+		    fprintf(stderr, "Hard wrapping would occur for (%d..%d)",
+			physical_min, physical_max);
+		fprintf(stderr, " cells; with range %d..%d\n", hard_min, hard_max);
+	    }
 	}
 
 	if (!physical_overflow) {
