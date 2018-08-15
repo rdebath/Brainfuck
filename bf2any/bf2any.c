@@ -298,12 +298,11 @@ void
 pipe_to_be(char ** filelist, int filecount)
 {
     FILE * ifd;
-    int ch, m, m0, ar, inp=0, lc=0;
+    int ch, m, m0, ar, inp=0, lc=0, di = 0;
     int digits = 0, number = 0, ov_flg = 0, multi = 1;
     int qstring = 0;
     char * xc = 0;
 
-    outcmd('!', 0);
     for(ar=0; ar<filecount; ar++) {
 
 	if (strcmp(filelist[ar], "-") == 0) {
@@ -363,6 +362,25 @@ pipe_to_be(char ** filelist, int filecount)
 	    }
 	    if (ch == ' ' || ch == '\t') continue;
 	    if ( ov_flg ) number=digits=ov_flg=0;
+
+	    if (!di) {
+		if (ch == '\n') continue;
+		if (ch == '%' ) {
+		    if (number == 8 && !be_interface.nobytecell )
+			;
+		    else if (number == 32 && be_interface.cells_are_ints)
+			;
+		    else if (number <= 32) {
+			fprintf(stderr, "Bitsize of %d not supported for this backend.\n", number);
+			exit(1);
+		    }
+		    bytecell = (number == 8);
+		    number = 0; digits = 0;
+		    continue;
+		}
+		di = 1;
+		outcmd('!', 0);
+	    }
 
 	    /* These chars have an argument. */
 	    m = (ch == '>' || ch == '<' || ch == '+' || ch == '-' ||

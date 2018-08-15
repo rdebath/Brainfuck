@@ -28,6 +28,9 @@ print_dd(void)
 
     printf("{ Code generated from %s }\n\n", bfname);
 
+    if (cell_size > 0)
+	outcmd('%', cell_size);
+
     if (most_neg_maad_loop < -BOFF && node_type_counts[T_MOV] != 0)
 	outcmd('>', BOFF-most_neg_maad_loop);
 
