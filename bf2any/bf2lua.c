@@ -60,7 +60,7 @@ static size_t luacodesize = 0;
 #endif
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg, .noifcmd=1};
+struct be_interface_s be_interface = {fn_check_arg};
 
 static int
 fn_check_arg(const char * arg)
@@ -103,10 +103,10 @@ outcmd(int ch, int count)
     }
     last = n;
 
-    if (n->ch == '[') {
+    if (n->ch == '[' || n->ch == 'I') {
 	n->ino = ++lblcount;
 	n->loop = jmpstack; jmpstack = n;
-    } else if (n->ch == ']') {
+    } else if (n->ch == ']' || n->ch == 'E') {
 	n->loop = jmpstack; jmpstack = jmpstack->loop; n->loop->loop = n;
     }
 
@@ -140,11 +140,12 @@ outcmd(int ch, int count)
 	    loutcmd(n->ch, n->count, n);
     } else {
 	for(n=pgm; n; n=n->next) {
-	    if (n->ch != ']') continue;
+	    if (n->ch != ']' && n->ch != 'E') continue;
 	    if (n->icount-n->loop->icount <= maxwhile) continue;
 	    loutcmd(1000, 1, n->loop);
 	    for(n2 = n->loop->next; n != n2; n2=n2->next) {
-		if (n2->ch == '[' && n2->loop->icount-n2->icount > maxwhile) {
+		if ((n2->ch == '[' || n2->ch == 'I')
+			&& n2->loop->icount-n2->icount > maxwhile) {
 		    loutcmd(n2->ch, n2->count, n);
 		    I; fprintf(ofd, "bf%d()\n", n2->ino);
 		    n2 = n2->loop;
@@ -156,7 +157,8 @@ outcmd(int ch, int count)
 	}
 
 	for(n=pgm; n; n=n->next) {
-	    if (n->ch != '[' || n->loop->icount-n->icount <= maxwhile)
+	    if ((n->ch != '[' && n->ch != 'I')
+		    || n->loop->icount-n->icount <= maxwhile)
 		loutcmd(n->ch, n->count, n);
 	    else {
 		loutcmd(n->ch, n->count, n);
@@ -255,6 +257,15 @@ loutcmd(int ch, int count, struct instruction *n)
 	break;
     case ']':
 	if(bytecell) { I; fprintf(ofd, "m[p] = m[p]%%256\n"); }
+	ind--; I; fprintf(ofd, "end\n");
+	break;
+
+    case 'I':
+	if(bytecell) { I; fprintf(ofd, "m[p] = m[p]%%256\n"); }
+	I; fprintf(ofd, "if m[p]~=0 then\n");
+	ind++;
+	break;
+    case 'E':
 	ind--; I; fprintf(ofd, "end\n");
 	break;
 
