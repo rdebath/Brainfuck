@@ -42,7 +42,7 @@ fn_check_arg(const char * arg)
 	use_macro = 1;
 	return 1;
     }
-    if (strncmp(arg, "-b", 2) == 0 && arg[2] ) {
+    if (strncmp(arg, "-b", 2) == 0 && arg[2] > '0' && arg[2] <= '9') {
         bpc = strtol(arg+2, 0, 10);
 	if (bpc < 32) {
 	    fprintf(stderr, "Cell size must be a minimum of 32 bits\n");
