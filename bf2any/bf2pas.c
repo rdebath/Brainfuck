@@ -32,10 +32,9 @@ static int ind = 0;
 
 static int lblcount = 0;
 static int icount = 0;
+static int has_inp = 0;
 
 static void print_string(char *);
-
-struct be_interface_s be_interface = {.noifcmd = 1};
 
 void
 outcmd(int ch, int count)
@@ -56,12 +55,13 @@ outcmd(int ch, int count)
     }
     last = n;
 
-    if (n->ch == '[') {
+    if (n->ch == '[' || n->ch == 'I') {
 	n->ino = ++lblcount;
 	n->loop = jmpstack; jmpstack = n;
-    } else if (n->ch == ']') {
+    } else if (n->ch == ']' || n->ch == 'E') {
 	n->loop = jmpstack; jmpstack = jmpstack->loop; n->loop->loop = n;
-    }
+    } else if (n->ch == ',')
+	has_inp = 1;
 
     if (ch != '~') return;
 
@@ -72,11 +72,12 @@ outcmd(int ch, int count)
 	    loutcmd(n->ch, n->count, n);
     } else {
 	for(n=pgm; n; n=n->next) {
-	    if (n->ch != ']') continue;
+	    if (n->ch != ']' && n->ch != 'E') continue;
 	    if (n->icount-n->loop->icount <= MAXWHILE) continue;
 	    loutcmd(1000, 1, n->loop);
 	    for(n2 = n->loop->next; n != n2; n2=n2->next) {
-		if (n2->ch == '[' && n2->loop->icount-n2->icount > MAXWHILE) {
+		if ((n2->ch == '[' || n2->ch == 'I')
+			&& n2->loop->icount-n2->icount > MAXWHILE) {
 		    loutcmd(n2->ch, n2->count, n);
 		    prv("bf%d()", n2->ino);
 		    n2 = n2->loop;
@@ -88,7 +89,8 @@ outcmd(int ch, int count)
 	}
 
 	for(n=pgm; n; n=n->next) {
-	    if (n->ch != '[' || n->loop->icount-n->icount <= MAXWHILE)
+	    if ((n->ch != '[' && n->ch != 'I')
+		    || n->loop->icount-n->icount <= MAXWHILE)
 		loutcmd(n->ch, n->count, n);
 	    else {
 		loutcmd(n->ch, n->count, n);
@@ -133,7 +135,8 @@ loutcmd(int ch, int count, struct instruction *n)
 	    prv("tape : packed array [0..%d] of longint;", tapesz);
 	pr("tapepos : longint;");
 	pr("v : longint;");
-	pr("inch : char;");
+	if (has_inp)
+	    pr("inch : char;");
 	ind --;
 	pr("");
 	break;
@@ -158,9 +161,11 @@ loutcmd(int ch, int count, struct instruction *n)
     case '-': prv("tape[tapepos] := tape[tapepos] - %d;", count); break;
     case '<': prv("tapepos := tapepos - %d;", count); break;
     case '>': prv("tapepos := tapepos + %d;", count); break;
-    case '[': pr("while tape[tapepos] <> 0 do begin"); ind++; break;
     case 'X': pr("{Infinite Loop};"); break;
+    case '[': pr("while tape[tapepos] <> 0 do begin"); ind++; break;
     case ']': ind--; pr("end;"); break;
+    case 'I': pr("if tape[tapepos] <> 0 then begin"); ind++; break;
+    case 'E': ind--; pr("end;"); break;
     case ',': pr("if not eof then begin read(inch); tape[tapepos] := ord(inch); end;"); break;
     case '.': pr("write(chr(tape[tapepos]));"); break;
     case '"': print_string(n->cstr); break;
