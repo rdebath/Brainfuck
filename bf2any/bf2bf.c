@@ -13,7 +13,7 @@ struct be_interface_s be_interface = {
     .check_arg = fn_check_arg,
     .disable_be_optim=1,
     .disable_fe_optim=1,
-    .noifcmd=1
+    .hasdebug=1
 };
 
 /*

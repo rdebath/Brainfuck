@@ -133,13 +133,23 @@ main(int argc, char ** argv)
 	} else if (strcmp(argv[ar], "-h") == 0) {
 
 	    fprintf(stderr, "%s: [options] [File]\n", pgm);
+	    fprintf(stderr, "%s\n",
+		"\t"    "-h      This message");
+
+	    if (!be_interface.bytesonly)
+		fprintf(stderr, "%s\n",
+		    "\t"    "-b      Force byte cells"
+		    );
+
+	    if (be_interface.hasdebug)
+		fprintf(stderr, "%s\n",
+		    "\t"    "-#      Turn on trace code."
+		    );
+
 	    fprintf(stderr, "%s%d%s\n",
-	    "\t"    "-h      This message"
-	    "\n\t"  "-b      Force byte cells"
-	    "\n\t"  "-#      Turn on trace code."
-	    "\n\t"  "-R      Decode rle on '+-<>', quoted strings and '='."
+	    "\t"    "-R      Decode rle on '+-<>', quoted strings and '='."
 	    "\n\t"  "-m      Disable optimisation (including dead loop removal)"
-	    "\n\t"  "-p      This is a part of a BF program"
+	    "\n\t"  "-p      Optimise as part of a BF program"
 	    "\n\t"  "-O      Enable optimisation"
 	    "\n\t"  "-M<num> Set length of tape, default is ", TAPELEN,
 	    ""

@@ -21,6 +21,7 @@ struct be_interface_s {
     int bytesonly;
     int disable_be_optim;
     int disable_fe_optim;
+    int hasdebug;
 } be_interface;
 
 /* This can be changed by the Makefile but everything must be recompiled. */
