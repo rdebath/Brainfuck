@@ -766,7 +766,7 @@ ps(const char * s)
 	    l++;
 	    /* So we add a tiny fix to make Chinese characters double width.
 	     * It's still not right, but no longer quite as wrong */
-	    if ((*p&0xFF) >= 0xE3 && (*p&0xFF) <= 0xEA)
+	    if (((*p&0xFF) >= 0xE3 && (*p&0xFF) <= 0xEC) || (*p&0xFF) == 0xF0)
 		l++;
 	    p++;
 	} else
