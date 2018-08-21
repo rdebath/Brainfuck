@@ -297,7 +297,7 @@ alloc_ptr(int memoff)
 
 void run(void)
 {
-    int m = 0;
+    int m = 0, m0;
     int n, v = 1;
     m = alloc_ptr(MAXOFF)-MAXOFF;
     for(n = 0;; n++) {
@@ -550,7 +550,64 @@ void run(void)
 		}
 	    }
 	    break;
+	case '{':
 
+	    if (!physical_overflow) {
+		if ((mem[m] & cell_mask) == 0 && mem[m]) {
+		    /* This condition will be different. */
+		    if (mem[m] < 0) underflows++; else overflows++;
+		    profile['['*4 + 3]++;
+
+		    mem[m] &= cell_mask;
+		    if (mem[m] > physical_max)
+			mem[m] -= (physical_max-physical_min+1);
+		}
+	    }
+
+	    profile['['*4+1 + !!mem[m]]++;
+	    if (mem[m] == 0) { n = pgm[n].arg; break; }
+
+	    n++;
+	    m0 = m;
+	    do
+	    {
+		if (pgm[n].cmd == '>' ) {
+		    m += pgm[n].arg;
+		    if (m+MAXOFF >= memsize) m = alloc_ptr(m+MAXOFF)-MAXOFF;
+		    if(tape_max < m-memshift) tape_max = m-memshift;
+		} else {
+		    m -= pgm[n].arg;
+		    if (m+MINOFF <= 0) m = alloc_ptr(m+MINOFF)-MINOFF;
+		    if(tape_min > m-memshift) {
+			tape_min = m-memshift;
+			if(tape_min < -1000) {
+			    fprintf(stderr, "Tape underflow at pointer %d\n", tape_min);
+			    exit(1);
+			}
+		    }
+		}
+
+		if (!physical_overflow) {
+		    if ((mem[m] & cell_mask) == 0 && mem[m]) {
+			/* This condition will be different. */
+			if (mem[m] < 0) underflows++; else overflows++;
+			profile[']'*4 + 3]++;
+
+			mem[m] &= cell_mask;
+			if (mem[m] > physical_max)
+			    mem[m] -= (physical_max-physical_min+1);
+		    }
+		}
+
+	    } while(mem[m] != 0);
+
+	    m0 = abs(m0-m);
+	    profile[pgm[n].cmd*4] += m0;
+	    profile[']'*4+1 ]++;
+	    profile[']'*4+1 + 1] += (m0/pgm[n].arg -1);
+	    n++;
+
+	    break;
 	}
     }
 }
@@ -594,6 +651,12 @@ void optimise(void)
 	    pgm[n].cmd = 'E';
 	} else
 	    lastopen = 0;
+
+	if (pgm[n].cmd == ']' && (pgm[n-1].cmd == '>' || pgm[n-1].cmd == '<')
+	    && pgm[n-2].cmd == '[') {
+	    pgm[n-2].cmd = '{';
+	    pgm[n].cmd = '}';
+	}
     }
 }
 
@@ -620,8 +683,8 @@ print_pgm()
 			pgm[n].cmd=='R'?'>':
 			'<');
 	}
-	else if (pgm[n].cmd == 'B') fprintf(stderr, "[");
-	else if (pgm[n].cmd == 'E') fprintf(stderr, "]");
+	else if (pgm[n].cmd == 'B' || pgm[n].cmd == '{') fprintf(stderr, "[");
+	else if (pgm[n].cmd == 'E' || pgm[n].cmd == '}') fprintf(stderr, "]");
 	else if (pgm[n].cmd != ' ') fprintf(stderr, "%c", pgm[n].cmd);
     }
 }
