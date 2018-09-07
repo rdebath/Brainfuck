@@ -91,6 +91,8 @@ main(int argc, char ** argv)
 
     if (dump_table) dump_tables();
 
+    initbytebftab();
+
     if (filecount>0) {
 	for(ar=0; ar<filecount; ar++) {
 	    const char * s;
