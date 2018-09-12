@@ -198,7 +198,7 @@ print_dd(void)
 }
 
 static int col = 0;
-static int maxcol = 76;
+static int maxcol = 72;
 static int pending_offset = 0;
 
 static void ddump(int ch, int count);
@@ -241,7 +241,7 @@ ddump(int ch, int count)
 	int sch; unsigned i = 0;
 	if (buflen == 0) return;
 
-	if (col+3>maxcol) {
+	if (col+60>maxcol) {
 	    printf("\n");
 	    col = 0;
 	}
@@ -249,7 +249,7 @@ ddump(int ch, int count)
 	putchar('"'); col++;
 	for(i=0; i<buflen; i++) {
 	    sch = strbuf[i];
-	    if (col > maxcol-(sch == '"')-2) {
+	    if (col > maxcol-(sch == '"')-2 + 80) {
 		printf("\"\n\"");
 		col = 1;
 	    }
