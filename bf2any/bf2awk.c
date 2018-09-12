@@ -21,7 +21,7 @@
 
 static int do_input = 0;
 static int ind = 0;
-static int use_functions = 0;
+static int old_awk = 0;
 #define I printf("%*s", ind*4, "")
 
 static void print_cstring(void);
@@ -33,12 +33,16 @@ static int
 fn_check_arg(const char * arg)
 {
     if (strcmp(arg, "-fn") == 0) {
-	use_functions = 1;
+	old_awk = 0;
+	return 1;
+    }
+    if (strcmp(arg, "-foawk") == 0) {
+	old_awk = 1;
 	return 1;
     }
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
-	"\t"    "-fn     Use a getch function.");
+	"\t"    "-foawk  Use only oawk features (very old)");
 	return 1;
     } else
     return 0;
@@ -156,13 +160,17 @@ outcmd(int ch, int count)
 	break;
 
     case '.':
-	if(bytecell) { I; printf("%s %%= 256\n", cm); }
-	I; printf("printf \"%%c\",%s\n", cm);
+	if (old_awk) {
+	    I; printf("printf \"%%c\",((%s %% 256) + 256) %% 256\n", cm);
+	} else {
+	    if(bytecell) { I; printf("%s %%= 256\n", cm); }
+	    I; printf("printf \"%%c\",%s\n", cm);
+	}
 	break;
     case '"': print_cstring(); break;
 
     case ',':
-	if (use_functions) {
+	if (!old_awk) {
 	    I; printf("getch(%d)\n", mov); do_input++;
 	    break;
 	}
@@ -199,13 +207,13 @@ print_cstring(void)
 {
     char * str = get_string();
     char buf[256];
-    int gotnl = 0, gotperc = 0;
+    int gotnl = 0, gotperc = 0, badchar = 0;
     size_t outlen = 0;
 
     if (!str) return;
 
     for(;; str++) {
-	if (outlen && (*str == 0 || gotnl || outlen > sizeof(buf)-8))
+	if (outlen && (*str == 0 || gotnl || badchar || outlen > sizeof(buf)-8))
 	{
 	    buf[outlen] = 0;
 	    if (gotnl) {
@@ -217,6 +225,10 @@ print_cstring(void)
 		I; printf("printf \"%s\"\n", buf);
 	    }
 	    gotnl = gotperc = 0; outlen = 0;
+	}
+	if (badchar) {
+	    I; printf("printf \"%%c\",%d\n", badchar);
+	    badchar = 0;
 	}
 	if (!*str) break;
 
@@ -230,6 +242,8 @@ print_cstring(void)
 	    buf[outlen++] = '\\'; buf[outlen++] = 'n';
 	} else if (*str == '\t') {
 	    buf[outlen++] = '\\'; buf[outlen++] = 't';
+	} else if (old_awk) {
+	    badchar = (*str & 0xFF);
 	} else {
 	    char buf2[16];
 	    int n;
