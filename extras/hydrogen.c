@@ -924,7 +924,11 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 	    break;
 
 	case T_PRT:
+#ifdef MODMASK
+	    putchar(M(*m + MASK + 1));
+#else
 	    putchar(*m);
+#endif
 	    p += 2;
 	    break;
 
