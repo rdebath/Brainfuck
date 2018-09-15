@@ -9,6 +9,7 @@
 #include <limits.h>
 
 void run(void);
+void qrun(void);
 void putch(int);
 void dump(void);
 static void pc(int ch);
@@ -112,19 +113,28 @@ int main(int argc, char **argv)
 	while((ch = getc(ifd)) != EOF)
 	    putch(ch);
 
-    if (col > 0) pc('\n');
+    if (col > 0 && out_format != L_ASCII) pc('\n');
+    if (col > 0 && out_format == L_ASCII) {
+	fflush(stdout);
+	fprintf(stderr, "\n");
+	col = 0;
+    }
     return !ifd;
 }
 
+static unsigned char t[(sizeof(int) > sizeof(short))+USHRT_MAX];
+
 void run(void)
 {
-    static unsigned char t[(sizeof(int) > sizeof(short))+USHRT_MAX];
     static unsigned char z[(sizeof(int) > sizeof(short))+USHRT_MAX];
     static unsigned short m = 0;
     int n, ch;
+
+    if (!zcells) { qrun() ; return; }
+
     for(n = 0;; n++) {
 	m += pgm[n].mov;
-	if (zcells) {
+	{
 	    switch (pgm[n].cmd)
 	    {
 	    case '=': z[m] = 1; break;
@@ -150,6 +160,34 @@ void run(void)
 		continue;
 	    }
 	}
+	switch(pgm[n].cmd)
+	{
+	case 0:    return;
+	case '=':  t[m] = pgm[n].arg; break;
+	case '+':  t[m] += pgm[n].arg; break;
+	case '[':  if (t[m] == 0) n = pgm[n].arg; break;
+	case ']':  if (t[m] != 0) n = pgm[n].arg; break;
+	case '?':  while(t[m]) m += pgm[n].arg; break;
+	case '>':  m += pgm[n].arg; break;
+	case '.':  putch(t[m]); break;
+	case ',':  if((ch = getchar()) != EOF) t[m] = ch;
+	    else if (on_eof != 1) t[m] = on_eof;
+	    break;
+	case '!':  if(t[m]) exit(1); break;
+	case '#':
+	    fprintf(stderr, "\n%3d %3d %3d %3d %3d %3d %3d %3d %3d %3d\n%*s\n",
+		    t[0], t[1], t[2], t[3], t[4], t[5], t[6], t[7], t[8], t[9], 4*m+3, "^");
+	    break;
+	}
+    }
+}
+
+void qrun(void)
+{
+    static unsigned short m = 0;
+    int n, ch;
+    for(n = 0;; n++) {
+	m += pgm[n].mov;
 	switch(pgm[n].cmd)
 	{
 	case 0:    return;
