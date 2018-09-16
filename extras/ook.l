@@ -737,7 +737,8 @@ bf_prefilter(char * buf, size_t max_size)
 		    buf[n++] = character_conversion[p-character_prefilter];
 		else
 		    buf[n++] = (char) c;
-	    }
+	    } else if (line_cc != EOF && (c == '\001' || c == '\n'))
+		buf[n++] = (char) c;
 	}
     }
     if ( c == EOF && ferror( yyin ) )
@@ -863,7 +864,8 @@ utf8_conversion(char * buf, size_t max_size)
     };
 
     for ( n = 0; n < max_size && (c = getc( yyin )) != EOF;) {
-	if (c == line_cc) c = '\001';
+	if (c == line_cc) { buf[n++] = '\001'; continue; }
+	else if (c == '\n' && line_cc != EOF) { buf[n++] = '\n'; continue; }
 	else if (c>=0 && c<' ' && c!='\t' && c!='\n') c = ' ';
 
 	c = (unsigned char)c;
