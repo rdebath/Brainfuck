@@ -813,7 +813,8 @@ outcmd(int ch, int count)
     if (ch == '!' && (langclass & GEN_HEADER) != 0)
 	ps(lang[8]);
 
-    if (L_BASE != L_TOKENS && L_BASE != L_BFRLE && L_BASE != L_BINRLE)
+    if (L_BASE != L_TOKENS && L_BASE != L_BFRLE &&
+	L_BASE != L_HANOILOVE && L_BASE != L_BINRLE)
     {
 	if (ch == '=') {
 	    outcmd('[', 1);
@@ -1386,6 +1387,17 @@ hanoilove(int ch, int count)
     */
 
     /*  This is a somewhat better translation. */
+    if (ch == '=') {
+	while(state != 0) {state = (state+1)%4; pc('.');}
+	pc(',');
+	pc('`');
+	ch = '+';
+	if (count < 0) {
+	    count = -count;
+	    ch = '-';
+	}
+    } else if (ch == '[' || ch == ']' || ch == '.' || ch == ',')
+	count = 1;
 
     while (count-->0) switch (ch) {
     case '#':
