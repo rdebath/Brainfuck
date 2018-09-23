@@ -308,12 +308,13 @@ void
 pipe_to_be(char ** filelist, int filecount)
 {
     FILE * ifd;
-    int ch, m, m0, ar, inp=0, lc=0, di = 0;
-    int digits = 0, number = 0, ov_flg = 0, multi = 1;
-    int qstring = 0;
-    char * xc = 0;
+    int ar, hashwarn = 0;
 
     for(ar=0; ar<filecount; ar++) {
+	int ch, m, m0, inp=0, cmt=0, di = 0;
+	int digits = 0, number = 0, ov_flg = 0, multi = 1;
+	int qstring = 0;
+	char * xc = 0;
 
 	if (strcmp(filelist[ar], "-") == 0) {
 	    ifd = stdin;
@@ -357,7 +358,7 @@ pipe_to_be(char ** filelist, int filecount)
 	    }
 
 	    /* Comments */
-	    if (lc || ch == '{') { lc += (ch=='{') - (ch=='}'); continue; }
+	    if (cmt || ch == '{') { cmt += (ch=='{') - (ch=='}'); continue; }
 
 	    /* Source RLE decoding */
 	    if (ch >= '0' && ch <= '9') {
@@ -420,11 +421,18 @@ pipe_to_be(char ** filelist, int filecount)
 	    if (ch == '\n' || ch == '\f' || ch == '\a') continue;
 
 	    if(!m && !m0) {
-		if (ch > ' ' && ch <= '~')
-		    fprintf(stderr, "Command '%c' not supported\n", ch);
-		else
-		    fprintf(stderr, "Command 0x%02x not supported\n", ch);
-		exit(97);
+		if (ch == '#') {
+		    if (!hashwarn)
+			fprintf(stderr,
+			    "WARNING: Command '#' ignored by backend.\n");
+		    hashwarn = 1;
+		} else {
+		    if (ch > ' ' && ch <= '~')
+			fprintf(stderr, "Command '%c' not supported\n", ch);
+		    else
+			fprintf(stderr, "Command 0x%02x not supported\n", ch);
+		    exit(97);
+		}
 	    }
 
 	    if (xc) {
