@@ -58,6 +58,9 @@ ook: ook.c
 lightning: lightning.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ $(LIBS_LIGHTNING) -o $@
 
+bbf2bfrle: bbf2bfrle.c
+	$(CC) $(GNUC99) $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
+
 qtable.h: byte2byte.tmp
 	./byte2byte.tmp -d > qtable.tmp
 	mv qtable.tmp qtable.h
@@ -202,10 +205,11 @@ else
 txtbf: qtable.h
 endif
 
-STDC99 := $(call try-run,\
+GNUC99 := $(call try-run,\
         { echo '\#include <stdio.h>'; \
-          echo 'int main () {printf("Hello World!");return 0;}'; \
-          } > $(TMP).c ; $(TRYCC2) -std=c99 -o $(TMP),-std=c99)
+          echo 'int main (int argc, char **argv)'; \
+          echo '{for(int i=1; i<10;i++) printf("Hello World!");}'; \
+          } > $(TMP).c ; $(TRYCC2) -std=gnu99 -o $(TMP),-std=gnu99)
 
 # And shared libraries ?
 ifneq ($(wildcard /usr/include/dlfcn.h),)
