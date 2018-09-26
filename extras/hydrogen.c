@@ -396,13 +396,17 @@ int main(int argc, char **argv)
 		//n = n->next;
 		n->next->next->type = T_NOP;
 
+		/* If we go up a rail then immediatly back down, there's
+		 * no point doing it. However, the return run might go
+		 * past our start position, so we only remove the up bound
+		 * runner.
+		 * T_FIND(n) T_MOV(-n) T_FIND(-n) => T_MOV(-n) T_FIND(-n) */
 		if (n->prev && n->prev->prev)
 		{
 		    struct bfi *p1 = n->prev, *p2 = p1->prev;
 		    if (p1->type == T_MOV && p1->count == n->count &&
 			p2->type == T_ZFIND && p2->count == -n->count)
 		    {
-			n->type = T_NOP;
 			p2->type = T_NOP;
 			n = p2;
 		    }
