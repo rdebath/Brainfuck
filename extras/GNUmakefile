@@ -26,7 +26,7 @@ install:
 
 clean:
 	-rm -f $(OBJECTS) $(LIBOBJ) $(ILIST)
-	-rm -f ook.c $(ALLEXE) $(patsubst %,%.o,$(MOREEXE))
+	-rm -f ook-tmp.c $(ALLEXE) $(patsubst %,%.o,$(MOREEXE))
 
 # Delete the direct to exe rule to make sure %.o files are used for ccache.
 % : %.c
@@ -52,8 +52,10 @@ hydrogen64: hydrogen.c
 cdowhile: cdowhile.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@ $(LIBS_LIBDL)
 
-ook: ook.c
-	$(CC) $(CFLAGS) $(NOSGN) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
+ook: ook.l
+	$(LEX) $(LFLAGS) -t $^ > ook-tmp.c || rm ook-tmp.c
+	$(CC) $(CFLAGS) $(NOSGN) $(LDFLAGS) $(TARGET_ARCH) ook-tmp.c -o $@
+	-@rm -f ook-tmp.c
 
 lightning: lightning.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ $(LIBS_LIGHTNING) -o $@
