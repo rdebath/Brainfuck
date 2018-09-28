@@ -10,6 +10,7 @@ int main (int argc, char *argv[]) {
     int i=0;
     FILE *fp=argc>1?fopen(argv[1], "r"):stdin;
     size_t r=0;
+    setbuf(stdout, 0);
     if(!fp || getdelim(&b,&r,argc>1?'\0':'!',fp)<0)
 	perror(argv[1]);
     else if(b&&r>0)for(p=b;*p;p++)switch(*p) {

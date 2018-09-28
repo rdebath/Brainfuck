@@ -28,6 +28,7 @@ main(int argc, char **argv){
 		    p++;
 		}
 		if (!pgm[p]) break;
+		/* continue; // BUG: This is missing. */
 	    }
 	}
 

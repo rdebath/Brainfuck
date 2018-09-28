@@ -1,18 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 
-char * bf = "+-><[].,";
-char * cc[] = {
-	"array[p]++;",
-	"array[p]--;",
-	"p++;",
-	"p--;",
-	"while(array[p]) {",
-	"}",
-	"putchar(array[p]);",
-	"array[p]=getchar();"
-};
-
 int main(int argc, char ** argv) {
 	char * s;
 	int c;
