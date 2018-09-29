@@ -4,11 +4,9 @@
 void print_bf(void);
 int checkarg_bf(char * opt, char * arg);
 #define BE_BF
-
 #endif
 
 #ifdef XX
-
 X(bf,BF,
     printf("   -F   Attempt to regenerate BF code. (This disables a lot of optimisations.)\n");,
     case 'F': do_codestyle = c_bf; break;                           ,
@@ -16,7 +14,7 @@ X(bf,BF,
     Nothing_Here						    )
 #if XX == 4
     if (do_codestyle == c_bf) {
-	opt_no_calc = opt_no_endif = opt_no_litprt = 1;
+	opt_no_calcmult = opt_no_calc = opt_no_endif = opt_no_litprt = 1;
 	opt_regen_mov = 0;
 	hard_left_limit = 0;
 

@@ -1,10 +1,8 @@
-
 #ifndef _BFI_DD_H
 #define _BFI_DD_H
 
 void print_dd(void);
 #define BE_DD
-
 #endif
 
 #ifdef XX
@@ -14,4 +12,9 @@ X(dd,DD,
     case c_dd: print_dd(); break;                                   ,
     Nothing_Here                                                    )
 
+#if XX == 4
+    if (do_codestyle == c_dd) {
+        opt_no_calcmult = 1;
+    }
+#endif
 #endif

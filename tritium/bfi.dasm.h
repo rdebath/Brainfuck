@@ -6,7 +6,6 @@ void run_dynasm(void);
 int checkarg_dynasm(char * opt, char * arg);
 extern int dynasm_ok;
 #define BE_DYNASM
-
 #endif
 
 #ifdef XX

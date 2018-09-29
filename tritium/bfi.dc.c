@@ -13,7 +13,7 @@
 #include "bfi.dc.h"
 
 static FILE * ofd;
-static int no_v7 = 0;
+static int no_v7 = 1;
 
 /*
  * DC Registers:
@@ -74,8 +74,12 @@ prt_value(const char * prefix, int count, const char * suffix)
 int
 checkarg_dc(char * opt, char * arg UNUSED)
 {
-    if (!strcmp(opt, "-nov7")) {
+    if (!strcmp(opt, "-fno-v7")) {
 	no_v7 = 1;
+	return 1;
+    }
+    if (!strcmp(opt, "-fv7")) {
+	no_v7 = 0;
 	return 1;
     }
     return 0;
@@ -177,6 +181,34 @@ print_dc(void)
 	    if (use_lmx) fprintf(ofd, "lmx ");
 	    save_cell(n->offset);
 	    break;
+
+	case T_CALCMULT:
+	    /* p[offset] = count + count2 * p[offset2] * count3 * p[offset3] */
+	    if (n->offset == n->offset2 && n->count2 == 1) {
+		fetch_cell(n->offset2);
+	    } else if (n->count2 != 0) {
+		fetch_cell(n->offset2);
+		if (n->count2 != 1)
+		    prt_value("", n->count2, "*");
+	    } else
+		prt_value("", 0, " ");
+
+	    if (n->count3 != 0) {
+		fetch_cell(n->offset3);
+
+		if (n->count3 != 1)
+		    prt_value("", n->count3, "**");
+		else
+		    fprintf(ofd, "*");
+	    }
+
+	    if (n->count)
+		prt_value("", n->count, "+");
+
+	    if (use_lmx) fprintf(ofd, "lmx ");
+	    save_cell(n->offset);
+	    break;
+
 
 	case T_IF: case T_MULT: case T_CMULT:
 	case T_WHL:

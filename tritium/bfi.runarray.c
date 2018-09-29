@@ -64,7 +64,7 @@ convert_tree_to_runarray(void)
 	case T_MOV:
 	    break;
 
-	case T_CALC:
+	case T_CALC: case T_CALCMULT:
 	    arraylen += 7;
 	    break;
 
@@ -209,6 +209,14 @@ convert_tree_to_runarray(void)
 	    }
 	    break;
 
+	case T_CALCMULT:
+	    *p++ = n->count;
+	    *p++ = n->offset2 - last_offset;
+	    *p++ = n->count2;
+	    *p++ = n->offset3 - last_offset;
+	    *p++ = n->count3;
+	    break;
+
 	case T_STOP: case T_NOP:
 	    break;
 
@@ -307,6 +315,11 @@ run_progarray(int * p, icell * m)
 	case T_CALC5:
 	    *m += m[p[2]];
 	    p += 3;
+	    break;
+
+	case T_CALCMULT:
+	    *m = p[2] + m[p[3]] * p[4] * m[p[5]] * p[6];
+	    p += 7;
 	    break;
 
 	case T_ADDWZ:

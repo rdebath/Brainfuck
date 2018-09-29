@@ -1,17 +1,15 @@
-
 #ifndef _BFI_DC_H
 #define _BFI_DC_H
 
 void print_dc(void);
 int checkarg_dc(char * opt, char * arg);
 #define BE_DC
-
 #endif
 
 #ifdef XX
 X(dc,DC,
     printf("   -D   Create code for dc(1).\n");
-    printf("   -nov7   Disable Unix V7 dc(1) support.\n");          ,
+    printf("   -fv7 Enable Unix V7 dc(1) support.\n");              ,
     case 'D': do_codestyle = c_dc; break;                           ,
     case c_dc: print_dc(); break;                                   ,
     Nothing_Here						    )

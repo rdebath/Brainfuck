@@ -4,7 +4,6 @@
 void print_nasm(void);
 int checkarg_nasm(char * opt, char * arg);
 #define BE_NASM
-
 #endif
 
 #ifdef XX

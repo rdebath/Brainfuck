@@ -120,6 +120,7 @@ int opt_no_endif = 0;
 int opt_no_kv_recursion = 0;
 int opt_no_loop_classify = 0;
 int opt_no_kvmov = 0;
+int opt_no_calcmult = 0;
 int opt_regen_mov = -1;
 int opt_pointerrescan = 0;
 
@@ -196,6 +197,7 @@ void invariants_scan(void);
 void trim_trailing_sets(void);
 int scan_one_node(struct bfi * v, struct bfi ** move_v);
 int find_known_calc_state(struct bfi * v);
+int find_known_calcmult_state(struct bfi * v);
 int flatten_loop(struct bfi * v, int constant_count);
 int classify_loop(struct bfi * v);
 int flatten_multiplier(struct bfi * v);
@@ -584,6 +586,7 @@ checkarg(char * opt, char * arg)
 	return 1;
     } else if (!strcmp(opt, "-fno-negtape")) { hard_left_limit = 0; return 1;
     } else if (!strcmp(opt, "-fno-calctok")) { opt_no_calc = 1; return 1;
+    } else if (!strcmp(opt, "-fno-calcmul")) { opt_no_calcmult = 1; return 1;
     } else if (!strcmp(opt, "-fno-endif")) { opt_no_endif = 1; return 1;
     } else if (!strcmp(opt, "-fno-litprt")) { opt_no_litprt = 1; return 1;
     } else if (!strcmp(opt, "-fno-kv-recursion")) { opt_no_kv_recursion = 1; return 1;
@@ -992,6 +995,15 @@ printtreecell(FILE * efd, int indent, struct bfi * n)
 		n->offset, n->offset3, n->count3, n->count);
 	} else
 	    fprintf(efd, "[%d] = %d + [%d]*%d + [%d]*%d, ",
+		n->offset, n->count, n->offset2, n->count2,
+		n->offset3, n->count3);
+	break;
+    case T_CALCMULT:
+	if (n->count == 0 && n->count2 == 1 && n->count3 == 1) {
+	    fprintf(efd, "[%d] = [%d] * [%d], ",
+		n->offset, n->offset2, n->offset3);
+	} else
+	    fprintf(efd, "[%d] = %d + [%d]*%d * [%d]*%d, ",
 		n->offset, n->count, n->offset2, n->count2,
 		n->offset3, n->count3);
 	break;
@@ -1437,6 +1449,21 @@ run_tree(void)
 		}
 		break;
 
+	    case T_CALCMULT:
+		p[n->offset] = n->count
+		    + (n->count2 * p[n->offset2] * n->count3 * p[n->offset3]);
+		if (n->count2) {
+		    int off = (p+n->offset2) - oldp;
+		    if (off < profile_min_cell) profile_min_cell = off;
+		    if (off > profile_max_cell) profile_max_cell = off;
+		}
+		if (n->count3) {
+		    int off = (p+n->offset3) - oldp;
+		    if (off < profile_min_cell) profile_min_cell = off;
+		    if (off > profile_max_cell) profile_max_cell = off;
+		}
+		break;
+
 	    case T_IF: case T_MULT: case T_CMULT:
 
 	    case T_WHL: if(UM(p[n->offset]) == 0) n=n->jmp;
@@ -1627,7 +1654,7 @@ pointer_scan(void)
 		if(n4) n4->prev = n;
 		continue;
 
-	    case T_CALC:
+	    case T_CALC: case T_CALCMULT:
 		if(verbose>4)
 		    fprintf(stderr, "Push past command.\n");
 		/* Put movement after a normal cmd. */
@@ -1776,10 +1803,10 @@ pointer_regen(void)
 	    n->offset -= current_shift;
 	    break;
 
-	case T_CALC:
+	case T_CALC: case T_CALCMULT:
 	    n->offset -= current_shift;
-	    n->offset2 -= current_shift;
-	    n->offset3 -= current_shift;
+	    if(n->count2 != 0) n->offset2 -= current_shift;
+	    if(n->count3 != 0) n->offset3 -= current_shift;
 	    break;
 
 	case T_STOP:
@@ -1904,6 +1931,12 @@ invariants_scan(void)
 
 	case T_CALC:
 	    node_changed = find_known_calc_state(n);
+	    if (node_changed && n->prev)
+		n = n->prev;
+	    break;
+
+	case T_CALCMULT:
+	    node_changed = find_known_calcmult_state(n);
 	    if (node_changed && n->prev)
 		n = n->prev;
 	    break;
@@ -2101,7 +2134,7 @@ find_known_value_recursion(struct bfi * n, int v_offset,
 	    }
 	    break;
 
-	case T_CALC:
+	case T_CALC: case T_CALCMULT:
 	    /* Nope, if this were a constant it'd be downgraded already */
 	    if (n->offset == v_offset)
 		goto break_break;
@@ -2702,7 +2735,7 @@ search_for_update_of_offset(struct bfi *n, struct bfi *v, int n_offset)
 	{
 	case T_WHL: case T_IF: case T_MULT: case T_CMULT:
 
-	case T_ADD: case T_SET: case T_CALC:
+	case T_ADD: case T_SET: case T_CALC: case T_CALCMULT:
 	    if (n->offset == n_offset)
 		return 0;
 	    break;
@@ -2967,6 +3000,87 @@ find_known_calc_state(struct bfi * v)
     return rv;
 }
 
+int
+find_known_calcmult_state(struct bfi * v)
+{
+    int rv = 0;
+    struct bfi *n1 = 0;
+    int const_found1 = 0, known_value1 = 0, non_zero_unsafe1 = 0;
+    struct bfi *n2 = 0;
+    int const_found2 = 0, known_value2 = 0, non_zero_unsafe2 = 0;
+    struct bfi *n3 = 0;
+    int const_found3 = 0, known_value3 = 0, non_zero_unsafe3 = 0;
+
+    if(v == 0) return 0;
+    if (v->type != T_CALCMULT) return 0;
+
+    if (verbose>5) {
+	fprintf(stderr, "Check T_CALCMULT node: ");
+	printtreecell(stderr, 0,v);
+	fprintf(stderr, "\n");
+    }
+
+    if ((v->count2 == 0 || v->offset2 != v->offset) &&
+        (v->count3 == 0 || v->offset3 != v->offset)) {
+	find_known_value(v->prev, v->offset,
+		    &n1, &const_found1, &known_value1, &non_zero_unsafe1);
+	if (n1 &&
+	    (n1->type == T_ADD || n1->type == T_SET || n1->type == T_CALC)) {
+	    /* Overidden change, delete it */
+	    struct bfi *n4;
+
+	    n1->type = T_NOP;
+	    n4 = n1; n1 = n1->prev;
+	    if (n1) n1->next = n4->next; else bfprog = n4->next;
+	    if (n4->next) n4->next->prev = n1;
+	    free(n4);
+	    return 1;
+	}
+    }
+
+    /* This are always set to this. */
+    if (v->count2 != 1 || v->count3 != 1)
+	return 0;
+
+    if (v->count2) {
+	find_known_value(v->prev, v->offset2,
+		    &n2, &const_found2, &known_value2, &non_zero_unsafe2);
+    }
+
+    if (v->count3) {
+	find_known_value(v->prev, v->offset3,
+		    &n3, &const_found3, &known_value3, &non_zero_unsafe3);
+    }
+
+    if (const_found2 && const_found3) {
+	/* Change to T_SET */
+	int ov_flg=0, mval;
+
+	mval = ov_iadd(v->count,
+		ov_imul(
+		    ov_imul(v->count2, known_value2, &ov_flg),
+		    ov_imul(v->count3, known_value3, &ov_flg),
+		    &ov_flg), &ov_flg);
+
+	if (ov_flg) {
+	    if (verbose>5)
+		fprintf(stderr, "T_CALCMULT overflow @(%d,%d)\n",
+			v->line, v->col);
+	    return 0;
+	}
+
+	v->type = T_SET;
+	v->count2 = v->offset2 = v->count3 = v->offset3 = 0;
+	v->count = mval;
+	return 1;
+
+    } else if (const_found2 || const_found3) {
+	/* Change to T_CALC */
+    }
+
+    return rv;
+}
+
 /*
  * This function will remove very simple loops that have a constant loop
  * variable on entry.
@@ -3128,10 +3242,11 @@ flatten_loop(struct bfi * v, int constant_count)
 int
 classify_loop(struct bfi * v)
 {
-    struct bfi *n, *dec_node = 0;
+    struct bfi *n, *dec_node = 0, *calc_node = (void*)0xDEADBEEF;
     int is_znode = 0;
     int has_equ = 0;
     int has_add = 0;
+    int has_calc = 0;
     int typewas;
     int most_negoff = 0;
     int nested_loop_count = 0;
@@ -3150,7 +3265,14 @@ classify_loop(struct bfi * v)
     while(n != v->jmp)
     {
 	if (n == 0 || n->type == T_MOV) return 0;
-	if (n->type != T_ADD && n->type != T_SET) {
+	/* Looking for a cell*cell multiplication, try to spot _anything_ odd. */
+	if (n->type == T_CALC && !opt_no_calcmult && !has_calc &&
+	    n->offset != v->offset && n->offset3 != v->offset &&
+	    n->offset == n->offset2 && n->offset != n->offset3 &&
+	    n->count == 0 && n->count2 == 1 && n->count3 == 1) {
+	    has_calc = 1;
+	    calc_node = n;
+	} else if (n->type != T_ADD && n->type != T_SET) {
 	    return 0;
 	} else {
 	    if (n->offset == v->offset) {
@@ -3178,6 +3300,47 @@ classify_loop(struct bfi * v)
 	if (verbose>4 && v->type != T_IF)
 	    fprintf(stderr, "Possible Infinite loop at %d:%d\n", v->line, v->col);
 	return 0;
+    }
+
+    /* Is this a cell*cell multiplication loop? */
+    if (has_calc) {
+	struct bfi *n2 = 0;
+	int const_found = 0, known_value = 0, non_zero_unsafe = 0;
+
+	if (has_add || has_equ || is_znode ||
+	    dec_node->type != T_ADD || dec_node->count != -1) {
+	    if (verbose>4)
+		fprintf(stderr, "Skipping complex multiply loop at %d:%d\n", v->line, v->col);
+	    return 0;
+	}
+
+	find_known_value(v->prev, calc_node->offset,
+		    &n2, &const_found, &known_value, &non_zero_unsafe);
+
+	if (!const_found || known_value != 0 || non_zero_unsafe) {
+	    if (verbose>4)
+		fprintf(stderr, "Skip cell mult and add loop at %d:%d\n", v->line, v->col);
+	    return 0;
+	}
+
+	calc_node->type = T_CALCMULT;
+	calc_node->offset2 = v->offset;
+
+	n = v;
+	while(n != v->jmp)
+	{
+	    if (n != calc_node)
+		n->type = T_NOP;
+	    n=n->next;
+	}
+	n->type = T_SET;
+	n->count = 0;
+	n->orgtype = 0;
+	n->jmp = 0;
+
+	if (verbose>4)
+	    fprintf(stderr, "Cell multiplcation loop at %d:%d\n", v->line, v->col);
+	return 1;
     }
 
     /* Found a loop that contains only T_ADD and T_SET where the loop
@@ -3349,7 +3512,8 @@ build_string_in_tree(struct bfi * v)
 	    found = 1;
 	    break;
 
-	case T_MOV: case T_ADD: case T_CALC: case T_SET: /* Safe */
+	case T_MOV: case T_ADD: case T_SET: /* Safe */
+	case T_CALC: case T_CALCMULT:
 	    break;
 
 	case T_PRT:
@@ -3626,6 +3790,9 @@ print_codedump(void)
 	"\n"	"#define set_cmi(o1,o2,o3,o4) p[o1] = p[o2] * o3 + o4;"
 	"\n"	"#define set_tmi(o1,o2,o3,o4,o5,o6) p[o1] = o2 + p[o3] * o4 + p[o5] * o6;");
 
+	if (node_type_counts[T_CALCMULT])
+	    puts("#define multcell(x,y,z) p[x] = p[y] * p[z];");
+
 	if(node_type_counts[T_MULT] || node_type_counts[T_CMULT]
 	    || node_type_counts[T_WHL]) {
 	    if (add_mask) {
@@ -3749,6 +3916,17 @@ print_codedump(void)
 		    n->offset, n->offset2, n->count2, n->count);
 	    } else {
 		printf("set_tmi(%d,%d,%d,%d,%d,%d)\n",
+		    n->offset, n->count, n->offset2, n->count2,
+		    n->offset3, n->count3);
+	    }
+	    break;
+
+	case T_CALCMULT:
+	    if (n->count == 0 && n->count2 == 1 && n->count3 == 1) {
+		printf("multcell(%d,%d,%d)\n",
+		    n->offset, n->offset2, n->offset3);
+	    } else {
+		printf("multcell_ex(%d,%d,%d,%d,%d,%d)\n",
 		    n->offset, n->count, n->offset2, n->count2,
 		    n->offset3, n->count3);
 	    }

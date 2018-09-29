@@ -5,11 +5,9 @@
 void run_ccode(void);
 void print_ccode(FILE * ofd);
 int checkarg_ccode(char * opt, char * arg);
-
 #endif
 
 #ifdef XX
-
 #if !defined(DISABLE_TCCLIB) || !defined(DISABLE_DLOPEN)
 X(ccode,CCODE,
     printf("   -c   Create C code. If combined with -r the code is loaded and run.\n");   ,
@@ -45,5 +43,4 @@ X(ccode,CCODE,
 	if (f) return f;
     }
 #endif
-
 #endif

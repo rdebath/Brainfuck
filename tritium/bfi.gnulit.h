@@ -3,14 +3,12 @@
 #ifndef _BFI_GNULIGHTNING_H
 #define _BFI_GNULIGHTNING_H
 
-
 void run_gnulightning(void);
 extern int gnulightning_ok;
 #define BE_GNULIGHTNING
 #endif
 
 #ifdef XX
-
 X(gnulightning,GNULIGHTNING,
     printf("   -j   Run using the GNU lightning interpreter/assembler.\n");    ,
     case 'j': do_codestyle = c_gnulightning; break;                ,
@@ -32,6 +30,5 @@ X(gnulightning,GNULIGHTNING,
 #if XX == 6
 if (cell_size == 0 && do_codestyle == c_gnulightning) set_cell_size(-1);
 #endif
-
 #endif
 #endif

@@ -442,7 +442,38 @@ run_dynasm(void)
 	    if (n->count) {
 		| add REG_A, count
 	    }
+	    break;
 
+	case T_CALCMULT:
+	    if (n->count2 == 0 || n->count3 == 0) {
+		fprintf(stderr, "Warning: T_CALCMULT with countX == 0 !?\n");
+		set_acc_offset(offset);
+		| xor REG_A, REG_A
+		break;
+	    }
+
+	    load_acc_offset(n->offset2);
+	    set_acc_offset(offset);
+	    if (n->count2 != 1) {
+		| imul REG_A, REG_A, (n->count2)
+	    }
+	    if (n->count3 == 1 && tape_step > 1) {
+		| imul REG_A, [REG_P+ (n->offset3*tape_step) ]
+	    } else {
+		if (tape_step > 1) {
+		    | mov REG_D, [REG_P+ (n->offset3*tape_step) ]
+		} else {
+		    | movzx REG_D, byte [REG_P+ (n->offset3) ]
+		}
+		if (n->count3 != 1) {
+		    | imul REG_D, REG_D, (n->count3)
+		}
+		| imul REG_A, REG_D
+	    }
+
+	    if (n->count) {
+		| add REG_A, count
+	    }
 	    break;
 
 	case T_WHL:

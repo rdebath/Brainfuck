@@ -96,6 +96,11 @@ run_maxtree(void)
 			    + n->count2 * p[n->offset2]
 			    + n->count3 * p[n->offset3];
 		break;
+	    case T_CALCMULT:
+		p[n->offset] = n->count
+			    + n->count2 * p[n->offset2]
+			    * n->count3 * p[n->offset3];
+		break;
 
 	    case T_IF: case T_MULT: case T_CMULT:
 
@@ -132,8 +137,8 @@ run_maxtree(void)
 
 	    default:
 		fprintf(stderr, "Execution error:\n"
-		       "Bad node: type %d: ptr+%d, cnt=%d.\n",
-			n->type, n->offset, n->count);
+		       "Bad node: type %s: ptr+%d, cnt=%d.\n",
+			tokennames[n->type], n->offset, n->count);
 		exit(1);
 	}
 	n = n->next;
@@ -205,6 +210,7 @@ run_supertree(void)
     register BIGNUM ** m = move_ptr(alloc_ptr(mem),0);
     BIGNUM *t1 = BN_new(), *t2 = BN_new(), *t3 = BN_new();
     int do_mask = (cell_length>0 && cell_length<INT_MAX);
+    BN_CTX * BNtmp = BN_CTX_new();
 
     if (verbose)
 	fprintf(stderr, "Maxtree variant: using OpenSSL Bignums\n");
@@ -213,6 +219,11 @@ run_supertree(void)
     start_runclock();
 
     while(n) {
+#if 0
+	fprintf(stderr, "P(%d,%d)=", n->line, n->col);
+	printtreecell(stderr, -1, n);
+	fprintf(stderr, "\n");
+#endif
 	switch(n->type)
 	{
 	    case T_MOV: m = move_ptr(m, n->count); break;
@@ -237,6 +248,18 @@ run_supertree(void)
 		// p[n->offset] = n->count
 		//	    + n->count2 * p[n->offset2]
 		//	    + n->count3 * p[n->offset3];
+
+		/* Quick copy or add */
+		if (n->count == 0 && n->count2 == 1) {
+		    if (n->count3 == 0) {
+			BN_copy(m[n->offset], m[n->offset2]);
+			break;
+		    }
+		    if (n->count3 == 1) {
+			BN_add(m[n->offset], m[n->offset2], m[n->offset3]);
+			break;
+		    }
+		}
 
 		if (n->count >= 0) {
 		    BN_set_word(t1, n->count);
@@ -267,6 +290,58 @@ run_supertree(void)
 		    BN_copy(t3, m[n->offset3]);
 		    BN_mul_word(t3, -n->count3);
 		    BN_sub(t1, t1, t3);
+		}
+
+		if(do_mask)
+		    BN_mask_bits(t1, cell_length);
+		BN_copy(m[n->offset], t1);
+		break;
+
+	    case T_CALCMULT:
+		// p[n->offset] = n->count
+		//	    + n->count2 * p[n->offset2]
+		//	    * n->count3 * p[n->offset3];
+
+		if (n->count == 0 && n->count2 == 1 && n->count3 == 1) {
+
+		    BN_mul(m[n->offset], m[n->offset2], m[n->offset3], BNtmp);
+		    if(do_mask)
+			BN_mask_bits(m[n->offset], cell_length);
+		    break;
+		}
+
+		if (n->count2 == 1) {
+		    BN_copy(t1, m[n->offset2]);
+		} else if (n->count2 > 0) {
+		    BN_copy(t1, m[n->offset2]);
+		    BN_mul_word(t1, n->count2);
+		} else if (n->count2 < 0) {
+		    BN_copy(t2, m[n->offset2]);
+		    if (n->count2 != -1)
+			BN_mul_word(t2, -n->count2);
+		    BN_zero(t1);
+		    BN_sub(t1, t1, t2);
+		}
+
+		if (n->count3 == 1) {
+		    BN_mul(t1, t1, m[n->offset3], BNtmp);
+		} else if (n->count3 > 0) {
+		    BN_copy(t3, m[n->offset3]);
+		    BN_mul_word(t3, n->count3);
+		    BN_mul(t1, t1, t3, BNtmp);
+		} else if (n->count3 < 0) {
+		    BN_copy(t3, m[n->offset3]);
+		    if (n->count3 != -1)
+			BN_mul_word(t3, -n->count3);
+		    BN_zero(t2);
+		    BN_sub(t2, t2, t3);
+		    BN_mul(t1, t1, t2, BNtmp);
+		}
+
+		if (n->count > 0) {
+		    BN_add_word(t1, n->count);
+		} else if (n->count < 0) {
+		    BN_sub_word(t1, -n->count);
 		}
 
 		if(do_mask)
@@ -355,8 +430,8 @@ run_supertree(void)
 
 	    default:
 		fprintf(stderr, "Execution error:\n"
-		       "Bad node: type %d: ptr+%d, cnt=%d.\n",
-			n->type, n->offset, n->count);
+		       "Bad node: type %s: ptr+%d, cnt=%d.\n",
+			tokennames[n->type], n->offset, n->count);
 		exit(1);
 	}
 	n = n->next;
@@ -376,8 +451,7 @@ run_supertree(void)
 #ifdef TESTSOFTMULT
 typedef C uint_cell;
 #define NO_BIG_INT
-#else
-#if defined(__SIZEOF_INT128__) && defined(UINT64_MAX)
+#elif defined(__SIZEOF_INT128__) && defined(UINT64_MAX)
 typedef unsigned __int128 uint_long;
 typedef uint64_t uint_cell;
 #elif defined(_UINT128_T) && defined(UINT64_MAX)
@@ -392,7 +466,6 @@ typedef unsigned int uint_cell;
 #else
 typedef C uint_cell;
 #define NO_BIG_INT
-#endif
 #endif
 
 /*
@@ -448,11 +521,10 @@ move_ptr(uint_cell **p, int off) {
     return p;
 }
 
-static inline void BI_null(uint_cell ** m)
+static inline void BI_zero(uint_cell ** m)
 {
     if (!*m) return;
-    free(*m);
-    *m = 0;
+    memset(*m, 0, byte_per_cell);
 }
 
 static inline void BI_init(uint_cell ** m)
@@ -488,7 +560,7 @@ static inline void BI_set_int(uint_cell ** m, int v)
 
 static inline void BI_copy(uint_cell ** a, uint_cell ** b)
 {
-    if (!*b) BI_null(a);
+    if (!*b) BI_zero(a);
     else {
 	BI_init(a);
 	memcpy(*a, *b, byte_per_cell);
@@ -586,6 +658,39 @@ static inline void BI_mul_uint(uint_cell ** pa, unsigned int b)
 	cy = h;
     }
 }
+
+static inline void BI_mul(uint_cell ** pr, uint_cell ** pa, uint_cell ** pb)
+{
+    uint_cell h;
+    uint_long lr;
+    int i, j, k;
+    uint_cell *r, *a, *b;
+    if (!*pa || !*pb) { BI_zero(pr); return; }
+
+    BI_set_int(pr, 0);
+    r = *pr; a = *pa; b = *pb;
+
+    for(i=0; i<ints_per_cell; i++) {
+	if (a[i] == 0) continue;
+	for(j=0; j<ints_per_cell-i; j++) {
+	    if (b[j] == 0) continue;
+	    k = i + j;
+
+	    lr = a[i];
+	    lr *= b[j];
+	    lr += r[k];
+	    r[k] = lr; k++;
+	    h = (lr >> (sizeof(uint_cell) * CHAR_BIT));
+	    while(h != 0 && k < ints_per_cell)
+	    {
+		lr = h;
+		lr += r[k];
+		r[k] = lr; k++;
+		h = (lr >> (sizeof(uint_cell) * CHAR_BIT));
+	    }
+	}
+    }
+}
 #endif
 
 #ifdef NO_BIG_INT
@@ -645,6 +750,42 @@ BI_mul_uint(uint_cell ** pa, unsigned int b)
     }
 }
 
+static inline void BI_mul(uint_cell ** pr, uint_cell ** pa, uint_cell ** pb)
+{
+    uint_cell h;
+    uint_cell rl;
+    int i, j, k;
+    uint_cell *r, *a, *b;
+    if (!*pa || !*pb) { BI_zero(pr); return; }
+
+    BI_set_int(pr, 0);
+    r = *pr; a = *pa; b = *pb;
+
+    for(i=0; i<ints_per_cell; i++) {
+	if (a[i] == 0) continue;
+	for(j=0; j<ints_per_cell-i; j++) {
+	    if (b[j] == 0) continue;
+	    k = i + j;
+
+	    long_mult(&h, &rl, a[i], b[j]);
+	    rl += r[k];
+	    if (rl < r[k])
+		h++;
+
+	    r[k] = rl; k++;
+	    while(h != 0 && k < ints_per_cell)
+	    {
+		rl = h; h = 0;
+		rl += r[k];
+		if (rl < r[k])
+		    h++;
+
+		r[k] = rl; k++;
+	    }
+	}
+    }
+}
+
 #endif
 
 static inline int BI_is_zero(uint_cell ** pa)
@@ -695,6 +836,11 @@ run_supertree(void)
     start_runclock();
 
     while(n) {
+#if 0
+	fprintf(stderr, "P(%d,%d)=", n->line, n->col);
+	printtreecell(stderr, -1, n);
+	fprintf(stderr, "\n");
+#endif
 	switch(n->type)
 	{
 	    case T_MOV: m = move_ptr(m, n->count); break;
@@ -709,16 +855,29 @@ run_supertree(void)
 
 	    case T_SET:
 		// p[n->offset] = n->count;
-		if (n->count == 0 && ints_per_cell > 99)
-		    BI_null(m + n->offset);
-		else
-		    BI_set_int(m + n->offset, n->count);
+		BI_set_int(m + n->offset, n->count);
 		break;
 
 	    case T_CALC:
 		// p[n->offset] = n->count
 		//	    + n->count2 * p[n->offset2]
 		//	    + n->count3 * p[n->offset3];
+
+		if (n->count == 0 && n->count2 == 1) {
+		    if (n->offset == n->offset2) {
+			if (n->count3 == 1) {
+			    BI_add(m + n->offset, m + n->offset3);
+			    break;
+			}
+			if (n->count3 == -1) {
+			    BI_sub(m + n->offset, m + n->offset3);
+			    break;
+			}
+		    } else if (n->count3 == 0) {
+			BI_copy(m + n->offset, m + n->offset2);
+			break;
+		    }
+		}
 
 		BI_set_int(&t1, n->count);
 
@@ -747,6 +906,16 @@ run_supertree(void)
 		}
 
 		BI_copy(m + n->offset, &t1);
+		break;
+
+	    case T_CALCMULT:
+		if (n->count == 0 && n->count2 == 1 && n->count3 == 1) {
+		    BI_mul(m + n->offset, m + n->offset2, m + n->offset3);
+		    break;
+		}
+		fprintf(stderr, "Error on code generation:\n"
+		       "Bad T_CALCMULT node with incorrect counts.\n");
+		exit(99);
 		break;
 
 	    case T_IF: case T_MULT: case T_CMULT:
@@ -792,8 +961,8 @@ run_supertree(void)
 
 	    default:
 		fprintf(stderr, "Execution error:\n"
-		       "Bad node: type %d: ptr+%d, cnt=%d.\n",
-			n->type, n->offset, n->count);
+		       "Bad node: type %s: ptr+%d, cnt=%d.\n",
+			tokennames[n->type], n->offset, n->count);
 		exit(1);
 	}
 	n = n->next;

@@ -283,6 +283,21 @@ print_nasm(void)
 		printf("\tadd byte ptr [ecx%s],%d\n", oft(n->offset), SM(n->count));
 	    break;
 
+	case T_CALCMULT:
+	    if (n->count == 0 && n->count2 == 1 && n->count3 == 1) {
+		printf("\tmovzx eax,byte ptr [ecx%s]\n", oft(n->offset2));
+		printf("\tmovzx ebx,byte ptr [ecx%s]\n", oft(n->offset3));
+		printf("\timul eax,ebx\n");
+		printf("\tmov byte ptr [ecx%s],al\n", oft(n->offset));
+		break;
+	    }
+
+	    fprintf(stderr, "Error on code generation:\n"
+	           "Bad T_CALCMULT node incorrect counts.\n");
+	    exit(99);
+
+	    break;
+
 	case T_CHR:
 	    *sp++ = (char) /*GCC -Wconversion*/ n->count;
 	    break;
@@ -381,12 +396,10 @@ print_nasm(void)
 	    break;
 
 	default:
-	    printf("; Bad node: type %d: ptr+%d, cnt=%d.\n",
-		    n->type, n->offset, n->count);
 	    fprintf(stderr, "Error on code generation:\n"
-	           "Bad node: type %d: ptr+%d, cnt=%d.\n",
-		    n->type, n->offset, n->count);
-	    break;
+	           "Bad node: type %s: ptr+%d, cnt=%d.\n",
+		    tokennames[n->type], n->offset, n->count);
+	    exit(99);
 	}
 	n=n->next;
     }

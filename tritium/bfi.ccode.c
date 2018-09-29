@@ -203,6 +203,19 @@ static char namebuf[64];
 }
 
 char *
+rval2(int offset)
+{
+static char namebuf[64];
+    if (tiny_tape)
+	sprintf(namebuf, "%s", bijective_hexavigesimal(offset+1));
+    else if (offset)
+	sprintf(namebuf, "m[%d]", offset);
+    else
+	strcpy(namebuf, "*m");
+    return namebuf;
+}
+
+char *
 lval(int offset)
 {
 static char namebuf[64];
@@ -778,7 +791,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 
 		    if (n->count3 == 1 && n->count2 != 0) {
 			fprintf(ofd, "%s = %s*%d + %s;\n",
-			    lval(n->offset), rvalmsk(n->offset2), n->count2, rval(n->offset3));
+			    lval(n->offset), rval2(n->offset2), n->count2, rval(n->offset3));
 			break;
 		    }
 		}
@@ -811,9 +824,26 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		} else {
 		    fprintf(ofd, "%s = %d + %s*%d + %s*%d; /*T_CALC*/\n",
 			lval(n->offset), n->count, rval(n->offset2), n->count2,
-			rvalmsk(n->offset3), n->count3);
+			rval2(n->offset3), n->count3);
 		}
 	    } while(0);
+
+	    if (enable_trace) {
+		pt(ofd, indent,0);
+		fprintf(ofd, "t(%d,%d,\"\",m+ %d)\n", n->line, n->col, n->offset);
+	    }
+	    break;
+
+	case T_CALCMULT:
+	    if (!disable_indent) pt(ofd, indent,n);
+
+	    if (n->count == 0 && n->count2 == 1 && n->count3 == 1)
+		fprintf(ofd, "%s = %s * %s;\n",
+		    lval(n->offset), rval(n->offset2), rval2(n->offset3));
+	    else
+		fprintf(ofd, "%s = %d + %s*%d * %s*%d; /* WARNING */\n",
+		    lval(n->offset), n->count, rval(n->offset2), n->count2,
+		    rval2(n->offset3), n->count3);
 
 	    if (enable_trace) {
 		pt(ofd, indent,0);
