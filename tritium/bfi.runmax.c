@@ -373,6 +373,10 @@ run_supertree(void)
 
 #ifdef DISABLE_BN
 
+#ifdef TESTSOFTMULT
+typedef C uint_cell;
+#define NO_BIG_INT
+#else
 #if defined(__SIZEOF_INT128__) && defined(UINT64_MAX)
 typedef unsigned __int128 uint_long;
 typedef uint64_t uint_cell;
@@ -389,25 +393,25 @@ typedef unsigned int uint_cell;
 typedef C uint_cell;
 #define NO_BIG_INT
 #endif
+#endif
 
 /*
  * Another simple tree based interpreter, this one is definitly slow.
  */
 
-static uint_cell * mem = 0;
+static uint_cell ** mem = 0;
 static int dyn_memsize = 0;
 static int ints_per_cell = 0;
 static unsigned byte_per_cell = 0;
-static int max_int_offset, min_int_offset;
 
 #define MINALLOC 16
 
 static
-uint_cell *
-alloc_ptr(uint_cell *p)
+uint_cell **
+alloc_ptr(uint_cell **p)
 {
     int amt, memoff, i, off;
-    uint_cell * nmem;
+    uint_cell ** nmem;
     if (p >= mem && p < mem+dyn_memsize) return p;
 
     memoff = p-mem; off = 0;
@@ -434,39 +438,69 @@ alloc_ptr(uint_cell *p)
     return mem+memoff;
 }
 
-static inline uint_cell *
-move_ptr(uint_cell *p, int off) {
+static inline uint_cell **
+move_ptr(uint_cell **p, int off) {
     p += off;
-    if (off>=0 && p+max_int_offset >= mem+dyn_memsize)
-        p = alloc_ptr(p+max_int_offset)-max_int_offset;
-    if (off<=0 && p+min_int_offset <= mem)
-        p = alloc_ptr(p+min_int_offset)-min_int_offset;
+    if (off>=0 && p+max_pointer >= mem+dyn_memsize)
+        p = alloc_ptr(p+max_pointer)-max_pointer;
+    if (off<=0 && p+min_pointer <= mem)
+        p = alloc_ptr(p+min_pointer)-min_pointer;
     return p;
 }
 
-static inline void BI_zero(uint_cell * m)
+static inline void BI_null(uint_cell ** m)
 {
-    memset(m, 0, byte_per_cell);
+    if (!*m) return;
+    free(*m);
+    *m = 0;
 }
 
-static inline void BI_set_int(uint_cell * m, int v)
+static inline void BI_init(uint_cell ** m)
 {
-    *m = (uint_cell)v;
+    uint_cell *t;
+    if (*m) return;
+    t = malloc(sizeof(uint_cell) * ints_per_cell);
+    if (!t) {
+	fprintf(stderr, "Memory overflow when expanding tape.\n");
+	exit(99);
+    }
+    *m = t;
+}
+
+static inline uint_cell * BI_zinit(uint_cell ** m)
+{
+    if (!*m) {
+	BI_init(m);
+	memset(*m, 0, byte_per_cell);
+    }
+    return *m;
+}
+
+static inline void BI_set_int(uint_cell ** m, int v)
+{
+    BI_init(m);
+    **m = (uint_cell)v;
     if (v < 0)
-	memset(m+1, -1, byte_per_cell-sizeof(uint_cell));
+	memset(*m+1, -1, byte_per_cell-sizeof(uint_cell));
     else
-	memset(m+1, 0, byte_per_cell-sizeof(uint_cell));
+	memset(*m+1, 0, byte_per_cell-sizeof(uint_cell));
 }
 
-static inline void BI_copy(uint_cell * a, uint_cell * b)
+static inline void BI_copy(uint_cell ** a, uint_cell ** b)
 {
-    memcpy(a, b, byte_per_cell);
+    if (!*b) BI_null(a);
+    else {
+	BI_init(a);
+	memcpy(*a, *b, byte_per_cell);
+    }
 }
 
-static inline void BI_add_cell(uint_cell * a, uint_cell v)
+static inline void BI_add_cell(uint_cell ** pa, uint_cell v)
 {
     uint_cell b = v;
+    uint_cell * a;
     int cy = 0, i;
+    a = BI_zinit(pa);
     for(i=0; i<ints_per_cell; i++) {
 	uint_cell p = a[i];
 	a[i] = cy + a[i] + b;
@@ -476,10 +510,12 @@ static inline void BI_add_cell(uint_cell * a, uint_cell v)
     }
 }
 
-static inline void BI_sub_cell(uint_cell * a, uint_cell v)
+static inline void BI_sub_cell(uint_cell ** pa, uint_cell v)
 {
     uint_cell b = v;
+    uint_cell * a;
     int cy = 1, i;
+    a = BI_zinit(pa);
     for(i=0; i<ints_per_cell; i++) {
 	uint_cell p = a[i];
 	a[i] = cy + a[i] + ~b;
@@ -489,9 +525,13 @@ static inline void BI_sub_cell(uint_cell * a, uint_cell v)
     }
 }
 
-static inline void BI_add(uint_cell * a, uint_cell * b)
+static inline void BI_add(uint_cell ** pa, uint_cell ** pb)
 {
     int cy = 0, i;
+    uint_cell * a, * b;
+    if (!*pb) return;
+    a = BI_zinit(pa);
+    b = *pb;
     for(i=0; i<ints_per_cell; i++) {
 	uint_cell p = a[i];
 	a[i] = cy + a[i] + b[i];
@@ -500,9 +540,13 @@ static inline void BI_add(uint_cell * a, uint_cell * b)
     }
 }
 
-static inline void BI_sub(uint_cell * a, uint_cell * b)
+static inline void BI_sub(uint_cell ** pa, uint_cell ** pb)
 {
     int cy = 1, i;
+    uint_cell * a, * b;
+    if (!*pb) return;
+    a = BI_zinit(pa);
+    b = *pb;
     for(i=0; i<ints_per_cell; i++) {
 	uint_cell p = a[i];
 	a[i] = cy + a[i] + ~b[i];
@@ -511,9 +555,12 @@ static inline void BI_sub(uint_cell * a, uint_cell * b)
     }
 }
 
-static inline void BI_neg(uint_cell * a)
+static inline void BI_neg(uint_cell ** pa)
 {
     int cy = 1, i;
+    uint_cell * a;
+    if (!*pa) return;
+    a = *pa;
     for(i=0; i<ints_per_cell; i++) {
 	a[i] = cy + ~a[i];
 	cy = (a[i] == 0);
@@ -521,11 +568,14 @@ static inline void BI_neg(uint_cell * a)
 }
 
 #ifndef NO_BIG_INT
-static inline void BI_mul_uint(uint_cell * a, unsigned int b)
+static inline void BI_mul_uint(uint_cell ** pa, unsigned int b)
 {
     uint_cell h, cy = 0;
     uint_long r;
     int i;
+    uint_cell * a;
+    if (!*pa) return;
+    a = *pa;
 
     for(i=0; i<ints_per_cell; i++) {
 	r = a[i];
@@ -576,11 +626,14 @@ long_mult(uint_cell * rh, uint_cell * rl, uint_cell a, uint_cell b)
 }
 
 static inline void
-BI_mul_uint(uint_cell * a, unsigned int b)
+BI_mul_uint(uint_cell ** pa, unsigned int b)
 {
     uint_cell cy = 0;
     uint_cell rl, rh;
     int i;
+    uint_cell * a;
+    if (!*pa) return;
+    a = *pa;
 
     for(i=0; i<ints_per_cell; i++) {
 	long_mult(&rh, &rl, a[i], b);
@@ -594,10 +647,13 @@ BI_mul_uint(uint_cell * a, unsigned int b)
 
 #endif
 
-static inline int BI_is_zero(uint_cell * a)
+static inline int BI_is_zero(uint_cell ** pa)
 {
     uint_cell b = 0;
     int i;
+    uint_cell * a;
+    if (!*pa) return 1;
+    a = *pa;
     for(i=0; i<ints_per_cell; i++) {
 	b |= a[i];
     }
@@ -608,8 +664,8 @@ static void
 run_supertree(void)
 {
     struct bfi * n = bfprog;
-    uint_cell * m;
-    uint_cell *t1, *t2, *t3;
+    uint_cell ** m;
+    uint_cell *t1 = 0, *t2 = 0, *t3 = 0;
     uint_cell mask_value = -1;
     int mask_offset = 0;
 
@@ -623,9 +679,6 @@ run_supertree(void)
 	mask_value >>= (byte_per_cell*CHAR_BIT - cell_length);
     }
 
-    max_int_offset = max_pointer*ints_per_cell + ints_per_cell - 1;
-    min_int_offset = max_pointer*ints_per_cell;
-
 #ifndef NO_BIG_INT
     if (verbose)
 	fprintf(stderr, "Maxtree variant: %dx%d byte int/cell (hardmult)\n",
@@ -636,10 +689,6 @@ run_supertree(void)
 		ints_per_cell, (int)sizeof(uint_cell));
 #endif
 
-    t1 = tcalloc(sizeof(uint_cell), ints_per_cell);
-    t2 = tcalloc(sizeof(uint_cell), ints_per_cell);
-    t3 = tcalloc(sizeof(uint_cell), ints_per_cell);
-
     m = move_ptr(alloc_ptr(mem),0);
 
     only_uses_putch = 1;
@@ -648,19 +697,22 @@ run_supertree(void)
     while(n) {
 	switch(n->type)
 	{
-	    case T_MOV: m = move_ptr(m, n->count * ints_per_cell); break;
+	    case T_MOV: m = move_ptr(m, n->count); break;
 	    case T_ADD:
 		// p[n->offset] += n->count;
 		if (n->count >= 0) {
-		    BI_add_cell(m + n->offset*ints_per_cell, n->count);
+		    BI_add_cell(m + n->offset, n->count);
 		} else {
-		    BI_sub_cell(m + n->offset*ints_per_cell, -n->count);
+		    BI_sub_cell(m + n->offset, -n->count);
 		}
 		break;
 
 	    case T_SET:
 		// p[n->offset] = n->count;
-		BI_set_int(m + n->offset*ints_per_cell, n->count);
+		if (n->count == 0 && ints_per_cell > 99)
+		    BI_null(m + n->offset);
+		else
+		    BI_set_int(m + n->offset, n->count);
 		break;
 
 	    case T_CALC:
@@ -668,45 +720,47 @@ run_supertree(void)
 		//	    + n->count2 * p[n->offset2]
 		//	    + n->count3 * p[n->offset3];
 
-		BI_set_int(t1, n->count);
+		BI_set_int(&t1, n->count);
 
 		if (n->count2 == 1) {
-		    BI_add(t1, m + n->offset2*ints_per_cell);
+		    BI_add(&t1, m + n->offset2);
 		} else if (n->count2 > 0) {
-		    BI_copy(t2, m + n->offset2*ints_per_cell);
-		    BI_mul_uint(t2, n->count2);
-		    BI_add(t1, t2);
+		    BI_copy(&t2, m + n->offset2);
+		    BI_mul_uint(&t2, n->count2);
+		    BI_add(&t1, &t2);
 		} else if (n->count2 < 0) {
-		    BI_copy(t2, m + n->offset2*ints_per_cell);
-		    BI_mul_uint(t2, -n->count2);
-		    BI_sub(t1, t2);
+		    BI_copy(&t2, m + n->offset2);
+		    BI_mul_uint(&t2, -n->count2);
+		    BI_sub(&t1, &t2);
 		}
 
 		if (n->count3 == 1) {
-		    BI_add(t1, m + n->offset3*ints_per_cell);
+		    BI_add(&t1, m + n->offset3);
 		} else if (n->count3 > 0) {
-		    BI_copy(t3, m + n->offset3*ints_per_cell);
-		    BI_mul_uint(t3, n->count3);
-		    BI_add(t1, t3);
+		    BI_copy(&t3, m + n->offset3);
+		    BI_mul_uint(&t3, n->count3);
+		    BI_add(&t1, &t3);
 		} else if (n->count3 < 0) {
-		    BI_copy(t3, m + n->offset3*ints_per_cell);
-		    BI_mul_uint(t3, -n->count3);
-		    BI_sub(t1, t3);
+		    BI_copy(&t3, m + n->offset3);
+		    BI_mul_uint(&t3, -n->count3);
+		    BI_sub(&t1, &t3);
 		}
 
-		BI_copy(m + n->offset*ints_per_cell, t1);
+		BI_copy(m + n->offset, &t1);
 		break;
 
 	    case T_IF: case T_MULT: case T_CMULT:
 
 	    case T_WHL:
-		m[n->offset*ints_per_cell+mask_offset] &= mask_value;
-		if( BI_is_zero(m + n->offset*ints_per_cell) ) n=n->jmp;
+		if (m[n->offset])
+		    m[n->offset][mask_offset] &= mask_value;
+		if( BI_is_zero(m + n->offset) ) n=n->jmp;
 		break;
 
 	    case T_END:
-		m[n->offset*ints_per_cell+mask_offset] &= mask_value;
-		if(!BI_is_zero(m + n->offset*ints_per_cell) ) n=n->jmp;
+		if (m[n->offset])
+		    m[n->offset][mask_offset] &= mask_value;
+		if(!BI_is_zero(m + n->offset) ) n=n->jmp;
 		break;
 
 	    case T_ENDIF:
@@ -716,14 +770,14 @@ run_supertree(void)
 		putch(n->count);
 		break;
 	    case T_PRT:
-		putch(m[n->offset*ints_per_cell]);
+		putch(m[n->offset][0]);
 		break;
 	    case T_INP:
 		{   /* Cell is too large for an int */
 		    int ch = -256;
 		    ch = getch(ch);
 		    if (ch != -256) {
-			BI_set_int(m + n->offset*ints_per_cell, ch);
+			BI_set_int(m + n->offset, ch);
 		    }
 		}
 		break;
@@ -747,10 +801,10 @@ run_supertree(void)
 
     finish_runclock(&run_time, &io_time);
 
-    free(mem);
-    free(t1);
-    free(t2);
-    free(t3);
+    /* TODO: free(mem); */
+    if (t1) free(t1);
+    if (t2) free(t2);
+    if (t3) free(t3);
 }
 
 #endif
