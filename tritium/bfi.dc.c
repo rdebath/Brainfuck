@@ -129,7 +129,7 @@ print_dc(void)
     else
 	fprintf(ofd, "[0sp\n");
 
-    use_lmx = (cell_length>0);
+    use_lmx = (cell_length>0 && cell_length<INT_MAX);
 
     while(n)
     {
@@ -174,6 +174,7 @@ print_dc(void)
 		    fprintf(ofd, "+");
 	    }
 
+	    if (use_lmx) fprintf(ofd, "lmx ");
 	    save_cell(n->offset);
 	    break;
 

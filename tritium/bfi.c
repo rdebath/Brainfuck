@@ -546,7 +546,11 @@ checkarg(char * opt, char * arg)
 		set_cell_size(8);
 		return 1;
 	    } else {
-		set_cell_size(strtol(arg,0,10));
+		long l = strtol(arg,0,10);
+		if (l<=0 || l>=INT_MAX)
+		    set_cell_size(INT_MAX);
+		else
+		    set_cell_size(l);
 		return 2;
 	    }
 	case 'P': case 'I':
@@ -1168,11 +1172,15 @@ process_file(void)
 	    if (verbose>2 || debug_mode || enable_trace ||
 		total_nodes == node_type_counts[T_CHR] ||
 		node_type_counts[T_DUMP] != 0) {
+		char cbuf[sizeof(int)*3+8];
+		sprintf(cbuf, "%dbit", cell_length);
+		if (cell_length == INT_MAX)
+		    strcpy(cbuf, "unbounded");
 
 		if (total_nodes != node_type_counts[T_CHR] && cell_size <= 0) {
 		    fprintf(stderr, "ERROR: cannot run combination: "
-				    "%dbit cells%s%s%s.\n",
-			cell_length,
+				    "%s cells%s%s%s.\n",
+			cbuf,
 			debug_mode? ", debug mode":"",
 			enable_trace? ", trace mode":"",
 			verbose>2 ? ", profiling enabled":"");

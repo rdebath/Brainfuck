@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <limits.h>
 
 #include "bfi.tree.h"
 #include "bfi.run.h"
@@ -160,6 +161,7 @@ BIGNUM **
 alloc_ptr(BIGNUM **p)
 {
     int amt, memoff, i, off;
+    BIGNUM ** nmem;
     if (p >= mem && p < mem+dyn_memsize) return p;
 
     memoff = p-mem; off = 0;
@@ -167,7 +169,12 @@ alloc_ptr(BIGNUM **p)
     else if(memoff>=dyn_memsize) off = memoff-dyn_memsize;
     amt = off / MINALLOC;
     amt = (amt+1) * MINALLOC;
-    mem = realloc(mem, (dyn_memsize+amt)*sizeof(*mem));
+    nmem = realloc(mem, (dyn_memsize+amt)*sizeof(*mem));
+    if (!nmem) {
+	if(mem) free(mem);
+	fprintf(stderr, "Memory overflow when expanding tape.\n");
+	exit(99);
+    } else mem=nmem;
     if (memoff<0) {
         memmove(mem+amt, mem, dyn_memsize*sizeof(*mem));
         for(i=0; i<amt; i++)
@@ -197,6 +204,7 @@ run_supertree(void)
     struct bfi * n = bfprog;
     register BIGNUM ** m = move_ptr(alloc_ptr(mem),0);
     BIGNUM *t1 = BN_new(), *t2 = BN_new(), *t3 = BN_new();
+    int do_mask = (cell_length>0 && cell_length<INT_MAX);
 
     if (verbose)
 	fprintf(stderr, "Maxtree variant: using OpenSSL Bignums\n");
@@ -261,19 +269,22 @@ run_supertree(void)
 		    BN_sub(t1, t1, t3);
 		}
 
-		BN_mask_bits(t1, cell_length);
+		if(do_mask)
+		    BN_mask_bits(t1, cell_length);
 		BN_copy(m[n->offset], t1);
 		break;
 
 	    case T_IF: case T_MULT: case T_CMULT:
 
 	    case T_WHL:
-		BN_mask_bits(m[n->offset], cell_length);
+		if(do_mask)
+		    BN_mask_bits(m[n->offset], cell_length);
 		if( BN_is_zero(m[n->offset]) ) n=n->jmp;
 		break;
 
 	    case T_END:
-		BN_mask_bits(m[n->offset], cell_length);
+		if(do_mask)
+		    BN_mask_bits(m[n->offset], cell_length);
 		if(!BN_is_zero(m[n->offset]) ) n=n->jmp;
 		break;
 
@@ -286,7 +297,8 @@ run_supertree(void)
 	    case T_PRT:
 		if (iostyle == 3) {
 		    char * dec_num;
-		    BN_mask_bits(m[n->offset], cell_length);
+		    if(do_mask)
+			BN_mask_bits(m[n->offset], cell_length);
 		    dec_num = BN_bn2dec(m[n->offset]);
 		    printf("%s\n", dec_num);
 		    OPENSSL_free(dec_num);
@@ -317,7 +329,8 @@ run_supertree(void)
 			    BN_sub_word(m[n->offset], -c);
 		    } else {
 			BN_dec2bn(&m[n->offset], bntxtptr);
-			BN_mask_bits(m[n->offset], cell_length);
+			if(do_mask)
+			    BN_mask_bits(m[n->offset], cell_length);
 			free(bntxtptr);
 		    }
 		} else {   /* Cell is too large for an int */
@@ -394,6 +407,7 @@ uint_cell *
 alloc_ptr(uint_cell *p)
 {
     int amt, memoff, i, off;
+    uint_cell * nmem;
     if (p >= mem && p < mem+dyn_memsize) return p;
 
     memoff = p-mem; off = 0;
@@ -401,7 +415,12 @@ alloc_ptr(uint_cell *p)
     else if(memoff>=dyn_memsize) off = memoff-dyn_memsize;
     amt = off / MINALLOC;
     amt = (amt+1) * MINALLOC;
-    mem = realloc(mem, (dyn_memsize+amt)*sizeof(*mem));
+    nmem = realloc(mem, (dyn_memsize+amt)*sizeof(*mem));
+    if (!nmem) {
+	if(mem) free(mem);
+	fprintf(stderr, "Memory overflow when expanding tape.\n");
+	exit(99);
+    } else mem=nmem;
     if (memoff<0) {
         memmove(mem+amt, mem, dyn_memsize*sizeof(*mem));
         for(i=0; i<amt; i++)
@@ -594,9 +613,8 @@ run_supertree(void)
     uint_cell mask_value = -1;
     int mask_offset = 0;
 
-    ints_per_cell = sizeof(uint_cell)*CHAR_BIT -1;
-    ints_per_cell += cell_length;
-    ints_per_cell /= sizeof(uint_cell)*CHAR_BIT;
+    ints_per_cell = ((unsigned)cell_length + sizeof(uint_cell)*CHAR_BIT -1)
+		    / (sizeof(uint_cell)*CHAR_BIT);
 
     byte_per_cell = sizeof(uint_cell)*ints_per_cell;
 

@@ -276,7 +276,7 @@ print_c_header(FILE * ofd)
     }
 
     if (cell_size == 0) {
-	if (cell_length == 0) {
+	if (cell_length == 0 || cell_length == INT_MAX) {
 	    if (knr_c_ok)
 		fprintf(ofd, "#ifdef __STDC__\n");
 
@@ -309,12 +309,19 @@ print_c_header(FILE * ofd)
 	    fprintf(ofd, "#endif\n");
 	    fprintf(ofd, "#endif\n\n");
 
-	    fprintf(ofd, "#ifndef M\n");
-	    fprintf(ofd, "#define M(V) V\n");
-	    fprintf(ofd, "#endif\n\n");
-	    if (knr_c_ok) fprintf(ofd, "#ifdef __STDC__\n");
-	    fprintf(ofd, "enum { MaskTooSmall=1/(M(0x80)) };\n");
-	    if (knr_c_ok) fprintf(ofd, "#endif\n\n");
+	    if (cell_length != INT_MAX) {
+		fprintf(ofd, "#ifndef M\n");
+		fprintf(ofd, "#define M(V) V\n");
+		fprintf(ofd, "#endif\n\n");
+		if (knr_c_ok) fprintf(ofd, "#ifdef __STDC__\n");
+		fprintf(ofd, "enum { MaskTooSmall=1/(M(0x80)) };\n");
+		if (knr_c_ok) fprintf(ofd, "#endif\n\n");
+	    } else {
+		mask_defined = 0;
+		if (knr_c_ok) fprintf(ofd, "#ifdef __STDC__\n");
+		fprintf(ofd, "enum { CellTooSmall=1/(sizeof(C)>=sizeof(int)) };\n");
+		if (knr_c_ok) fprintf(ofd, "#endif\n\n");
+	    }
 	} else {
 	    if (cell_type_iso)
 		fprintf(ofd, "#include <stdint.h>\n\n");
