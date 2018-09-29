@@ -372,6 +372,7 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("   -fpointer-rescan\n");
     printf("        Rerun the pointer scan pass after other optimisations.\n");
 #ifndef NO_EXT_BE
+#ifdef BE_CCODE
     printf("\n");
     printf("C generation extras\n");
     printf("   -dynmem\n");
@@ -394,6 +395,7 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("        Generate BF code in a single function.\n");
     printf("   -fgoto\n");
     printf("        Use gotos not while loops for [].\n");
+#endif
 #endif
 #if !defined(DISABLE_TCCLIB)
     printf("   -ltcc\n");

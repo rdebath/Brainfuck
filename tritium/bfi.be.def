@@ -8,16 +8,6 @@ it to the list and fill in it's entry.
 #undef XX
 #else
 
-#if XX == 0
-#include "bfi.ccode.h"
-#include "bfi.gnulit.h"
-#include "bfi.nasm.h"
-#include "bfi.bf.h"
-#include "bfi.dc.h"
-#include "bfi.dd.h"
-#include "bfi.dasm.h"
-#else
-
 #define Nothing_Here /* TCC-0.9.27 needs a something in a argument of a
 		      * preprocessor macro, as this seems like a likely
 		      * bug for other compilers I've added a macro that
@@ -54,185 +44,18 @@ it to the list and fill in it's entry.
 #endif
 
 /****************************************************************************/
-#ifndef DISABLE_DYNASM
-X(dynasm,DYNASM,
-    printf("   -q   Run using the Dynasm interpreter/assembler.\n");    ,
-    case 'q': do_codestyle = c_dynasm; break;                ,
-    /* Cannot do print_dynasm() */                                     ,
-    case c_dynasm: run_dynasm(); break;                               )
-#if XX == 4
-    if (do_run == -1 && do_codestyle == c_default &&
-	    (cell_length==0 || cell_size>0) &&
-	    verbose<3 && !enable_trace && !debug_mode && dynasm_ok) {
-	do_run = 1;
-	do_codestyle = c_dynasm;
-    }
-    if (do_codestyle == c_dynasm && do_run == -1) do_run = 1;
-    if (do_codestyle == c_dynasm && cell_length>0 && cell_size == 0) {
-	fprintf(stderr, "The DynASM generator does not support that cell size\n");
-	exit(255);
-    }
-#endif
-#if XX == 6
-if (cell_size == 0 && do_codestyle == c_dynasm) set_cell_size(-1);
-#endif
-#if XX == 9
-    {	int f = checkarg_dynasm(opt, arg);
-	if (f) return f;
-    }
-#endif
-#endif
 
-/****************************************************************************/
-#ifndef DISABLE_GNULIGHTNING
-X(gnulightning,GNULIGHTNING,
-    printf("   -j   Run using the GNU lightning interpreter/assembler.\n");    ,
-    case 'j': do_codestyle = c_gnulightning; break;                ,
-    /* Cannot do print_gnulightning() */                                     ,
-    case c_gnulightning: run_gnulightning(); break;                               )
-#if XX == 4
-    if (do_run == -1 && do_codestyle == c_default &&
-	    (cell_length==0 || cell_size>0) &&
-	    verbose<3 && !enable_trace && !debug_mode && gnulightning_ok) {
-	do_run = 1;
-	do_codestyle = c_gnulightning;
-    }
-    if (do_codestyle == c_gnulightning && do_run == -1) do_run = 1;
-    if (do_codestyle == c_gnulightning && cell_length>0 && cell_size == 0) {
-	fprintf(stderr, "The GNU Lightning generator does not support that cell size\n");
-	exit(255);
-    }
-#endif
-#if XX == 6
-if (cell_size == 0 && do_codestyle == c_gnulightning) set_cell_size(-1);
-#endif
-#endif
-
-/****************************************************************************/
-#if !defined(DISABLE_TCCLIB) || !defined(DISABLE_DLOPEN)
-X(ccode,CCODE,
-    printf("   -c   Create C code. If combined with -r the code is loaded and run.\n");   ,
-    case 'c': do_codestyle = c_ccode; break;			  ,
-    case c_ccode: print_ccode(stdout); break;			    ,
-    case c_ccode: run_ccode(); break;                               )
-
-#if (XX == 4) && !defined(DISABLE_RUNC)
-    if (do_run == -1 && do_codestyle == c_default && verbose<3
-	&& (cell_length == 0 || !!strcmp(cell_type, "C"))) {
-	do_run = 1;
-	do_codestyle = c_ccode;
-    }
-#endif
-#else
-X(ccode,CCODE,
-    printf("   -c   Create C code.\n");				    ,
-    case 'c': do_codestyle = c_ccode; break;			    ,
-    case c_ccode: print_ccode(stdout); break;			    ,
-    Nothing_Here						    )
-#endif
-
-#if XX == 4
-    if (do_codestyle == c_ccode &&
-	    cell_length>0 && cell_size == 0 && !strcmp(cell_type, "C")) {
-	fprintf(stderr, "The C generator does not support that cell size\n");
-	exit(255);
-    }
-#endif
-#if XX == 9
-    {	int f = checkarg_ccode(opt, arg);
-	if (f) return f;
-    }
-#endif
-
-/****************************************************************************/
-X(nasm,NASM,
-    printf("   -s   Create i386 Linux ELF NASM code.\n");           ,
-    case 's': do_codestyle = c_nasm; break;                         ,
-    case c_nasm: print_nasm(); break;                               ,
-    Nothing_Here						    )
-#if XX == 4
-    if (do_codestyle == c_nasm)
-    {
-	if (cell_length && cell_size != 8) {
-	    fprintf(stderr, "The 'nasm' generator only supports 8 bit cells.\n");
-	    exit(255);
-	}
-	set_cell_size(8);
-	if (!default_io && iostyle != 2) {
-	    fprintf(stderr, "The 'nasm' generator only supports binary I/O.\n");
-	    exit(255);
-	}
-	iostyle = 2;
-    }
-#endif
-#if XX == 6
-if (cell_size == 0 && do_codestyle == c_nasm) set_cell_size(-1);
-#endif
-#if XX == 9
-    {	int f = checkarg_nasm(opt, arg);
-	if (f) return f;
-    }
-#endif
-
-/****************************************************************************/
-X(bf,BF,
-    printf("   -F   Attempt to regenerate BF code. (This disables a lot of optimisations.)\n");,
-    case 'F': do_codestyle = c_bf; break;                           ,
-    case c_bf: print_bf(); break;                                   ,
-    Nothing_Here						    )
-#if XX == 4
-    if (do_codestyle == c_bf) {
-	opt_no_calc = opt_no_endif = opt_no_litprt = 1;
-	opt_regen_mov = 0;
-	hard_left_limit = 0;
-
-	if (!default_io) {
-	    fprintf(stderr, "The -F option only supports default I/O.\n");
-	    exit(255);
-	}
-    }
-#endif
-#if XX == 9
-    {	int f = checkarg_bf(opt, arg);
-	if (f) return f;
-    }
-#endif
-
-/****************************************************************************/
-X(dc,DC,
-    printf("   -D   Create code for dc(1).\n");
-    printf("   -nov7   Disable Unix V7 dc(1) support.\n");          ,
-    case 'D': do_codestyle = c_dc; break;                           ,
-    case c_dc: print_dc(); break;                                   ,
-    Nothing_Here						    )
-#if XX == 4
-    if (do_codestyle == c_dc) {
-	if (eofcell == 0 && do_codestyle == c_dc && input_string == 0)
-	    eofcell = 6;
-	if (!default_io && iostyle != 2) {
-	    fprintf(stderr, "The -D option only supports binary I/O.\n");
-	    exit(255);
-	}
-	iostyle = 2;
-    }
-#endif
-#if XX == 9
-    {	int f = checkarg_dc(opt, arg);
-	if (f) return f;
-    }
-#endif
-
-/****************************************************************************/
-X(dd,DD,
-    printf("   -d   Code for be-pipe of bf2any\n");,
-    case 'd': do_codestyle = c_dd; break;			    ,
-    case c_dd: print_dd(); break;                                   ,
-    Nothing_Here                                                    )
-
+#include "bfi.dasm.h"
+#include "bfi.gnulit.h"
+#include "bfi.ccode.h"
+#include "bfi.dd.h"
+#include "bfi.nasm.h"
+#include "bfi.bf.h"
+#include "bfi.dc.h"
 
 /****************************************************************************/
 
 #undef X
-#endif /*XX==?*/
+#undef Nothing_Here
 #undef XX
 #endif /*NO_EXT_BE*/
