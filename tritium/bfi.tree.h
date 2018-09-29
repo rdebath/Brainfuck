@@ -56,7 +56,9 @@ enum token { TOKEN_LIST(GEN_TOK_ENUM) TCOUNT};
 struct bfi
 {
     struct bfi *next;
-    int type;
+    unsigned char type;
+    unsigned char orgtype;
+
     int count;
     int offset;
     struct bfi *jmp;
@@ -66,12 +68,10 @@ struct bfi
     int count3;
     int offset3;
 
-    int profile;
     int line, col;
     int inum;
-    int ipos;
+    int iprof;
 
-    int orgtype;
     struct bfi *prev;
     struct bfi *prevskip;
 };

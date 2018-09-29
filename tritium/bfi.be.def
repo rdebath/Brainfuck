@@ -53,14 +53,6 @@ it to the list and fill in it's entry.
 #define X(a,b,c,d,e,f)
 #endif
 
-#if XX == 6
-    /* Generators normally generate code with a fixed cell size. */
-    if (cell_size == 0 && do_codestyle != c_default &&
-	    do_codestyle != c_dc && do_codestyle != c_dd &&
-	    do_codestyle != c_ccode && do_codestyle != c_bf)
-	set_cell_size(-1);
-#endif
-
 /****************************************************************************/
 #ifndef DISABLE_DYNASM
 X(dynasm,DYNASM,
@@ -80,6 +72,9 @@ X(dynasm,DYNASM,
 	fprintf(stderr, "The DynASM generator does not support that cell size\n");
 	exit(255);
     }
+#endif
+#if XX == 6
+if (cell_size == 0 && do_codestyle == c_dynasm) set_cell_size(-1);
 #endif
 #if XX == 9
     {	int f = checkarg_dynasm(opt, arg);
@@ -107,6 +102,9 @@ X(gnulightning,GNULIGHTNING,
 	fprintf(stderr, "The GNU Lightning generator does not support that cell size\n");
 	exit(255);
     }
+#endif
+#if XX == 6
+if (cell_size == 0 && do_codestyle == c_gnulightning) set_cell_size(-1);
 #endif
 #endif
 
@@ -156,16 +154,19 @@ X(nasm,NASM,
     if (do_codestyle == c_nasm)
     {
 	if (cell_length && cell_size != 8) {
-	    fprintf(stderr, "The -s option only supports 8 bit cells.\n");
+	    fprintf(stderr, "The 'nasm' generator only supports 8 bit cells.\n");
 	    exit(255);
 	}
 	set_cell_size(8);
 	if (!default_io && iostyle != 2) {
-	    fprintf(stderr, "The -s option only supports binary I/O.\n");
+	    fprintf(stderr, "The 'nasm' generator only supports binary I/O.\n");
 	    exit(255);
 	}
 	iostyle = 2;
     }
+#endif
+#if XX == 6
+if (cell_size == 0 && do_codestyle == c_nasm) set_cell_size(-1);
 #endif
 #if XX == 9
     {	int f = checkarg_nasm(opt, arg);
@@ -176,13 +177,14 @@ X(nasm,NASM,
 /****************************************************************************/
 X(bf,BF,
     printf("   -F   Attempt to regenerate BF code. (This disables a lot of optimisations.)\n");,
-    case 'F': do_codestyle = c_bf; hard_left_limit = 0; break;      ,
+    case 'F': do_codestyle = c_bf; break;                           ,
     case c_bf: print_bf(); break;                                   ,
     Nothing_Here						    )
 #if XX == 4
     if (do_codestyle == c_bf) {
 	opt_no_calc = opt_no_endif = opt_no_litprt = 1;
 	opt_regen_mov = 0;
+	hard_left_limit = 0;
 
 	if (!default_io) {
 	    fprintf(stderr, "The -F option only supports default I/O.\n");

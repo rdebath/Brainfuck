@@ -57,10 +57,10 @@ static int leave_temps = 0;
 #endif
 
 #ifndef DISABLE_TCCLIB
-void run_tccode(void);
+static void run_tccode(void);
 #endif
 #ifndef DISABLE_DLOPEN
-void run_gccode(void);
+static void run_gccode(void);
 #endif
 
 static void pt(FILE* ofd, int indent, struct bfi * n);
@@ -70,7 +70,7 @@ static char * lval(int offset);
 static void print_c_header(FILE * ofd);
 
 int
-checkarg_ccode(char * opt, char * arg)
+checkarg_ccode(char * opt, char * arg UNUSED)
 {
 #if !defined(DISABLE_TCCLIB)
     if (!strcmp(opt, "-ltcc")) {
@@ -1096,6 +1096,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		   "%s node: ptr+%d, cnt=%d, @(%d,%d).\n",
 		    tokennames[n->type],
 		    n->offset, n->count, n->line, n->col);
+	    if (disable_indent) fprintf(ofd, ";\n");
 	    break;
 
 	case T_CALL:
@@ -1185,12 +1186,12 @@ print_ccode(FILE * ofd)
     }
 
     for(n=bfprog; n; n=n->next) {
-	n->ipos = ++ipos;
+	n->iprof = ++ipos;
 
 	if (n->orgtype == T_END) indent--;
 
 	if (n->type == T_END && n->jmp->type == T_WHL &&
-	    n->ipos-n->jmp->ipos > 5) {
+	    n->iprof-n->jmp->iprof > 5) {
 	    int ti = indent;
 	    indent = 0;
 
@@ -1250,7 +1251,7 @@ run_ccode(void)
 #ifndef DISABLE_TCCLIB
 typedef void (*void_func)(void);
 
-void
+static void
 run_tccode(void)
 {
     char * ccode;
@@ -1420,7 +1421,7 @@ static char ccode_name[sizeof(tmpdir)+16];
 static char dl_name[sizeof(tmpdir)+16];
 static char obj_name[sizeof(tmpdir)+16];
 
-void
+static void
 run_gccode(void)
 {
     FILE * ofd;

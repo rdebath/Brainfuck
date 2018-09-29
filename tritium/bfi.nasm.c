@@ -138,7 +138,7 @@ print_nasm(void)
 
     /* Scan the nodes so we get an APPROXIMATE distance measure */
     for(i=0, n = bfprog; n; n=n->next) {
-	n->ipos = i;
+	n->iprof = i;
 	switch(n->type) {
 #ifndef oldnasm
 	case T_MOV: i++; break;
@@ -316,7 +316,7 @@ print_nasm(void)
 	     * put here without being a lot more detailed about the
 	     * instructions we use so we don't force short jumps.
 	     */
-	    if (abs(n->ipos - n->jmp->ipos) > 120 && !intel_gas)
+	    if (abs(n->iprof - n->jmp->iprof) > 120 && !intel_gas)
 		neartok = " near";
 	    else
 		neartok = "";
@@ -335,7 +335,7 @@ print_nasm(void)
 	    break;
 
 	case T_END:
-	    if (abs(n->ipos - n->jmp->ipos) > 120 && !intel_gas)
+	    if (abs(n->iprof - n->jmp->iprof) > 120 && !intel_gas)
 		neartok = " near";
 	    else
 		neartok = "";
@@ -1075,7 +1075,7 @@ static void
 print_nasm_elf_hello_world(void)
 {
     struct bfi * n = bfprog;
-    int i, bytecount = 0;
+    int bytecount = 0;
 
     printf("%s\n",
 		"; asmsyntax=nasm"
@@ -1137,20 +1137,10 @@ print_nasm_elf_hello_world(void)
     }
     printf("msg:\n");
 
-#if 0
-    for(i=0, n = bfprog; n; n=n->next) {
-	if (i == 0) printf("\tdb\t"); else printf(", ");
-	printf("0x%02x", n->count & 0xFF);
-	bytecount ++;
-	i = ((i+1) & 7);
-	if (i == 0|| n->next == 0) printf("\n");
-    }
-#endif
-
     {
 	char txtbuf[80], *p=0;
 	int l = 0, instrn = 0;
-	for(i=0, n = bfprog; n; n=n->next) {
+	for(n = bfprog; n; n=n->next) {
 	    int need;
 
 	    bytecount++;

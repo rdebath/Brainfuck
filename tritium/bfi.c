@@ -135,13 +135,16 @@ int libc_allows_utf8 = 0;
 int default_io = 1;
 
 /*
- * The default values here make the compiler assume that the cell is
- * an integer type greater than or equal to a byte. Eveything should
- * be fine even if the cell size is larger than an int.
+ * The optimiser always assumes that the cell size is a power of two.
+ * The default: cell_size=0, cell_length=0 means that the cell size is
+ * the same or larger than a byte, so any power of two may be a zero.
  *
- * When the cell size is actually set some more optimisations will be
- * allowed. The masks will be set to the correct values for the cell size.
- * The cell size may be anything between ONE bit and the sizeof an int.
+ * If the cell_size (and cell_length) are set to a size less than or
+ * equal to an integer, that size is used explicitly for all operations.
+ *
+ * If the cell_length is greater than an int the cell_size will be zero,
+ * however, the optimiser will no longer assume that any power of two
+ * can be a zero.
  */
 unsigned cell_length = 0;/* Number of bits in cell */
 int cell_size = 0;  /* Number of bits in cell IF they fit in an int. */
@@ -278,7 +281,7 @@ void LongUsage(FILE * fd, const char * errormsg)
 #endif
     printf("\n");
     printf("   -A   Generate output to be compiled or assembled.\n");
-    printf("        (opposite of -r, use -b32 to add C header to default.)\n");
+    printf("        Includes '#define' lines for C compilation.\n");
     printf("\n");
 #ifndef NO_EXT_BE
 #define XX 2
@@ -464,12 +467,13 @@ UsageInt64(void)
 #endif
     fprintf(stderr, " bits.\n");
 
-#if !defined(NO_EXT_BE)
     fprintf(stderr,
 	"The generated C can be configured to use other types "
 	"using the 'C' #define.\n"
-	"The dc(1) generator can have unlimited size cells\n");
+#if !defined(NO_EXT_BE)
+	"The dc(1) generator can have unlimited size cells\n"
 #endif
+	);
 
     exit(1);
 }
@@ -494,6 +498,8 @@ checkarg(char * opt, char * arg)
 #ifndef NO_EXT_BE
 #define XX 3
 #include "bfi.be.def"
+#else
+	case 'c': do_run=0; break;
 #endif
 	case 'm': opt_level= -1; break;
 	case 'T': enable_trace=1; break;
@@ -760,7 +766,7 @@ load_file(FILE * ifd, int is_first, int is_last, char * bfstring)
     struct bfi *p=0, *n=bfprog;
 
 static struct bfi *jst;
-static int dld, inp, out, rle = 0, num = 1, ov_flg;
+static int dld, inp, rle = 0, num = 1, ov_flg;
 
     if (is_first) { jst = 0; dld = 0; }
     if (n) { while(n->next) n=n->next; p = n;}
@@ -802,7 +808,7 @@ static int dld, inp, out, rle = 0, num = 1, ov_flg;
 	case '-': ch = T_ADD; c= -num; break;
 	case '[': ch = T_WHL; break;
 	case ']': ch = T_END; break;
-	case '.': ch = T_PRT; out = 1; break;
+	case '.': ch = T_PRT; break;
 	case ',':
 	    if (eofcell == 5) ch = T_NOP;
 	    else if (eofcell == 6) ch = T_STOP;
@@ -938,7 +944,7 @@ printtreecell(FILE * efd, int indent, struct bfi * n)
     while(i-->0)
 	fprintf(efd, " ");
     if (n == 0) {fprintf(efd, "NULL Cell"); return; }
-    if (n->type >= 0 && n->type < TCOUNT)
+    if ((unsigned)n->type < TCOUNT)
 	fprintf(efd, "%s", tokennames[n->type]);
     else
 	fprintf(efd, "TOKEN(%d)", n->type);
@@ -954,9 +960,27 @@ printtreecell(FILE * efd, int indent, struct bfi * n)
 	fprintf(efd, "[%d]:%d, ", n->offset, n->count);
 	break;
     case T_CALC:
+	if (n->count == 0 && n->count2 == 1) {
+	    if (n->offset == n->offset2) {
+		if (n->count3 == 1) {
+		    fprintf(efd, "[%d] += [%d], ", n->offset, n->offset3);
+		    break;
+		}
+		if (n->count3 == -1) {
+		    fprintf(efd, "[%d] -= [%d], ", n->offset, n->offset3);
+		    break;
+		}
+	    } else if (n->count3 == 0) {
+		fprintf(efd, "[%d] = [%d], ", n->offset, n->offset2);
+		break;
+	    }
+	}
 	if (n->count3 == 0) {
-	    fprintf(efd, "[%d] = %d + [%d]*%d, ",
-		n->offset, n->count, n->offset2, n->count2);
+	    fprintf(efd, "[%d] = [%d]*%d + %d, ",
+		n->offset, n->offset2, n->count2, n->count);
+	} else if (n->offset == n->offset2 && n->count2 == 1 && n->count3<0) {
+	    fprintf(efd, "[%d] -= [%d]*%d + %d, ",
+		n->offset, n->offset3, -n->count3, n->count);
 	} else if (n->offset == n->offset2 && n->count2 == 1) {
 	    fprintf(efd, "[%d] += [%d]*%d + %d, ",
 		n->offset, n->offset3, n->count3, n->count);
@@ -1010,8 +1034,8 @@ printtreecell(FILE * efd, int indent, struct bfi * n)
 	    fprintf(efd, "jmp $%d, ", n->jmp->inum);
 	if(n->prevskip)
 	    fprintf(efd, "skip $%d, ", n->prevskip->inum);
-	if(n->profile)
-	    fprintf(efd, "prof %d, ", n->profile);
+	if(n->iprof)
+	    fprintf(efd, "prof %d, ", n->iprof);
 	if(n->line || n->col)
 	    fprintf(efd, "@(%d,%d)", n->line, n->col);
 	else
@@ -1019,8 +1043,8 @@ printtreecell(FILE * efd, int indent, struct bfi * n)
     } else {
 	if(n->jmp)
 	    fprintf(efd, "jmp $%d, ", n->jmp->inum);
-	if(n->profile)
-	    fprintf(efd, "prof %d, ", n->profile);
+	if(n->iprof)
+	    fprintf(efd, "prof %d, ", n->iprof);
     }
 }
 
@@ -1056,9 +1080,9 @@ process_file(void)
 
     if (verbose>5) printtree();
     if (opt_level>=1) {
-	if (verbose>2)
-	    fprintf(stderr, "Starting optimise level %d, cell_size %d\n",
-		    opt_level, cell_size);
+	if (verbose>1)
+	    fprintf(stderr, "Starting optimise level %d, cell_size %d(%d)\n",
+		    opt_level, cell_size, cell_length);
 
 	tickstart();
 	pointer_scan();
@@ -1259,8 +1283,8 @@ calculate_stats(void)
 	    if (min_pointer > n->offset) min_pointer = n->offset;
 	    if (max_pointer < n->offset) max_pointer = n->offset;
 	}
-	if (n->profile)
-	    profile_hits += n->profile;
+	if (n->iprof)
+	    profile_hits += n->iprof;
 
 	if (indent>0 && n->orgtype == T_END) indent--;
 	if (indent>max_indent) max_indent = indent;
@@ -1333,7 +1357,7 @@ run_tree(void)
     while(n){
 	{
 	    int off = (p+n->offset) - oldp;
-	    n->profile++;
+	    n->iprof++;
 	    node_profile_counts[n->type]++;
 	    if (n->type != T_MOV) {
 		if (off < profile_min_cell) profile_min_cell = off;
@@ -3019,7 +3043,7 @@ flatten_loop(struct bfi * v, int constant_count)
 	/* This detects the code [-]++[>+<++] which generates MAXINT */
 	/* We can only resolve this if we know the cell size. */
 	if (abs(loop_step) == 2 && cell_size>1 && loop_step == constant_count) {
-	    constant_count = ~(-1 << (cell_size-1));	    /* GCC Whinge */
+	    constant_count = ~(~0U << (cell_size-1));	    /* GCC Whinge */
 	    loop_step = -1;
 	}
 
@@ -3533,24 +3557,31 @@ void
 print_codedump(void)
 {
     struct bfi * n = bfprog;
-    int disable_c_header = 0;
 
-    if (cell_size != sizeof(int)*CHAR_BIT &&
-	cell_size != sizeof(short)*CHAR_BIT &&
-	cell_size != sizeof(char)*CHAR_BIT &&
-	cell_length < sizeof(int)*CHAR_BIT) {
-	disable_c_header = 1;
-	if (verbose)
-	    fprintf(stderr, "Code dump C header only works for C types\n");
-    }
+    if (!noheader) {
+	int add_mask = 0, unknown_type = 0;
 
-    if (!noheader && !disable_c_header) {
-	printf("%s%s%s\n",
-	    "#ifndef bf_start" "\n"
-	    "#include <unistd.h>",
-	    (cell_length <= sizeof(int)*CHAR_BIT?"":"\n#include <stdint.h>"),
-	    "\n#define bf_end() return 0;}");
+	if (cell_size != sizeof(int)*CHAR_BIT &&
+	    cell_size != sizeof(short)*CHAR_BIT &&
+	    cell_size != sizeof(char)*CHAR_BIT &&
+	    cell_mask > 0) {
+	    add_mask = 1;
+	}
+	unknown_type = (strcmp(cell_type, "C") == 0);
 
+	puts("#ifndef bf_start");
+	puts("#include <stdlib.h>");
+	puts("#include <unistd.h>");
+	if (cell_type_iso || unknown_type)
+	    puts("#include <stdint.h>");
+
+	if (unknown_type) {
+	    puts("#ifndef C");
+	    puts("#define C uintmax_t");
+	    puts("#endif");
+	}
+
+	puts("#define bf_end() return 0;}");
 	printf("%s%s%s\n",
 	    "#define bf_start(msz,moff,bits) ",cell_type," mem[msz+moff]; \\");
 
@@ -3589,13 +3620,24 @@ print_codedump(void)
 
 	if(node_type_counts[T_MULT] || node_type_counts[T_CMULT]
 	    || node_type_counts[T_WHL]) {
-	    puts("#define lp_start(x,y,c) if(p[x]==0) goto E##y; S##y:");
-	    puts("#define lp_end(x,y) if(p[x]) goto S##y; E##y:");
+	    if (add_mask) {
+		printf("#define lp_start(x,y,c) "
+			"if((p[x]&=0x%x)==0) goto E##y; S##y:\n", cell_mask);
+		printf("#define lp_end(x,y) "
+			"if(p[x]&=0x%x) goto S##y; E##y:\n", cell_mask);
+	    } else {
+		puts("#define lp_start(x,y,c) if(p[x]==0) goto E##y; S##y:");
+		puts("#define lp_end(x,y) if(p[x]) goto S##y; E##y:");
+	    }
 	}
 
 	/* See:  opt_no_endif */
 	if (node_type_counts[T_IF]) {
-	    puts("#define if_start(x,y) if(p[x]==0) goto E##y;");
+	    if (add_mask)
+		printf("#define if_start(x,y) "
+			"if((p[x]&=0x%x)==0) goto E##y;\n", cell_mask);
+	    else
+		puts("#define if_start(x,y) if(p[x]==0) goto E##y;");
 	    puts("#define if_end(x) E##x:");
 	}
 
@@ -3643,6 +3685,7 @@ print_codedump(void)
 	}
 
 	puts("#endif");
+	puts("/* ###################### CUT HERE ###################### */");
     }
 
     printf("bf_start(%d,%d,%d)\n", memsize, -most_neg_maad_loop, cell_size);
@@ -3902,36 +3945,33 @@ putch(int ch)
 void
 set_cell_size(int cell_bits)
 {
+#if !defined(NO_EXT_BE)
     /* First try for an, oversized, exact C cell type */
-#if !defined(NO_EXT_BE) && defined(UINT64_MAX)
+#if defined(UINT64_MAX)
     if (cell_bits == (int)sizeof(uint64_t)*CHAR_BIT) {
 	cell_type = "uint64_t";
 	cell_type_iso = 1;
     } else
 #endif
-#if !defined(NO_EXT_BE) && defined(UINTMAX_MAX)
+#if defined(UINTMAX_MAX)
     if (cell_bits == (int)sizeof(uintmax_t)*CHAR_BIT) {
 	cell_type = "uintmax_t";
 	cell_type_iso = 1;
     } else
 #endif
-#if !defined(NO_EXT_BE)
     if (cell_bits == (int)sizeof(long)*CHAR_BIT && sizeof(long) > sizeof(int)) {
 	cell_type = "unsigned long";
     } else
-#endif
-#if !defined(NO_EXT_BE) && defined(__SIZEOF_INT128__)
+#if defined(__SIZEOF_INT128__)
     if (cell_bits == (int)sizeof(__int128)*CHAR_BIT) {
 	cell_type = "unsigned __int128";
     } else
 #endif
 	cell_type = 0;
 
-#ifdef BE_DC
     if (cell_bits > (int)sizeof(int)*CHAR_BIT && cell_type == 0) {
 	cell_type = "C";
     }
-#endif
 
     if (cell_type != 0) {
 	cell_length = cell_bits;
@@ -3942,6 +3982,9 @@ set_cell_size(int cell_bits)
 	if (verbose>5) fprintf(stderr, "Cell type is %s\n", cell_type);
 	return;
     }
+#else
+    cell_type = 0;
+#endif
 
     if (cell_bits >= (int)sizeof(int)*CHAR_BIT || cell_bits <= 0) {
 	if (cell_bits == -1 && opt_bytedefault) {

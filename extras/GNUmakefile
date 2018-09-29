@@ -101,6 +101,7 @@ CALLOK := yes
 endif
 
 ifeq ($(CALLOK),yes)
+TMP :=/tmp/_test-$$$$
 ################################################################################
 # Current GCC policy seems to be to do any unsafe optimisation they can think
 # of and let everyone else pick up the pieces. In addition v4.7 of GCC does
@@ -108,7 +109,6 @@ ifeq ($(CALLOK),yes)
 # C standard.
 ifneq ($(CC),cc)
 # Check for GCC options c/o the Linux kernel makefiles
-TMP :=/tmp/_test-$$$$
 cc-option = $(shell set -e;               \
 	echo Checking $(CC) "$(1)" > $(LOGDEV); \
 	if ($(CC) $(1) -c -x c /dev/null -o $(TMP) ) >$(LOGDEV) 2>&1;      \
