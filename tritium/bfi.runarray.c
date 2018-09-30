@@ -3,38 +3,32 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <limits.h>
 
 #include "bfi.tree.h"
 #include "bfi.run.h"
 #include "bfi.runarray.h"
 #include "clock.h"
 
-#ifndef MASK
-typedef int icell;
-#else
-#if MASK == 0xFF
-#define icell	unsigned char
-#define M(x) x
-#elif MASK == 0xFFFF
-#define icell	unsigned short
-#define M(x) x
-#elif MASK == -1
-#define icell	unsigned int
-#define M(x) (x)
-#elif MASK < 0xFF
-#define icell	char
-#define M(x) ((x)&MASK)
-#else
-#define icell	int
-#define M(x) ((x)&MASK)
-#endif
-#endif
+#define FNAME run_intprog
+#define icell   unsigned int
+#include "bfi.execloop.h"
+#undef FNAME
+#undef icell
 
-#ifndef M
+#define FNAME run_charprog
+#define icell   unsigned char
+#include "bfi.execloop.h"
+#undef FNAME
+#undef icell
+
+#define FNAME run_maskprog
+#define icell   unsigned int
 #define DYNAMIC_MASK
-#endif
-
-static void run_progarray(int * p, icell * m);
+#include "bfi.execloop.h"
+#undef FNAME
+#undef icell
+#undef DYNAMIC_MASK
 
 void
 convert_tree_to_runarray(void)
@@ -44,17 +38,7 @@ convert_tree_to_runarray(void)
     int * progarray = 0;
     int * p;
     int last_offset = 0;
-#ifndef DYNAMIC_MASK
-    if (cell_mask != MASK) {
-	if (verbose)
-	    fprintf(stderr, "Oops: Switching to profiling interpreter "
-			    "because the array interpreter has been\n"
-			    "configured with a fixed cell mask of 0x%x\n",
-			    MASK);
-	run_tree();
-	return;
-    }
-#endif
+
     only_uses_putch = 1;
 
     while(n)
@@ -252,119 +236,14 @@ convert_tree_to_runarray(void)
 
     delete_tree();
     start_runclock();
-    run_progarray(progarray, map_hugeram());
+    if (cell_size == CHAR_BIT) {
+	run_charprog(progarray, map_hugeram());
+    } else if (cell_size == sizeof(int)*CHAR_BIT) {
+	run_intprog(progarray, map_hugeram());
+    } else {
+	run_maskprog(progarray, map_hugeram());
+    }
     finish_runclock(&run_time, &io_time);
     free(progarray);
 }
 
-#if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
-__attribute__((optimize(3),noinline,hot))
-#endif
-
-static void
-run_progarray(int * p, icell * m)
-{
-#ifdef DYNAMIC_MASK
-    const icell msk = (icell)cell_mask;
-#define M(x) ((x) &= msk)
-#define MS(x) ((x) & msk)
-#else
-#define MS(x) M(x)
-#endif
-    for(;;) {
-	m += p[0];
-	switch(p[1])
-	{
-	case T_ADD: *m += p[2]; p += 3; break;
-	case T_SET: *m = p[2]; p += 3; break;
-
-	case T_END:
-	    if(M(*m) != 0) p += p[2];
-	    p += 3;
-	    break;
-
-	case T_WHL:
-	    if(M(*m) == 0) p += p[2];
-	    p += 3;
-	    break;
-
-	case T_ENDIF:
-	    p += 2;
-	    break;
-
-	case T_CALC:
-	    *m = p[2] + m[p[3]] * p[4] + m[p[5]] * p[6];
-	    p += 7;
-	    break;
-
-	case T_CALC2:
-	    *m = p[2] + m[p[3]] * p[4];
-	    p += 5;
-	    break;
-
-	case T_CALC3:
-	    *m += m[p[2]] * p[3];
-	    p += 4;
-	    break;
-
-	case T_CALC4:
-	    *m = m[p[2]];
-	    p += 3;
-	    break;
-
-	case T_CALC5:
-	    *m += m[p[2]];
-	    p += 3;
-	    break;
-
-	case T_CALCMULT:
-	    *m = p[2] + m[p[3]] * p[4] * m[p[5]] * p[6];
-	    p += 7;
-	    break;
-
-	case T_ADDWZ:
-	    /* This is normally a running dec, it cleans up a rail */
-	    while(M(*m)) {
-		m[p[2]] += p[3];
-		m += p[4];
-	    }
-	    p += 5;
-	    break;
-
-	case T_ZFIND:
-	    /* Search along a rail til you find the end of it. */
-	    while(M(*m)) {
-		m += p[2];
-	    }
-	    p += 3;
-	    break;
-
-	case T_MFIND:
-	    /* Search along a rail for a minus 1 */
-            *m -= 1;
-            while(MS(*m+1) != 0) m += p[2];
-            *m += 1;
-	    p += 3;
-	    break;
-
-	case T_INP:
-	    *m = getch(*m);
-	    p += 2;
-	    break;
-
-	case T_PRT:
-	    putch(*m);
-	    p += 2;
-	    break;
-
-	case T_CHR:
-	    putch(p[2]);
-	    p += 3;
-	    break;
-
-	case T_STOP:
-	    goto break_break;
-	}
-    }
-break_break:;
-}

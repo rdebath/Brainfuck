@@ -65,8 +65,8 @@ characters after your favorite comment marker in a very visible form.
 #include "inttypes.h"
 #endif
 
-#include "ov_int.h"
 #include "bfi.tree.h"
+#include "ov_int.h"
 
 #ifndef NO_EXT_BE
 #include "bfi.run.h"
@@ -852,6 +852,12 @@ static int dld, inp, rle = 0, num = 1, ov_flg;
 		    int ov_flg_rle = 0, t = ov_iadd(p->count, c, &ov_flg_rle);
 		    if (!ov_flg_rle) {
 			p->count = t;
+			if (p->count == 0) {
+			    struct bfi *t1 = p;
+			    p = p->prev;
+			    if (p) p->next = 0; else bfprog = 0;
+			    free(t1);
+			}
 			continue;
 		    }
 		}
@@ -1836,7 +1842,7 @@ quick_scan(void)
 	    n->next->type == T_ADD &&
 	    n->next->next->type == T_END &&
 	    n->offset == n->next->offset &&
-	    ( n->next->count == 1 || n->next->count == -1 )
+	    (n->next->count&1) == 1
 	    ) {
 	    /* Change to T_SET */
 	    n->next->type = T_SET;

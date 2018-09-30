@@ -100,6 +100,7 @@ bfi.ccode.o: bfi.ccode.c bfi.tree.h bfi.run.h bfi.ccode.h
 bfi.dc.o: bfi.dc.c bfi.tree.h bfi.run.h
 bfi.nasm.o: bfi.nasm.c bfi.tree.h bfi.nasm.h
 bfi.dd.o: bfi.dd.c bfi.tree.h
+bfi.runarray.o: bfi.runarray.c bfi.execloop.h
 
 taperam.o: bfi.tree.h bfi.run.h
 

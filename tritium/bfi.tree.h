@@ -22,6 +22,10 @@
 #define __attribute__(__ignored__)
 #endif
 
+#ifndef __has_builtin         // Optional of course.
+  #define __has_builtin(x) 0  // Compatibility with non-clang compilers.
+#endif
+
 extern const char * bfname;
 extern int noheader, enable_trace, hard_left_limit, memsize, most_neg_maad_loop;
 extern int min_pointer, max_pointer;
