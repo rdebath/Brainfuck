@@ -9,6 +9,7 @@
 
 static int BFBasic = 0;
 static int bfrle = 0;
+static int col = 0;
 
 int
 checkarg_bf(char * opt, char * arg UNUSED)
@@ -19,10 +20,22 @@ checkarg_bf(char * opt, char * arg UNUSED)
 }
 
 static void
-pint(int v)
-{
-    if (v<0) printf("(%d)", -v);
-    else     printf("%d", v);
+pc(int ch) { if (col>=72) { putchar('\n'); col=0; } col++; putchar(ch); }
+
+static void
+ps(char * p) {
+    if (!p || col+strlen(p) >= 72) {putchar('\n'); col = 0;}
+    while(p&&*p) pc(*p++);
+}
+
+static void
+pr(char ch, int r) {
+    char wbuf[sizeof(int)*3+8];
+    if (bfrle && r>1) {
+	sprintf(wbuf, "%d%c", r, ch);
+	ps(wbuf);
+    } else
+	while(r-->0) pc(ch);
 }
 
 /*
@@ -37,115 +50,52 @@ pint(int v)
 void
 print_bf(void)
 {
-    struct bfi *v, *n = bfprog;
-    int last_offset = 0;
-    int i, nocr = 0;
+    struct bfi *n = bfprog;
+    int i, last_offset = 0;
 
     printf("[ BF%s regenerated from %s ]\n", bfrle?"-RLE":"", bfname);
 
     while(n)
     {
-	if (enable_trace && !nocr) { /* Sort of! */
-	    v = n;
-
-	    do
-	    {
-		printf("// %s", tokennames[v->type&0xF]);
-		printf(" O="); pint(v->offset);
-		switch(v->type) {
-		case T_WHL:
-		    printf(" ID="); pint(v->count);
-		    break;
-		case T_END: case T_ENDIF:
-		    printf(" ID="); pint(v->jmp->count);
-		    if (v->count != 0) { printf(" C="); pint(v->count); }
-		    break;
-		case T_ADD:
-		    printf(" V="); pint(v->count);
-		    break;
-		case T_SET:
-		    printf(" ="); pint(v->count);
-		    break;
-		default:
-		    printf(" C="); pint(v->count);
-		    break;
-		}
-		if (v->count2 != 0) {
-		    printf(" O2="); pint(v->offset2);
-		    printf(" C="); pint(v->count2);
-		}
-		if (v->count3 != 0) {
-		    printf(" O3="); pint(v->offset3);
-		    printf(" C="); pint(v->count3);
-		}
-		printf(" @%d;%d", v->line, v->col);
-		printf("\n");
-		v=v->next;
-	    }
-	    while(v && v->prev->type != T_END && v->prev->type != T_ENDIF && (
-		n->type == T_MULT ||
-		n->type == T_CMULT ||
-		n->type == T_IF));
-	}
-
 	if (n->type == T_MOV) {
 	    last_offset -= n->count;
 	    n = n->next;
 	    continue;
 	}
 
-	if (n->offset!=last_offset) {
-	    if (bfrle && (n->offset>last_offset+1 || n->offset<last_offset-1)) {
-		if(n->offset>last_offset)
-		    printf("%d>", n->offset-last_offset);
-		if(n->offset<last_offset)
-		    printf("%d>", last_offset-n->offset);
-		last_offset = n->offset;
-	    }
-	    while(n->offset>last_offset) { putchar('>'); last_offset++; };
-	    while(n->offset<last_offset) { putchar('<'); last_offset--; };
-	    if (!nocr)
-		printf("\n");
-	}
+	if(n->offset>last_offset)
+	    pr('>', n->offset-last_offset);
+	if(n->offset<last_offset)
+	    pr('<', last_offset-n->offset);
+	last_offset = n->offset;
 
 	switch(n->type)
 	{
 	case T_SET:
-	    if (bfrle) putchar('='); else printf("[-]");
+	    if (bfrle) pc('='); else ps("[-]");
 	    i = n->count;
-	    if (bfrle && (i>1 || i<-1)) {
-		if(i>0) printf("%d+", i);
-		if(i<0) printf("%d-", -i);
-		i=0;
-	    }
-	    while(i>0) { putchar('+'); i--; }
-	    while(i<0) { putchar('-'); i++; }
+	    if(i>0) pr('+', i);
+	    if(i<0) pr('-', -i);
 	    break;
 
 	case T_ADD:
 	    i = n->count;
-	    if (bfrle && (i>1 || i<-1)) {
-		if(i>0) printf("%d+", i);
-		if(i<0) printf("%d-", -i);
-		i=0;
-	    }
-	    while(i>0) { putchar('+'); i--; }
-	    while(i<0) { putchar('-'); i++; }
+	    if(i>0) pr('+', i);
+	    if(i<0) pr('-', -i);
 	    break;
 
 	case T_PRT:
-	    putchar('.');
+	    pc('.');
 	    break;
 
 	case T_INP:
-	    putchar(',');
+	    pc(',');
 	    break;
 
 	case T_MULT: case T_CMULT:
 	case T_IF:
-	    nocr = 1;
 	case T_WHL:
-	    putchar('[');
+	    pc('[');
 	    /* This is something that's always true for BF Basic generated
 	     * code. The 'while-switch' loop takes the first few cells and
 	     * next seven are temps that will always be left at zero. This
@@ -153,27 +103,22 @@ print_bf(void)
 	     * easily see this is true. */
 	    if (BFBasic)
 		if (n->offset == 2)
-		    printf("\n[-]+> [-]>[-]>[-]>[-]>[-]>[-]>[-]><<<<<<< <");
+		    ps("[-]+> [-]>[-]>[-]>[-]>[-]>[-]>[-]><<<<<<< <");
 	    break;
 
 	case T_END:
-	    putchar(']');
-	    nocr = 0;
+	    pc(']');
 	    break;
 
 	case T_STOP:
-	    printf("[-]+[]");
-	    nocr = 0;
+	    ps("[-]+[]");
 	    break;
 
 	case T_DUMP:
-	    putchar('#');
+	    pc('#');
 	    break;
 
 	case T_NOP:
-	    fprintf(stderr, "Warning on code generation: "
-		   "NOP node: ptr+%d, cnt=%d, @(%d,%d).\n",
-		    n->offset, n->count, n->line, n->col);
 	    break;
 
 	default:
@@ -183,9 +128,8 @@ print_bf(void)
 	    fprintf(stderr, "Optimisation level probably too high for BF output\n");
 	    exit(1);
 	}
-	if (!nocr)
-	    putchar('\n');
 	n=n->next;
     }
+    ps(0);
 }
 
