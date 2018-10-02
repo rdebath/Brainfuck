@@ -104,6 +104,10 @@ static const char *blub[] =
 static const char *f__k[] =
     {"folk", "sing", "barb", "teas", "cask", "kerb", "able", "bait"};
 
+/* Language "fuck fuck" With "RLE" */
+static const char *f__krle[] =
+    {"f**k", "s**g", "b**b", "t**s", "c**k", "k**b", "a**e", "b**t", "!"};
+
 /* Language "pogaack" */
 static const char * pogaack[] =
 		{"pogack!", "pogaack!", "pogaaack!", "poock!",
@@ -543,6 +547,9 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-fk") == 0) {
 	lang = f__k; langclass = L_CDWORDS; return 1;
     } else
+    if (strcmp(arg, "-fk!") == 0) {
+	lang = f__krle; langclass = L_JNWORD+GEN_RLE; return 1;
+    } else
     if (strcmp(arg, "-pog") == 0 || strcmp(arg, "-pogaack") == 0) {
 	lang = pogaack; langclass = L_WORDS+GEN_RLE; return 1;
     } else
@@ -681,6 +688,7 @@ fn_check_arg(const char * arg)
 	"\n\t"  "-blub   Blub -- http://esolangs.org/wiki/Blub"
 	"\n\t"  "-moo    Cow -- http://www.frank-buss.de/cow.html"
 	"\n\t"  "-fk     fuck fuck"
+	"\n\t"  "-fk!    fuck fuck with !"
 	"\n\t"  "-head   Headsecks."
 	"\n\t"  "-bfrle  Convert to BF RLE as used by -R."
 	"\n\t"  "-:      Dotty"

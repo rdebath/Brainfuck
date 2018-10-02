@@ -38,7 +38,7 @@ size_t bf_prefilter(char * buf, size_t maxsize);
 %s OOK
 %s BLUB
 %s POG
-%s FK
+%x FK
 %x CCOMMENT
 %x BFCOMMENT
 %x ZZZ
@@ -161,6 +161,8 @@ ook	B?[Oo]ok
     a{twoc}e!*		pcr('[', yyleng-3);
     b{twoc}t!*		pcr(']', yyleng-3);
     "/*"		{ uncomment_mode = YY_START; BEGIN(CCOMMENT); }
+    \n		|
+    .		commentch(yytext[0]);
 }
 
 <CCOMMENT>{
@@ -394,8 +396,12 @@ int main(int argc, char ** argv)
 	    else if (!strcmp(argv[1], "-ook")) { mode = OOK; line_cc = '/'; }
 	    else if (!strcmp(argv[1], "-blub")) mode = BLUB;
 	    else if (!strcmp(argv[1], "-pog")) mode = POG;
-	    else if (!strcmp(argv[1], "-fk")) mode = FK;
 	    else if (!strcmp(argv[1], "-zzz")) mode = ZZZ;
+	    else if (!strcmp(argv[1], "-fk")) {
+		mode = FK;
+		character_prefilter =
+		    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz*/!";
+	    }
 
 	    else if (!strcmp(argv[1], "-nice")) {
 		mode = WORDLIST;
