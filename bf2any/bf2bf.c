@@ -220,6 +220,13 @@ static const char * spoon[] =
 static const char * troll[] =
     { "ooo", "ool", "olo", "oll", "loo", "lol", "llo", "lll", "Tro", "ll." };
 
+/* Language "Roadrunner" */
+static const char * roadrunner[] =
+    { "meeP", "Meep", "mEEp", "MeeP", "MEEP", "meep", "mEEP", "MEEp", 0 };
+
+static const char * roadrunner2[] =
+    { "meeP", "Meep", "mEEp", "MeeP", "MEEP", "meep", "mEEP", "MEEp", "MEep" };
+
 /* Language brainbool: http://esolangs.org/wiki/Brainbool */
 static const char * brainbool[] =
     {">>>>>>>>>", "<<<<<<<<<",
@@ -645,6 +652,12 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-ara") == 0 || strcmp(arg, "-arabic") == 0) {
 	lang = arabic; langclass = L_JNWORD; return 1;
     } else
+    if (strcmp(arg, "-meep") == 0 || strcmp(arg, "-roadrunner") == 0) {
+	lang = roadrunner; langclass = L_CDWORDS; return 1;
+    } else
+    if (strcmp(arg, "-meepmeep") == 0) {
+	lang = roadrunner2; langclass = L_CRLE; return 1;
+    } else
 
     if (strcmp(arg, "-w") == 0) {
 	maxcol = 0;
@@ -688,6 +701,7 @@ fn_check_arg(const char * arg)
 	"\n\t"  "-pika   Pikalang from https://github.com/skj3gg/pikalang"
 	"\n\t"  "-spoon  Language spoon http://esolangs.org/wiki/spoon"
 	"\n\t"  "-cupid  Cupid from http://esolangs.org/wiki/Cupid"
+	"\n\t"  "-meep   Roadrunner from http://esolangs.org/wiki/Roadrunner"
 	"\n\t"  "-ternary Ternary from http://esolangs.org/wiki/Ternary"
 	"\n\t"  "-malbrain Malbrain translation"
 	"\n\t"  "-hanoilove Hanoi Love translation"
