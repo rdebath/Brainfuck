@@ -236,10 +236,6 @@ run_dynasm(void)
     char *strbuf = 0;
     size_t maxstrlen = 0;
 
-    if (cell_size == 8) tape_step = 1; else
-    tape_step = sizeof(int);
-    only_uses_putch = 1;
-
     if (total_nodes > 2000000) {
 	if (verbose)
 	    fprintf(stderr, "WARNING: "
@@ -248,6 +244,10 @@ run_dynasm(void)
 	run_tree();
 	return;
     }
+
+    if (cell_size == 8) tape_step = 1; else
+    tape_step = sizeof(int);
+    only_uses_putch = 1;
 
     if (use_sse4_2 < 0) check_for_sse4_2();
 
@@ -301,22 +301,28 @@ run_dynasm(void)
 	case T_MOV:
 	    clean_acc();
 	    if (acc_loaded) acc_offset -= count;
-	    if (tape_step == 1) {
+	    if (tape_step == 1 && use_sse4_2<1) {
 		if (count == 1) {
 		    | inc REG_P
+		    break;
 		} else if (count == -1) {
 		    | dec REG_P
+		    break;
 		} else if (count == 2) {
 		    | inc REG_P
 		    | inc REG_P
+		    break;
 		} else if (count == -2) {
 		    | dec REG_P
 		    | dec REG_P
+		    break;
 		} else if (count < 0 && count != -128) {
 		    | sub REG_P, -count
 		} else {
 		    | add REG_P, count
 		}
+	    } else if (count*tape_step < 0 && count*tape_step != -128) {
+		| sub REG_P, -count*tape_step
 	    } else {
 		| add REG_P, count*tape_step
 	    }
@@ -325,13 +331,15 @@ run_dynasm(void)
         case T_ADD:
 	    load_acc_offset(offset);
 	    set_acc_offset(offset);
-	    if (count == 1) {
-		| inc REG_A
-		break;
-	    }
-	    if (count == -1) {
-		| dec REG_A
-		break;
+	    if (use_sse4_2<1) {
+		if (count == 1) {
+		    | inc REG_A
+		    break;
+		}
+		if (count == -1) {
+		    | dec REG_A
+		    break;
+		}
 	    }
 	    if ((count != 128 && count >= 0) || count <= -128) {
 		| add REG_A, count
