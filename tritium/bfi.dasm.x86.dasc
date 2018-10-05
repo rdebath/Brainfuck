@@ -965,10 +965,16 @@ link_and_run(dasm_State ** state)
 
 #ifndef __SSE4_2__
 #if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=2))
+#ifndef __PCC__
 #include <cpuid.h>
 #endif
 #endif
+#endif
 
+/* The sse4_2 and popcnt instructions were introduced with "Nehalem" X86
+ * processors. This release also included considerable optimisations in
+ * the instruction scheduling and merging processes.
+ */
 static void
 check_for_sse4_2(void)
 {

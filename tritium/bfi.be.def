@@ -48,6 +48,8 @@ it to the list and fill in it's entry.
 #include "bfi.dasm.h"
 #include "bfi.gnulit.h"
 #include "bfi.ccode.h"
+#include "bfi.openssl.h"
+
 #include "bfi.dd.h"
 #include "bfi.nasm.h"
 #include "bfi.bf.h"

@@ -55,7 +55,7 @@ MOREGCC=$(MOREDEFS) -Wstack-usage=512 -Wunsafe-loop-optimizations -Wold-style-de
 MORECLANG=$(MOREDEFS) -fsanitize=integer -Wpadded
 
 OBJECTS=bfi.o bfi.version.o bfi.ccode.o bfi.nasm.o bfi.bf.o bfi.dc.o \
-	bfi.dd.o bfi.runarray.o bfi.runmax.o clock.o taperam.o
+	bfi.dd.o bfi.runarray.o bfi.runmax.o bfi.openssl.o clock.o taperam.o
 
 CONF=-DCNF $(CONF_DYNASM) $(CONF_LIGHTNING) $(CONF_TCCLIB) $(CONF_BNLIB) $(CONF_LIBDL)
 LDLIBS=$(GNUSTK) $(LIBS_LIGHTNING) $(LIBS_TCCLIB) $(LIBS_BNLIB) $(GNUDYN) $(LIBS_LIBDL)
@@ -94,17 +94,20 @@ bfi.version.o: bfi.version.h
 bfi.o: \
     bfi.c bfi.tree.h bfi.run.h bfi.be.def bfi.ccode.h bfi.gnulit.h \
     bfi.nasm.h bfi.bf.h bfi.dc.h bfi.dd.h clock.h ov_int.h \
-    bfi.runarray.h bfi.runmax.h
-bfi.bf.o: bfi.bf.c bfi.tree.h
-bfi.ccode.o: bfi.ccode.c bfi.tree.h bfi.run.h bfi.ccode.h
-bfi.dc.o: bfi.dc.c bfi.tree.h bfi.run.h
+    bfi.runarray.h bfi.runmax.h bfi.dd.h bfi.openssl.h
+bfi.bf.o: bfi.bf.c bfi.tree.h bfi.bf.h
+bfi.ccode.o: bfi.ccode.c bfi.tree.h bfi.run.h bfi.ccode.h clock.h
+bfi.dc.o: bfi.dc.c bfi.tree.h bfi.run.h bfi.dc.h
 bfi.nasm.o: bfi.nasm.c bfi.tree.h bfi.nasm.h
 bfi.dd.o: bfi.dd.c bfi.tree.h
-bfi.runarray.o: bfi.runarray.c bfi.execloop.h
+bfi.runarray.o: bfi.runarray.c bfi.tree.h bfi.run.h bfi.runarray.h \
+    clock.h bfi.execloop.h
+bfi.runmax.o: bfi.runmax.c bfi.tree.h bfi.run.h bfi.runmax.h ov_int.h clock.h
+bfi.dd.o: bfi.dd.c bfi.tree.h bfi.run.h bfi.dd.h
+bfi.openssl.o: bfi.openssl.c bfi.tree.h bfi.run.h bfi.openssl.h clock.h
 
-taperam.o: bfi.tree.h bfi.run.h
-
-clock.o: clock.h
+clock.o: clock.c clock.h
+taperam.o: taperam.c bfi.tree.h bfi.run.h
 
 ################################################################################
 # Don't configure if we're just cleaning.
