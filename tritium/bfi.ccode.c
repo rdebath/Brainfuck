@@ -444,7 +444,7 @@ print_c_header(FILE * ofd)
 	    }
 	}
 
-	if (node_type_counts[T_INP] != 0)
+	if (node_type_counts[T_INP] != 0 && iostyle != 3)
 	{
 	    if (l_iostyle == 2 && (eofcell == 4 || (eofcell == 2 && EOF == -1))) {
 		use_direct_getchar = 1;
@@ -508,6 +508,21 @@ print_c_header(FILE * ofd)
 		}
 		fprintf(ofd, "}\n\n");
 	    }
+	}
+
+	if (node_type_counts[T_INP] != 0 && iostyle == 3)
+	{
+	    fprintf(ofd, "#ifdef __STDC__\n");
+	    fprintf(ofd, "static int\n");
+	    fprintf(ofd, "getch(int oldch)\n");
+	    fprintf(ofd, "#else\n");
+	    fprintf(ofd, "static int getch(oldch) int oldch;\n");
+	    fprintf(ofd, "#endif\n");
+	    fprintf(ofd, "{\n");
+	    fprintf(ofd, "  int ch;\n");
+	    fprintf(ofd, "  if (scanf(\"%%d\", &ch)) return ch;\n");
+	    fprintf(ofd, "  return oldch;\n");
+	    fprintf(ofd, "}\n\n");
 	}
 
 	if (node_type_counts[T_CHR] != 0 || node_type_counts[T_PRT] != 0) {
@@ -640,7 +655,7 @@ print_c_header(FILE * ofd)
 		"\n"	"  register CELL * m = move_ptr(alloc_ptr(mem),0);" );
 	}
 
-	if (node_type_counts[T_INP] != 0) {
+	if (node_type_counts[T_INP] != 0 && iostyle != 3) {
 	    fprintf(ofd, "  setbuf(stdout, 0);\n");
 	}
 	if (node_type_counts[T_INP] != 0 || node_type_counts[T_PRT] != 0)
@@ -1156,11 +1171,6 @@ print_ccode(FILE * ofd)
 
     if (verbose)
 	fprintf(stderr, "Generating C Code.\n");
-
-    if (!do_run && node_type_counts[T_INP] != 0 && iostyle == 3) {
-	fprintf(stderr, "Standalone C code for integer input not implemented.\n");
-	exit(1);
-    }
 
     if (use_dynmem && (do_run || enable_trace || node_type_counts[T_DUMP] != 0)) {
 	fprintf(stderr, "Note: Option -dynmem ignored in run/debug/trace modes.\n");
