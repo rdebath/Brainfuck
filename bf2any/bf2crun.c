@@ -169,7 +169,7 @@ outcmd(int ch, int count)
 		"{ const char s[] = x; write(1,s,sizeof(s)-1); }");
 	} else {
 	    pr("#include <stdio.h>");
-	    pr("#define GETC(x) { v=getchar(); if(v!=EOF) (x)=v; }");
+	    pr("#define GETC(x) { int c=getchar(); if(c!=EOF) (x)=c; }");
 	    pr("#define PUTC(x) putchar(x)");
 	}
 
@@ -208,12 +208,12 @@ outcmd(int ch, int count)
 	    ind++;
 	}
 	if (bytecell) {
-	    pr("static char mem[TAPELEN+TAPEOFF];");
-	    pr("register char *m = mem + TAPEOFF;");
+	    pr("static unsigned char mem[TAPELEN+TAPEOFF];");
+	    pr("register unsigned char *m = mem + TAPEOFF;");
 	    pr("register int v;");
 	} else {
-	    pr("static int mem[TAPELEN+TAPEOFF];");
-	    pr("register int v, *m = mem + TAPEOFF;");
+	    pr("static unsigned int mem[TAPELEN+TAPEOFF];");
+	    pr("register unsigned int v, *m = mem + TAPEOFF;");
 	}
 	if (runmode == no_run && !use_unistd)
 	    pr("setbuf(stdout,0);");
