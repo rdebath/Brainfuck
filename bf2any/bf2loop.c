@@ -178,9 +178,9 @@ static void process_loop()
     qcnt = 0;
 
     /* Start new */
-    if ((minmov < -BOFF || has_zmode) && !loopz) {
+    if ((minmov < -tapeinit || has_zmode) && !loopz) {
 	/*
-	 * Note the 'BOFF' define; this is an optimisation
+	 * Note the 'tapeinit' value; this is an optimisation
 	 * tweak that allows loops, that may be skipped over, to
 	 * be converted into move/add instructions even if the
 	 * references inside the loop may be converted so they
@@ -217,7 +217,7 @@ static void process_loop()
 	    if (!use_v_var) {
 		if (	(!madd_zmode[i] || madd_count<2) &&
 			!loopz &&
-			(!(madd_offset[i] < -BOFF) || madd_count<2) )
+			(!(madd_offset[i] < -tapeinit) || madd_count<2) )
 		    continue;
 	    }
 
@@ -254,8 +254,8 @@ static void process_loop()
 		    qrep[qcnt] = -qrep[qcnt];
 		}
 
-		if (mov < -BOFF && !doneif) {
-		    fprintf(stderr, "BOFF underflow\n");
+		if (mov < -tapeinit && !doneif) {
+		    fprintf(stderr, "Unexpected TAPE underflow\n");
 		    exit(1);
 		}
 		qcnt++;

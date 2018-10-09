@@ -12,10 +12,6 @@
 #include "bfi.run.h"
 #include "bfi.dd.h"
 
-#ifndef BOFF
-#define BOFF 256
-#endif
-
 static void outcmd(int ch, int count);
 
 static char * strbuf;
@@ -39,8 +35,8 @@ print_dd(void)
     if (cell_size > 0)
 	outcmd('%', cell_size);
 
-    if (most_neg_maad_loop < -BOFF && node_type_counts[T_MOV] != 0)
-	outcmd('>', BOFF-most_neg_maad_loop);
+    if (node_type_counts[T_MOV] != 0 && most_neg_maad_loop)
+	outcmd('>', -most_neg_maad_loop);
 
     while(n)
     {

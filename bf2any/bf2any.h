@@ -1,5 +1,6 @@
 
 extern int tapelen;
+extern int tapeinit;
 extern int enable_optim;
 extern int disable_init_optim;
 extern int enable_debug;
@@ -22,12 +23,6 @@ struct be_interface_s {
     int hasdebug;
 } be_interface;
 
-/* This can be changed by the Makefile but everything must be recompiled. */
-#ifndef BOFF
-#define BOFF 256
-#endif
-
-#define tapeinit (enable_optim?BOFF:0)
 #define tapesz   (tapelen+tapeinit)
 
 /* Make a strdup() for old systems with an ok GCC */

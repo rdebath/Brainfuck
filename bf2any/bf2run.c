@@ -121,20 +121,20 @@ outcmd(int ch, int count)
 	}
 	setbuf(stdout, 0);
 
-	tapealloc = tapelen + BOFF;
+	tapealloc = tapesz;
 	if(!enable_debug && !checklimits) {
 	    if (bytecell) {
 		unsigned char * btape;
 		btape = calloc(tapealloc, sizeof(unsigned char));
-		runprog_byte(mem, btape+BOFF);
+		runprog_byte(mem, btape+tapeinit);
 	    } else {
 		unsigned int * itape;
 		itape = calloc(tapealloc, sizeof(unsigned int));
-		runprog_int(mem, itape+BOFF);
+		runprog_int(mem, itape+tapeinit);
 	    }
 	} else {
 	    tape = calloc(tapealloc, sizeof(icell));
-	    debugprog(mem, tape+BOFF);
+	    debugprog(mem, tape+tapeinit);
 	}
 	break;
 
@@ -221,8 +221,8 @@ dumpmem(icell *mp)
     size_t i, j = 0;
     const icell msk = (bytecell)?0xFF:-1;
     for (i = 0; i < tapealloc; i++) if (tape[i]&msk) j = i + 1;
-    fprintf(stderr, "Ptr: %3d, mem:", (int)(mp-tape-BOFF));
-    for (i = BOFF; i < j; i++)
+    fprintf(stderr, "Ptr: %3d, mem:", (int)(mp-tape-tapeinit));
+    for (i = tapeinit; i < j; i++)
 	fprintf(stderr, "%s%d", tape + i == mp ? ">" : " ", tape[i]&msk);
     fprintf(stderr, "\n");
 }
@@ -297,11 +297,11 @@ runprog_int(register int * p, register tcell *mp)
     for(;;){
 	mp += p[0];
 #ifndef PART
-	if (mp>=tape+tapealloc || (mp<tape+BOFF && (a || mp<tape)))
+	if (mp>=tape+tapealloc || (mp<tape+tapeinit && (a || mp<tape)))
 	{
 	    fprintf(stderr,
 		    "Error: Tape pointer has moved to position %d\n",
-		    (int)(mp-tape-BOFF));
+		    (int)(mp-tape-tapeinit));
 	    exit(42);
 	}
 #endif

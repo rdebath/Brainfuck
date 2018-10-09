@@ -3,17 +3,22 @@
 #include <string.h>
 #include <limits.h>
 
-#ifndef TAPELEN
-#define TAPELEN 0x100000
-#endif
-
 #include "bf2any.h"
 #include "bf2loop.h"
 #include "ov_int.h"
 
+#ifndef TAPELEN
+#define TAPELEN 0x100000
+#endif
+
+#ifndef BOFF
+#define BOFF 256
+#endif
+
 static int opt_optim = 0;
 
 int tapelen = TAPELEN;
+int tapeinit = 0;
 int enable_optim = 0;
 int disable_init_optim = 0;
 int enable_debug;
@@ -189,6 +194,8 @@ main(int argc, char ** argv)
 
     if (!opt_optim)
 	opt_optim = enable_optim = 1;
+
+    tapeinit = (enable_optim && !backend_only)?BOFF:0;
 
     if (be_interface.bytesonly) bytecell = 1;
 
@@ -389,19 +396,23 @@ pipe_to_be(char ** filelist, int filecount)
 		    number = 0; digits = 0;
 		    continue;
 		}
+		if (ch == '>' && tapeinit <= 0) {
+		    tapeinit = number;
+		    number = 0; digits = 0;
+		    continue;
+		}
 		di = 1;
 		outcmd('!', 0);
 	    }
 
 	    /* These chars have an argument. */
 	    m = (ch == '>' || ch == '<' || ch == '+' || ch == '-' ||
-		 ch == '=' || ch == 'N' || ch == 'M' || ch == 'Q' ||
-		 ch == 'm' || ch == 'n');
+		 ch == '=' || ch == 'N' || ch == 'M' || ch == 'Q' );
 
 	    /* These ones do not */
 	    m0 = (ch == '[' || ch == ']' || ch == '.' || ch == ',' ||
 		  ch == 'I' || ch == 'E' || ch == 'B' || ch == 'S' ||
-		  ch == 's' || ch == '"' || ch == 'X');
+		  ch == '"' || ch == 'X');
 
 	    if (extra_commands && (xc = strchr(extra_commands, ch)) != 0)
 		m0 = 1;
