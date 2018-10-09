@@ -25,13 +25,22 @@ static int do_input = 0;
 static int ind = 2;
 static int lblcount = 0;
 static int icount = 0;
+static int noheader = 0;
 static char * boilerplate;
 
 #define pr(s)           printf("%*s" s "\n", ind*2, "")
 #define prv(s,v)        printf("%*s" s "\n", ind*2, "", (v))
 #define prv2(s,v,v2)    printf("%*s" s "\n", ind*2, "", (v), (v2))
 
-struct be_interface_s be_interface = {.bytesonly=1, .noifcmd=1};
+static check_arg_t fn_check_arg;
+struct be_interface_s be_interface = {.bytesonly=1, .check_arg = fn_check_arg};
+
+static int
+fn_check_arg(const char * arg)
+{
+    if (strcmp(arg, "-no-hdr") == 0) { noheader = 1; return 1; }
+    return 0;
+}
 
 void
 outcmd(int ch, int count)
@@ -50,10 +59,10 @@ outcmd(int ch, int count)
     }
     last = n;
 
-    if (n->ch == '[') {
+    if (n->ch == '[' ||  n->ch == 'I') {
 	n->iloop = ++lblcount;
 	n->loop = jmpstack; jmpstack = n;
-    } else if (n->ch == ']') {
+    } else if (n->ch == ']' || n->ch == 'E') {
 	n->iloop = ++lblcount;
 	n->loop = jmpstack; jmpstack = jmpstack->loop; n->loop->loop = n;
     } else if (ch == ',') {
@@ -121,17 +130,14 @@ loutcmd(int ch, int count, struct instruction *n)
     case '.': pr("write(m[p]);"); break;
 
     case 'X': pr("ERROR('Abort: Infinite Loop');"); break;
-/*
-    case '[': pr("while m[p] <> 0 do begin"); ind++; break;
-    case ']': ind--; pr("end;"); break;
-    case ',': pr("if not eof then begin read(inch); m[p] := ord(inch); end;"); break;
-*/
     }
 
     if (n->has_inp == 0) {
 	switch(ch) {
 	case '[': pr("WHILE m[p] <> 0 DO BEGIN"); ind++; break;
 	case ']': ind--; pr("END;"); break;
+	case 'I': pr("IF m[p] <> 0 THEN BEGIN"); ind++; break;
+	case 'E': ind--; pr("END;"); break;
 	}
     } else {
 	switch(ch) {
@@ -143,8 +149,8 @@ loutcmd(int ch, int count, struct instruction *n)
 	    prv("%d: BEGIN", n->iloop);
 	    ind++;
 	    break;
-	case '[':
-	    pr("if m[p] = 0 THEN ");
+	case '[': case 'I':
+	    pr("IF m[p] = 0 THEN ");
 	    ind++; prv("j := %d", n->loop->iloop); ind--;
 	    pr("ELSE");
 	    ind++; prv("j := %d;", n->iloop); ind--;
@@ -154,10 +160,17 @@ loutcmd(int ch, int count, struct instruction *n)
 	    ind ++;
 	    break;
 	case ']':
-	    pr("if m[p] <> 0 THEN ");
+	    pr("IF m[p] <> 0 THEN ");
 	    ind++; prv("j := %d", n->loop->iloop); ind--;
 	    pr("ELSE");
 	    ind++; prv("j := %d;", n->iloop); ind--;
+	    ind--;
+	    pr("END;");
+	    prv("%d: BEGIN", n->iloop);
+	    ind ++;
+	    break;
+	case 'E':
+	    prv("j := %d;", n->iloop);
 	    ind--;
 	    pr("END;");
 	    prv("%d: BEGIN", n->iloop);
@@ -169,7 +182,7 @@ loutcmd(int ch, int count, struct instruction *n)
     switch(ch) {
     case '!':
 
-	printf("%s\n", boilerplate);
+	if (!noheader) printf("%s\n", boilerplate);
         pr("PROCEDURE ResetProg@1000000003();");
         pr("BEGIN");
 	pr("  j := 0;");
@@ -193,11 +206,12 @@ loutcmd(int ch, int count, struct instruction *n)
 	ind--; pr("END;");
 	ind--; pr("END;");
 
-	printf("%s\n",
-	    "\n"    "    BEGIN"
-	    "\n"    "    END."
-	    "\n"    "  }"
-	    "\n"    "}");
+	if (!noheader)
+	    printf("%s\n",
+		"\n"    "    BEGIN"
+		"\n"    "    END."
+		"\n"    "  }"
+		"\n"    "}");
 	break;
     }
 }

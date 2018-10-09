@@ -443,16 +443,7 @@ pipe_to_be(char ** filelist, int filecount)
 	    if (ch == '"') { qstring++; continue; }
 	    if (ch == ',') inp = 1;
 
-	    if (be_interface.noifcmd && ch == 'I') {
-		outcmd('B', 0);
-		outcmd('[', 0);
-	    } else if (be_interface.noifcmd && ch == 'E') {
-		outcmd('B', 0);
-		outcmd('=', 0);
-		outcmd(']', 0);
-		outcmd('S', 0);
-	    } else
-		outcmd(ch, multi);
+	    outcmd(ch, multi);
 	}
 	if (ifd != stdin) fclose(ifd);
     }

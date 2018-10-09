@@ -15,7 +15,6 @@ void add_string(int ch);
 typedef int (check_arg_t)(const char * arg);
 struct be_interface_s {
     check_arg_t *check_arg;
-    int noifcmd;
     int cells_are_ints;
     int bytesonly;
     int disable_be_optim;

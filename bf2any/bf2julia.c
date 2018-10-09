@@ -41,7 +41,7 @@ static void print_cstring(char * str);
 static int no_function = 0;
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg, .noifcmd=1};
+struct be_interface_s be_interface = {fn_check_arg, .cells_are_ints=1};
 
 static int
 fn_check_arg(const char * arg)
@@ -79,10 +79,10 @@ outcmd(int ch, int count)
     }
     last = n;
 
-    if (n->ch == '[') {
+    if (n->ch == '[' || n->ch == 'I') {
 	n->ino = ++lblcount;
 	n->loop = jmpstack; jmpstack = n;
-    } else if (n->ch == ']') {
+    } else if (n->ch == ']' || n->ch == 'E') {
 	n->loop = jmpstack; jmpstack = jmpstack->loop; n->loop->loop = n;
     }
 
@@ -197,7 +197,14 @@ loutcmd(int ch, int count, struct instruction *n)
     case ']':
 	ind--; I; printf("end\n");
 	break;
-    case '.': I; printf("print(char(m[p]))\n"); break;
+    case 'I':
+	I; printf("if m[p] != 0\n");
+	ind++;
+	break;
+    case 'E':
+	ind--; I; printf("end\n");
+	break;
+    case '.': I; printf("print(Char(m[p]))\n"); break;
     case '"': print_cstring(n->cstr); break;
     case ',': I; printf("if !eof(STDIN) ; m[p] = read(STDIN, Char) ; end\n"); break;
     }

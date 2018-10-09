@@ -19,7 +19,6 @@ static void ddump(int ch, int count);
 static int
 fn_check_arg(const char * arg)
 {
-    if (strcmp(arg, "-no_if") == 0) { be_interface.noifcmd = 1; return 1; }
     if (strcmp(arg, "-no-be") == 0) { be_interface.disable_be_optim = 1; return 1; }
     if (strcmp(arg, "-no-q") == 0) { no_quote = 1; return 1; }
     if (strcmp(arg, "-int") == 0) { be_interface.cells_are_ints = 1; return 1; }
@@ -29,7 +28,6 @@ fn_check_arg(const char * arg)
 
     if (strcmp(arg, "-h") == 0) {
         fprintf(stderr, "%s\n",
-        "\t"    "-no_if  Turn off 'IF' token."
         "\n\t"  "-no-be  Turn off BE optimisation."
         "\n\t"  "-no-q   Turn off \" command."
         "\n\t"  "-int    Turn on cell==int flag."

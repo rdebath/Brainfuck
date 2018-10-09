@@ -56,7 +56,7 @@ static int tapealloc = 32768;
 #define I printf("%*s", ind*4, "")
 #define IO(d) printf("%*s", (ind+(d))*4, "")
 
-struct be_interface_s be_interface = {.noifcmd = 1};
+struct be_interface_s be_interface = {};
 
 void
 outcmd(int ch, int count)
@@ -74,10 +74,10 @@ outcmd(int ch, int count)
     }
     last = n;
 
-    if (n->ch == '[') {
+    if (n->ch == '[' || n->ch == 'I') {
 	n->ino = ++lblcount;
 	n->loop = jmpstack; jmpstack = n;
-    } else if (n->ch == ']') {
+    } else if (n->ch == ']' || n->ch == 'E') {
 	n->ino = ++lblcount;
 	n->loop = jmpstack; jmpstack = jmpstack->loop; n->loop->loop = n;
     } else if (ch == ',') {
@@ -160,6 +160,8 @@ loutcmd(int ch, int count, struct instruction *n)
 	switch(ch) {
 	case '[': I; printf("while ((%s|0) != 0) {\n", mp); ind++; break;
 	case ']': ind--; I; printf("}\n"); break;
+	case 'I': I; printf("if ((%s|0) != 0) {\n", mp); ind++; break;
+	case 'E': ind--; I; printf("}\n"); break;
 	}
     } else {
 	switch(ch) {
@@ -170,7 +172,7 @@ loutcmd(int ch, int count, struct instruction *n)
 	    IO(-1); printf("case %d:\n", n->ino);
 	    I; printf("j = 0;\n");
 	    break;
-	case '[':
+	case '[': case 'I':
 	    I; printf("if ((%s|0) == 0) {\n", mp);
 	    IO(1); printf("j = %d;\n", n->loop->ino);
 	    IO(1); printf("break;\n");
@@ -187,6 +189,12 @@ loutcmd(int ch, int count, struct instruction *n)
 	    IO(1); printf("j = %d;\n", n->loop->ino);
 	    IO(1); printf("break;\n");
 	    I; printf("}\n");
+	    IO(-1); printf("case %d:\n", n->ino);
+	    I; printf("j = 0;\n");
+	    break;
+	case 'E':
+	    ind--;
+	    I; printf("//}\n");
 	    IO(-1); printf("case %d:\n", n->ino);
 	    I; printf("j = 0;\n");
 	    break;

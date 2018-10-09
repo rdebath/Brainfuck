@@ -176,22 +176,31 @@ static void process_loop()
     qcnt = 0;
 
     /* Start new */
-    if (minmov < -BOFF && !loopz && !be_interface.noifcmd) {
+    if (minmov < -BOFF && !loopz) {
+	/*
+	 * Note the 'BOFF' define; this is an optimisation
+	 * tweak that allows loops, that may be skipped over, to
+	 * be converted into move/add instructions even if the
+	 * references inside the loop may be converted so they
+	 * 'Add zero' to cells before the start of the tape. The
+	 * start of the tape will be shifted by this count so the
+	 * 'add zero' doesn't cause a segfault.
+	 *
+	 * Any reference that is further back than this range
+	 * cannot be proven to be after the physical start of
+	 * the tape so it must keep the 'if non-zero' condition
+	 * to avert the possible segfault.
+	 */
+
 	qcmd[qcnt] = 'I'; qrep[qcnt] = 0; qcnt ++;
 	qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
 	doneif = 1;
     } else if (loopz) {
 	inc = -1;
-	if (be_interface.noifcmd) {
-	    qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
-	    qcmd[qcnt] = 'Q'; qrep[qcnt] = 1; qcnt ++;
-	    qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
-	} else {
-	    qcmd[qcnt] = 'I'; qrep[qcnt] = 0; qcnt ++;
-	    qcmd[qcnt] = '='; qrep[qcnt] = 0; qcnt ++;
-	    donezap = 1;
-	    doneif = 1;
-	}
+	qcmd[qcnt] = 'I'; qrep[qcnt] = 0; qcnt ++;
+	qcmd[qcnt] = '='; qrep[qcnt] = 0; qcnt ++;
+	donezap = 1;
+	doneif = 1;
     } else {
 	qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
     }
@@ -202,14 +211,13 @@ static void process_loop()
 	    if (!madd_zmode[i] && madd_inc[i] == 0) continue; /* NOP */
 
 	    if (!use_v_var) {
-		if (be_interface.noifcmd) continue;
 		if (	(!madd_zmode[i] || madd_count<2) &&
 			!loopz &&
 			(!(madd_offset[i] < -BOFF) || madd_count<2) )
 		    continue;
 	    }
 
-	    if (!be_interface.noifcmd && (use_v_var == doneif)) {
+	    if (use_v_var == doneif) {
 		if (mov != 0) {
 		    qcmd[qcnt] = '>'; qrep[qcnt] = 0 - mov; qcnt ++;
 		    mov = 0;
@@ -242,23 +250,10 @@ static void process_loop()
 		    qrep[qcnt] = -qrep[qcnt];
 		}
 
-		/*
-		 * Note the 'BOFF' define; this is an optimisation
-		 * tweak that allows loops, that may be skipped over, to
-		 * be converted into move/add instructions even if the
-		 * references inside the loop may be converted so they
-		 * 'Add zero' to cells before the start of the tape. The
-		 * start of the tape will be shifted by this count so the
-		 * 'add zero' doesn't cause a segfault.
-		 *
-		 * Any reference that is further back than this range
-		 * cannot be proven to be after the physical start of
-		 * the tape so it must keep the 'if non-zero' condition
-		 * to avert the possible segfault.
-		 */
-
-		if (mov < -BOFF && !doneif)
-		    qcmd[qcnt] = qcmd[qcnt] - 'A' + 'a';
+		if (mov < -BOFF && !doneif) {
+		    fprintf(stderr, "BOFF underflow\n");
+		    exit(1);
+		}
 		qcnt++;
 	    }
 	    madd_zmode[i] = madd_inc[i] = 0; /* Done this one */
