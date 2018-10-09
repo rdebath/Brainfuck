@@ -68,7 +68,8 @@ outcmd(int ch, int count)
 	printf("#include <stdlib.h>\n"
 	       "#include <stdio.h>\n"
 	       "#include <string.h>\n"
-	       "#include <openssl/bn.h>\n");
+	       "#include <openssl/bn.h>\n"
+	       "#include <openssl/err.h>\n");
 	puts("");
 	printf("BIGNUM ** mem = 0;\n");
 	printf("int memsize = 0;\n");
@@ -186,60 +187,72 @@ outcmd(int ch, int count)
 	I; printf("BIGNUM *t1 = BN_new();\n");
 	I; printf("setbuf(stdout, 0);\n");
 	I; printf("p = move_ptr(mem,0);\n");
+	I; printf("if (0) {\n");
+	   printf("BN_op_failed:\n");
+	ind++;
+	I; printf("fprintf(stderr, \"OpenSSL-BN: %%s\\n\",\n");
+	ind++;
+	I; printf("ERR_error_string(ERR_get_error(), 0));\n");
+	ind--;
+	I; printf("exit(255);\n");
+	ind--;
+	I; printf("}\n");
 	break;
 
     case '~': I; printf("return 0;\n}\n"); break;
 
     case '=':
 	if (count > 0) {
-	    I; printf("BN_set_word(*p, %d);\n", count);
+	    I; printf("if(!BN_set_word(*p, %d)) goto BN_op_failed;\n", count);
 	} else if (count <= 0) {
-	    I; printf("BN_zero(*p);\n");
+	    I; printf("if(!BN_zero(*p)) goto BN_op_failed;\n");
 	    if (count < 0) {
-		I; printf("BN_sub_word(*p, %d);\n", -count);
+		I; printf("if(!BN_sub_word(*p, %d)) goto BN_op_failed;\n",
+		    -count);
 	    }
 	}
 	break;
 
     case 'B':
 	I; printf("BN_mask_BPC(*p);\n");
-	I; printf("BN_copy(v, *p);\n");
+	I; printf("if(!BN_copy(v, *p)) goto BN_op_failed;\n");
 	break;
 
     case 'm':
     case 'M':
 	if (count != 1) {
-	    I; printf("BN_copy(t1, v);\n");
-	    I; printf("BN_mul_word(t1, %d);\n", count);
-	    I; printf("BN_add(*p, *p, t1);\n");
+	    I; printf("if(!BN_copy(t1, v)) goto BN_op_failed;\n");
+	    I; printf("if(!BN_mul_word(t1, %d)) goto BN_op_failed;\n", count);
+	    I; printf("if(!BN_add(*p, *p, t1)) goto BN_op_failed;\n");
 	} else {
-	    I; printf("BN_add(*p, *p, v);\n");
+	    I; printf("if(!BN_add(*p, *p, v)) goto BN_op_failed;\n");
 	}
 	break;
 
     case 'n':
     case 'N':
 	if (count != 1) {
-	    I; printf("BN_copy(t1, v);\n");
-	    I; printf("BN_mul_word(t1, %d);\n", count);
-	    I; printf("BN_sub(*p, *p, t1);\n");
+	    I; printf("if(!BN_copy(t1, v)) goto BN_op_failed;\n");
+	    I; printf("if(!BN_mul_word(t1, %d)) goto BN_op_failed;\n", count);
+	    I; printf("if(!BN_sub(*p, *p, t1)) goto BN_op_failed;\n");
 	} else {
-	    I; printf("BN_sub(*p, *p, v);\n");
+	    I; printf("if(!BN_sub(*p, *p, v)) goto BN_op_failed;\n");
 	}
 	break;
 
     case 's':
-    case 'S': I; printf("BN_add(*p, *p, v);\n"); break;
+    case 'S': I; printf("if(!BN_add(*p, *p, v)) goto BN_op_failed;\n"); break;
 
     case 'Q':
 	I; printf("if(!BN_is_zero(v)) {\n");
 	ind++;
 	if (count > 0) {
-	    I; printf("BN_set_word(*p, %d);\n", count);
+	    I; printf("if(!BN_set_word(*p, %d)) goto BN_op_failed;\n", count);
 	} else if (count <= 0) {
-	    I; printf("BN_zero(*p);\n");
+	    I; printf("if(!BN_zero(*p)) goto BN_op_failed;\n");
 	    if (count < 0) {
-		I; printf("BN_sub_word(*p, %d);\n", -count);
+		I; printf("if(!BN_sub_word(*p, %d)) goto BN_op_failed;\n",
+		    -count);
 	    }
 	}
 	ind--;
@@ -248,8 +261,8 @@ outcmd(int ch, int count)
 
     case 'X': I; printf("fprintf(stderr, \"Abort: Infinite Loop.\\n\"); exit(1);\n"); break;
 
-    case '+': I; printf("BN_add_word(*p, %d);\n", count); break;
-    case '-': I; printf("BN_sub_word(*p, %d);\n", count); break;
+    case '+': I; printf("if(!BN_add_word(*p, %d)) goto BN_op_failed;\n", count); break;
+    case '-': I; printf("if(!BN_sub_word(*p, %d)) goto BN_op_failed;\n", count); break;
     case '<': I; printf("p = move_ptr(p, %d);\n", -count); break;
     case '>': I; printf("p = move_ptr(p, %d);\n", count); break;
 
@@ -283,7 +296,7 @@ outcmd(int ch, int count)
 	I; printf("c = getchar();\n");
 	I; printf("if (c != EOF)\n");
 	ind++;
-	I; printf("BN_set_word(*p, c);\n");
+	I; printf("if(!BN_set_word(*p, c)) goto BN_op_failed;\n");
 	ind--;
 	break;
     }
