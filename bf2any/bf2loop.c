@@ -104,12 +104,17 @@ static void process_loop()
     int use_v_var = 0;	/* Generate mult-v instructions */
     int doneif = 0;	/* Added if command ? */
     int donezap = 0;	/* Added loopcnt=0 ? */
+    int minmov = 0;	/* Lowest address found */
 
     madd_count = 0;
     for(i=1; i<qcnt-1; i++) {
 	int j;
 	if (qcmd[i] == '>') { mov += qrep[i]; continue; }
-	if (qcmd[i] == '<') { mov -= qrep[i]; continue; }
+	if (qcmd[i] == '<') {
+	    mov -= qrep[i];
+	    if (mov<minmov) minmov = mov;
+	    continue;
+	}
 	if (qcmd[i] == '+' && mov == 0) { inc += qrep[i]; continue; }
 	if (qcmd[i] == '-' && mov == 0) { inc -= qrep[i]; continue; }
 	if (qcmd[i] == '=' && mov == 0) { loopz = 1; inc = qrep[i]; continue; }
@@ -171,7 +176,11 @@ static void process_loop()
     qcnt = 0;
 
     /* Start new */
-    if (loopz) {
+    if (minmov < -BOFF && !loopz && !be_interface.noifcmd) {
+	qcmd[qcnt] = 'I'; qrep[qcnt] = 0; qcnt ++;
+	qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
+	doneif = 1;
+    } else if (loopz) {
 	inc = -1;
 	if (be_interface.noifcmd) {
 	    qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
