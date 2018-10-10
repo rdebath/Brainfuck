@@ -105,6 +105,7 @@ static void process_loop()
     int doneif = 0;	/* Added if command ? */
     int donezap = 0;	/* Added loopcnt=0 ? */
     int minmov = 0;	/* Lowest address found */
+    int has_zmode = 0;	/* Anything else zeroed with [-] ? */
 
     madd_count = 0;
     for(i=1; i<qcnt-1; i++) {
@@ -135,6 +136,7 @@ static void process_loop()
 	if (qcmd[i] == '=') {
 	    madd_zmode[j] = 1;
 	    madd_inc[j] = qrep[i];
+	    has_zmode ++;
 	    continue;
 	}
 	if (qcmd[i] == '+') { madd_inc[j] += qrep[i]; continue; }
@@ -176,7 +178,7 @@ static void process_loop()
     qcnt = 0;
 
     /* Start new */
-    if (minmov < -BOFF && !loopz) {
+    if ((minmov < -BOFF || has_zmode) && !loopz) {
 	/*
 	 * Note the 'BOFF' define; this is an optimisation
 	 * tweak that allows loops, that may be skipped over, to
@@ -193,7 +195,9 @@ static void process_loop()
 	 */
 
 	qcmd[qcnt] = 'I'; qrep[qcnt] = 0; qcnt ++;
-	qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
+	if (madd_count > has_zmode) {
+	    qcmd[qcnt] = 'B'; qrep[qcnt] = 1; qcnt ++;
+	}
 	doneif = 1;
     } else if (loopz) {
 	inc = -1;
