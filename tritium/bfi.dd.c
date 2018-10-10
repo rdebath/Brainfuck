@@ -94,8 +94,12 @@ print_dd(void)
 		outcmd('<', n->offset2);
 
 		outcmd('>', n->offset);
-		outcmd('=', n->count);
-		outcmd('M', n->count2);
+		if (n->count) {
+		    outcmd('=', n->count);
+		    outcmd('M', n->count2);
+		} else {
+		    outcmd('C', n->count2);
+		}
 		outcmd('<', n->offset);
 	    }
 
@@ -108,6 +112,30 @@ print_dd(void)
 		outcmd('M', n->count3);
 		outcmd('<', n->offset);
 	    }
+	    break;
+
+	case T_CALCMULT:
+	    if (n->count == 0 && n->count2 == 1 && n->count3 == 1) {
+		if (n->offset != n->offset2) {
+		    outcmd('>', n->offset2);
+		    outcmd('B', 0);
+		    outcmd('<', n->offset2);
+		    outcmd('>', n->offset);
+		    outcmd('C', 0);
+		    outcmd('<', n->offset);
+		}
+		outcmd('>', n->offset3);
+		outcmd('B', 0);
+		outcmd('<', n->offset3);
+		outcmd('>', n->offset);
+		outcmd('*', 0);
+		outcmd('<', n->offset);
+		break;
+	    }
+
+	    fprintf(stderr, "Error on code generation:\n"
+		   "Bad T_CALCMULT node with incorrect counts.\n");
+	    exit(99);
 	    break;
 
 	case T_IF:
@@ -209,6 +237,13 @@ static void ddump(int ch, int count);
 
 void outcmd(int ch, int count)
 {
+    if (ch == '~') {
+	if (col)
+	    printf("\n");
+	col = 0;
+	return;
+    }
+
     if (ch == '<') { ch = '>'; count = -count; }
     if (ch == '>') { pending_offset += count; return; }
 
@@ -220,6 +255,7 @@ void outcmd(int ch, int count)
     if (ch == '-' && count <= 0) { ch = '+'; count = -count; }
     if (ch == 'M' && count < 0) { ch = 'N'; count = -count; }
     if (ch == 'M' && count == 1) { ch = 'S'; count = 0; }
+    if (ch == 'M' && count == -1) { ch = 'T'; count = 0; }
 
     if (ch == '>' && count == 0) return;
     if (ch == '+' && count == 0) return;
@@ -233,13 +269,6 @@ ddump(int ch, int count)
 {
     char ibuf[sizeof(int)*3+6];
     int l;
-
-    if (ch == '~') {
-	if (col)
-	    printf("\n");
-	col = 0;
-	return;
-    }
 
     if (ch == '"') {
 	int sch; unsigned i = 0;

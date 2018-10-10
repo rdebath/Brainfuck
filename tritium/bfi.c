@@ -120,7 +120,6 @@ int opt_no_endif = 0;
 int opt_no_kv_recursion = 0;
 int opt_no_loop_classify = 0;
 int opt_no_kvmov = 0;
-int opt_no_calcmult = 0;
 int opt_regen_mov = -1;
 int opt_pointerrescan = 0;
 
@@ -586,7 +585,6 @@ checkarg(char * opt, char * arg)
 	return 1;
     } else if (!strcmp(opt, "-fno-negtape")) { hard_left_limit = 0; return 1;
     } else if (!strcmp(opt, "-fno-calctok")) { opt_no_calc = 1; return 1;
-    } else if (!strcmp(opt, "-fno-calcmul")) { opt_no_calcmult = 1; return 1;
     } else if (!strcmp(opt, "-fno-endif")) { opt_no_endif = 1; return 1;
     } else if (!strcmp(opt, "-fno-litprt")) { opt_no_litprt = 1; return 1;
     } else if (!strcmp(opt, "-fno-kv-recursion")) { opt_no_kv_recursion = 1; return 1;
@@ -3257,7 +3255,7 @@ classify_loop(struct bfi * v)
     int most_negoff = 0;
     int nested_loop_count = 0;
 
-    if (opt_no_loop_classify) return 0;
+    if (opt_no_loop_classify || opt_no_calc) return 0;
     if(verbose>5) {
 	fprintf(stderr, "Classify loop: ");
 	printtreecell(stderr, 0, v);
@@ -3272,7 +3270,7 @@ classify_loop(struct bfi * v)
     {
 	if (n == 0 || n->type == T_MOV) return 0;
 	/* Looking for a cell*cell multiplication, try to spot _anything_ odd. */
-	if (n->type == T_CALC && !opt_no_calcmult && !has_calc &&
+	if (n->type == T_CALC && !has_calc &&
 	    n->offset != v->offset && n->offset3 != v->offset &&
 	    n->offset == n->offset2 && n->offset != n->offset3 &&
 	    n->count == 0 && n->count2 == 1 && n->count3 == 1) {

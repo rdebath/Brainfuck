@@ -12,9 +12,8 @@ X(dd,DD,
     case c_dd: print_dd(); break;                                   ,
     Nothing_Here                                                    )
 
-#if XX == 4
-    if (do_codestyle == c_dd) {
-        opt_no_calcmult = 1;
-    }
+#if XX == 6
+    if (do_codestyle == c_dd && opt_regen_mov < 0)
+	opt_regen_mov = 1;
 #endif
 #endif
