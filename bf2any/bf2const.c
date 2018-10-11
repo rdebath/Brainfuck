@@ -340,10 +340,15 @@ void outopt(int ch, int count)
     case 'M':
     case 'N':
     case 'S':
-    case 'Q':
-    case 'm':
-    case 'n':
-    case 's':
+    case 'T':
+#if 0
+	if (tape->is_set && tape->v == 0) {
+	    tape->is_set = 0 ; tape->v = 0;
+	    if (ch == 'N') count = -count;
+	    ch = 'C';
+	}
+#endif
+
 	flush_tape(0,1);
 	clear_cell(tape);
 	if (be_interface.disable_be_optim) be_codegen_failure();

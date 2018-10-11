@@ -110,24 +110,18 @@ void
 loutcmd(int ch, int count, struct instruction *n)
 {
     switch(ch) {
-    case 'N': ch = 'M'; count = ((-count) & 255); break;
-    case 'n': ch = 'm'; count = ((-count) & 255); break;
-    case '-': ch = '+'; count = ((-count) & 255); break;
-    default: count &= 255; break;
-    }
-    switch(ch) {
-    case '=': prv("m[p] := %d;", count); break;
+    case '=': prv("m[p] := %d;", count%256); break;
     case 'B': pr("v := m[p];"); break;
-    case 'M': prv("m[p] := (m[p] + %d*v) MOD 256;", count); break;
+    case 'M': prv("m[p] := (m[p] + %d*v) MOD 256;", count%256); break;
+    case 'N': prv("m[p] := (m[p] - %d*v) MOD 256;", count%256); break;
     case 'S': pr("m[p] := (m[p] + v) MOD 256;"); break;
-    case 'Q': prv("if v <> 0 then m[p] := %d;", count); break;
-    case 'm': prv("if v <> 0 then m[p] := (m[p] + %d*v) MOD 256;", count); break;
-    case 's': pr("if v <> 0 then m[p] := (m[p] + v) MOD 256;"); break;
+    case 'T': pr("m[p] := (m[p] - v) MOD 256;"); break;
 
-    case '+': prv("m[p] := (m[p] + %d) MOD 256;", count); break;
+    case '+': prv("m[p] := (m[p] + %d) MOD 256;", count%256); break;
+    case '-': prv("m[p] := (m[p] - %d) MOD 256;", count%256); break;
     case '<': prv("p := p - %d;", count); break;
     case '>': prv("p := p + %d;", count); break;
-    case '.': pr("write(m[p]);"); break;
+    case '.': pr("Write(m[p]);"); break;
 
     case 'X': pr("ERROR('Abort: Infinite Loop');"); break;
     }
@@ -275,7 +269,7 @@ static char * boilerplate =
 "\n"	"      InputLine@1000000007 : Text[1024];"
 "\n"	"      j@1000000002 : Integer;"
 "\n"	"      p@1000000003 : Integer;"
-"\n"	"      m@1000000004 : ARRAY [60000] OF Char;"	    /* TODO: tapesz */
+"\n"	"      m@1000000004 : ARRAY [60000] OF Integer;"    /* TODO: tapesz */
 "\n"	"      v@1000000005 : Integer;"
 "\n"	"      moreinp@1000000006 : Integer;"
 "\n"	""
@@ -283,6 +277,7 @@ static char * boilerplate =
 "\n"	"    VAR"
 "\n"	"      C@1000000001 : Char;"
 "\n"	"    BEGIN"
+"\n"	"      WChar := (WChar + 256) MOD 256;"
 "\n"	"      IF WChar = 10 THEN"
 "\n"	"        SaveTextLine"
 "\n"	"      ELSE BEGIN"
@@ -307,6 +302,8 @@ static char * boilerplate =
 "\n"	"    END;"
 "\n"	""
 "\n"	"    PROCEDURE RunLoop@1000000002();"
+"\n"	"    VAR"
+"\n"	"      C@1000000001 : Char;"
 "\n"	"    BEGIN"
 "\n"	""
 "\n"	"      IF UpdateLineNo <> 0 THEN BEGIN"
@@ -316,8 +313,8 @@ static char * boilerplate =
 "\n"	"      END;"
 "\n"	""
 "\n"	"      IF moreinp <> 0 THEN BEGIN"
-"\n"	"        m[p] := 10;"
-"\n"	"        InputLine := InputLine + FORMAT(m[p]);"
+"\n"	"        C := 10;"
+"\n"	"        InputLine := InputLine + FORMAT(C);"
 "\n"	"      END;"
 "\n"	""
 "\n"	"      REPEAT"

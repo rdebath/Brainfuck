@@ -407,12 +407,12 @@ pipe_to_be(char ** filelist, int filecount)
 
 	    /* These chars have an argument. */
 	    m = (ch == '>' || ch == '<' || ch == '+' || ch == '-' ||
-		 ch == '=' || ch == 'N' || ch == 'M' || ch == 'Q' );
+		 ch == '=' || ch == 'N' || ch == 'M' || ch == 'C');
 
 	    /* These ones do not */
 	    m0 = (ch == '[' || ch == ']' || ch == '.' || ch == ',' ||
 		  ch == 'I' || ch == 'E' || ch == 'B' || ch == 'S' ||
-		  ch == '"' || ch == 'X');
+		  ch == 'T' || ch == '"' || ch == 'X');
 
 	    if (extra_commands && (xc = strchr(extra_commands, ch)) != 0)
 		m0 = 1;

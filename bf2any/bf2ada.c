@@ -89,16 +89,8 @@ outcmd(int ch, int count)
     case 'M': I; printf("m(p) := m(p)+v*%d;\n", count & msk); break;
     case 'N': I; printf("m(p) := m(p)-v*%d;\n", count & msk); break;
     case 'S': I; printf("m(p) := m(p)+v;\n"); break;
-    case 'Q':
-	I; printf("if v /= 0 then m(p) := %d; end if;\n", count & msk);
-	break;
-    case 'm':
-	I; printf("if v /= 0 then m(p) := m(p)+v*%d; end if;\n", count & msk);
-	break;
-    case 'n':
-	I; printf("if v /= 0 then m(p) := m(p)-v*%d; end if;\n", count & msk);
-	break;
-    case 's': I; printf("if v /= 0 then m(p) := m(p)+v; end if;\n"); break;
+    case 'T': I; printf("m(p) := m(p)-v;\n"); break;
+
     case 'X': I; printf("raise Infinite_loop;\n"); break;
     case '+': I; printf("m(p) := m(p) + %d;\n", count & msk); break;
     case '-': I; printf("m(p) := m(p) - %d;\n", count & msk); break;

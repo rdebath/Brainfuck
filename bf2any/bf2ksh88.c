@@ -59,11 +59,7 @@ outcmd(int ch, int count)
     case 'M': prv(": $((M[P]+=V*%d))", count); break;
     case 'N': prv(": $((M[P]-=V*%d))", count); break;
     case 'S': pr(": $((M[P]+=V))"); break;
-
-    case 'Q': prv("((V)) && : $((M[P]=%d))", count); break;
-    case 'm': prv("((V)) && : $((M[P]+=V*%d))", count); break;
-    case 'n': prv("((V)) && : $((M[P]-=V*%d))", count); break;
-    case 's': pr("((V)) && : $((M[P]+=V))"); break;
+    case 'T': pr(": $((M[P]-=V))"); break;
 
     case '+': prv(": $((M[P]+=%d))", count); break;
     case '-': prv(": $((M[P]-=%d))", count); break;

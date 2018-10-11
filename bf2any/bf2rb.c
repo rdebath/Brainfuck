@@ -78,10 +78,7 @@ outcmd(int ch, int count)
     case 'M': I; printf("%s += v*%d\n", cm, count); break;
     case 'N': I; printf("%s -= v*%d\n", cm, count); break;
     case 'S': I; printf("%s += v\n", cm); break;
-    case 'Q': I; printf("%s = %d unless v == 0\n", cm, count); break;
-    case 'm': I; printf("%s += v*%d unless v == 0\n", cm, count); break;
-    case 'n': I; printf("%s -= v*%d unless v == 0\n", cm, count); break;
-    case 's': I; printf("%s += v unless v == 0\n", cm); break;
+    case 'T': I; printf("%s -= v\n", cm); break;
 
     case 'X': I; printf("raise 'Aborting Infinite Loop.'\n"); break;
 

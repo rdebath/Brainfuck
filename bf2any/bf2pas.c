@@ -152,10 +152,7 @@ loutcmd(int ch, int count, struct instruction *n)
     case 'M': prv("tape[tapepos] := tape[tapepos] + %d*v;", count); break;
     case 'N': prv("tape[tapepos] := tape[tapepos] - %d*v;", count); break;
     case 'S': pr("tape[tapepos] := tape[tapepos] + v;"); break;
-    case 'Q': prv("if v <> 0 then tape[tapepos] := %d;", count); break;
-    case 'm': prv("if v <> 0 then tape[tapepos] := tape[tapepos] + %d*v;", count); break;
-    case 'n': prv("if v <> 0 then tape[tapepos] := tape[tapepos] - %d*v;", count); break;
-    case 's': pr("if v <> 0 then tape[tapepos] := tape[tapepos] + v;"); break;
+    case 'T': pr("tape[tapepos] := tape[tapepos] - v;"); break;
 
     case '+': prv("tape[tapepos] := tape[tapepos] + %d;", count); break;
     case '-': prv("tape[tapepos] := tape[tapepos] - %d;", count); break;

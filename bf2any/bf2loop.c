@@ -245,7 +245,8 @@ static void process_loop()
 		    qcnt++;
 		}
 	    } else if (madd_zmode[i]) {
-		qcmd[qcnt] = 'Q'; qrep[qcnt] = madd_inc[i]; qcnt ++;
+		fprintf(stderr, "Zmode failure.\n");
+		exit(1);
 	    } else {
 		qcmd[qcnt] = 'M'; qrep[qcnt] = madd_inc[i] * -inc;
 		if (qrep[qcnt] == 1) qcmd[qcnt] = 'S';

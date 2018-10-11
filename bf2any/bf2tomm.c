@@ -202,7 +202,6 @@ outcmd(int ch, int count)
 	I; printf("mp_copy(p, v);\n");
 	break;
 
-    case 'm':
     case 'M':
 	if (count > 1 && count <= 127) {
 	    I; printf("mp_copy(v, t1);\n");
@@ -219,7 +218,6 @@ outcmd(int ch, int count)
 	}
 	break;
 
-    case 'n':
     case 'N':
 	if (count > 1 && count <= 127) {
 	    I; printf("mp_copy(v, t1);\n");
@@ -236,23 +234,8 @@ outcmd(int ch, int count)
 	}
 	break;
 
-    case 's':
     case 'S': I; printf("mp_add(p, v, p);\n"); break;
-
-    case 'Q':
-	I; printf("if(mp_cmp_d(v,0) != MP_EQ) {\n");
-	ind++;
-	if (count >= 127 && count <= 127) {
-	    I; printf("mp_set(p, %d);\n", abs(count));
-	} else {
-	    I; printf("mp_set_int(p, %d);\n", abs(count));
-	}
-	if (count < 0) {
-	    I; printf("mp_neg(p, p);\n");
-	}
-	ind--;
-	I; printf("}\n");
-	break;
+    case 'T': I; printf("mp_sub(p, v, p);\n"); break;
 
     case 'X': I; printf("fprintf(stderr, \"Abort: Infinite Loop.\\n\"); exit(1);\n"); break;
 

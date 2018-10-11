@@ -167,8 +167,9 @@ outcmd(int ch, int count)
 	putsnum(10); \
 	printf(CMD_OUTCHAR);
 
-    if (ch == 'N' || ch == 'n')
-	count = -count;
+    if (ch == 'N') { ch = 'M'; count = -count; }
+    if (ch == 'S') { ch = 'M'; count = 1; }
+    if (ch == 'T') { ch = 'M'; count = -1; }
 
     switch(ch) {
     case '!':
@@ -256,7 +257,7 @@ outcmd(int ch, int count)
 	PRTTOK(STORE);
 	break;
 
-    case 'N': case 'S': case 'M':
+    case 'M':
 	PRTTOK(DUP);
 	PRTTOK(DUP);
 	PRTTOK(FETCH);
@@ -270,49 +271,6 @@ outcmd(int ch, int count)
 	}
 	PRTTOK(ADD);
 	PRTTOK(STORE);
-	break;
-
-    case 'Q':
-	PRTTOK(PUSH);
-	putsnum(0);
-	PRTTOK(FETCH);
-	PRTTOK(JZ);
-	putlabel(loopid);
-
-	PRTTOK(DUP);
-	PRTTOK(PUSH);
-	putsnum(count);
-	PRTTOK(STORE);
-
-	PRTTOK(LABEL);
-	putlabel(loopid);
-	loopid++;
-	break;
-
-    case 'n': case 's': case 'm':
-	PRTTOK(PUSH);
-	putsnum(0);
-	PRTTOK(FETCH);
-	PRTTOK(JZ);
-	putlabel(loopid);
-
-	PRTTOK(DUP);
-	PRTTOK(DUP);
-	PRTTOK(FETCH);
-	PRTTOK(PUSH);
-	putsnum(0);
-	PRTTOK(FETCH);
-	if (count != 1) {
-	    PRTTOK(PUSH);
-	    putsnum(count);
-	    PRTTOK(MUL);
-	}
-	PRTTOK(ADD);
-	PRTTOK(STORE);
-
-	PRTTOK(LABEL);
-	putlabel(loopid);
-	loopid++;
 	break;
 
     case 'X':

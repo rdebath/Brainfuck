@@ -98,10 +98,7 @@ outcmd(int ch, int count)
     case 'M': I; fprintf(ofd, "lset d $dc [expr {[lindex $d $dc] +$v*%d}]\n", count); break;
     case 'N': I; fprintf(ofd, "lset d $dc [expr {[lindex $d $dc] -$v*%d}]\n", count); break;
     case 'S': I; fprintf(ofd, "lset d $dc [expr {[lindex $d $dc] +$v}]\n"); break;
-    case 'Q': I; fprintf(ofd, "if {$v != 0} {lset d $dc %d}\n", count); break;
-    case 'm': I; fprintf(ofd, "if {$v != 0} {lset d $dc [expr {[lindex $d $dc] +$v*%d}] }\n", count); break;
-    case 'n': I; fprintf(ofd, "if {$v != 0} {lset d $dc [expr {[lindex $d $dc] -$v*%d}] }\n", count); break;
-    case 's': I; fprintf(ofd, "if {$v != 0} {lset d $dc [expr {[lindex $d $dc] +$v}] }\n"); break;
+    case 'T': I; fprintf(ofd, "lset d $dc [expr {[lindex $d $dc] -$v}]\n"); break;
 
 #if 0
     case 'X': I; fprintf(ofd, "die(\"Abort: Infinite Loop.\\n\");\n"); break;

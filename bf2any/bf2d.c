@@ -53,10 +53,7 @@ outcmd(int ch, int count)
     case 'M': prv("mem[m] += v*%d;", count); break;
     case 'N': prv("mem[m] -= v*%d;", count); break;
     case 'S': pr("mem[m] += v;"); break;
-    case 'Q': prv("if(v) mem[m] = %d;", count); break;
-    case 'm': prv("if(v) mem[m] += v*%d;", count); break;
-    case 'n': prv("if(v) mem[m] -= v*%d;", count); break;
-    case 's': pr("if(v) mem[m] += v;"); break;
+    case 'T': pr("mem[m] -= v;"); break;
 
     case '+': prv("mem[m] +=%d;", count); break;
     case '-': prv("mem[m] -=%d;", count); break;

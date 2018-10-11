@@ -231,10 +231,7 @@ outcmd(int ch, int count)
     case 'M': prv2("m[%d] += v*%d;", mov, count); return;
     case 'N': prv2("m[%d] -= v*%d;", mov, count); return;
     case 'S': prv("m[%d] += v;", mov); return;
-    case 'Q': prv2("if(v) m[%d] = %d;", mov, count); return;
-    case 'm': prv2("if(v) m[%d] += v*%d;", mov, count); return;
-    case 'n': prv2("if(v) m[%d] -= v*%d;", mov, count); return;
-    case 's': prv("if(v) m[%d] += v;", mov); return;
+    case 'T': prv("m[%d] -= v;", mov); return;
 
     case '+': prv2("m[%d] += %d;", mov, count); return;
     case '-': prv2("m[%d] -= %d;", mov, count); return;

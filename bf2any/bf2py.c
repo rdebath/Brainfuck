@@ -263,10 +263,7 @@ outcmd(int ch, int count)
     case 'M': I; fprintf(ofd, "%s = %s+v*%d\n", mc, mc, count); break;
     case 'N': I; fprintf(ofd, "%s = %s-v*%d\n", mc, mc, count); break;
     case 'S': I; fprintf(ofd, "%s = %s+v\n", mc, mc); break;
-    case 'Q': I; fprintf(ofd, "if (v != 0) : %s = %d\n", mc, count); break;
-    case 'm': I; fprintf(ofd, "if (v != 0) : %s = %s+v*%d\n", mc, mc, count); break;
-    case 'n': I; fprintf(ofd, "if (v != 0) : %s = %s-v*%d\n", mc, mc, count); break;
-    case 's': I; fprintf(ofd, "if (v != 0) : %s = %s+v\n", mc, mc); break;
+    case 'T': I; fprintf(ofd, "%s = %s-v\n", mc, mc); break;
 
     case 'X': I; fprintf(ofd, "raise Exception('Aborting infinite loop')\n"); break;
 

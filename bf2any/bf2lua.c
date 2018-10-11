@@ -235,10 +235,7 @@ loutcmd(int ch, int count, struct instruction *n)
     case 'M': I; fprintf(ofd, "m[p] = m[p]+v*%d\n", count); break;
     case 'N': I; fprintf(ofd, "m[p] = m[p]-v*%d\n", count); break;
     case 'S': I; fprintf(ofd, "m[p] = m[p]+v\n"); break;
-    case 'Q': I; fprintf(ofd, "if v ~= 0 then m[p] = %d end\n", count); break;
-    case 'm': I; fprintf(ofd, "if v ~= 0 then m[p] = m[p]+v*%d end\n", count); break;
-    case 'n': I; fprintf(ofd, "if v ~= 0 then m[p] = m[p]-v*%d end\n", count); break;
-    case 's': I; fprintf(ofd, "if v ~= 0 then m[p] = m[p]+v end\n"); break;
+    case 'T': I; fprintf(ofd, "m[p] = m[p]-v\n"); break;
 
     case 'X': I; fprintf(ofd, "error('Aborting Infinite Loop')\n"); break;
 

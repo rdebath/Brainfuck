@@ -23,7 +23,6 @@ static int lineno = 0;
 static int lineinc = 1;
 
 static int enable_linenos = 0;
-static int open_doloop = 0; /* So we don't get an "unused variable" warning in VB. */
 static int do_input = 0;
 static int do_indent = 0;
 
@@ -196,6 +195,7 @@ outcmd(int ch, int count)
 		 * rather than having an automatic wrap.
 		 */
 		I; printf("Dim %s(%d) As Integer\n", tapename, tapesz);
+		I; printf("Dim %s As Integer = 0\n", tempcell);
 		I; printf("Dim %s As Integer\n", tapeptr);
 		I; printf("%s = %d\n", tapeptr, tapeinit);
 		break;
@@ -265,11 +265,6 @@ outcmd(int ch, int count)
 		I; printf("SYSTEM\n");
 		break;
 	    case end_vb:
-		if (open_doloop) {
-		    ind--;
-		    I; printf("Loop While False\n");
-		    open_doloop = 0;
-		}
 		ind--;
 		I; printf("End Sub\n");
 		ind--;
@@ -319,13 +314,6 @@ outcmd(int ch, int count)
 	break;
     case '=': I; printf("%s=%d\n", tapecell, count); break;
     case 'B':
-	if (end_style == end_vb && !open_doloop) {
-	    I; printf("Do\n");
-	    ind++;
-	    I; printf("Dim %s As Integer\n", tempcell);
-	    open_doloop = 1;
-	}
-
 	if(bytecell && init_style != init_fbas) {
 	    I; printf("%s=%s %s 256\n", tapecell, tapecell, modop);
 	}
@@ -334,11 +322,7 @@ outcmd(int ch, int count)
     case 'M': I; printf("%s=%s+%s*%d\n", tapecell, tapecell, tempcell, count); break;
     case 'N': I; printf("%s=%s-%s*%d\n", tapecell, tapecell, tempcell, count); break;
     case 'S': I; printf("%s=%s+%s\n", tapecell, tapecell, tempcell); break;
-    case 'Q': I; printf("IF %s <> 0 THEN %s = %d\n", tempcell, tapecell, count); break;
-
-    case 'm': I; printf("IF %s <> 0 THEN %s=%s+%s*%d\n", tempcell, tapecell, tapecell, tempcell, count); break;
-    case 'n': I; printf("IF %s <> 0 THEN %s=%s-%s*%d\n", tempcell, tapecell, tapecell, tempcell, count); break;
-    case 's': I; printf("IF %s <> 0 THEN %s=%s+%s\n", tempcell, tapecell, tapecell, tempcell); break;
+    case 'T': I; printf("%s=%s-%s\n", tapecell, tapecell, tempcell); break;
 
     case '+': I; printf("%s=%s+%d\n", tapecell, tapecell, count); break;
     case '-': I; printf("%s=%s-%d\n", tapecell, tapecell, count); break;
@@ -424,12 +408,6 @@ outcmd(int ch, int count)
 	}
 	break;
     case '[':
-	if (open_doloop) {
-	    ind--;
-	    I; printf("Loop While False\n");
-	    open_doloop = 0;
-	}
-
 	if(bytecell && init_style != init_fbas) {
 	    I; printf("%s=%s %s 256\n", tapecell, tapecell, modop);
 	}
@@ -459,12 +437,6 @@ outcmd(int ch, int count)
 	ind++;
 	break;
     case ']':
-	if (open_doloop) {
-	    ind--;
-	    I; printf("Loop While False\n");
-	    open_doloop = 0;
-	}
-
 	if(bytecell && init_style != init_fbas) {
 	    I; printf("%s=%s %s 256\n", tapecell, tapecell, modop);
 	}

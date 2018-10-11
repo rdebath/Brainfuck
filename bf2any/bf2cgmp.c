@@ -186,13 +186,11 @@ outcmd(int ch, int count)
 	I; printf("mpz_set(v, *p);\n");
 	break;
 
-    case 'm':
     case 'M': I; printf("mpz_addmul_ui(*p, v, %d);\n", count); break;
-    case 'n':
     case 'N': I; printf("mpz_submul_ui(*p, v, %d);\n", count); break;
-    case 's':
     case 'S': I; printf("mpz_add(*p, *p, v);\n"); break;
-    case 'Q': I; printf("if(mpz_cmp_ui(v, 0)) mpz_set_si(*p, %d);\n", count); break;
+    case 'T': I; printf("mpz_sub(*p, *p, v);\n"); break;
+
     case 'X': I; printf("fprintf(stderr, \"Abort: Infinite Loop.\\n\"); exit(1);\n"); break;
     case '+': I; printf("mpz_add_ui(*p, *p, %d);\n", count); break;
     case '-': I; printf("mpz_sub_ui(*p, *p, %d);\n", count); break;

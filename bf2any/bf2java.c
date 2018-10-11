@@ -274,8 +274,7 @@ loutcmd(int ch, int count, struct instruction *n)
     if (bytecell) {
 	switch(ch) {
 	case '+': case '-': case '=':
-	case 'M': case 'N': case 'Q':
-	case 'm': case 'n':
+	case 'M': case 'N':
 	    count = (signed char) count;
 	}
     }
@@ -370,10 +369,7 @@ loutcmd(int ch, int count, struct instruction *n)
     case 'M': I; printf("m[p] += v*%d;\n", count); break;
     case 'N': I; printf("m[p] -= v*%d;\n", count); break;
     case 'S': I; printf("m[p] += v;\n"); break;
-    case 'Q': I; printf("if(v!=0) m[p] = %d;\n", count); break;
-    case 'm': I; printf("if(v!=0) m[p] += v*%d;\n", count); break;
-    case 'n': I; printf("if(v!=0) m[p] -= v*%d;\n", count); break;
-    case 's': I; printf("if(v!=0) m[p] += v;\n"); break;
+    case 'T': I; printf("m[p] -= v;\n"); break;
 
     case 'X': I; printf("throw new IllegalStateException(\"Infinite Loop detected.\");"); break;
 

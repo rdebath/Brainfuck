@@ -54,10 +54,7 @@ outcmd(int ch, int count)
     case 'M': I; printf("%s = %s+$v*%d;\n", mc, mc, count); break;
     case 'N': I; printf("%s = %s-$v*%d;\n", mc, mc, count); break;
     case 'S': I; printf("%s = %s+$v;\n", mc, mc); break;
-    case 'Q': I; printf("if ($v != 0) %s = %d;\n", mc, count); break;
-    case 'm': I; printf("if ($v != 0) %s = %s+$v*%d;\n", mc, mc, count); break;
-    case 'n': I; printf("if ($v != 0) %s = %s-$v*%d;\n", mc, mc, count); break;
-    case 's': I; printf("if ($v != 0) %s = %s+$v;\n", mc, mc); break;
+    case 'T': I; printf("%s = %s-$v;\n", mc, mc); break;
 
     case 'X': I; printf("fwrite(STDERR, \"Abort: Infinite Loop.\\n\"); exit;\n"); break;
 

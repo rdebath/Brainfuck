@@ -75,10 +75,7 @@ outcmd(int ch, int count)
     case 'M': printf("SET /A MEMORY%%PTR%%=MEMORY%%PTR%%+V*%d\r\n", count); break;
     case 'N': printf("SET /A MEMORY%%PTR%%=MEMORY%%PTR%%-V*%d\r\n", count); break;
     case 'S': printf("SET /A MEMORY%%PTR%%=MEMORY%%PTR%%+V\r\n"); break;
-    case 'Q': printf("IF %%V%% NEQ 0 (SET /A MEMORY%%PTR%%=%d )\r\n", count); break;
-    case 'm': printf("IF %%V%% NEQ 0 (SET /A MEMORY%%PTR%%=MEMORY%%PTR%%+V*%d)\r\n", count); break;
-    case 'n': printf("IF %%V%% NEQ 0 (SET /A MEMORY%%PTR%%=MEMORY%%PTR%%-V*%d)\r\n", count); break;
-    case 's': printf("IF %%V%% NEQ 0 (SET /A MEMORY%%PTR%%=MEMORY%%PTR%%+V)\r\n"); break;
+    case 'T': printf("SET /A MEMORY%%PTR%%=MEMORY%%PTR%%-V\r\n"); break;
 
     case 'X': printf("ECHO Abort Infinite Loop & EXIT\r\n"); break;
 

@@ -89,10 +89,16 @@ static int ind = 0;
     case 'M': printf("%s += v*%d;\n", cell(mov), count); break;
     case 'N': printf("%s -= v*%d;\n", cell(mov), count); break;
     case 'S': printf("%s += v;\n", cell(mov)); break;
-    case 'Q': printf("if(v!=0) %s = %d;\n", cell(mov), count); break;
-    case 'm': printf("if(v!=0) %s += v*%d;\n", cell(mov), count); break;
-    case 'n': printf("if(v!=0) %s -= v*%d;\n", cell(mov), count); break;
-    case 's': printf("if(v!=0) %s += v;\n", cell(mov)); break;
+    case 'T': printf("%s -= v;\n", cell(mov)); break;
+
+    case 'C':
+	if (count == 1)
+	    printf("%s = v;\n", cell(mov));
+	else if (count == -1)
+	    printf("%s = -v;\n", cell(mov));
+	else if (count != 0)
+	    printf("%s = v*%d;\n", cell(mov), count);
+	break;
 
     case '>': printf("m += %d;\n", count); break;
     case '<': printf("m -= %d;\n", count); break;
@@ -158,7 +164,8 @@ static int ind = 0;
     case '~': puts("}"); break;
 
     default:
-	printf("/* ? */\n");
+	printf("/* Unknown token 0x%02x.%d */\n", ch, count);
+	fprintf(stderr, "ERROR: Unknown token 0x%02x.%d\n", ch, count);
 	break;
     }
 }

@@ -76,11 +76,7 @@ outcmd(int ch, int count)
     case 'M': I; printf("$m[$p]=$m[$p]+$v*%d\n", count); break;
     case 'N': I; printf("$m[$p]=$m[$p]-$v*%d\n", count); break;
     case 'S': I; printf("$m[$p]=$m[$p]+$v\n"); break;
-    case 'Q': I; printf("if ($v -ne 0) { $m[$p] = %d; }\n", count); break;
-
-    case 'm': I; printf("if ($v -ne 0) { $m[$p]=$m[$p]+$v*%d; }\n", count); break;
-    case 'n': I; printf("if ($v -ne 0) { $m[$p]=$m[$p]-$v*%d; }\n", count); break;
-    case 's': I; printf("if ($v -ne 0) { $m[$p]=$m[$p]+$v; }\n"); break;
+    case 'T': I; printf("$m[$p]=$m[$p]-$v\n"); break;
 
     case 'X': I; printf("throw 'Aborting Infinite Loop'\n"); break;
 
