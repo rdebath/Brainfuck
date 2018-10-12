@@ -19,7 +19,7 @@ ALLEXE=bf2run \
 	bf2cmd bf2cobol bf2crun bf2cs bf2csh bf2d bf2dc bf2dump bf2elf \
 	bf2f90 bf2gas32 bf2gas64 bf2go bf2java bf2julia bf2ksh bf2ksh88 \
 	bf2lua bf2nav bf2neko bf2oldsh bf2pas bf2perl bf2php bf2ps1 \
-	bf2py bf2rb bf2rc bf2semi bf2sh bf2slang bf2swift bf2tcl bf2tomm \
+	bf2py bf2rb bf2rc bf2sh bf2slang bf2swift bf2tcl bf2tomm \
 	bf2tsql bf2whitespace
 
 TOOLDIR=../tools
@@ -96,8 +96,6 @@ bf2gas32.o: bf2gas.c
 
 bf2gas64.o: bf2gas.c
 	$(CC) $(CFLAGS) -DUSE64 $(TARGET_ARCH) -c -o $@ bf2gas.c
-
-bf2semi.o: bf2semi.c bf2whitespace.c
 
 bf2crun.o bf2dump.o bf2py.o bf2php.o bf2perl.o bf2rb.o: move_opt.h
 

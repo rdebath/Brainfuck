@@ -11,6 +11,10 @@
 static int loopid = 1;
 static int embed_tokens = 0;
 static int signed_label_bug = 0;
+static int semicolon = 0;
+static int bytewrap_label = -1;
+static int call_works = 1;
+static enum {no_init, quick_init, full_init} init_type = full_init;
 
 static struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
@@ -19,11 +23,6 @@ static void prttok(char *, char *);
 static void putsnum(long val);
 static void putunum(unsigned long num);
 static void putlabel(unsigned long num);
-
-#ifndef BF2SEMI
-
-#define TAPE_PREALLOC	1
-#define TAPE_PREALLOC_QUICK	0
 
 #define CMD_ADD		"\t   "
 #define CMD_CALL	"\n \t"
@@ -52,41 +51,40 @@ static void putlabel(unsigned long num);
 #define BIT_ONE		"\t"
 #define END_NUM		"\n"
 
-#else
+/* This is the alternate "semicolon" syntax */
 
-#define BROKEN_CMD_CALL	" ;⁏"
-#define BROKEN_CMD_RET	" ; "
+#define SCMD_CALL	" ;⁏"	/* This doesn't work in the reference interpreter */
+#define SCMD_RET	" ; "	/* This doesn't work in the reference interpreter */
 
-#define CMD_ADD		"⁏;;"
-#define CMD_DROP	";⁏⁏"
-#define CMD_DUP		";;⁏"
-#define CMD_EXIT	"  ;"
-#define CMD_FETCH	"; ⁏"
-#define CMD_JMP		" ⁏ "
-#define CMD_JZ		" ⁏;"
-#define CMD_LABEL	" ;;"
+#define SCMD_ADD	"⁏;;"
+#define SCMD_DROP	";⁏⁏"
+#define SCMD_DUP	";;⁏"
+#define SCMD_EXIT	"  ;"
+#define SCMD_FETCH	"; ⁏"
+#define SCMD_JMP	" ⁏ "
+#define SCMD_JZ		" ⁏;"
+#define SCMD_LABEL	" ;;"
 /* Semicolon has arguments to MOD, DIV and SUB swapped relative to WS and Forth
  * (the additive operations may also be swapped but it's impossible to tell) */
-#define CMD_MOD		CMD_SWAP "⁏  "
-#define CMD_MUL		"⁏⁏;"
-#define CMD_OUTCHAR	"⁏ ;;"
-#define CMD_OUTNUM	"⁏ ;⁏"
-#define CMD_PUSH	";;;"
-#define CMD_READCHAR	"⁏ ⁏;"
-#define CMD_STORE	"; ;"
-#define CMD_SWAP	";⁏;"
+#define SCMD_MOD	SCMD_SWAP "⁏  "
+#define SCMD_MUL	"⁏⁏;"
+#define SCMD_OUTCHAR	"⁏ ;;"
+#define SCMD_OUTNUM	"⁏ ;⁏"
+#define SCMD_PUSH	";;;"
+#define SCMD_READCHAR	"⁏ ⁏;"
+#define SCMD_STORE	"; ;"
+#define SCMD_SUB	"⁏;⁏"
+#define SCMD_SWAP	";⁏;"
 
-#define BIT_ZERO	";"
-#define BIT_ONE		"⁏"
-#define END_NUM		"\n"
+#define SBIT_ZERO	";"
+#define SBIT_ONE	"⁏"
+#define SEND_NUM	"\n"
 
-#define AFTER_END \
-	printf(CMD_LABEL); \
+#define SAFTER_END \
+	printf(SCMD_LABEL); \
 	putlabel(0); /* End the program with a newline */
 
-#endif
-
-#define PRTTOK(s)	prttok("(" #s ")", CMD_##s);
+#define PRTTOK(s)	prttok("(" #s ")", semicolon? SCMD_##s : CMD_##s);
 
 static check_arg_t fn_check_arg;
 struct be_interface_s be_interface = {fn_check_arg};
@@ -106,6 +104,27 @@ fn_check_arg(const char * arg)
 	signed_label_bug = 1;
 	return 1;
     }
+    if (strcmp(arg, "-semi") == 0) {
+	semicolon = 1;
+	call_works = 0;
+	return 1;
+    }
+
+    if (strcmp(arg, "-quickinit") == 0) { init_type = quick_init; return 1; }
+    if (strcmp(arg, "-fullinit") == 0) { init_type = full_init; return 1; }
+    if (strcmp(arg, "-noinit") == 0) { init_type = no_init; return 1; }
+
+    if (strcmp("-h", arg) ==0) {
+        fprintf(stderr, "%s\n",
+        "\t"    "-tokens Include token names in output."
+        "\n\t"  "-semi   Generate code for 'semicolon' language"
+        "\n\t"  "-signbug    Interpreter has signed int bug"
+        "\n\t"  "-fullinit   Init every tape cell."
+        "\n\t"  "-quickinit  Write to last tape cell."
+        );
+        return 1;
+    }
+
     return 0;
 }
 
@@ -118,20 +137,17 @@ fn_check_arg(const char * arg)
     PRTTOK(MOD);	\
     PRTTOK(STORE);
 
-#if defined(CMD_CALL)
-static int bytewrap_label = -1;
-#endif
 
 static void
 do_bytewrap(void)
 {
     if(!bytecell) return;
-#ifndef CMD_CALL
-    BYTEWRAP();
-#else
-    PRTTOK(CALL);
-    putlabel(bytewrap_label);
-#endif
+    if (!call_works) {
+	BYTEWRAP();
+    } else {
+	PRTTOK(CALL);
+	putlabel(bytewrap_label);
+    }
 }
 
 void
@@ -157,42 +173,45 @@ outcmd(int ch, int count)
     switch(ch) {
     case '!':
 
-#if TAPE_PREALLOC_QUICK
 	if (tapelen) {
-	    /* The Haskell interpreter needs us to poke the highest cell we
-	     * want to use before we read any before that cell.
-	     */
-	    PRTTOK(PUSH);
-	    putsnum(tapesz+2);
-	    PRTTOK(PUSH);
-	    putsnum(0);
-	    PRTTOK(STORE);
-	}
-#elif TAPE_PREALLOC
-	if (tapelen) {
-	    /* Some WS interpreters need EVERY cell cleared manually before we
-	     * use them.
-	     */
-	    PRTTOK(PUSH); putsnum(0);
-	    PRTTOK(LABEL); putlabel(loopid);
-	    PRTTOK(DUP);
-	    PRTTOK(PUSH); putsnum(tapesz+4);
-	    PRTTOK(SUB);
-	    PRTTOK(JZ); putlabel(loopid+1);
-	    PRTTOK(DUP);
-	    PRTTOK(PUSH); putsnum(0);
-	    PRTTOK(STORE);
-	    PRTTOK(PUSH); putsnum(1);
-	    PRTTOK(ADD);
-	    PRTTOK(JMP); putlabel(loopid);
-	    PRTTOK(LABEL); putlabel(loopid+1);
-	    PRTTOK(DROP);
-	    loopid += 2;
-	}
-#endif
+	    switch(init_type)
+	    {
+	    case no_init: break;
+	    case quick_init:
+		/* The Haskell interpreter needs us to poke the highest cell we
+		 * want to use before we read any before that cell.
+		 */
+		PRTTOK(PUSH);
+		putsnum(tapesz+2);
+		PRTTOK(PUSH);
+		putsnum(0);
+		PRTTOK(STORE);
+		break;
 
-#if defined(CMD_CALL)
-	if(bytecell) {
+	    case full_init:
+		/* Some WS interpreters need EVERY cell cleared manually before we
+		 * use them.
+		 */
+		PRTTOK(PUSH); putsnum(0);
+		PRTTOK(LABEL); putlabel(loopid);
+		PRTTOK(DUP);
+		PRTTOK(PUSH); putsnum(tapesz+4);
+		PRTTOK(SUB);
+		PRTTOK(JZ); putlabel(loopid+1);
+		PRTTOK(DUP);
+		PRTTOK(PUSH); putsnum(0);
+		PRTTOK(STORE);
+		PRTTOK(PUSH); putsnum(1);
+		PRTTOK(ADD);
+		PRTTOK(JMP); putlabel(loopid);
+		PRTTOK(LABEL); putlabel(loopid+1);
+		PRTTOK(DROP);
+		loopid += 2;
+		break;
+	    }
+	}
+
+	if(bytecell && call_works) {
 	    /* The Semicolon language doesn't have a working call instruction
 	     * without it the %256 for byte cells takes up a lot of space.
 	     */
@@ -207,7 +226,6 @@ outcmd(int ch, int count)
 	    bytewrap_label = loopid;
 	    loopid += 2;
 	}
-#endif
 
 	PRTTOK(PUSH);
 	putsnum(tapeinit+2);
@@ -217,9 +235,9 @@ outcmd(int ch, int count)
     case '~':
 	PRTTOK(DROP);
 	PRTTOK(EXIT);
-#ifdef AFTER_END
-	AFTER_END;
-#endif
+	if (semicolon) {
+	    SAFTER_END;
+	}
 	break;
 
     case '=':
@@ -449,10 +467,16 @@ static void
 putsnum(long val)
 {
     if (val >= 0) {
-	prttok("(pos)", BIT_ZERO);
+	if (semicolon)
+	    prttok("(pos)", SBIT_ZERO);
+	else
+	    prttok("(pos)", BIT_ZERO);
 	putunum(val);
     } else {
-	prttok("(neg)", BIT_ONE);
+	if (semicolon)
+	    prttok("(neg)", SBIT_ONE);
+	else
+	    prttok("(neg)", BIT_ONE);
 	putunum(-val);
     }
 }
@@ -474,7 +498,11 @@ putunum(unsigned long num)
     for(;;) {
 	v = num / max;
 	num = num % max;
-	if (v == 0) printf(BIT_ZERO); else printf(BIT_ONE);
+	if (semicolon) {
+	    if (v == 0) printf(SBIT_ZERO); else printf(SBIT_ONE);
+	} else {
+	    if (v == 0) printf(BIT_ZERO); else printf(BIT_ONE);
+	}
 	if (max == 1) break;
 	max /= 2;
     }
@@ -482,5 +510,5 @@ putunum(unsigned long num)
     if (embed_tokens)
 	printf(")");
 
-    printf(END_NUM);
+    if (semicolon) printf(SEND_NUM); else printf(END_NUM);
 }
