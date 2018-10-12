@@ -144,6 +144,12 @@ loutcmd(int ch, int count, struct instruction *n)
     case 'N': I; printf("%s = (%s|0) - (v*%d |0);\n", mp, mp, count); break;
     case 'S': I; printf("%s = (%s|0) + v;\n", mp, mp); break;
     case 'T': I; printf("%s = (%s|0) - v;\n", mp, mp); break;
+    case '*': I; printf("%s = (%s|0) * v;\n", mp, mp); break;
+
+    case 'C': I; printf("%s = (v*%d |0);\n", mp, count); break;
+    case 'D': I; printf("%s = -(v*%d |0);\n", mp, count); break;
+    case 'V': I; printf("%s = v;\n", mp); break;
+    case 'W': I; printf("%s = -v;\n", mp); break;
 
     case '+': I; printf("%s = (%s|0) + %d;\n", mp, mp, count); break;
     case '-': I; printf("%s = (%s|0) - %d;\n", mp, mp, count); break;

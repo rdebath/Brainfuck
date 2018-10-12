@@ -121,6 +121,12 @@ outcmd(int ch, int count)
     case 'N': prv("lp;alV%s*+lp:a", dc_ltoa(-count)); break;
     case 'S': pr("lp;alV+lp:a"); break;
     case 'T': pr("lp;alV-lp:a"); break;
+    case '*': pr("lp;alV*lp:a"); break;
+
+    case 'C': prv("lV%s*lp:a", dc_ltoa(count)); break;
+    case 'D': prv("lV%s*lp:a", dc_ltoa(-count)); break;
+    case 'V': pr("lVlp:a"); break;
+    case 'W': pr("0lV-lp:a"); break;
 
     case '+': prv("lp;a%s+lp:a", dc_ltoa(count)); break;
     case '-': prv("lp;a%s-lp:a", dc_ltoa(count)); break;

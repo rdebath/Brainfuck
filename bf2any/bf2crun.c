@@ -232,6 +232,12 @@ outcmd(int ch, int count)
     case 'N': prv2("m[%d] -= v*%d;", mov, count); return;
     case 'S': prv("m[%d] += v;", mov); return;
     case 'T': prv("m[%d] -= v;", mov); return;
+    case '*': prv("m[%d] *= v;", mov); return;
+
+    case 'C': prv2("m[%d] = v*%d;", mov, count); return;
+    case 'D': prv2("m[%d] = -v*%d;", mov, count); return;
+    case 'V': prv("m[%d] = v;", mov); return;
+    case 'W': prv("m[%d] = -v;", mov); return;
 
     case '+': prv2("m[%d] += %d;", mov, count); return;
     case '-': prv2("m[%d] -= %d;", mov, count); return;

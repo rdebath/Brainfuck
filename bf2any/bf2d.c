@@ -54,6 +54,12 @@ outcmd(int ch, int count)
     case 'N': prv("mem[m] -= v*%d;", count); break;
     case 'S': pr("mem[m] += v;"); break;
     case 'T': pr("mem[m] -= v;"); break;
+    case '*': pr("mem[m] *= v;"); break;
+
+    case 'C': prv("mem[m] = v*%d;", count); break;
+    case 'D': prv("mem[m] = -v*%d;", count); break;
+    case 'V': pr("mem[m] = v;"); break;
+    case 'W': pr("mem[m] = -v;"); break;
 
     case '+': prv("mem[m] +=%d;", count); break;
     case '-': prv("mem[m] -=%d;", count); break;

@@ -185,6 +185,7 @@ outcmd(int ch, int count)
 	I; printf("register int c;\n");
 	I; printf("BIGNUM *v = BN_new();\n");
 	I; printf("BIGNUM *t1 = BN_new();\n");
+	I; printf("BN_CTX * BNtmp = BN_CTX_new();\n");
 	I; printf("setbuf(stdout, 0);\n");
 	I; printf("p = move_ptr(mem,0);\n");
 	I; printf("if (0) {\n");
@@ -232,6 +233,28 @@ outcmd(int ch, int count)
 
     case 'S': I; printf("if(!BN_add(*p, *p, v)) goto BN_op_failed;\n"); break;
     case 'T': I; printf("if(!BN_sub(*p, *p, v)) goto BN_op_failed;\n"); break;
+
+    case '*':
+	I; printf("if(!BN_mul(*p, *p, v, BNtmp)) goto BN_op_failed;\n");
+	break;
+
+    case 'C':
+	I; printf("if(!BN_copy(*p, v)) goto BN_op_failed;\n");
+	I; printf("if(!BN_mul_word(*p, %d)) goto BN_op_failed;\n", count);
+	break;
+
+    case 'D':
+	I; printf("if(!BN_copy(t1, v)) goto BN_op_failed;\n");
+	I; printf("if(!BN_mul_word(t1, %d)) goto BN_op_failed;\n", count);
+	I; printf("if(!BN_zero(*p)) goto BN_op_failed;\n");
+	I; printf("if(!BN_sub(*p, *p, t1)) goto BN_op_failed;\n");
+	break;
+
+    case 'V': I; printf("if(!BN_copy(*p, v)) goto BN_op_failed;\n"); break;
+    case 'W':
+	I; printf("if(!BN_zero(*p)) goto BN_op_failed;\n");
+	I; printf("if(!BN_sub(*p, *p, v)) goto BN_op_failed;\n");
+	break;
 
     case 'X': I; printf("fprintf(stderr, \"Abort: Infinite Loop.\\n\"); exit(1);\n"); break;
 

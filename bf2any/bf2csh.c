@@ -46,6 +46,12 @@ outcmd(int ch, int count)
     case 'N': prv("@ M[$P]-=$V * %d", count); break;
     case 'S': pr("@ M[$P]+=$V"); break;
     case 'T': pr("@ M[$P]-=$V"); break;
+    case '*': pr("@ M[$P]*=$V"); break;
+
+    case 'C': prv("@ M[$P]=$V * %d", count); break;
+    case 'D': prv("@ M[$P]=-$V * %d", count); break;
+    case 'V': pr("@ M[$P]=$V"); break;
+    case 'W': pr("@ M[$P]=-$V"); break;
 
     case '+': prv("@ M[$P]+=%d", count); break;
     case '-': prv("@ M[$P]-=%d", count); break;

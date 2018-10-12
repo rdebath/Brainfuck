@@ -79,6 +79,12 @@ outcmd(int ch, int count)
     case 'N': I; printf("%s -= v*%d\n", cm, count); break;
     case 'S': I; printf("%s += v\n", cm); break;
     case 'T': I; printf("%s -= v\n", cm); break;
+    case '*': I; printf("%s *= v\n", cm); break;
+
+    case 'C': I; printf("%s = v*%d\n", cm, count); break;
+    case 'D': I; printf("%s = -v*%d\n", cm, count); break;
+    case 'V': I; printf("%s = v\n", cm); break;
+    case 'W': I; printf("%s = -v\n", cm); break;
 
     case 'X': I; printf("raise 'Aborting Infinite Loop.'\n"); break;
 

@@ -249,11 +249,6 @@ static void process_loop()
 		exit(1);
 	    } else {
 		qcmd[qcnt] = 'M'; qrep[qcnt] = madd_inc[i] * -inc;
-		if (qrep[qcnt] == 1) qcmd[qcnt] = 'S';
-		if (qrep[qcnt] < 0) {
-		    qcmd[qcnt] = 'N';
-		    qrep[qcnt] = -qrep[qcnt];
-		}
 
 		if (mov < -tapeinit && !doneif) {
 		    fprintf(stderr, "Unexpected TAPE underflow\n");

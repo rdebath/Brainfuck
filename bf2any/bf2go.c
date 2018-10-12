@@ -54,6 +54,12 @@ outcmd(int ch, int count)
     case 'N': I; printf("m[p] = m[p]-v*%d\n", count & vmask); break;
     case 'S': I; printf("m[p] = m[p]+v\n"); break;
     case 'T': I; printf("m[p] = m[p]-v\n"); break;
+    case '*': I; printf("m[p] = m[p]*v\n"); break;
+
+    case 'C': I; printf("m[p] = v*%d\n", count & vmask); break;
+    case 'D': I; printf("m[p] = -v*%d\n", count & vmask); break;
+    case 'V': I; printf("m[p] = v\n"); break;
+    case 'W': I; printf("m[p] = -v\n"); break;
 
     case 'X':
 	I; printf("fmt.Fprintf(os.Stderr, \"Aborting Infinite Loop.\\n\")\n");

@@ -370,8 +370,26 @@ loutcmd(int ch, int count, struct instruction *n)
     case 'N': I; printf("m[p] -= v*%d;\n", count); break;
     case 'S': I; printf("m[p] += v;\n"); break;
     case 'T': I; printf("m[p] -= v;\n"); break;
+    case '*': I; printf("m[p] *= v;\n"); break;
 
-    case 'X': I; printf("throw new IllegalStateException(\"Infinite Loop detected.\");"); break;
+    case 'C':
+	if (bytecell) {
+	    I; printf("m[p] = (byte)(v*%d);\n", count);
+	} else {
+	    I; printf("m[p] = v*%d;\n", count);
+	}
+	break;
+    case 'D':
+	if (bytecell) {
+	    I; printf("m[p] = (byte)(-v*%d);\n", count);
+	} else {
+	    I; printf("m[p] = -v*%d;\n", count);
+	}
+	break;
+    case 'V': I; printf("m[p] = v;\n"); break;
+    case 'W': I; printf("m[p] = -v;\n"); break;
+
+    case 'X': I; printf("throw new IllegalStateException(\"Infinite Loop detected.\");\n"); break;
 
     case '+': I; printf("m[p] += %d;\n", count); break;
     case '-': I; printf("m[p] -= %d;\n", count); break;

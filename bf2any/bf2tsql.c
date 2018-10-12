@@ -70,6 +70,12 @@ outcmd(int ch, int count)
     case 'N': I; printf("set @ccell = @ccell-@vcell*%d\n", count); break;
     case 'S': I; printf("set @ccell = @ccell+@vcell\n"); break;
     case 'T': I; printf("set @ccell = @ccell-@vcell\n"); break;
+    case '*': I; printf("set @ccell = @ccell*@vcell\n"); break;
+
+    case 'C': I; printf("set @ccell = @vcell*%d\n", count); break;
+    case 'D': I; printf("set @ccell = -@vcell*%d\n", count); break;
+    case 'V': I; printf("set @ccell = @vcell\n"); break;
+    case 'W': I; printf("set @ccell = -@vcell\n"); break;
 
     case 'X': I; printf("RAISERROR ('Aborting Infinite Loop.', 16, 1) RETURN\n");
 

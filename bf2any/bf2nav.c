@@ -116,6 +116,12 @@ loutcmd(int ch, int count, struct instruction *n)
     case 'N': prv("m[p] := (m[p] - %d*v) MOD 256;", count%256); break;
     case 'S': pr("m[p] := (m[p] + v) MOD 256;"); break;
     case 'T': pr("m[p] := (m[p] - v) MOD 256;"); break;
+    case '*': pr("m[p] := (m[p] * v) MOD 256;"); break;
+
+    case 'C': prv("m[p] := (%d*v) MOD 256;", count%256); break;
+    case 'D': prv("m[p] := (%d*-v) MOD 256;", count%256); break;
+    case 'V': pr("m[p] := v MOD 256;"); break;
+    case 'W': pr("m[p] := -v MOD 256;"); break;
 
     case '+': prv("m[p] := (m[p] + %d) MOD 256;", count%256); break;
     case '-': prv("m[p] := (m[p] - %d) MOD 256;", count%256); break;

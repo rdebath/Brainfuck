@@ -90,6 +90,12 @@ outcmd(int ch, int count)
     case 'N': arith(); prv("  M[P]-=V*%d,", count); break;
     case 'S': arith(); pr("  M[P]+=V,"); break;
     case 'T': arith(); pr("  M[P]-=V,"); break;
+    case '*': arith(); pr("  M[P]*=V,"); break;
+
+    case 'C': arith(); prv("  M[P]=V*%d,", count); break;
+    case 'D': arith(); prv("  M[P]=-V*%d,", count); break;
+    case 'V': arith(); pr("  M[P]=V,"); break;
+    case 'W': arith(); pr("  M[P]=-V,"); break;
 
     case '+': arith(); prv("  M[P]+=%d,", count); break;
     case '-': arith(); prv("  M[P]-=%d,", count); break;

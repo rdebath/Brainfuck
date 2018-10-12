@@ -323,6 +323,12 @@ outcmd(int ch, int count)
     case 'N': I; printf("%s=%s-%s*%d\n", tapecell, tapecell, tempcell, count); break;
     case 'S': I; printf("%s=%s+%s\n", tapecell, tapecell, tempcell); break;
     case 'T': I; printf("%s=%s-%s\n", tapecell, tapecell, tempcell); break;
+    case '*': I; printf("%s=%s*%s\n", tapecell, tapecell, tempcell); break;
+
+    case 'C': I; printf("%s=%s*%d\n", tapecell, tempcell, count); break;
+    case 'D': I; printf("%s=-%s*%d\n", tapecell, tempcell, count); break;
+    case 'V': I; printf("%s=%s\n", tapecell, tempcell); break;
+    case 'W': I; printf("%s=-%s\n", tapecell, tempcell); break;
 
     case '+': I; printf("%s=%s+%d\n", tapecell, tapecell, count); break;
     case '-': I; printf("%s=%s-%d\n", tapecell, tapecell, count); break;

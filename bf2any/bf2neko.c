@@ -42,6 +42,12 @@ outcmd(int ch, int count)
     case 'N': I; printf("m[p] = m[p]-v*%d\n", count); break;
     case 'S': I; printf("m[p] = m[p]+v\n"); break;
     case 'T': I; printf("m[p] = m[p]-v\n"); break;
+    case '*': I; printf("m[p] = m[p]*v\n"); break;
+
+    case 'C': I; printf("m[p] = v*%d\n", count); break;
+    case 'D': I; printf("m[p] = -v*%d\n", count); break;
+    case 'V': I; printf("m[p] = v\n"); break;
+    case 'W': I; printf("m[p] = -v\n"); break;
 
     case 'X': I; printf("$throw(\"Abort Infinite Loop\");\n"); break;
 

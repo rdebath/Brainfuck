@@ -321,7 +321,6 @@ pipe_to_be(char ** filelist, int filecount)
 	int ch, m, m0, inp=0, cmt=0, di = 0;
 	int digits = 0, number = 0, ov_flg = 0, multi = 1;
 	int qstring = 0;
-	char * xc = 0;
 
 	if (strcmp(filelist[ar], "-") == 0) {
 	    ifd = stdin;
@@ -407,15 +406,14 @@ pipe_to_be(char ** filelist, int filecount)
 
 	    /* These chars have an argument. */
 	    m = (ch == '>' || ch == '<' || ch == '+' || ch == '-' ||
-		 ch == '=' || ch == 'N' || ch == 'M' || ch == 'C');
+		 ch == '=' || ch == 'N' || ch == 'M' || ch == 'C' ||
+		 ch == 'D');
 
 	    /* These ones do not */
 	    m0 = (ch == '[' || ch == ']' || ch == '.' || ch == ',' ||
 		  ch == 'I' || ch == 'E' || ch == 'B' || ch == 'S' ||
-		  ch == 'T' || ch == '"' || ch == 'X');
-
-	    if (extra_commands && (xc = strchr(extra_commands, ch)) != 0)
-		m0 = 1;
+		  ch == 'T' || ch == 'V' || ch == 'W' || ch == '"' ||
+		  ch == 'X' || ch == '*');
 
 	    if (!m) {
 		multi = 0;
@@ -446,11 +444,6 @@ pipe_to_be(char ** filelist, int filecount)
 		}
 	    }
 
-	    if (xc) {
-		outcmd(256+(xc-extra_commands), multi);
-		xc = 0;
-		continue;
-	    }
 	    if (ch == '"') { qstring++; continue; }
 	    if (ch == ',') inp = 1;
 

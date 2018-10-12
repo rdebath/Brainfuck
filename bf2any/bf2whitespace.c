@@ -171,6 +171,10 @@ outcmd(int ch, int count)
     if (ch == 'S') { ch = 'M'; count = 1; }
     if (ch == 'T') { ch = 'M'; count = -1; }
 
+    if (ch == 'D') { ch = 'C'; count = -count; }
+    if (ch == 'V') { ch = 'C'; count = 1; }
+    if (ch == 'W') { ch = 'C'; count = -1; }
+
     switch(ch) {
     case '!':
 
@@ -270,6 +274,30 @@ outcmd(int ch, int count)
 	    PRTTOK(MUL);
 	}
 	PRTTOK(ADD);
+	PRTTOK(STORE);
+	break;
+
+    case '*':
+	PRTTOK(DUP);
+	PRTTOK(DUP);
+	PRTTOK(FETCH);
+	PRTTOK(PUSH);
+	putsnum(0);
+	PRTTOK(FETCH);
+	PRTTOK(MUL);
+	PRTTOK(STORE);
+	break;
+
+    case 'C':
+	PRTTOK(DUP);
+	PRTTOK(PUSH);
+	putsnum(0);
+	PRTTOK(FETCH);
+	if (count != 1) {
+	    PRTTOK(PUSH);
+	    putsnum(count);
+	    PRTTOK(MUL);
+	}
 	PRTTOK(STORE);
 	break;
 

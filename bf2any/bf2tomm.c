@@ -5,7 +5,7 @@
 #include "bf2any.h"
 
 /*
- * LibTomMath translation From BF, runs at about ? instructions per second.
+ * LibTomMath translation From BF
  *
  * https://github.com/libtom/libtommath.git
  *
@@ -203,6 +203,7 @@ outcmd(int ch, int count)
 	break;
 
     case 'M':
+    case 'S':
 	if (count > 1 && count <= 127) {
 	    I; printf("mp_copy(v, t1);\n");
 	    I; printf("mp_mul_d(t1, %d, t1);\n", count);
@@ -219,6 +220,7 @@ outcmd(int ch, int count)
 	break;
 
     case 'N':
+    case 'T':
 	if (count > 1 && count <= 127) {
 	    I; printf("mp_copy(v, t1);\n");
 	    I; printf("mp_mul_d(t1, %d, t1);\n", count);
@@ -234,8 +236,28 @@ outcmd(int ch, int count)
 	}
 	break;
 
-    case 'S': I; printf("mp_add(p, v, p);\n"); break;
-    case 'T': I; printf("mp_sub(p, v, p);\n"); break;
+    case 'C':
+    case 'D':
+    case 'V':
+    case 'W':
+	if (count > 1 && count <= 127) {
+	    I; printf("mp_mul_d(v, %d, p);\n", count);
+	} else
+	if (count != 1) {
+	    I; printf("mp_set_int(t2, %d);\n", count);
+	    I; printf("mp_mul(v, t2, p);\n");
+	} else {
+	    I; printf("mp_copy(v, p);\n");
+	}
+	if (ch == 'D' || ch == 'W') {
+	    I; printf("mp_neg(p, p);\n");
+	}
+	break;
+
+    case '*':
+	I; printf("mp_mul(p, v, p);\n");
+	I; printf("mp_mask_BPC(p);\n");
+	break;
 
     case 'X': I; printf("fprintf(stderr, \"Abort: Infinite Loop.\\n\"); exit(1);\n"); break;
 

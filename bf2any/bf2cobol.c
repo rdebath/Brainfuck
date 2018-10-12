@@ -128,6 +128,12 @@ outcmd(int ch, int count)
     case 'N': I; printf("COMPUTE m(p) EQUAL m(p)-v*%d\n", count); break;
     case 'S': I; printf("ADD v TO m(p)\n"); break;
     case 'T': I; printf("SUBTRACT v FROM m(p)\n"); break;
+    case '*': I; printf("COMPUTE m(p) EQUAL m(p)*v\n"); break;
+
+    case 'C': I; printf("COMPUTE m(p) EQUAL v*%d\n", count); break;
+    case 'D': I; printf("COMPUTE m(p) EQUAL -v*%d\n", count); break;
+    case 'V': I; printf("MOVE v TO m(p)\n"); break;
+    case 'W': I; printf("COMPUTE m(p) EQUAL -v\n"); break;
 
     case 'X': I; printf("DISPLAY \"Aborting Infinite Loop.\"\n");
               I; printf("STOP RUN RETURNING 1\n");

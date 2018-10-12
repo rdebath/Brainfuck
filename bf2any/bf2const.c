@@ -337,17 +337,24 @@ void outopt(int ch, int count)
 	outcmd(ch, count);
 	return;
 
-    case 'M':
-    case 'N':
-    case 'S':
-    case 'T':
-#if 0
+    case 'M': case 'N': case 'S': case 'T':
+	if (ch == 'N') count = -count;
+	else if (ch == 'S') count = 1;
+	else if (ch == 'T') count = -1;
+
 	if (tape->is_set && tape->v == 0) {
 	    tape->is_set = 0 ; tape->v = 0;
-	    if (ch == 'N') count = -count;
+
 	    ch = 'C';
+	    if (count == 1) ch = 'V';
+	    else if (count == -1) { ch = 'W'; count = -count; }
+	    else if (count < 0) { ch = 'D'; count = -count; }
+	} else {
+	    ch = 'M';
+	    if (count == 1) ch = 'S';
+	    else if (count == -1) { ch = 'T'; count = -count; }
+	    else if (count < 0) { ch = 'N'; count = -count; }
 	}
-#endif
 
 	flush_tape(0,1);
 	clear_cell(tape);

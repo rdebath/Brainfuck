@@ -190,8 +190,21 @@ outcmd(int ch, int count)
     case 'N': I; printf("mpz_submul_ui(*p, v, %d);\n", count); break;
     case 'S': I; printf("mpz_add(*p, *p, v);\n"); break;
     case 'T': I; printf("mpz_sub(*p, *p, v);\n"); break;
+    case '*': I; printf("mpz_mul(*p, *p, v);\n"); break;
+
+    case 'C': I; printf("mpz_mul_ui(*p, v, %d);\n", count); break;
+    case 'D':
+	I; printf("mpz_mul_ui(*p, v, %d);\n", count);
+	I; printf("mpz_neg(*p, *p);\n");
+	break;
+    case 'V': I; printf("mpz_set(*p, v);\n"); break;
+    case 'W':
+	I; printf("mpz_set(*p, v);\n");
+	I; printf("mpz_neg(*p, *p);\n");
+	break;
 
     case 'X': I; printf("fprintf(stderr, \"Abort: Infinite Loop.\\n\"); exit(1);\n"); break;
+
     case '+': I; printf("mpz_add_ui(*p, *p, %d);\n", count); break;
     case '-': I; printf("mpz_sub_ui(*p, *p, %d);\n", count); break;
     case '<': I; printf("p = move_ptr(p, %d);\n", -count); break;

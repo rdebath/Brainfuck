@@ -90,15 +90,12 @@ static int ind = 0;
     case 'N': printf("%s -= v*%d;\n", cell(mov), count); break;
     case 'S': printf("%s += v;\n", cell(mov)); break;
     case 'T': printf("%s -= v;\n", cell(mov)); break;
+    case '*': printf("%s *= v;\n", cell(mov)); break;
 
-    case 'C':
-	if (count == 1)
-	    printf("%s = v;\n", cell(mov));
-	else if (count == -1)
-	    printf("%s = -v;\n", cell(mov));
-	else if (count != 0)
-	    printf("%s = v*%d;\n", cell(mov), count);
-	break;
+    case 'C': printf("%s = v*%d;\n", cell(mov), count); break;
+    case 'D': printf("%s = -v*%d;\n", cell(mov), count); break;
+    case 'V': printf("%s = v;\n", cell(mov)); break;
+    case 'W': printf("%s = -v;\n", cell(mov)); break;
 
     case '>': printf("m += %d;\n", count); break;
     case '<': printf("m -= %d;\n", count); break;
