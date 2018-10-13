@@ -2563,9 +2563,7 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 		    v->type = T_ENDIF;
 
 		    /*
-		     * Move the set out of the loop, if it won't move duplicate
-		     * it to make searches easier as a T_ENDIF does NOT
-		     * guarantee it's cell is zero.
+		     * Move the set out of the loop, if it's a simple one.
 		     */
 		    if (n && n->type == T_SET) {
 			n->type = T_NOP;
@@ -2573,12 +2571,12 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 			if (n) n->next = n2->next; else bfprog = n2->next;
 			if (n2->next) n2->next->prev = n;
 			free(n2);
-		    }
 
-		    n2 = add_node_after(v);
-		    n2->type = T_SET;
-		    n2->count = 0;
-		    n2->offset = v->offset;
+			n2 = add_node_after(v);
+			n2->type = T_SET;
+			n2->count = 0;
+			n2->offset = v->offset;
+		    }
 
 #if 1
 		    /* Also note the loop variable may have been saved as it

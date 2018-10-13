@@ -34,7 +34,7 @@
 
     >+<<
 	// less than 2**32 bits
-	[[-]>>-<<
+	[>>-<<
 	>
 
 	// Calculate the value 256 and test if it's zero
@@ -56,7 +56,7 @@
 	    >>>+<<<
 	<[-]]<
 
-	<]
+	<[-]]
 
 [-]]<
 
