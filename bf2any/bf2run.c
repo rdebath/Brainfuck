@@ -22,7 +22,7 @@ static size_t tapealloc;
 
 #define TOKEN_LIST(Mac) \
     Mac(STOP) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
-    Mac(SET) Mac(BEG) Mac(MUL) Mac(MUL1) Mac(QSET) Mac(QMUL) \
+    Mac(SET) Mac(BEG) Mac(MUL) Mac(MUL1) Mac(SETNV) Mac(MULV) Mac(SETV) \
     Mac(ZFIND) Mac(RAILC) Mac(RAILZ) Mac(DUMP) Mac(NOP)
 
 #define GEN_TOK_ENUM(NAME) T_ ## NAME,
@@ -96,14 +96,17 @@ outcmd(int ch, int count)
 
     case '=': *mptr++ = t = T_SET; *mptr++ = count; break;
     case 'B': *mptr++ = t = T_BEG; break;
+
     case 'M': *mptr++ = t = T_MUL; *mptr++ = count; break;
     case 'N': *mptr++ = t = T_MUL; *mptr++ = -count; break;
     case 'S': *mptr++ = t = T_MUL1; break;
+    case 'T': *mptr++ = t = T_MUL; *mptr++ = -1; break;
+    case '*': *mptr++ = t = T_MULV; break;
 
-    case 'Q': *mptr++ = t = T_QSET; *mptr++ = count; break;
-    case 'm': *mptr++ = t = T_QMUL; *mptr++ = count; break;
-    case 'n': *mptr++ = t = T_QMUL; *mptr++ = -count; break;
-    case 's': *mptr++ = t = T_QMUL; *mptr++ = 1; break;
+    case 'C': *mptr++ = t = T_SETNV; *mptr++ = count; break;
+    case 'D': *mptr++ = t = T_SETNV; *mptr++ = -count; break;
+    case 'V': *mptr++ = t = T_SETV; break;
+    case 'W': *mptr++ = t = T_SETNV; *mptr++ = -1; break;
 
     case '+': *mptr++ = t = T_ADD; *mptr++ = count; break;
     case '-': *mptr++ = t = T_ADD; *mptr++ = -count; break;
@@ -112,7 +115,7 @@ outcmd(int ch, int count)
     case 'X': *mptr++ = t = T_STOP; break;
     case ',': *mptr++ = t = T_INP; break;
     case '.': *mptr++ = t = T_PRT; break;
-    case '#': *mptr++ = t = T_DUMP; break;
+    case '#': *mptr++ = t = T_DUMP; checklimits = 1; break;
     case '~':
 	*mptr++ = t = T_STOP;
 	if (do_dump) {
@@ -122,7 +125,7 @@ outcmd(int ch, int count)
 	setbuf(stdout, 0);
 
 	tapealloc = tapesz;
-	if(!enable_debug && !checklimits) {
+	if(!checklimits) {
 	    if (bytecell) {
 		unsigned char * btape;
 		btape = calloc(tapealloc, sizeof(unsigned char));
@@ -240,14 +243,14 @@ dumpprog(int * p, int * ep)
 	case T_STOP:
 	case T_PRT: case T_INP:
 	case T_BEG: case T_MUL1:
+	case T_SETV: case T_MULV:
 	case T_DUMP: case T_NOP:
 	    break;
 	case T_WHL: case T_END:
 	    printf(" %d (%06d)", *p, (int)(p-mem + *p+1));
 	    p++;
 	    break;
-	case T_SET: case T_ADD:
-	case T_MUL: case T_QSET: case T_QMUL:
+	case T_SET: case T_ADD: case T_MUL: case T_SETNV:
 	case T_ZFIND: case T_RAILC: case T_RAILZ:
 	    printf(" %d", *p++);
 	    break;
@@ -273,7 +276,7 @@ debugprog(register int * p, register icell *mp)
 
 #if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
 /* Tell GNU C to think really hard about this function! */
-__attribute__((optimize(3),hot,aligned(64)))
+__attribute__((optimize(3),hot))
 #endif
 
 #undef tcell
@@ -311,15 +314,18 @@ runprog_int(register int * p, register tcell *mp)
 	case T_END: if (AM(*mp)!=0) p+= p[2]; p+=3; break;
 	case T_WHL: if (AM(*mp)==0) p+= p[2]; p+=3; break;
 	case T_BEG: a = AM(*mp); p+=2; break;
+
 	case T_MUL1: *mp += a; p+=2; break;
+	case T_MULV: *mp *= a; p+=2; break;
+	case T_SETV: *mp = a; p+=2; break;
+	case T_MUL: *mp += p[2] * a; p+=3; break;
+	case T_SETNV: *mp = p[2] * a; p+=3; break;
+
 	case T_ZFIND: while(M(*mp)) mp += p[2]; p+=3; break;
 	case T_RAILC: while(M(*mp)) {*mp -=1; mp += p[2]; } p+=3; break;
 	case T_RAILZ: while(M(*mp)) {*mp =0; mp += p[2]; } p+=3; break;
 	case T_PRT: putchar(*mp); p+=2; break;
 	case T_INP: {int i; if((i=getchar()) != EOF) *mp = i; } p+=2; break;
-	case T_MUL: *mp += p[2] * a; p+=3; break;
-	case T_QSET: if(a) *mp = p[2]; p+=3; break;
-	case T_QMUL: if(a) *mp += p[2]*a; p+=3; break;
 	case T_NOP: p += 2; break;
 	case T_STOP: return;
 #ifndef PART
