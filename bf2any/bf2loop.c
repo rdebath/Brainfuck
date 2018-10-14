@@ -16,7 +16,7 @@ static int qrep[128];
 static int qcnt = 0;
 
 static void process_loop(void);
-static int try_constant_loop(int loopz, int inc, int mov);
+static int try_constant_loop(int loopz, int inc, int mov, int has_zmode);
 
 static int madd_offset[32];
 static int madd_inc[32];
@@ -73,19 +73,8 @@ outtxn(int ch, int repcnt)
 
     if (ch == '[')
     {
-	if (be_interface.disable_be_optim)
-	{
-	    if (tape->is_set)
-	    {
-		if (bytecell) tape->v %= 256; /* -255 .. +255 */
-		/* The unoptimised backends are usually eight bit, even if I
-		 * don't know it yet. So if this code looks like it might be
-		 * testing for 8-bit don't optimise too hard. */
-		if (tape->v%256 != 0)
-		    return; /* OK for dumb BE */
-	    }
-	    outtxn(0, 0);
-	} else if (tape->is_set && tape->v == 0)
+	if (bytecell) tape->v %= 256; /* Paranoia! */
+	if (tape->is_set && tape->v == 0)
 	    outtxn(0, 0);
     }
 
@@ -164,7 +153,7 @@ static void process_loop()
 
     if (tape && tape->is_set) {
 	/* We might be able to do the calculation. */
-	if (try_constant_loop(loopz, inc, mov))
+	if (try_constant_loop(loopz, inc, mov, has_zmode))
 	    return;
     }
 
@@ -279,14 +268,36 @@ static void process_loop()
 }
 
 static int
-try_constant_loop(int loopz, int inc, int mov)
+try_constant_loop(int loopz, int inc, int mov, int has_zmode)
 {
     int i;
     int v = tape->v, ninc = inc;
 
     if (!tape->is_set) return 0;
 
+    if (be_interface.disable_be_optim && !bytecell)
+	/* The unoptimised backends are usually eight bit, even if I
+	 * don't know it yet. So if this code looks like it might be
+	 * testing for 8-bit don't optimise too hard.
+	 *
+	 * Specifically, if the known value, the loop count is not
+	 * zero but is a value that an eight bit interpreter would
+	 * wrap we don't actually know if this code would be run or
+	 * skipped.
+	 *
+	 * Simple additions or multiplications are okay, but any
+	 * 'set to zero' is different for zero.
+	 */
+	if (loopz || has_zmode) {
+	{
+	    /* If it's wrapped to 8bit will it be zero ? */
+	    if (v != 0 && v%256 == 0)
+		return 0;
+	}
+    }
+
     if (loopz) {
+	if (bytecell) v %= 256; /* Paranoia! */
 	ninc = -1;
 	v = (v!=0);
     }
