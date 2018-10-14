@@ -17,7 +17,6 @@ struct be_interface_s {
     check_arg_t *check_arg;
     int noifcmd;
     int cells_are_ints;
-    int nobytecell;
     int bytesonly;
     int disable_be_optim;
     int disable_fe_optim;

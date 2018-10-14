@@ -68,7 +68,7 @@ check_arg(const char * arg) {
 static int
 check_argv(const char * arg)
 {
-    if (!be_interface.nobytecell && strcmp(arg, "-b") == 0) {
+    if (strcmp(arg, "-b") == 0) {
 	bytecell = 1;
 
     } else if (strcmp(arg, "-m") == 0) {
@@ -377,7 +377,7 @@ pipe_to_be(char ** filelist, int filecount)
 	    if (!di) {
 		if (ch == '\n') continue;
 		if (ch == '%' ) {
-		    if (number == 8 && !be_interface.nobytecell )
+		    if (number == 8)
 			;
 		    else if (number == 32 && be_interface.cells_are_ints)
 			;

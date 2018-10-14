@@ -35,7 +35,7 @@ static int use_macro = 0;
 static int bpc = 0;
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {.check_arg=fn_check_arg,.nobytecell=1};
+struct be_interface_s be_interface = {.check_arg=fn_check_arg};
 
 static int
 fn_check_arg(const char * arg)
@@ -77,15 +77,22 @@ outcmd(int ch, int count)
 	printf("#define MINALLOC 16\n");
 	puts("");
 
-	printf("#ifndef BPC\n");
-	printf("#define BPC %d\n", bpc);
-	printf("#endif\n");
-	printf("#if BPC > 0\n");
-	printf("static mpz_t cell_and;\n");
-	printf("#define mpz_and_BPC(c) mpz_and(c, c, cell_and)\n");
-	printf("#else\n");
-	printf("#define mpz_and_BPC(c)\n");
-	printf("#endif\n");
+	if(bytecell) {
+	    printf("#define BPC 8\n");
+	    printf("static mpz_t cell_and;\n");
+	    printf("#define mpz_and_BPC(c) mpz_and(c, c, cell_and)\n");
+	} else {
+	    printf("#ifndef BPC\n");
+	    printf("#define BPC %d\n", bpc);
+	    printf("#endif\n");
+	    printf("#if BPC > 0\n");
+	    printf("enum { CellsTooSmall=1/((BPC)>=32) };\n");
+	    printf("static mpz_t cell_and;\n");
+	    printf("#define mpz_and_BPC(c) mpz_and(c, c, cell_and)\n");
+	    printf("#else\n");
+	    printf("#define mpz_and_BPC(c)\n");
+	    printf("#endif\n");
+	}
 	puts("");
 
 	/* This from mini-gmp */
