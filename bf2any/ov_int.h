@@ -10,9 +10,19 @@
  * Hopefully I haven't introduced any bugs.
  */
 
+/* See if we have any help from the compiler */
+#ifndef __has_builtin
+  #define __has_builtin(x) 0  // Compatibility with non-clang compilers.
+#endif
+
 static inline
 signed int ov_imul(signed int a, signed int b, int * ov) {
 
+#if __has_builtin(__builtin_smul_overflow)
+  int r = INT_MIN;
+  *ov = *ov || __builtin_smul_overflow(a, b, &r);
+  return r;
+#else
   /* Propagate overflow indicator */
   if (*ov) return INT_MIN;
 
@@ -47,11 +57,17 @@ signed int ov_imul(signed int a, signed int b, int * ov) {
   } /* End if a is nonpositive */
 
   return a * b;
+#endif
 }
 
 static inline
 signed int ov_iadd(signed int a, signed int b, int * ov) {
 
+#if __has_builtin(__builtin_sadd_overflow)
+  int r = INT_MIN;
+  *ov = *ov || __builtin_sadd_overflow(a, b, &r);
+  return r;
+#else
   /* Propagate overflow indicator */
   if (*ov) return INT_MIN;
 
@@ -64,11 +80,17 @@ signed int ov_iadd(signed int a, signed int b, int * ov) {
   } else {
     return a + b;
   }
+#endif
 }
 
 static inline
 signed int ov_isub(signed int a, signed int b, int * ov) {
 
+#if __has_builtin(__builtin_ssub_overflow)
+  int r = INT_MIN;
+  *ov = *ov || __builtin_ssub_overflow(a, b, &r);
+  return r;
+#else
   /* Propagate overflow indicator */
   if (*ov) return INT_MIN;
 
@@ -80,6 +102,7 @@ signed int ov_isub(signed int a, signed int b, int * ov) {
   } else {
     return a - b;
   }
+#endif
 }
 
 static inline
@@ -121,4 +144,3 @@ signed int ov_ineg(signed int a, int * ov) {
   }
   return -a;
 }
-
