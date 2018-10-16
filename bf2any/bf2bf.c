@@ -263,7 +263,7 @@ static const char * doubler_copy_LXXH[] =
     ">[-]>[-]<<"
     };
 
-/* 12 cost, cells in LXXH order */
+/* 12 cost, cells in LXXH order, no tmpzero */
 static const char * doubler_12nz[] =
     {">>>>", "<<<<", ">+<+[>-]>[->>+<]<<", ">+<[>-]>[->>-<]<<-",
     ".", ">>>[-]<<<[-],",
@@ -271,7 +271,7 @@ static const char * doubler_12nz[] =
     ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "]<",
     0};
 
-/* 12 cost, cells in LXXH order, uses "[>]" */
+/* 12 cost, cells in HXXL order, uses "[>]", no tmpzero */
 static const char * doubler_12r[] =
     {">>>>", "<<<<", ">>+>+[<-]<[-<<+>]<", ">>+>[<-]<[-<<->]>>-<<<",
     ">>>.<<<", "[-]>>>[-],<<<",
@@ -279,7 +279,7 @@ static const char * doubler_12r[] =
     ">>+>[<-]<[-<+<[>-]>[>]<[->+<]]>-" "]<<",
     0};
 
-/* 17 cost, cells in XXLHXX order uses [>] */
+/* 17 cost, cells in XXLHXX order uses [>], no tmpzero */
 static const char * doubler_17a[] =
     {
     ">>>>", "<<<<",
@@ -289,7 +289,7 @@ static const char * doubler_17a[] =
     ">>[>>+<<<]>>>[>]<[->+<]<[<<+>>>]<<<[<]>>>>>[-<<<<+>>>>]<<<<" "]<",
     0};
 
-/* 17 cost, cells in XXLHXX order */
+/* 17 cost, cells in XXLHXX order, no tmpzero */
 static const char * doubler_17b[] =
     {
     ">>>>", "<<<<",
@@ -311,7 +311,7 @@ static const char * doubler_copy[] =
     "[-]>>>[-]<<<"
     };
 
-/* Copy cell cost, cells in XLHX order */
+/* Copy cell cost, cells in XLHX order, no tmpzero */
 static const char * doubler_copynz[] =
     {
     ">>>", "<<<",
@@ -322,7 +322,7 @@ static const char * doubler_copynz[] =
     ">[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<" "]",
     0};
 
-/* Copy cell cost(+), cells in XLHX..X order */
+/* Copy cell cost(+), cells in XLHX..X order, no tmpzero */
 /* http://esolangs.org/wiki/Brainfuck_bitwidth_conversions  */
 static const char * doubler_esolang[] =
     {
@@ -338,7 +338,7 @@ static const char * doubler_esolang[] =
 	  "[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<" "[[-]<<<+>>>]<<<" "]",
     0};
 
-/* Copy cell cost, cells in XLMNHX order */
+/* Copy cell cost, cells in XLMNHX order, with tmpzero */
 static const char * bfquadz[] = {
     ">>>>>", "<<<<<",
 
@@ -359,7 +359,7 @@ static const char * bfquadz[] = {
     "[-]>>>>>[-]<<<<<"
     };
 
-/* Copy cell cost, cells in XLMNHX order */
+/* Copy cell cost, cells in XLMNHX order, no tmpzero */
 static const char * bfquadnz[] = {
     ">>>>>", "<<<<<",
 
@@ -435,6 +435,12 @@ fn_check_arg(const char * arg)
 	    /* This enables BF style optimisation of '<' and '>' on OUTPUT */
 	    if (L_BASE == L_BF || L_BASE == L_BFCHARS || L_BASE == L_DOWHILE)
 		enable_bf_mov = 1;
+	}
+
+	if (L_BASE == L_BFRLE || L_BASE == L_HANOILOVE || L_BASE == L_BINRLE ||
+	    L_BASE == L_BFXML || (langclass & C_ADDRLE) == C_ADDRLE)
+	{
+	    be_interface.disable_fe_optim = 0;
 	}
 
 	return 1;
@@ -969,40 +975,40 @@ bftranslate(int ch, int count)
 	if ((bf_multi & 6) == 6) {
 	    /* This generates 65536 to check for larger than 16bit cells. */
 	    pc(0); puts("// This generates 65536 to check for larger than 16bit cells");
-	    pmc(">[-]<[-]++[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]+>[");
-	    pmc(">\n\n");
+	    pmc("[-]>[-]++[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[");
+	    pmc("[-]\n\n");
 
 	    pc(0); puts("// This code may be replaced by the original source");
 	    lang = bfout; bfreprint();
 	    pc('\n'); puts("// to here");
 
-	    pmc("\n<[-]]<\n\n");
+	    pmc("\n[-]]\n\n");
 
+	    /* I generate 256 and 65536 to test for mid sized cells.
+	     * The method used can be optimised all the way to zero by bf2any's
+	     * constant folding. NB: bf2any never uses 16bit cells. */
 	    pc(0); puts("// This section is cell doubling for 16bit cells");
-	    /* This generates 256 to check for larger than byte cells. */
-	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]<[");
+	    pmc(">[-]>[-]<<[-]++++++++[>++++++++<-]>[<++++>-]<[->+>+<<]");
+	    pmc(">[<++++++++>-]<[>++++++++<-]>[<++++>-]>[<+>[-]]<<[>[-]<[-]]>[-<+>]<");
 
-	    /* This generates 65536 to check for cells upto 16 bits */
-	    pmc("[-]>[-]++[<++++++++>-]<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]+<[>-<[-]]>[");
-	    pmc(">");
+	    pmc("[[-]");
 	    pmc("\n\n");
 
 	    lang = doubler;
 	    if (bf_multi & 8) bfpackprint(); else bfreprint();
 
 	    pmc("\n\n");
-	    pmc("<[-]]<");
 	    pmc("[-]]\n\n");
 
 	    pc(0); puts("// This section is cell quadrupling for 8bit cells");
 	    /* This generates 256 to check for cells upto 8 bits */
-	    pmc(">[-]<[-]++++++++[>++++++++<-]>[<++++>-]+<[>-<[-]]>[>");
+	    pmc("[-]>[-]++++++++[<++++++++>-]<[>++++<-]+>[<->[-]]<[[-]");
 	    pmc("\n\n");
 
 	    lang = bfquad; bfreprint();
 
 	    pmc("\n\n");
-	    pmc("<[-]]<");
+	    pmc("[-]]");
 	} else if ((bf_multi & 0xF) == 10) {
 	    bfpackprint();
 	} else if ((bf_multi & 7) != 5) {
@@ -1040,11 +1046,11 @@ bftranslate(int ch, int count)
 	} else {
 	    /* Eight bit and thirty two bit. */
 	    /* This condition is a bit more difficult to optimise and a bit
-	     * smaller than the simple multiply list above.
-	     * It checks for binary cells of 16bits or less. */
-	    pc(0); puts("// This generates 65536 to check for larger than 16bit cells");
-	    pmc("++>>+++++[-<<[->++++++++<]>[-<+>]>]<");
-	    pmc("+<[[-]>>");
+	     * smaller than the simple multiply lists above.
+	     * It checks for binary cells of 24bits or less. */
+	    pc(0); puts("// This generates 16777216 to check for larger than 24bit cells");
+	    pmc("+>>++++++++[-<<[->++++++++<]>[-<+>]>]<");
+	    pmc("+<[[-]>[-]<");
 	    pmc("\n\n");
 
 	    lang = bfout;
@@ -1053,14 +1059,14 @@ bftranslate(int ch, int count)
 	    /* This is an "else" condition, the code cannot be resequenced */
 	    pmc("\n\n");
 	    pc(0); puts("// This is an else condition linked to the start of the file");
-	    pmc("<[-]<[-]]>[>");
+	    pmc(">[-]<[-]]>[[-]<");
 	    pmc("\n\n");
 
 	    lang = bfquad;
 	    bfreprint();
 
 	    pmc("\n\n");
-	    pmc("<[-]]<");
+	    pmc(">[-]]<");
 	}
     }
 }
