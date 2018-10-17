@@ -10,7 +10,9 @@ struct be_interface_s be_interface = { .check_arg = fn_check_arg};
 
 static int c_header = 0;
 static int no_quote = 0;
+static int no_mov = 0;
 static int data_dump = 0;
+static int tokens = 1;
 static int col = 0;
 static int maxcol = 76;
 
@@ -19,20 +21,29 @@ static void ddump(int ch, int count);
 static int
 fn_check_arg(const char * arg)
 {
-    if (strcmp(arg, "-no-be") == 0) { be_interface.disable_be_optim = 1; return 1; }
+    if (strcmp(arg, "-no-be") == 0) {
+	be_interface.disable_be_optim = 1;
+	no_quote = 1;
+	return 1;
+    }
     if (strcmp(arg, "-no-q") == 0) { no_quote = 1; return 1; }
+    if (strcmp(arg, "-no-mov") == 0) { no_mov = 1; return 1; }
+    if (strcmp(arg, "-q") == 0) { no_quote = 0; return 1; }
     if (strcmp(arg, "-int") == 0) { be_interface.cells_are_ints = 1; return 1; }
     if (strcmp(arg, "-dd") == 0) { data_dump = 1; return 1; }
     if (strcmp(arg, "-c") == 0) { c_header = 1; return 1; }
+    if (strcmp(arg, "-c-only") == 0) { tokens = 0; c_header = 1; return 1; }
     if (strcmp(arg, "-#") == 0) return 1;
 
     if (strcmp(arg, "-h") == 0) {
         fprintf(stderr, "%s\n",
         "\n\t"  "-no-be  Turn off BE optimisation."
         "\n\t"  "-no-q   Turn off \" command."
+        "\n\t"  "-no-mov Turn off move optimisation."
         "\n\t"  "-int    Turn on cell==int flag."
         "\n\t"  "-#      Enable debug flag."
         "\n\t"  "-c      Add a C header for compiling."
+        "\n\t"  "-c-only Only print C code."
         "\n\t"  "-dd     Data dump mode."
 	);
 	return 1;
@@ -57,28 +68,33 @@ static int ind = 0;
 
     if (data_dump) { ddump(ch, count); return; }
 
-    if (ch == '!' && c_header && bytecell)
-	printf("%s\n",  "#include<stdio.h>"
+    if (ch == '!' && c_header)
+    {
+	if (bytecell)
+	    printf("%s\n",  "#include<stdio.h>"
 		"\n"	"#define I(a,b)"
 		"\n"	"#define putch(x) putchar(x)"
 		"\n"	"#define getch(x) {int a; a=getchar();if(a!=EOF) x=a;}"
-		"\n"	"static unsigned char mem[30000], *m=mem, v;"
-		"\n"	"int"
-		"\n"	"main()");
+		"\n"	"static unsigned char mem[30000], *m=mem, v;");
 
-    if (ch == '!' && c_header && !bytecell)
-	printf("%s\n",  "#include<stdio.h>"
+	if (!bytecell)
+	    printf("%s\n",  "#include<stdio.h>"
 		"\n"	"#define I(a,b)"
 		"\n"	"#define putch(x) putchar((char)x)"
 		"\n"	"#define getch(x) {int a; a=getchar();if(a!=EOF) x=a;}"
-		"\n"	"static unsigned int mem[30000], *m=mem, v;"
-		"\n"	"int"
-		"\n"	"main()");
+		"\n"	"static unsigned int mem[30000], *m=mem, v;");
 
-    printf("I('%c', %d)\t", ch, count);
+	if (tokens) printf("\t\t");
+	puts("int main()");
+    }
 
-    move_opt(&ch, &count, &mov);
-    if (ch == 0) { putchar('\n'); return; }
+    if (tokens)
+	printf("I('%c', %d)\t", ch, count);
+
+    if (!no_mov) {
+	move_opt(&ch, &count, &mov);
+	if (ch == 0) { if(tokens) putchar('\n'); return; }
+    }
 
     if (ch == ']' || ch == '~' || ch == 'E') ind--;
     printf("%*s", ind*2, "");
@@ -115,9 +131,11 @@ static int ind = 0;
 
     case ']':
 	if (count > 0)
-	    printf("  m += %d;\n%9s\t%*s", count, "", ind*2, "");
+	    printf("  m += %d;\n", count);
 	else if (count < 0)
-	    printf("  m -= %d;\n%9s\t%*s", -count, "", ind*2, "");
+	    printf("  m -= %d;\n", -count);
+	if (count)
+	    printf("%s%*s", tokens?"\t\t":"", ind*2, "");
 	printf("} /* %s */\n", cell(mov));
 	break;
 
@@ -127,15 +145,17 @@ static int ind = 0;
 	break;
     case 'E':
 	if (count > 0)
-	    printf("  m += %d;\n%9s\t%*s", count, "", ind*2, "");
+	    printf("  m += %d;\n", count);
 	else if (count < 0)
-	    printf("  m -= %d;\n%9s\t%*s", -count, "", ind*2, "");
+	    printf("  m -= %d;\n", -count);
+	if (count)
+	    printf("%s%*s", tokens?"\t\t":"", ind*2, "");
 	printf("} /* %s */\n", cell(mov));
 	break;
 
     case '"':
-	if (be_interface.disable_be_optim || no_quote) {
-	    puts("/* Ignored */");
+	if (no_quote) {
+	    puts("/* Ignored string. */");
 	    break;
 	}
 
