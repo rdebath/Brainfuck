@@ -101,8 +101,9 @@ bfi.dc.o: bfi.dc.c bfi.tree.h bfi.run.h bfi.dc.h
 bfi.nasm.o: bfi.nasm.c bfi.tree.h bfi.nasm.h
 bfi.dd.o: bfi.dd.c bfi.tree.h
 bfi.runarray.o: bfi.runarray.c bfi.tree.h bfi.run.h bfi.runarray.h \
-    clock.h bfi.execloop.h
-bfi.runmax.o: bfi.runmax.c bfi.tree.h bfi.run.h bfi.runmax.h ov_int.h clock.h
+    clock.h bfi.execloop.h big_int.h
+bfi.runmax.o: bfi.runmax.c bfi.tree.h bfi.run.h bfi.runmax.h \
+    ov_int.h clock.h big_int.h
 bfi.dd.o: bfi.dd.c bfi.tree.h bfi.run.h bfi.dd.h
 bfi.openssl.o: bfi.openssl.c bfi.tree.h bfi.run.h bfi.openssl.h clock.h
 

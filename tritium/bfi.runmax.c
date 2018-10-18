@@ -1,15 +1,6 @@
 /*
- * This file contains three interpretation engines, they are slow,
- * but have large cells with few limitations.
- *
- * The first "maxtree" uses the largest builtin C type it can find for
- * the basic cell with a bitmask so that it can use any bitsize upto
- * that size.
- *
- * The second "supertree" uses the openssl BIGNUM implementation to
- * support any bitsize upto physical memory limits.
- *
- * The third is an alternate "supertree" which doesn't use any library.
+ * This file contains an interpretation engine that is slow but has
+ * large cells. It doesn't use any external library.
  */
 
 #include <stdio.h>
@@ -23,123 +14,26 @@
 #include "bfi.runmax.h"
 #include "clock.h"
 #include "ov_int.h"
-
-#ifdef __STDC__
-#include <limits.h>
-/* LLONG_MAX came in after inttypes.h, limits.h is very old. */
-#if _POSIX_VERSION >= 199506L || defined(LLONG_MAX)
-#include <inttypes.h>
-#endif
-#endif
-
-#ifndef C
-#ifdef __SIZEOF_INT128__
-#define C unsigned __int128
-#else
-#ifdef _UINT128_T
-#define C __uint128_t
-#else
-#if defined(ULLONG_MAX) || defined(__LONG_LONG_MAX__)
-#define C unsigned long long
-#else
-#if defined(UINTMAX_MAX)
-#define C uintmax_t
-#else
-#define C unsigned long
-#endif
-#endif
-#endif
-#endif
-#endif
+#include "big_int.h"
+#include "bfi.runarray.h"
 
 static void run_supertree(void);
 
 /*
- * This is a simple tree based interpreter with big cells.
+ * First check if convert_tree_to_runarray() has an extended cell variant.
  */
 void
 run_maxtree(void)
 {
-    C *p, mask = 0;
-    struct bfi * n = bfprog;
-
-    mask = ~mask;
-    if (cell_length > (int)(sizeof(C))*CHAR_BIT) {
-	run_supertree();
+    if (cell_length <= (int)(sizeof(C))*CHAR_BIT) {
+	if (verbose)
+	    fprintf(stderr, "Extended array interpreter: %d byte int/cell\n",
+			    (int)sizeof(C));
+	convert_tree_to_runarray();
 	return;
     }
-    if (cell_length < (int)(sizeof(C))*CHAR_BIT) {
-	mask = ~( ((C)-1) << cell_length);
-    }
 
-    if (verbose)
-	fprintf(stderr, "Maxtree variant: %d byte int/cell\n",
-			(int)sizeof(C));
-
-    only_uses_putch = 1;
-    p = map_hugeram();
-    start_runclock();
-
-    while(n) {
-	switch(n->type)
-	{
-	    case T_MOV: p += n->count; break;
-	    case T_ADD: p[n->offset] += n->count; break;
-	    case T_SET: p[n->offset] = n->count; break;
-	    case T_CALC:
-		p[n->offset] = n->count
-			    + n->count2 * p[n->offset2]
-			    + n->count3 * p[n->offset3];
-		break;
-	    case T_CALCMULT:
-		p[n->offset] = n->count
-			    + n->count2 * p[n->offset2]
-			    * n->count3 * p[n->offset3];
-		break;
-
-	    case T_IF: case T_MULT: case T_CMULT:
-
-	    case T_WHL: if((p[n->offset] & mask) == 0) n=n->jmp;
-		break;
-
-	    case T_END: if((p[n->offset] & mask) != 0) n=n->jmp;
-		break;
-
-	    case T_ENDIF:
-		break;
-
-	    case T_CHR:
-		putch(n->count);
-		break;
-	    case T_PRT:
-		putch(p[n->offset]);
-		break;
-	    case T_INP:
-		{   /* Cell may be too large for an int */
-		    int ch = -256;
-		    ch = getch(ch);
-		    if (ch != -256) p[n->offset] = ch;
-		}
-		break;
-
-	    case T_STOP:
-		fprintf(stderr, "STOP Command executed.\n");
-		exit(1);
-
-	    case T_NOP:
-	    case T_DUMP:
-		break;
-
-	    default:
-		fprintf(stderr, "Execution error:\n"
-		       "Bad node: type %s: ptr+%d, cnt=%d.\n",
-			tokennames[n->type], n->offset, n->count);
-		exit(1);
-	}
-	n = n->next;
-    }
-
-    finish_runclock(&run_time, &io_time);
+    run_supertree();
 }
 
 /******************************************************************************/
@@ -163,10 +57,6 @@ typedef unsigned int uint_cell;
 typedef C uint_cell;
 #define NO_BIG_INT
 #endif
-
-/*
- * Another simple tree based interpreter, this one is definitly slow.
- */
 
 typedef struct { char f; int v; uint_cell * b[1]; } mem_cell;
 static mem_cell * mem = 0;

@@ -1,8 +1,12 @@
 
 #ifdef FNAME
 
+#ifndef COOLFUNC
 #if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
 __attribute__((optimize(3),hot))
+#endif
+#else
+#undef COOLFUNC
 #endif
 
 static void
@@ -11,6 +15,10 @@ FNAME(int * p, void * mem)
     register icell * m = mem;
 #ifdef DYNAMIC_MASK
     const icell msk = (icell)cell_mask;
+#define M(x) ((x) &= msk)
+#define MS(x) ((x) & msk)
+#elif defined(EXTENDED_MASK)
+    const icell msk = ((icell)2 << (cell_length-1)) - 1;
 #define M(x) ((x) &= msk)
 #define MS(x) ((x) & msk)
 #else

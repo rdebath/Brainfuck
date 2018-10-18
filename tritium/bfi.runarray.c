@@ -3,12 +3,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <limits.h>
 
 #include "bfi.tree.h"
 #include "bfi.run.h"
 #include "bfi.runarray.h"
 #include "clock.h"
+#include "big_int.h"
 
 #define FNAME run_intprog
 #define icell   unsigned int
@@ -29,6 +29,15 @@
 #undef FNAME
 #undef icell
 #undef DYNAMIC_MASK
+
+#define FNAME run_supermask
+#define icell   C
+#define EXTENDED_MASK
+#define COOLFUNC
+#include "bfi.execloop.h"
+#undef FNAME
+#undef icell
+#undef EXTENDED_MASK
 
 void
 convert_tree_to_runarray(void)
@@ -240,8 +249,10 @@ convert_tree_to_runarray(void)
 	run_charprog(progarray, map_hugeram());
     } else if (cell_size == sizeof(int)*CHAR_BIT) {
 	run_intprog(progarray, map_hugeram());
-    } else {
+    } else if (cell_length <= sizeof(int)*CHAR_BIT) {
 	run_maskprog(progarray, map_hugeram());
+    } else {
+	run_supermask(progarray, map_hugeram());
     }
     finish_runclock(&run_time, &io_time);
     free(progarray);
