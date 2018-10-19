@@ -152,6 +152,7 @@ static inline void BI_set_int(uint_cell ** m, int v)
 
 static inline void BI_copy(uint_cell ** a, uint_cell ** b)
 {
+    if (*a == *b) return;
     if (!*b) BI_zero(a);
     else {
 	BI_init(a);
@@ -480,59 +481,64 @@ run_supertree(void)
 		    }
 		}
 
-		if (n->count2 && !m[n->offset2].f) {
-		    m[n->offset2].f = 1;
-		    BI_set_int(m[n->offset2].b, m[n->offset2].v);
-		}
-		if (n->count3 && !m[n->offset3].f) {
-		    m[n->offset3].f = 1;
-		    BI_set_int(m[n->offset3].b, m[n->offset3].v);
-		}
+		{
+		    uint_cell ** m2 = m[n->offset2].b;
+		    uint_cell ** m3 = m[n->offset3].b;
 
-		m[n->offset].f = 1;
-		if (n->count == 0 && n->count2 == 1) {
-		    if (n->offset == n->offset2) {
-			if (n->count3 == 1) {
-			    BI_add(m[n->offset].b, m[n->offset3].b);
-			    break;
-			}
-			if (n->count3 == -1) {
-			    BI_sub(m[n->offset].b, m[n->offset3].b);
-			    break;
-			}
-		    } else if (n->count3 == 0) {
-			BI_copy(m[n->offset].b, m[n->offset2].b);
-			break;
+		    if (n->count2 && !m[n->offset2].f) {
+			m2 = t2;
+			BI_set_int(m2, m[n->offset2].v);
 		    }
+		    if (n->count3 && !m[n->offset3].f) {
+			m3 = t3;
+			BI_set_int(m3, m[n->offset3].v);
+		    }
+
+		    m[n->offset].f = 1;
+		    if (n->count == 0 && n->count2 == 1) {
+			if (n->offset == n->offset2) {
+			    if (n->count3 == 1) {
+				BI_add(m[n->offset].b, m3);
+				break;
+			    }
+			    if (n->count3 == -1) {
+				BI_sub(m[n->offset].b, m3);
+				break;
+			    }
+			} else if (n->count3 == 0) {
+			    BI_copy(m[n->offset].b, m2);
+			    break;
+			}
+		    }
+
+		    BI_set_int(t1, n->count);
+
+		    if (n->count2 == 1) {
+			BI_add(t1, m2);
+		    } else if (n->count2 > 0) {
+			BI_copy(t2, m2);
+			BI_mul_uint(t2, n->count2);
+			BI_add(t1, t2);
+		    } else if (n->count2 < 0) {
+			BI_copy(t2, m2);
+			BI_mul_uint(t2, -n->count2);
+			BI_sub(t1, t2);
+		    }
+
+		    if (n->count3 == 1) {
+			BI_add(t1, m3);
+		    } else if (n->count3 > 0) {
+			BI_copy(t3, m3);
+			BI_mul_uint(t3, n->count3);
+			BI_add(t1, t3);
+		    } else if (n->count3 < 0) {
+			BI_copy(t3, m3);
+			BI_mul_uint(t3, -n->count3);
+			BI_sub(t1, t3);
+		    }
+
+		    BI_copy(m[n->offset].b, t1);
 		}
-
-		BI_set_int(t1, n->count);
-
-		if (n->count2 == 1) {
-		    BI_add(t1, m[n->offset2].b);
-		} else if (n->count2 > 0) {
-		    BI_copy(t2, m[n->offset2].b);
-		    BI_mul_uint(t2, n->count2);
-		    BI_add(t1, t2);
-		} else if (n->count2 < 0) {
-		    BI_copy(t2, m[n->offset2].b);
-		    BI_mul_uint(t2, -n->count2);
-		    BI_sub(t1, t2);
-		}
-
-		if (n->count3 == 1) {
-		    BI_add(t1, m[n->offset3].b);
-		} else if (n->count3 > 0) {
-		    BI_copy(t3, m[n->offset3].b);
-		    BI_mul_uint(t3, n->count3);
-		    BI_add(t1, t3);
-		} else if (n->count3 < 0) {
-		    BI_copy(t3, m[n->offset3].b);
-		    BI_mul_uint(t3, -n->count3);
-		    BI_sub(t1, t3);
-		}
-
-		BI_copy(m[n->offset].b, t1);
 		break;
 
 	    case T_CALCMULT:
@@ -636,10 +642,8 @@ run_supertree(void)
 
     {
 	int i;
+	BI_free(t1); BI_free(t2); BI_free(t3);
 	for(i=0; i<dyn_memsize; i++) BI_free(mem[i].b);
 	free(mem);
-	if (*t1) free(*t1);
-	if (*t2) free(*t2);
-	if (*t3) free(*t3);
     }
 }
