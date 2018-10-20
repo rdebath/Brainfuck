@@ -285,8 +285,19 @@ run_openssltree(void)
 	    case T_PRT:
 		if (iostyle == 3) {
 		    char * dec_num;
-		    if(do_mask)
+		    if(do_mask) {
 			BN_mask_bits(m[n->offset], cell_length);
+			if (BN_is_negative(m[n->offset])) {
+			    if (!BN_set_word(t2, 2))
+				goto BN_op_failed;
+			    if (!BN_set_word(t3, cell_length))
+				goto BN_op_failed;
+			    if(!BN_exp(t1, t2, t3, BNtmp))
+				goto BN_op_failed;
+			    if(!BN_nnmod(m[n->offset], m[n->offset], t1, BNtmp))
+				goto BN_op_failed;
+			}
+		    }
 		    dec_num = BN_bn2dec(m[n->offset]);
 		    printf("%s\n", dec_num);
 		    OPENSSL_free(dec_num);

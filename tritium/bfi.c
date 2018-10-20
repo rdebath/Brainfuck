@@ -4031,7 +4031,7 @@ print_codedump(void)
 int
 getch(int oldch)
 {
-    int c = EOF;
+    int c = 0, goteof = 0;
     /* The "standard" getwchar() is really dumb, it will refuse to read
      * characters from a stream if getchar() has touched it first.
      * It does this EVEN if this is an ASCII+Unicode machine.
@@ -4044,7 +4044,7 @@ getch(int oldch)
     if (input_string) {
 	char * p = 0;
 	c = (unsigned char)*input_string;
-	if (c == 0) c = EOF;
+	if (c == 0) goteof = 1;
 	else
 	    p = strdup(input_string+1);
 	free(input_string);
@@ -4059,7 +4059,7 @@ getch(int oldch)
 	    int rv;
 	    rv = scanf("%d", &c);
 	    if (rv == EOF || rv == 0)
-		c = EOF;
+		goteof = 1;
 	    else
 		c = UM(c);
 	} else
@@ -4069,21 +4069,24 @@ getch(int oldch)
 	    wchar_t wch = EOF;
 	    rv = scanf("%lc", &wch);
 	    if (rv == EOF)
-		c = EOF;
+		goteof = 1;
 	    else if (rv == 0)
 		continue;
 	    else
 		c = wch;
 	} else
 #endif
+	{
 	    c = getchar();
+	    if (c == EOF) goteof = 1;
+	}
 
 	if (iostyle < 2 && c == '\r') continue;
 	break;
     }
     unpause_runclock();
 
-    if (c != EOF) return c;
+    if (!goteof) return c;
     switch(eofcell)
     {
     case 2: return -1;

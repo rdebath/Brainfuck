@@ -14,7 +14,8 @@ X(openssl,OPENSSL,
     case c_openssl: run_openssltree(); break;                           )
 #if XX == 4
     if (do_run == -1 && do_codestyle == c_default &&
-            cell_length > 256 && cell_length<64*1024*1024 &&
+            (cell_length > 256 ||(cell_length>32 && iostyle == 3)) &&
+            cell_length<64*1024*1024 &&
             verbose<3 && !enable_trace && !debug_mode) {
         do_run = 1;
         do_codestyle = c_openssl;
