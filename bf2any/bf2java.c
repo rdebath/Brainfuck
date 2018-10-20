@@ -20,7 +20,8 @@
  */
 #define MAXINSTR (12+65536/80)
 
-struct be_interface_s be_interface = {};
+static check_arg_t fn_check_arg;
+struct be_interface_s be_interface = {.check_arg = fn_check_arg};
 
 struct instruction {
     int ch;
@@ -37,6 +38,10 @@ static int icount = 0;
 static int do_input = 0;
 static int do_output = 0;
 
+static const char * packagename = "xz.bf2any.generated";
+static const char * classname = "brainfuck";
+static const char * public_class= "public ";
+
 static int ind = 0;
 #define I        printf("%*s", ind*4, "")
 #define prv(s,v) printf("%*s" s "\n", ind*4, "", (v))
@@ -45,6 +50,37 @@ static void reformat(void);
 static void loutcmd(int ch, int count, struct instruction *n);
 static void add_cstring(char *);
 static void print_cstring(char *);
+
+static int
+fn_check_arg(const char * arg)
+{
+    if (strcmp("-h", arg) ==0) {
+	fprintf(stderr, "%s\n",
+	"\t"	"-private Private class"
+	"\n\t"	"-public  Public class"
+	"\n\t"	"-Cname   Set class name"
+	"\n\t"	"-Pname   Set package name"
+	);
+	return 1;
+    }
+    if (strcmp("-private", arg) == 0) {
+	public_class = "";
+	return 1;
+    }
+    if (strcmp("-public", arg) == 0) {
+	public_class = "public ";
+	return 1;
+    }
+    if (strncmp("-P", arg, 2) ==0) {
+	packagename = arg+2;
+	return 1;
+    }
+    if (strncmp("-C", arg, 2) ==0) {
+	classname = arg+2;
+	return 1;
+    }
+    return 0;
+}
 
 static struct instruction *
 node_calloc(void)
@@ -282,13 +318,16 @@ loutcmd(int ch, int count, struct instruction *n)
     switch(ch) {
     case '!':
 
+	if (packagename && *packagename)
+	    printf("package %s;\n\n", packagename);
+
 	if (bytecell) {
-	    printf("%s\n",
+	    printf("%s%s%s%s%s\n",
 			"import java.io.InputStream;"
 		"\n"	"import java.io.OutputStream;"
 		"\n"	"import java.io.IOException;"
 		"\n"
-		"\n"	"public class fuck {"
+		"\n"	"",public_class,"class ",classname," {"
 		"\n"	"    static byte[] m;"
 		"\n"	"    static int p;"
 		"\n"	"    static byte v;");
@@ -310,12 +349,12 @@ loutcmd(int ch, int count, struct instruction *n)
 		"\n");
 
 	} else {
-	    printf("%s\n",
+	    printf("%s%s%s%s%s\n",
 			"import java.io.InputStream;"
 		"\n"	"import java.io.OutputStream;"
 		"\n"	"import java.io.IOException;"
 		"\n"
-		"\n"	"public class fuck {"
+		"\n"	"",public_class,"class ",classname," {"
 		"\n"	"    static int[] m;"
 		"\n"	"    static int p;"
 		"\n"	"    static int v;"
