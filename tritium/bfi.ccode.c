@@ -28,6 +28,7 @@
 #include <signal.h>
 #endif
 
+typedef void (*void_func)(void);
 static const char * putname = "putch";
 static int fixed_mask = 0;
 static int mask_defined = 1;
@@ -1320,7 +1321,6 @@ run_ccode(void)
 #endif
 
 #ifndef DISABLE_TCCLIB
-typedef void (*void_func)(void);
 
 static void
 run_tccode(void)
@@ -1332,9 +1332,6 @@ run_tccode(void)
     TCCState *s;
     int rv;
     void * memp;
-#ifdef __STRICT_ANSI__
-    void * iso_workaround;
-#endif
 
     libtcc_specials = 1;
 
@@ -1359,29 +1356,19 @@ run_tccode(void)
      * to standard mode, stupidly, it's now impossible to switch it back.
      *
      * So have the loaded C code use our getch and putch functions.
-     *
-     * The ugly casting is forced by the C99 standard as a (void*) is not a
-     * valid cast for a function pointer.
      */
 
-#ifdef __STRICT_ANSI__
-    *(void_func*) &iso_workaround  = (void_func) &getch;
-    tcc_add_symbol(s, "getch", iso_workaround);
-    *(void_func*) &iso_workaround  = (void_func) &putch;
-    tcc_add_symbol(s, "putch", iso_workaround);
-#else
+#if !defined(__STRICT_ANSI__) && defined(TCC_RELOCATE_AUTO)
     tcc_add_symbol(s, "getch", &getch);
     tcc_add_symbol(s, "putch", &putch);
 
-#if defined(__TCCLIB_VERSION) && __TCCLIB_VERSION == 0x000925
-#define TCCDONE
     {
 	int (*func)(void);
 	int imagesize;
 	void * image = 0;
 
 	if (verbose)
-	    fprintf(stderr, "Running C Code using libtcc 9.25.\n");
+	    fprintf(stderr, "Running C Code using libtcc\n");
 
 	imagesize = tcc_relocate(s, 0);
 	if (imagesize <= 0) {
@@ -1415,57 +1402,32 @@ run_tccode(void)
 	finish_runclock(&run_time, &io_time);
 	free(image);
     }
-#endif
 
-#if defined(__TCCLIB_VERSION) && __TCCLIB_VERSION == 0x000926
-#define TCCDONE
+#else /* __STRICT_ANSI__ */
+
+    /* If we're compiled under __STRICT_ANSI__ or version 9.26 of libtcc the
+     * above code doesn't compile. This is a, rather nasty, fallback. */
     {
-	int (*func)(void);
-
-	if (verbose)
-	    fprintf(stderr, "Running C Code using libtcc 9.26.\n");
-
-	rv = tcc_relocate(s);
-	if (rv) {
-	    perror("tcc_relocate()");
-	    fprintf(stderr, "tcc_relocate failed return value=%d\n", rv);
-	    exit(1);
-	}
-
+	static char arg0_tcclib[] = "tcclib";
+	static char * args[] = {arg0_tcclib, 0};
 	/*
-	 * The ugly casting is forced by the C99 standard as a (void*) is not a
-	 * valid cast for a function pointer.
-	*(void **) (&func) = tcc_get_symbol(s, "main");
+	    Hmm, I wanted to do the above without named initialisers ...
+	    so it looks like this ... but without the const problem.
+
+	    static char * args[] = {"tcclib", 0};
 	 */
-	func = tcc_get_symbol(s, "main");
+	void * iso_workaround;
 
-	if (!func) {
-	    fprintf(stderr, "Could not find compiled code entry point\n");
-	    exit(1);
-	}
-	start_runclock();
-	func();
-	finish_runclock(&run_time, &io_time);
-
-	tcc_delete(s);
-	free(ccode);
-    }
-#endif
-#endif
-
-#if !defined(TCCDONE)
-    {
-    static char arg0_tcclib[] = "tcclib";
-    static char * args[] = {arg0_tcclib, 0};
-    /*
-	Hmm, I want to do the above without named initialisers ... so it looks
-	like this ... but without the const problem.
-
-    static char * args[] = {"tcclib", 0};
-     */
+	/* The ugly casting is forced by the C99 standard as a (void*) is not a
+	 * valid cast for a function pointer.
+	 */
+	*(void_func*) &iso_workaround  = (void_func) &getch;
+	tcc_add_symbol(s, "getch", iso_workaround);
+	*(void_func*) &iso_workaround  = (void_func) &putch;
+	tcc_add_symbol(s, "putch", iso_workaround);
 
 	if (verbose)
-	    fprintf(stderr, "Running C Code using libtcc tcc_run() to compile & run.\n");
+	    fprintf(stderr, "Running C Code using libtcc tcc_run() to link & run.\n");
 
 	rv = tcc_run(s, 1, args);
 	if (verbose && rv)
