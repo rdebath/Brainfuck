@@ -225,6 +225,8 @@ move_tape(void)
     imov = 0;
 }
 
+static void failout(void) { fprintf(stderr, "STOP Command executed.\n"); exit(1); }
+
 /* Called from the front end as normal */
 void
 outcmd(int ch, int count)
@@ -360,6 +362,19 @@ outcmd(int ch, int count)
 	load_acc_offset(imov);
 	set_acc_offset(imov);
 	| sub REG_A, count
+	break;
+
+    case 'X':
+	|.if I386
+	| call &failout
+	|.else
+#if (defined(__code_model_small__) && !defined(__PIC__)) || defined(__ILP32__)
+	| mov   eax, (uintptr_t) failout
+#else
+	| mov64 rax, (uintptr_t) failout
+#endif
+	| call  rax
+	|.endif
 	break;
 
     case '[':
