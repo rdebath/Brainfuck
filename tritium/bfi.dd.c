@@ -26,7 +26,15 @@ print_dd(void)
 {
     struct bfi * n = bfprog;
 
-    printf("{ Code generated from %s }\n\n", bfname);
+    printf("{[ Code generated from %s ]}\n\n", bfname);
+
+    puts("{[    This is not brainfuck, use bf2any's -be-pipe option     ]}");
+    puts("{ ++++[>++++<-]>[>++>[++++++++>]++[<]>-]>>>>>>>++.<<<--.+.<<-- }");
+    puts("{ -----.<.>>>.<<.<.>>----.+.<+.<.>>>>.<<<--.>>>-.<.<-.>---.<<+ }");
+    puts("{ ++.>>---.<---.<<++++++++++++.------------.>.--.>>++.<<<.++++ }");
+    puts("{ +++++++++.>>>>+.<.<<<.>---.>--.<.>>.[>]<<.                [] }");
+    puts("\n");
+
 
     if (cell_size > 0)
 	outcmd('%', cell_size);
