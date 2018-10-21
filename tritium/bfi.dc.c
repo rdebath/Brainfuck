@@ -209,6 +209,21 @@ print_dc(void)
 	    save_cell(n->offset);
 	    break;
 
+	case T_LT:
+	    // Condition
+	    fprintf(ofd, "0[1+]SA\n");
+
+	    // a<b && A
+	    fetch_cell(n->offset2);
+	    fetch_cell(n->offset3);
+	    fprintf(ofd, ">A");
+	    fprintf(ofd, "0sALA1=A");	/* Drop top of "A" */
+
+	    // cell += flag
+	    fetch_cell(n->offset);
+	    fprintf(ofd, "+");
+	    save_cell(n->offset);
+	    break;
 
 	case T_IF: case T_MULT: case T_CMULT:
 	case T_WHL:
@@ -241,7 +256,7 @@ print_dc(void)
 	case T_PRT:
 	    fetch_cell(n->offset);
 	    if (use_lmx && cell_length<8) fprintf(ofd, "lmx ");
-	    if (no_v7)
+	    if (no_v7 && iostyle != 3)
 		fprintf(ofd, "aP\n");
 	    else {
 		fprintf(ofd, "lox\n");
@@ -321,7 +336,13 @@ print_dc(void)
 
     fprintf(ofd, "q]SF\n");
 
-    if (used_lox) {
+    if (iostyle == 3) {
+	/* Output and Input integers, -1 on EOF */
+	if (used_lox) fprintf(ofd, "[pd!=.]so\n");
+	if (used_lix) fprintf(ofd, "[? z [_1]SA 0=A 0sALA+ ]si\n");
+    }
+
+    if (used_lox && iostyle != 3) {
 	int i;
 	/* Setup the Z register with a script to create the C array */
 	fprintf(ofd, "[");
@@ -361,7 +382,7 @@ print_dc(void)
 	}
     }
 
-    if (used_lix) {
+    if (used_lix && iostyle != 3) {
 	if (input_string) {
 	    char * p = input_string;
 	    int c = 0;
@@ -379,10 +400,6 @@ print_dc(void)
 
 	    /* New for GNU dc, character I/O ... soon
 	    fprintf(ofd, "[1G [sB_1]SA [bAla]SB 0=A Bx 0sALAaBLB+ ]si\n");
-
-	    */
-	    /* Input integers, -1 on EOF
-	    // fprintf(ofd, "[? z [_1]SA 0=A 0sALA+ ]si\n");
 	    */
 	}
     }

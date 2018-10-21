@@ -48,6 +48,7 @@
 #define jit_addr jit_addr_i
 #define jit_andi jit_andi_i
 #define jit_extr_uc jit_extr_uc_i
+#define jit_ltr_u jit_ltr_ui
 
 #if !defined(__x86_64__) && !defined(__amd64__) && !defined(_M_AMD64) && !defined(_WIN32)
 #define JITLIBOK 1
@@ -72,6 +73,7 @@ static jit_state_t *_jit;
 #define REG_P   JIT_V1
 #define REG_ACC JIT_R0
 #define REG_A1	JIT_R1
+#define REG_A2	JIT_R2
 
 int gnulightning_ok = JITLIBOK;
 
@@ -336,6 +338,38 @@ run_gnulightning(void)
 	    fprintf(stderr, "Error on code generation:\n"
                    "Bad T_CALCMULT node with incorrect counts.\n");
             exit(99);
+            break;
+
+	case T_LT:
+	    if (n->count != 0 || n->count2 != 1 || n->count3 != 1) {
+		fprintf(stderr, "Error on code generation:\n"
+		       "Bad T_LT node with incorrect counts.\n");
+		exit(99);
+	    }
+
+	    load_acc_offset(n->offset);
+	    set_acc_offset(n->offset);
+
+	    if (tape_step > 1) {
+		jit_ldxi_i(REG_A1, REG_P, n->offset2 * tape_step);
+		jit_ldxi_i(REG_A2, REG_P, n->offset3 * tape_step);
+	    } else {
+		jit_ldxi_uc(REG_A1, REG_P, n->offset2);
+		jit_ldxi_uc(REG_A2, REG_P, n->offset3);
+	    }
+
+	    if (cell_mask > 0) {
+		if (cell_mask == 0xFF) {
+		    jit_extr_uc(REG_A1,REG_A1);
+		    jit_extr_uc(REG_A2,REG_A2);
+		} else {
+		    jit_andi(REG_A1, REG_A1, cell_mask);
+		    jit_andi(REG_A2, REG_A2, cell_mask);
+		}
+	    }
+
+	    jit_ltr_u(REG_A1, REG_A1, REG_A2);
+	    jit_addr(REG_ACC, REG_ACC, REG_A1);
 	    break;
 
 	case T_IF: case T_MULT: case T_CMULT:

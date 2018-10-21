@@ -72,8 +72,13 @@ FNAME(int * p, void * mem)
 	    break;
 
 	case T_CALCMULT:
-	    *m = p[2] + m[p[3]] * p[4] * m[p[5]] * p[6];
-	    p += 7;
+	    *m = m[p[2]] * m[p[3]];
+	    p += 4;
+	    break;
+
+	case T_LT:
+	    *m += (m[p[2]] < m[p[3]]);
+	    p += 4;
 	    break;
 
 	case T_ADDWZ:

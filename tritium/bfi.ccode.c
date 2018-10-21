@@ -851,6 +851,30 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    }
 	    break;
 
+	case T_LT:
+	    if (!disable_indent) pt(ofd, indent,n);
+
+	    if (n->count == 0 && n->count2 == 1 && n->count3 == 1)
+		fprintf(ofd, "%s += (%s < %s);\n",
+		    lval(n->offset), rval(n->offset2), rval2(n->offset3));
+	    else {
+		fprintf(stderr, "Code gen error: "
+			"%s\t"
+			"%d:%d, %d:%d, %d:%d\n",
+			tokennames[n->type],
+			n->offset, n->count,
+			n->offset2, n->count2,
+			n->offset3, n->count3);
+		exit(1);
+	    }
+
+	    if (enable_trace) {
+		pt(ofd, indent,0);
+		fprintf(ofd, "t(%d,%d,\"\",m+ %d)\n", n->line, n->col, n->offset);
+	    }
+	    break;
+
+
 	case T_PRT:
 	    if (!use_functions) {
 		if (!disable_indent) pt(ofd, indent,n);

@@ -298,6 +298,17 @@ print_nasm(void)
 
 	    break;
 
+	case T_LT:
+	    if (n->count != 0 || n->count2 != 1 || n->count3 != 1)
+                fprintf(stderr, "Warning: T_LT with bad counts.\n");
+
+	    printf("\tmovzx ebx,byte ptr [ecx%s]\n", oft(n->offset2));
+	    printf("\tmovzx edi,byte ptr [ecx%s]\n", oft(n->offset3));
+	    printf("\tcmp ebx,edi\n");
+	    printf("\tsetb al\n");
+	    printf("\tadd byte ptr [ecx%s],al\n", oft(n->offset));
+	    break;
+
 	case T_CHR:
 	    *sp++ = (char) /*GCC -Wconversion*/ n->count;
 	    break;

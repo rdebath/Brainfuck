@@ -115,6 +115,7 @@ int opt_bytedefault = 0;
 int opt_level = 2;
 int opt_runner = 0;
 int opt_no_calc = 0;
+int opt_no_lessthan = 0;
 int opt_no_litprt = 0;
 int opt_no_endif = 0;
 int opt_no_kv_recursion = 0;
@@ -200,6 +201,7 @@ int find_known_calcmult_state(struct bfi * v);
 int flatten_loop(struct bfi * v, int constant_count);
 int classify_loop(struct bfi * v);
 int flatten_multiplier(struct bfi * v);
+int test_for_lessthan(struct bfi * v);
 void build_string_in_tree(struct bfi * v);
 void * tcalloc(size_t nmemb, size_t size);
 struct bfi * add_node_after(struct bfi * p);
@@ -585,6 +587,7 @@ checkarg(char * opt, char * arg)
 	return 1;
     } else if (!strcmp(opt, "-fno-negtape")) { hard_left_limit = 0; return 1;
     } else if (!strcmp(opt, "-fno-calctok")) { opt_no_calc = 1; return 1;
+    } else if (!strcmp(opt, "-fno-lttok")) { opt_no_lessthan = 1; return 1;
     } else if (!strcmp(opt, "-fno-endif")) { opt_no_endif = 1; return 1;
     } else if (!strcmp(opt, "-fno-litprt")) { opt_no_litprt = 1; return 1;
     } else if (!strcmp(opt, "-fno-kv-recursion")) { opt_no_kv_recursion = 1; return 1;
@@ -1008,6 +1011,15 @@ printtreecell(FILE * efd, int indent, struct bfi * n)
 		n->offset, n->offset2, n->offset3);
 	} else
 	    fprintf(efd, "[%d] = %d + [%d]*%d * [%d]*%d, ",
+		n->offset, n->count, n->offset2, n->count2,
+		n->offset3, n->count3);
+	break;
+    case T_LT:
+	if (n->count == 0 && n->count2 == 1 && n->count3 == 1) {
+	    fprintf(efd, "[%d] += [%d] < [%d], ",
+		n->offset, n->offset2, n->offset3);
+	} else
+	    fprintf(efd, "[%d] ?= %d ? [%d]*%d < [%d]*%d, ",
 		n->offset, n->count, n->offset2, n->count2,
 		n->offset3, n->count3);
 	break;
@@ -1468,6 +1480,22 @@ run_tree(void)
 		}
 		break;
 
+	    case T_LT:
+		p[n->offset] += (((unsigned) UM(p[n->offset2]))
+			       < ((unsigned) UM(p[n->offset3])));
+
+		if (n->count2) {
+		    int off = (p+n->offset2) - oldp;
+		    if (off < profile_min_cell) profile_min_cell = off;
+		    if (off > profile_max_cell) profile_max_cell = off;
+		}
+		if (n->count3) {
+		    int off = (p+n->offset3) - oldp;
+		    if (off < profile_min_cell) profile_min_cell = off;
+		    if (off > profile_max_cell) profile_max_cell = off;
+		}
+		break;
+
 	    case T_IF: case T_MULT: case T_CMULT:
 
 	    case T_WHL: if(UM(p[n->offset]) == 0) n=n->jmp;
@@ -1658,7 +1686,7 @@ pointer_scan(void)
 		if(n4) n4->prev = n;
 		continue;
 
-	    case T_CALC: case T_CALCMULT:
+	    case T_CALC: case T_CALCMULT: case T_LT:
 		if(verbose>4)
 		    fprintf(stderr, "Push past command.\n");
 		/* Put movement after a normal cmd. */
@@ -1807,7 +1835,7 @@ pointer_regen(void)
 	    n->offset -= current_shift;
 	    break;
 
-	case T_CALC: case T_CALCMULT:
+	case T_CALC: case T_CALCMULT: case T_LT:
 	    n->offset -= current_shift;
 	    if(n->count2 != 0) n->offset2 -= current_shift;
 	    if(n->count3 != 0) n->offset3 -= current_shift;
@@ -1955,6 +1983,8 @@ invariants_scan(void)
 		    node_changed = classify_loop(n2);
 	    if (!node_changed && (n2->type == T_MULT || n2->type == T_CMULT))
 		    node_changed = flatten_multiplier(n2);
+	    if (!node_changed && n2->type == T_WHL)
+		    node_changed = test_for_lessthan(n2);
 
 	    if (node_changed)
 		n = n3;
@@ -2138,7 +2168,7 @@ find_known_value_recursion(struct bfi * n, int v_offset,
 	    }
 	    break;
 
-	case T_CALC: case T_CALCMULT:
+	case T_CALC: case T_CALCMULT: case T_LT:
 	    /* Nope, if this were a constant it'd be downgraded already */
 	    if (n->offset == v_offset)
 		goto break_break;
@@ -2738,8 +2768,9 @@ search_for_update_of_offset(struct bfi *n, struct bfi *v, int n_offset)
 	switch(n->type)
 	{
 	case T_WHL: case T_IF: case T_MULT: case T_CMULT:
-
 	case T_ADD: case T_SET: case T_CALC: case T_CALCMULT:
+	case T_LT:
+
 	    if (n->offset == n_offset)
 		return 0;
 	    break;
@@ -3495,6 +3526,100 @@ flatten_multiplier(struct bfi * v)
 }
 
 /*
+ * This function will generate T_LT tokens for subtract and test loops.
+ *
+ * T_WHL[1]		Instruction at v
+ *  T_IF[0]		|
+ *   T_ADD[2]:-1	|
+ *  T_ENDIF[0]		|
+ *  T_ADD[2]:1		m[2] += (m[0] < m[1])
+ *  T_ADD[0]:-1		m[0] -= m[1]
+ *  T_ADD[1]:-1		m[1] := 0
+ * T_END[1]
+ *
+ */
+int
+test_for_lessthan(struct bfi * v)
+{
+    int loop_offset = v->offset,	/* m[1] */
+	sub_result_offset = 0,		/* m[0] */
+	flag_offset = 0;		/* m[2] */
+    int if_found = 0,			/* Whole T_IF loop */
+	sub_result_found = 0,
+	sub_found = 0,
+	add_flag_found = 0;
+
+    struct bfi *n = v->next;
+
+    if (opt_no_calc || opt_no_lessthan) return 0;
+
+    while(n != v->jmp) {
+	if (n->type == T_IF) {
+	    if (if_found) return 0;
+	    if (n->next->type != T_ADD || n->next->count != -1 ||
+		n->next->next->type != T_ENDIF) return 0;
+	    flag_offset = n->next->offset;
+	    sub_result_offset = n->offset;
+	    if_found = 1;
+	} else if (n->type != T_ADD && n->type != T_ENDIF) return 0;
+	n = n->next;
+    }
+    if (!if_found) return 0;
+    if (loop_offset == sub_result_offset || loop_offset == flag_offset ||
+	flag_offset == sub_result_offset)
+	return 0;
+
+    if_found = 0;
+    for(n = v->next; n != v->jmp; n = n->next) {
+	if (n->type == T_IF) {
+	    n=n->jmp;
+	    if_found = 1;
+	} else if (n->offset == loop_offset && n->count == -1 && !sub_found)
+	    sub_found = 1;
+	else if (n->offset == sub_result_offset && n->count == -1 &&
+		!sub_result_found && if_found)
+	    sub_result_found = 1;
+	else if (n->offset == flag_offset && n->count == 1 && !add_flag_found)
+	    add_flag_found = 1;
+	else
+	    return 0;
+    }
+    if (!sub_found || !sub_result_found || !add_flag_found) return 0;
+
+    if (verbose>5) fprintf(stderr, "Convert loop to T_LT @(%d,%d)\n", v->line, v->col);
+
+    for(n = v; n != v->jmp; n = n->next) {
+	n->type = T_NOP;
+    }
+    v->jmp->type = T_NOP;
+
+    n = add_node_after(v->jmp);
+    n->type = T_LT;
+    n->count = 0;
+    n->offset = flag_offset;
+    n->count2 = 1;
+    n->offset2 = sub_result_offset;
+    n->count3 = 1;
+    n->offset3 = loop_offset;
+
+    n = add_node_after(n);
+    n->type = T_CALC;
+    n->count = 0;
+    n->offset = sub_result_offset;
+    n->count2 = 1;
+    n->offset2 = sub_result_offset;
+    n->count3 = -1;
+    n->offset3 = loop_offset;
+
+    n = add_node_after(n);
+    n->type = T_SET;
+    n->count = 0;
+    n->offset = loop_offset;
+
+    return 1;
+}
+
+/*
  * This moves literal T_CHR nodes back up the list to join to the previous
  * group of similar T_CHR nodes. An additional pointer (prevskip) is set
  * so that they all point at the first in the growing 'string'.
@@ -3517,7 +3642,7 @@ build_string_in_tree(struct bfi * v)
 	    break;
 
 	case T_MOV: case T_ADD: case T_SET: /* Safe */
-	case T_CALC: case T_CALCMULT:
+	case T_CALC: case T_CALCMULT: case T_LT:
 	    break;
 
 	case T_PRT:
@@ -3797,6 +3922,9 @@ print_codedump(void)
 	if (node_type_counts[T_CALCMULT])
 	    puts("#define multcell(x,y,z) p[x] = p[y] * p[z];");
 
+	if (node_type_counts[T_LT])
+	    puts("#define lessthan(x,y,z) p[x] += (p[y] < p[z]); /* unsigned! */");
+
 	if(node_type_counts[T_MULT] || node_type_counts[T_CMULT]
 	    || node_type_counts[T_WHL]) {
 	    if (add_mask) {
@@ -3931,6 +4059,17 @@ print_codedump(void)
 		    n->offset, n->offset2, n->offset3);
 	    } else {
 		printf("multcell_ex(%d,%d,%d,%d,%d,%d)\n",
+		    n->offset, n->count, n->offset2, n->count2,
+		    n->offset3, n->count3);
+	    }
+	    break;
+
+	case T_LT:
+	    if (n->count == 0 && n->count2 == 1 && n->count3 == 1) {
+		printf("lessthan(%d,%d,%d)\n",
+		    n->offset, n->offset2, n->offset3);
+	    } else {
+		printf("lessthan_ex(%d,%d,%d,%d,%d,%d)\n",
 		    n->offset, n->count, n->offset2, n->count2,
 		    n->offset3, n->count3);
 	    }

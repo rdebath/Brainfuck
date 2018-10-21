@@ -14,11 +14,12 @@ X(dc,DC,
     case c_dc: print_dc(); break;                                   ,
     Nothing_Here						    )
 #if XX == 4
-    if (do_codestyle == c_dc) {
-	if (eofcell == 0 && do_codestyle == c_dc && input_string == 0)
+    if (do_codestyle == c_dc && iostyle != 3) {
+	if (eofcell == 0 && input_string == 0)
 	    eofcell = 6;
 	if (!default_io && iostyle != 2) {
-	    fprintf(stderr, "The -D option only supports binary I/O.\n");
+	    fprintf(stderr,
+		    "The -D option only supports integer or binary I/O.\n");
 	    exit(255);
 	}
 	iostyle = 2;

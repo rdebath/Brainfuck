@@ -57,8 +57,12 @@ convert_tree_to_runarray(void)
 	case T_MOV:
 	    break;
 
-	case T_CALC: case T_CALCMULT:
+	case T_CALC:
 	    arraylen += 7;
+	    break;
+
+	case T_CALCMULT: case T_LT:
+	    arraylen += 4;
 	    break;
 
 	default:
@@ -203,11 +207,19 @@ convert_tree_to_runarray(void)
 	    break;
 
 	case T_CALCMULT:
-	    *p++ = n->count;
 	    *p++ = n->offset2 - last_offset;
-	    *p++ = n->count2;
 	    *p++ = n->offset3 - last_offset;
-	    *p++ = n->count3;
+
+	    if (n->count != 0 || n->count2 != 1 || n->count3 != 1)
+		fprintf(stderr, "Invalid %s node counts found\n", tokennames[n->type]);
+	    break;
+
+	case T_LT:
+	    *p++ = n->offset2 - last_offset;
+	    *p++ = n->offset3 - last_offset;
+
+	    if (n->count != 0 || n->count2 != 1 || n->count3 != 1)
+		fprintf(stderr, "Invalid %s node counts found\n", tokennames[n->type]);
 	    break;
 
 	case T_STOP: case T_NOP:

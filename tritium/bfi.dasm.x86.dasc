@@ -98,6 +98,9 @@ checkarg_dynasm(char * opt, char * arg UNUSED)
 |.define REG_D, edx
 |.define REG_C, ecx
 |.define REG_CW, ecx
+|.define REG_CB, cl
+|.define REG_E, edi
+|.define REG_EW, edi
 |.else
 |.define REG_P, rbx
 |.define REG_A, eax
@@ -105,6 +108,9 @@ checkarg_dynasm(char * opt, char * arg UNUSED)
 |.define REG_D, edx
 |.define REG_C, ecx
 |.define REG_CW, rcx
+|.define REG_CB, cl
+|.define REG_E, r14d
+|.define REG_EW, r14
 /* Windows is, of course, different.
  * This time it may not even be Microsoft's fault!?!? */
 |.define PRM, rdi
@@ -474,6 +480,34 @@ run_dynasm(void)
 	    if (n->count) {
 		| add REG_A, count
 	    }
+	    break;
+
+	case T_LT:
+	    if (n->count != 0 || n->count2 != 1 || n->count3 != 1)
+		fprintf(stderr, "Warning: T_LT with bad counts.\n");
+
+	    load_acc_offset(n->offset);
+	    set_acc_offset(offset);
+
+	    if (tape_step > 1) {
+		| mov REG_D, [REG_P+ (n->offset2*tape_step) ]
+		| mov REG_E, [REG_P+ (n->offset3*tape_step) ]
+	    } else {
+		| movzx REG_D, byte [REG_P+ (n->offset2) ]
+		| movzx REG_E, byte [REG_P+ (n->offset3) ]
+	    }
+
+	    if (cell_mask > 0) {
+		if (cell_mask != 0xFF || tape_step != 1) {
+		    | and REG_D, cell_mask
+		    | and REG_E, cell_mask
+		}
+	    }
+
+	    | xor REG_C, REG_C
+	    | cmp REG_D, REG_E
+	    | setb REG_CB
+	    | add REG_A, REG_C
 	    break;
 
 	case T_WHL:

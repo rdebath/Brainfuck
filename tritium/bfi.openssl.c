@@ -1,5 +1,6 @@
 /*
- * This is a "supertree" variant that uses the openssl BIGNUM implementation.
+ * This file contains an interpretation engine that is slow but has
+ * large cells. It uses the openssl BIGNUM implementation.
  */
 
 #include <stdio.h>
@@ -12,11 +13,6 @@
 #include "bfi.run.h"
 #include "bfi.openssl.h"
 #include "clock.h"
-
-/******************************************************************************/
-/*
- * Another simple tree based interpreter, but with unlimited cells.
- */
 
 #if !defined(DISABLE_BN)
 
@@ -260,6 +256,45 @@ run_openssltree(void)
 		    BN_mask_bits(t1, cell_length);
 		if (!BN_copy(m[n->offset], t1))
 		    goto BN_op_failed;
+		break;
+
+	    case T_LT:
+		if (n->count != 0 || n->count2 != 1 || n->count3 != 1) {
+		    fprintf(stderr, "Error on code generation:\n"
+			   "Bad T_LT node with incorrect counts.\n");
+		    exit(99);
+		}
+		if(do_mask) {
+		    BN_mask_bits(m[n->offset2], cell_length);
+		    if (BN_is_negative(m[n->offset2])) {
+			if (!BN_set_word(t2, 2))
+			    goto BN_op_failed;
+			if (!BN_set_word(t3, cell_length))
+			    goto BN_op_failed;
+			if(!BN_exp(t1, t2, t3, BNtmp))
+			    goto BN_op_failed;
+			if(!BN_nnmod(m[n->offset2], m[n->offset2], t1, BNtmp))
+			    goto BN_op_failed;
+		    }
+		}
+		if(do_mask) {
+		    BN_mask_bits(m[n->offset3], cell_length);
+		    if (BN_is_negative(m[n->offset3])) {
+			if (!BN_set_word(t2, 2))
+			    goto BN_op_failed;
+			if (!BN_set_word(t3, cell_length))
+			    goto BN_op_failed;
+			if(!BN_exp(t1, t2, t3, BNtmp))
+			    goto BN_op_failed;
+			if(!BN_nnmod(m[n->offset3], m[n->offset3], t1, BNtmp))
+			    goto BN_op_failed;
+		    }
+		}
+
+		if (BN_cmp(m[n->offset2], m[n->offset3]) < 0)
+		    if (!BN_add_word(m[n->offset], 1))
+			goto BN_op_failed;
+
 		break;
 
 	    case T_IF: case T_MULT: case T_CMULT:

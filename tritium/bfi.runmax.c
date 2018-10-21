@@ -220,7 +220,7 @@ static inline void BI_sub(uint_cell ** pa, uint_cell ** pb)
     }
 }
 
-static inline void UNUSED BI_neg(uint_cell ** pa)
+static inline void BI_neg(uint_cell ** pa)
 {
     int cy = 1, i;
     uint_cell * a;
@@ -390,6 +390,43 @@ static inline int BI_is_zero(uint_cell ** pa)
     for(i=0; i<ints_per_cell; i++)
 	if (a[i]) return 0;
     return 1;
+}
+
+static inline int BI_lessthan(uint_cell ** pa, uint_cell ** pb)
+{
+    uint_cell *a, *b;
+    int i;
+    if (!*pa) return !BI_is_zero(pb);
+
+    a = *pa; b = *pb;
+    for(i=ints_per_cell-1; i>0; i--) {
+	if (a[i] != b[i])
+	    return a[i] < b[i];
+    }
+    return *a < *b;
+}
+
+static inline int BI_input(uint_cell ** pa)
+{
+    int ch, ret_eof = 1, do_neg = 0;
+    BI_zero(pa);
+    while((ch = getchar()) != EOF) {
+	if (ch >= '0' && ch < '9') {
+	    if (!ret_eof)
+		BI_mul_uint(pa, 10);
+	    if (ch != '0')
+		BI_add_cell(pa, ch - '0');
+	    ret_eof = 0;
+	} else if (ret_eof && ch == '-') {
+	    do_neg = 1;
+	    ret_eof = 0;
+	} else if (!ret_eof)
+	    break;
+    }
+    ungetc(ch, stdin);
+    if (do_neg)
+	BI_neg(pa);
+    return ret_eof;
 }
 
 static void
@@ -572,6 +609,57 @@ run_supertree(void)
 		BI_mul(m[n->offset].b, m[n->offset2].b, m[n->offset3].b);
 		break;
 
+	    case T_LT:
+		if (n->count != 0 || n->count2 != 1 || n->count3 != 1) {
+		    fprintf(stderr, "Error on code generation:\n"
+			   "Bad T_LT node with incorrect counts.\n");
+		    exit(99);
+		}
+		{
+		    int flg = -1;
+
+		    if (!m[n->offset2].f && !m[n->offset3].f)
+		    {
+			/* Unsigned comparison!
+			 * Have to cast both as GCC is really stupid. */
+			flg = ((unsigned) m[n->offset2].v
+			    <  (unsigned) m[n->offset3].v);
+		    }
+
+		    if (flg < 0) {
+			uint_cell ** m2 = m[n->offset2].b;
+			uint_cell ** m3 = m[n->offset3].b;
+
+			if (!m[n->offset2].f) {
+			    m2 = t2;
+			    BI_set_int(m2, m[n->offset2].v);
+			}
+			if (!m[n->offset3].f) {
+			    m3 = t3;
+			    BI_set_int(m3, m[n->offset3].v);
+			}
+
+			flg = BI_lessthan(m2, m3);
+		    }
+
+		    if (flg != 1) break;
+
+		    // p[n->offset] ++;
+		    if (!m[n->offset].f) {
+			int ov=0, v;
+			v = ov_iadd(m[n->offset].v, 1, &ov);
+			if (!ov) {
+			    m[n->offset].v = v;
+			    break;
+			}
+			m[n->offset].f = 1;
+			BI_set_int(m[n->offset].b, m[n->offset].v);
+		    }
+
+		    BI_add_cell(m[n->offset].b, 1);
+		}
+		break;
+
 	    case T_IF: case T_MULT: case T_CMULT:
 
 	    case T_WHL:
@@ -611,7 +699,24 @@ run_supertree(void)
 		    putch(m[n->offset].b[0][0]);
 		break;
 	    case T_INP:
-		{   /* Cell is too large for an int */
+		if (iostyle == 3) {
+		    int eof = BI_input(t1), c = 1;
+		    if (!eof) {
+			m[n->offset].f = 1;
+			BI_copy(m[n->offset].b, t1);
+			break;
+		    }
+		    switch(eofcell)
+		    {
+		    case 2: c = -1; break;
+		    case 3: c = 0; break;
+		    case 4: c = EOF; break;
+		    }
+		    if (c <= 0) {
+			m[n->offset].f = 0;
+			m[n->offset].v = c;
+		    }
+		} else {   /* Cell is too large for an int */
 		    int ch = -256;
 		    ch = getch(ch);
 		    if (ch != -256) {
