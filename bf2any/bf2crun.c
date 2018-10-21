@@ -575,10 +575,10 @@ compile_and_run_libtcc(void)
     if (s == NULL) { perror("tcc_new() failed"); exit(7); }
     tcc_set_output_type(s, TCC_OUTPUT_MEMORY);
     tcc_compile_string(s, ccode);
+    free(ccode); ccode = 0; ccodesize = 0;
 
     rv = tcc_run(s, 0, 0);
-    if (rv) { perror("tcc_run() failed"); exit(8); }
+    if (rv) { fprintf(stderr, "tcc_run() failed = %d\n", rv); exit(8); }
     tcc_delete(s);
-    free(ccode);
 }
 #endif
