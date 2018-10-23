@@ -53,7 +53,7 @@ extern int cell_type_iso;
     Mac(ZFIND) Mac(MFIND) Mac(ADDWZ) Mac(LT) \
     Mac(CALC2) Mac(CALC3) Mac(CALC4) Mac(CALC5) \
     Mac(STOP) Mac(SUSP) Mac(DUMP) \
-    Mac(NOP) Mac(DEAD) Mac(ERR) Mac(CALL)
+    Mac(NOP) Mac(DEAD) Mac(CALL)
 
 #define GEN_TOK_ENUM(NAME) T_ ## NAME,
 enum token { TOKEN_LIST(GEN_TOK_ENUM) TCOUNT};

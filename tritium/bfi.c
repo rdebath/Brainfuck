@@ -193,7 +193,6 @@ void printtree(void);
 void calculate_stats(void);
 void pointer_scan(void);
 void pointer_regen(void);
-void quick_scan(void);
 void invariants_scan(void);
 void trim_trailing_sets(void);
 int scan_one_node(struct bfi * v, struct bfi ** move_v);
@@ -751,6 +750,8 @@ main(int argc, char ** argv)
 	free(filelist); filelist = 0;
     }
 
+    if (loaded_nodes == 0) opt_level = 0;
+
     process_file();
 
 #ifdef _WIN32
@@ -759,6 +760,27 @@ main(int argc, char ** argv)
 
     delete_tree();
     exit(0);
+}
+
+struct bfi *
+new_node(struct bfi * p, int type, int line, int col)
+{
+    struct bfi * n = tcalloc(1, sizeof*n);
+    n->inum = bfi_num++;
+    n->orgtype = n->type = type;
+    n->line = line;
+    n->col = col;
+    if (p) {
+	n->prev = p;
+	n->next = p->next;
+	if (n->next) n->next->prev = n;
+	n->prev->next = n;
+    } else if (bfprog) {
+	n->next = bfprog;
+	if (n->next) n->next->prev = n;
+    } else bfprog = n;
+
+    return n;
 }
 
 /*
@@ -773,13 +795,13 @@ main(int argc, char ** argv)
 void
 load_file(FILE * ifd, int is_first, int is_last, char * bfstring)
 {
-    int ch, lid = 0;
+    int ch, pending_mov = 0;
     struct bfi *p=0, *n=bfprog;
 
 static struct bfi *jst;
-static int dld, inp, rle = 0, num = 1, ov_flg;
+static int dld, inp, rle = 0, num = -1, ov_flg, loopid, zstate;
 
-    if (is_first) { jst = 0; dld = 0; }
+    if (is_first) { jst = 0; dld = 0; loopid = 0; zstate = 0;}
     if (n) { while(n->next) n=n->next; p = n;}
 
     curr_line = 1; curr_col = 0;
@@ -805,13 +827,14 @@ static int dld, inp, rle = 0, num = 1, ov_flg;
 
 	/* A long run of digits is ignored. */
 	if (ov_flg) {
-	    num = 1; ov_flg = 0;
+	    num = -1; ov_flg = 0;
 	    if (rle_input)
 		fprintf(stderr,
 		    "Warning: numeric overflow in prefix at Line %d, Col %d\n",
 		    curr_line, curr_col);
 	}
 
+	if (num<0) num = (ch!='=');
 	switch(ch) {
 	case '>': ch = T_MOV; c=  num; break;
 	case '<': ch = T_MOV; c= -num; break;
@@ -829,91 +852,139 @@ static int dld, inp, rle = 0, num = 1, ov_flg;
 	    if(debug_mode) ch = T_DUMP; else ch = T_NOP;
 	    break;
 	case '=':
-	    if(rle_input) ch = T_SET; else ch = T_NOP;
+	    if(rle_input) { ch = T_SET; c = num; }  else ch = T_NOP;
 	    break;
 	default:  ch = T_NOP; break;
 	}
-	num = 1;
+	num = -1;
 
-	if (ch != T_NOP) {
-#ifndef NO_PREOPT   /* Simple syntax optimisation */
-	    if (opt_level>=0) {
-		/* Comment loops, can never be run */
-		/* This BF code isn't just dead it's been buried in soft peat
-		 * for three months and recycled as firelighters. */
+	if (ch == T_NOP) continue;
 
-		if (dld ||  (ch == T_WHL && p==0 && !noheader) ||
-			    (ch == T_WHL && p!=0 && p->type == T_END)   ) {
-		    if (ch == T_WHL) dld ++;
-		    if (ch == T_END) dld --;
+#ifndef NO_PREOPT
+	/* Simple syntax optimisation. This will be done by later passes,
+	 * but it's far cheaper to do it here. */
+	if (opt_level>=0) {
+	    /* Comment loops, can never be run */
+	    /* This BF code isn't just dead it's been buried in soft peat
+	     * for three months and recycled as firelighters. */
+	    if (dld || (ch == T_WHL && (!p ? !noheader:
+			pending_mov == 0 && p->type == T_END))) {
+		if (ch == T_WHL) dld ++;
+		if (ch == T_END) dld --;
+		continue;
+	    }
+
+	    /* Matching [-], [+] and [] is annoyingly verbose */
+	    switch(zstate) {
+	    case 0:
+		if (ch == T_WHL) { zstate++ ; continue; }
+		break;
+	    case 1:
+		if (ch == T_ADD && c == -1) { zstate++ ; continue; }
+		if (ch == T_ADD && c == 1) { zstate+=2 ; continue; }
+		break;
+	    case 2: case 3:
+		if (ch != T_END) break;
+		ch = T_SET;
+		zstate = 0;
+		break;
+	    }
+
+	    if (zstate) {
+		if (pending_mov) {
+		    p = n = new_node(p, T_MOV, curr_line, curr_col);
+		    n->count = pending_mov;
+		    pending_mov = 0;
+		}
+		p = n = new_node(p, T_WHL, curr_line, curr_col);
+		{ n->jmp=jst; jst = n; n->count = ++loopid; }
+
+		if (zstate == 2) {
+		    p = n = new_node(p, T_ADD, curr_line, curr_col);
+		    n->count = -1;
+		} else if (zstate == 3) {
+		    p = n = new_node(p, T_ADD, curr_line, curr_col);
+		    n->count = 1;
+		} else if (ch == T_END) {
+		    p = n = new_node(p, T_STOP, curr_line, curr_col);
+		}
+		zstate = 0;
+	    }
+
+	    if (ch == T_WHL) { zstate++ ; continue; }
+
+	    /* There's about one MOV per ADD, merging it in reduces the
+	     * load size by a third. */
+	    if (ch == T_MOV) { pending_mov += c; c = 0; continue; }
+
+	    if (pending_mov &&
+		    (ch == T_WHL || ch == T_END || ch == T_DUMP)) {
+		p = n = new_node(p, T_MOV, curr_line, curr_col);
+		n->count = pending_mov;
+		pending_mov = 0;
+	    }
+
+	    /* RLE compacting of instructions. This is a huge win. */
+	    if (c && p && ch == p->type && pending_mov == p->offset &&
+		    (ch == T_MOV || ch == T_ADD)) {
+		int ov_flg_rle = 0, t = ov_iadd(p->count, c, &ov_flg_rle);
+		if (!ov_flg_rle) {
+		    p->count = t;
+		    if (p->count == 0) {
+			struct bfi *t1 = p;
+			p = p->prev;
+			if (p) p->next = 0; else bfprog = 0;
+			free(t1);
+		    }
 		    continue;
 		}
-		/* RLE compacting of instructions. This will be done by later
-		 * passes, but it's cheaper to do it here. */
-		if (c && p && ch == p->type){
-		    int ov_flg_rle = 0, t = ov_iadd(p->count, c, &ov_flg_rle);
-		    if (!ov_flg_rle) {
-			p->count = t;
-			if (p->count == 0) {
-			    struct bfi *t1 = p;
-			    p = p->prev;
-			    if (p) p->next = 0; else bfprog = 0;
-			    free(t1);
-			}
-			continue;
-		    }
-		}
 	    }
-#endif
-	    n = tcalloc(1, sizeof*n);
-	    n->inum = bfi_num++; n->line = curr_line; n->col = curr_col;
-	    if (p) { p->next = n; n->prev = p; } else bfprog = n;
-	    n->type = ch; p = n;
-	    if (n->type == T_WHL) { n->jmp=jst; jst = n; }
-	    else if (n->type == T_END) {
-		if (jst) { n->jmp = jst; jst = jst->jmp; n->jmp->jmp = n;
-		} else n->type = T_ERR;
-	    } else
-		n->count = c;
 	}
+#endif
+
+	p = n = new_node(p, ch, curr_line, curr_col);
+	if (n->type == T_WHL) { n->jmp=jst; jst = n; n->count = ++loopid; }
+	else if (n->type == T_END) {
+	    if (jst) { n->jmp = jst; jst = jst->jmp; n->jmp->jmp = n;
+	    } else {
+		n->type = T_NOP;
+		fprintf(stderr,
+		    "Warning: unbalanced bracket at Line %d, Col %d\n",
+		    n->line, n->col);
+	    }
+	} else {
+	    n->count = c;
+	    n->offset = pending_mov;
+	}
+    }
+
+    if (pending_mov) {
+	p = n = new_node(p, T_MOV, curr_line, curr_col);
+	n->count = pending_mov;
+	pending_mov = 0;
     }
 
     if (!is_last) return;
 
     if (debug_mode && (p && p->type != T_DUMP)) {
-	n = tcalloc(1, sizeof*n);
-	n->inum = bfi_num++;
-	n->line = curr_line;
-	if (p) { p->next = n; n->prev = p; } else bfprog = n;
-	n->type = T_DUMP; p = n;
+	p = n = new_node(p, T_DUMP, curr_line, curr_col);
     }
 
     /* I could make this close the loops, Better? */
-    while (jst) { n = jst; jst = jst->jmp; n->type = T_ERR; n->jmp = 0; }
+    while (jst) {
+	n = jst; jst = jst->jmp;
+	n->type = T_NOP;
+	n->jmp = 0;
+	fprintf(stderr, "Warning: unbalanced bracket at Line %d, Col %d\n",
+		n->line, n->col);
+    }
 
     if (dld)
 	fprintf(stderr, "Warning: Unterminated comment loop at end of file.\n");
+    if (zstate)
+	fprintf(stderr, "Warning: Unterminated loop at end of file.\n");
 
-    loaded_nodes = 0;
-    for(n=bfprog; n; n=n->next) {
-	switch(n->type)
-	{
-	    case T_ADD:
-	    case T_MOV:
-		if(n->count == 0) n->type = T_NOP;
-		break;
-	    case T_WHL: n->count = ++lid; break;
-	    case T_ERR: /* Unbalanced bkts */
-		fprintf(stderr,
-			"Warning: unbalanced bracket at Line %d, Col %d\n",
-			n->line, n->col);
-		n->type = T_NOP;
-		break;
-	}
-	loaded_nodes++;
-	n->orgtype = n->type;
-    }
-    total_nodes = loaded_nodes;
+    total_nodes = loaded_nodes = bfi_num;
 }
 
 void *
@@ -1122,10 +1193,6 @@ process_file(void)
 	tickstart();
 	pointer_scan();
 	tickend("Time for pointer scan");
-
-	tickstart();
-	quick_scan();
-	tickend("Time for quick scan");
 
 	if (opt_level>=2) {
 	    calculate_stats();
@@ -1857,86 +1924,6 @@ pointer_regen(void)
 	    exit(1);
 	}
 	n = n->next;
-    }
-}
-
-void
-quick_scan(void)
-{
-    struct bfi * n = bfprog, *n2;
-
-    if (verbose>1)
-	fprintf(stderr, "Finding 'quick' commands.\n");
-
-    while(n){
-	/* Looking for "[-]" or "[+]" */
-	/* The loop classifier won't pick up [+] */
-	if( n->type == T_WHL && n->next && n->next->next &&
-	    n->next->type == T_ADD &&
-	    n->next->next->type == T_END &&
-	    n->offset == n->next->offset &&
-	    (n->next->count&1) == 1
-	    ) {
-	    /* Change to T_SET */
-	    n->next->type = T_SET;
-	    n->next->count = 0;
-
-	    /* Delete the loop. */
-	    n->type = T_NOP;
-	    n->next->next->type = T_NOP;
-
-	    /* If followed by a matching T_ADD merge that in too */
-	    n2 = n->next->next->next;
-	    if (n2 && n2->type == T_ADD && n2->offset == n->next->offset) {
-		int ov_flg=0, t = ov_iadd(n->next->count, n2->count, &ov_flg);
-		if (!ov_flg) {
-		    n->next->count = t;
-		    n2->type = T_NOP;
-		}
-	    }
-
-	    if(verbose>4) {
-		fprintf(stderr, "Replaced T_WHL [-/+] with T_SET.\n");
-		printtreecell(stderr, 1, n->next);
-		fprintf(stderr, "\n");
-	    }
-	}
-
-	/* Looking for "[]" the Trivial infinite loop, replace it with
-	 * conditional abort.
-	 */
-	if( n->type == T_WHL && n->next &&
-	    (n->next->type == T_END ||
-	     (n->next->type == T_NOP && n->next->next && n->next->next->type == T_END)
-	    )){
-
-	    /* Insert a T_STOP */
-	    n2 = add_node_after(n);
-	    n2->type = T_STOP;
-
-	    /* Insert a T_SET because the T_STOP doesn't return so the T_WHL
-	     * can be converted to a T_IF later. */
-	    n2 = add_node_after(n2);
-	    n2->type = T_SET;
-	    n2->offset = n->offset;
-	    n2->count = 0;
-
-	    if(verbose>4) {
-		fprintf(stderr, "Inserted a T_STOP in a [].\n");
-		printtreecell(stderr, 1, n->next);
-		fprintf(stderr, "\n");
-	    }
-	}
-
-	/* Clean up the T_NOPs */
-	if (n && n->type == T_NOP) {
-	    n2 = n; n = n->next;
-	    if(n2->prev) n2->prev->next = n; else bfprog = n;
-	    if(n) n->prev = n2->prev;
-	    free(n2);
-	    continue;
-	}
-	n=n->next;
     }
 }
 
