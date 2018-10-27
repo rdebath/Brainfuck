@@ -268,7 +268,7 @@ print_c_header(FILE * ofd)
     fprintf(ofd, "/* Code generated from %s */\n\n", bfname);
     fprintf(ofd, "#include <stdio.h>\n");
 
-    if (libtcc_specials || use_functions || use_dynmem)
+    if (libtcc_specials || use_functions || use_dynmem || !knr_c_ok)
     {
 	if (knr_c_ok) fprintf(ofd, "#ifdef __STDC__\n");
 	fprintf(ofd, "#include <stdlib.h>\n");
@@ -303,24 +303,18 @@ print_c_header(FILE * ofd)
 	    if (knr_c_ok)
 		fprintf(ofd, "#endif\n\n");
 
-	    fprintf(ofd, "#ifndef C\n");
-	    fprintf(ofd, "#ifdef __SIZEOF_INT128__\n");
+	    fprintf(ofd, "#if 0 /*1978 K&R*/\n");
+	    fprintf(ofd, "#elif defined(C) /*Okay*/\n");
+	    fprintf(ofd, "#elif defined(__SIZEOF_INT128__)\n");
 	    fprintf(ofd, "#define C unsigned __int128\n");
-	    fprintf(ofd, "#else\n");
-	    fprintf(ofd, "#ifdef _UINT128_T\n");
+	    fprintf(ofd, "#elif defined(_UINT128_T)\n");
 	    fprintf(ofd, "#define C __uint128_t\n");
-	    fprintf(ofd, "#else\n");
-	    fprintf(ofd, "#if defined(ULLONG_MAX) || defined(__LONG_LONG_MAX__)\n");
+	    fprintf(ofd, "#elif defined(ULLONG_MAX) || defined(__LONG_LONG_MAX__)\n");
 	    fprintf(ofd, "#define C unsigned long long\n");
-	    fprintf(ofd, "#else\n");
-	    fprintf(ofd, "#if defined(UINTMAX_MAX)\n");
+	    fprintf(ofd, "#elif defined(UINTMAX_MAX)\n");
 	    fprintf(ofd, "#define C uintmax_t\n");
 	    fprintf(ofd, "#else\n");
-	    fprintf(ofd, "#define C unsigned long\n");
-	    fprintf(ofd, "#endif\n");
-	    fprintf(ofd, "#endif\n");
-	    fprintf(ofd, "#endif\n");
-	    fprintf(ofd, "#endif\n");
+	    fprintf(ofd, "#define C unsigned int\n");
 	    fprintf(ofd, "#endif\n\n");
 
 	    if (cell_length != INT_MAX) {
@@ -1209,7 +1203,8 @@ print_ccode(FILE * ofd)
 	cell_size != sizeof(char)*CHAR_BIT)
 	fixed_mask = cell_mask;
 
-    if (do_run || cell_type_iso || use_dynmem)
+    if (do_run || cell_type_iso || use_dynmem || enable_trace ||
+	    node_type_counts[T_DUMP] != 0)
 	knr_c_ok = 0;
 
     if (use_functions<0 && opt_level<1)
