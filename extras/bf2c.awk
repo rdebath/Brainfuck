@@ -105,7 +105,14 @@ END {
     ll = 1;
     print_line();
     if (icount && !debug) {
-	print "fprintf(stderr, \"\\nCommands executed: %\"PRIuCount\"\\n\", icount);" > of
+	print "#if defined(UINTMAX_MAX) && defined(__SIZEOF_INT128__)" > of
+	print "if (icount < UINTMAX_MAX)" > of
+	print "  fprintf(stderr, \"\\nCommands executed: %\"PRIuMAX\"\\n\", (uintmax_t) icount);" > of
+	print "else" > of
+	print "  fprintf(stderr, \"\\nCommands executed: %.15g\\n\", (double) icount);" > of
+	print "#else" > of
+	print "  fprintf(stderr, \"\\nCommands executed: %\"PRIuCount\"\\n\", icount);" > of
+	print "#endif" > of
     }
     print "return 0;}" > of
 
@@ -154,7 +161,11 @@ function header() {
 
     if (icount) {
 	print "#ifdef UINTMAX_MAX" > of
+	print "#ifdef __SIZEOF_INT128__" > of
+	print "__uint128_t icount = 0;" > of
+	print "#else" > of
 	print "uintmax_t icount = 0;" > of
+	print "#endif" > of
 	print "#define PRIuCount PRIuMAX" > of
 	print "#else" > of
 	print "unsigned long icount = 0;" > of
@@ -246,7 +257,14 @@ function print_line() {
 
 function debug_mem() {
     if (icount) {
-	print "fprintf(stderr, \"\\nCommands executed: %\"PRIuCount\"\\n\", icount);" > of
+	print "#if defined(UINTMAX_MAX) && defined(__SIZEOF_INT128__)" > of
+	print "if (icount < UINTMAX_MAX)" > of
+	print "  fprintf(stderr, \"\\nCommands executed: %\"PRIuMAX\"\\n\", (uintmax_t) icount);" > of
+	print "else" > of
+	print "  fprintf(stderr, \"\\nCommands executed: %.15g\\n\", (double) icount);" > of
+	print "#else" > of
+	print "  fprintf(stderr, \"\\nCommands executed: %\"PRIuCount\"\\n\", icount);" > of
+	print "#endif" > of
     }
     print "{ unsigned ii, jj=0;" > of;
     print "  for(ii=" memoff "; ii<sizeof(mem)/sizeof(*mem); ii++)" > of;
