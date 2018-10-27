@@ -6,7 +6,7 @@
 #include "move_opt.h"
 
 /*
- * Perl translation from BF, runs at about 14,000,000 instructions per second.
+ * Perl6 translation from BF, runs at about 830,000 instructions per second.
  */
 
 static int ind = 0;
@@ -20,11 +20,11 @@ static char *
 cell(int mov)
 {
     static char buf[9+3+sizeof(mov)*3];
-    if (mov == 0) return "$m[$p]";
+    if (mov == 0) return "@m[$p]";
     if (mov < 0)
-	sprintf(buf, "$m[$p-%d]", -mov);
+	sprintf(buf, "@m[$p-%d]", -mov);
     else
-	sprintf(buf, "$m[$p+%d]", mov);
+	sprintf(buf, "@m[$p+%d]", mov);
     return buf;
 }
 
@@ -40,16 +40,18 @@ outcmd(int ch, int count)
     mc = cell(mov);
     switch(ch) {
     case '!':
-	printf( "%s%d%s",
-		"#!/usr/bin/perl\n"
-		"$|++;    # Turn on autoflush.\n"
-		"$^W = 0; # Turn off warnings.\n"
-		"$p = ", tapeinit, ";\n");
+	printf( "%s",
+		"#!/usr/bin/env perl6\n"
+		"my int32 ($p, $v, $c);\n");
+	if (bytecell)
+	    printf("my uint8 @m;\n");
+	else
+	    printf("my int32 @m;\n");
+	printf("%s%d%s", "$p = ", tapeinit, ";\n");
 	break;
 
     case '=': I; printf("%s = %d;\n", mc, count); break;
     case 'B':
-	if(bytecell) { I; printf("%s &= 255;\n", mc); }
 	I; printf("$v = %s;\n", mc);
 	break;
     case 'M': I; printf("%s = %s+$v*%d;\n", mc, mc, count); break;
@@ -70,8 +72,7 @@ outcmd(int ch, int count)
     case '<': I; printf("$p -= %d;\n", count); break;
     case '>': I; printf("$p += %d;\n", count); break;
     case '[':
-	if(bytecell) { I; printf("%s &= 255;\n", mc); }
-	I; printf("while(%s != 0){\n", mc);
+	I; printf("while %s != 0 {\n", mc);
 	ind++;
 	break;
     case ']':
@@ -80,12 +81,10 @@ outcmd(int ch, int count)
 	} else if (count < 0) {
 	    I; printf("$p -= %d;\n", -count);
 	}
-	if(bytecell) { I; printf("%s &= 255;\n", mc); }
-	ind--; I; printf("}\n");
+	ind--; I; printf("};\n");
 	break;
     case 'I':
-	if(bytecell) { I; printf("%s &= 255;\n", mc); }
-	I; printf("if(%s != 0){\n", mc);
+	I; printf("if %s != 0 {\n", mc);
 	ind++;
 	break;
     case 'E':
@@ -94,10 +93,10 @@ outcmd(int ch, int count)
 	} else if (count < 0) {
 	    I; printf("$p -= %d;\n", -count);
 	}
-	ind--; I; printf("}\n");
+	ind--; I; printf("};\n");
 	break;
-    case '.': I; printf("print chr(%s&255);\n", mc); break;
-    case ',': I; printf("$c = getc(STDIN); if(defined $c){ %s = ord($c); }\n", mc); break;
+    case '.': I; printf("print chr(%s) if %s > 0;\n", mc, mc); break;
+    case ',': I; printf("%s = ord($_) if defined $_ = $*IN.getc;\n", mc); break;
     case '"': print_cstring(); break;
     }
 }
@@ -122,7 +121,8 @@ print_cstring(void)
 	if (!*str) break;
 
 	if (*str == '\n') gotnl = 1;
-	if (*str == '"' || *str == '\\' || *str == '@' || *str == '$') {
+	if (*str == '"' || *str == '\\' || *str == '@' ||
+		*str == '$' || *str == '{') {
 	    buf[outlen++] = '\\'; buf[outlen++] = *str;
 	} else if (*str >= ' ' && *str <= '~') {
 	    buf[outlen++] = *str;

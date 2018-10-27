@@ -20,7 +20,7 @@ ALLEXE=bf2run \
 	bf2f90 bf2gas bf2go bf2java bf2julia bf2ksh bf2ksh88 bf2lua \
 	bf2nav bf2neko bf2oldsh bf2pas bf2perl bf2php bf2ps1 bf2py \
 	bf2rb bf2rc bf2sh bf2slang bf2swift bf2tcl bf2tomm bf2tsql \
-	bf2whitespace
+	bf2whitespace bf2perl6
 
 TOOLDIR=../tools
 LDLIBS=
@@ -79,7 +79,7 @@ $(ALLEXE): $(COREOBJ)
 $(COREOBJ): bf2any.h bf2const.h bf2loop.h
 $(patsubst %.c,%.o,$(wildcard *.c)): bf2any.h
 
-bf2crun.o bf2dump.o bf2py.o bf2php.o bf2perl.o bf2rb.o: move_opt.h
+bf2crun.o bf2dump.o bf2py.o bf2php.o bf2perl.o bf2perl6.o bf2rb.o: move_opt.h
 
 #-------------------------------------------------------------------------------
 # Special cases and configuration
