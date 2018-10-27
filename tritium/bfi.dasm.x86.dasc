@@ -570,6 +570,65 @@ run_dynasm(void)
 		break;
 	    }
 
+	    /* This adds an 'MFIND' token to the dynasm generator. It's now
+	     * faster than -r for "Zozotez" */
+	    if (cell_mask <=0 || (tape_step==1 && cell_mask == 0xFF)) {
+                struct bfi *n1, *n2=0, *n3=0, *n4=0;
+                n1 = n->next;
+                if (n1) n2 = n1->next;
+                if (n2) n3 = n2->next;
+                if (n3) n4 = n3->next;
+
+		if (n1->type == T_ADD && n2->type == T_ADD &&
+                    n3->type == T_MOV && n4->type == T_END &&
+                    n1->count == -1 && n2->count == 1 &&
+                    n->offset == n1->offset &&
+                    n->offset == n2->offset - n3->count
+                ) {
+		    load_acc_offset(n->offset);
+		    set_acc_offset(n->offset);
+		    | sub REG_A, 1
+		    clean_acc();
+
+		    if (tape_step == 1) {
+			| cmp   REG_AL, 255
+		    } else {
+			| cmp   REG_A, -1
+		    }
+		    | jz   >2
+		    | 1:
+
+			clean_acc();
+			if (acc_loaded) acc_offset -= n3->count;
+			if (n3->count*tape_step < 0 && n3->count*tape_step != -128) {
+			    | sub REG_P, -n3->count*tape_step
+			} else {
+			    | add REG_P, n3->count*tape_step
+			}
+
+			load_acc_offset(n->offset);
+			clean_acc();
+
+			if (tape_step == 1) {
+			    | cmp   REG_AL, 255
+			} else {
+			    | cmp   REG_A, -1
+			}
+
+		    | jnz   <1
+		    | 2:
+
+		    load_acc_offset(n->offset);
+		    set_acc_offset(n->offset);
+		    | add REG_A, 1
+
+		    n = n->jmp;
+		    break;
+		}
+	    }
+
+	    /*FALLTHROUGH*/
+
 	case T_IF: case T_MULT: case T_CMULT:
 	    load_acc_offset(n->offset);
 	    clean_acc();
