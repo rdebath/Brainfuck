@@ -418,12 +418,12 @@ print_info()
     printf("\n");
 
 #if defined(FLT_MAX)
-    printf("Bytes FL%2d, float          %g\n", (int)sizeof(float), FLT_MAX);
+    printf("Bytes FL%2d, float          %.24g\n", (int)sizeof(float), FLT_MAX);
 #else
     printf("Bytes FL%2d, float          ?\n", (int)sizeof(float));
 #endif
 #if defined(DBL_MAX)
-    printf("Bytes DB%2d, double         %g\n", (int)sizeof(double), DBL_MAX);
+    printf("Bytes DB%2d, double         %.24g\n", (int)sizeof(double), DBL_MAX);
 #else
     printf("Bytes DB%2d, double         ?\n", (int)sizeof(double));
 #endif
