@@ -430,7 +430,7 @@ print_info()
 
 #if !defined(_WIN32) || defined(__MINGW32__)
 #if defined(LDBL_MAX) && defined(LDBL_MAX_EXP) && defined(DBL_MAX_EXP) && LDBL_MAX_EXP != DBL_MAX_EXP
-    printf("Bytes LD%2d, long double    %Lg\n", (int)sizeof(long double), LDBL_MAX);
+    printf("Bytes LD%2d, long double    %.24Lg\n", (int)sizeof(long double), LDBL_MAX);
 #endif
 #endif
 }
