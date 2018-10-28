@@ -38,6 +38,7 @@ static void print_dcstring(void);
 static FILE * ofd;
 static int outputmode = 2;
 static int inputmode = 2;
+static int stackdepth = 0;
 
 static check_arg_t fn_check_arg;
 struct be_interface_s be_interface = {.check_arg=fn_check_arg};
@@ -132,23 +133,37 @@ outcmd(int ch, int count)
     case '-': prv("lp;a%s-lp:a", dc_ltoa(count)); break;
     case '<': prv("lp%s-sp", dc_ltoa(count)); break;
     case '>': prv("lp%s+sp", dc_ltoa(count)); break;
-    case '[': pr("["); break;
+    case '[': pr("["); stackdepth++; break;
     case ']':
 	if(bytecell)
 	    pr("lmx0!=b]Sblmx0!=bLbc");
 	else
 	    pr("lp;a0!=b]Sblp;a0!=bLbc");
+	stackdepth--;
 	break;
 
-    case 'I': pr("["); break;
+    case 'I': pr("["); stackdepth++; break;
     case 'E':
 	if(bytecell)
 	    pr("]Sblmx0!=bLbc");
 	else
 	    pr("]Sblp;a0!=bLbc");
+	stackdepth--;
 	break;
 
-    case ',': if (inputmode != 2) { pr("lix"); do_input=1; } break;
+    case ',':
+	if (inputmode != 2) { pr("lix"); do_input=1; break; }
+
+	/*FALLTHROUGH*/
+
+    case 'X':
+	pr("[STOP command executed\n]P");
+	if (stackdepth>1)
+	    prv("%dQ", stackdepth);
+	else
+	    pr("q");
+	break;
+
     case '.': if (outputmode == 2) pr("lp;aaP"); else pr("lox"); do_output=1; break;
     case '"': print_dcstring(); break;
     }
@@ -213,7 +228,7 @@ outcmd(int ch, int count)
 #ifndef _WIN32
     if (inputmode == 1) pr("[?lp:a]si"); else
 #endif
-    if (do_input) {
+    if (do_input && inputmode == 2) {
 	int flg = 0;
 	pr("0si");
 	fprintf(stderr, "Please enter the input data for the program: ");
@@ -230,6 +245,18 @@ outcmd(int ch, int count)
 	fprintf(stderr, "\n");
 	pr("0li:I0sn");
 	pr("[lnd1+sn;Ilp:a]si");
+    }
+
+    if (do_input && inputmode == 3) {
+	/* New for GNU dc, character input with "$" ... soon after 2013! */
+	fprintf(ofd, "0dd:Isn\n");
+	fprintf(ofd, "[[0$I0sn]SNln0;I!>N\n");
+	fprintf(ofd, "[d>.ln1+dsn;I]sN_1ln0;I>N0sNLNd>.]si\n");
+    }
+
+    if (do_input && inputmode == 4) {
+	/* New for GNU dc, character I/O with "G" ... soon after 2013! */
+	fprintf(ofd, "[1G [sB_1]SA [bAla]SB 0=A Bx 0sALAaBLB+ ]si\n");
     }
 
     fprintf(ofd, "LFx ");
