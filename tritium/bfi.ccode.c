@@ -270,10 +270,15 @@ print_c_header(FILE * ofd)
 
     if (libtcc_specials || use_functions || use_dynmem || !knr_c_ok)
     {
-	if (knr_c_ok) fprintf(ofd, "#ifdef __STDC__\n");
+	if (knr_c_ok)
+	    fprintf(ofd, "#ifdef __STDC__\n");
 	fprintf(ofd, "#include <stdlib.h>\n");
 	fprintf(ofd, "#include <string.h>\n");
-	if (knr_c_ok) fprintf(ofd, "#endif\n");
+	if (knr_c_ok) {
+	    fprintf(ofd, "#else\n");
+	    fprintf(ofd, "#define const\n");
+	    fprintf(ofd, "#endif\n");
+	}
     }
     fprintf(ofd, "\n");
 
@@ -411,6 +416,9 @@ print_c_header(FILE * ofd)
 
 	fputs("\n", ofd);
     }
+
+    if (node_type_counts[T_STOP] != 0)
+	fputs("const char stopped[] = \"STOP Command executed.\\n\";\n\n", ofd);
 
     if (do_run) {
 	if (use_dlopen) {
@@ -1152,9 +1160,9 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	case T_STOP:
 	    if (!disable_indent) pt(ofd, indent,n);
 	    if (use_functions)
-		fprintf(ofd, "exit((fprintf(stderr, \"STOP Command executed.\\n\"),1));\n");
+		fprintf(ofd, "exit((fprintf(stderr, stopped),1));\n");
 	    else
-		fprintf(ofd, "return fprintf(stderr, \"STOP Command executed.\\n\"),1;\n");
+		fprintf(ofd, "return fprintf(stderr, stopped),1;\n");
 	    break;
 
 	case T_DUMP:
@@ -1257,8 +1265,9 @@ print_ccode(FILE * ofd)
 
 	if (n->orgtype == T_END) indent--;
 
-	if (n->type == T_END && n->jmp->type == T_WHL &&
-	    n->iprof-n->jmp->iprof > 5) {
+	if (((n->type == T_END && n->jmp->type == T_WHL) ||
+	    ( n->type == T_ENDIF && n->jmp->type == T_IF)) &&
+		n->iprof-n->jmp->iprof > 5) {
 	    int ti = indent;
 	    indent = 0;
 

@@ -123,6 +123,7 @@ int opt_no_loop_classify = 0;
 int opt_no_kvmov = 0;
 int opt_regen_mov = -1;
 int opt_pointerrescan = 0;
+int opt_delete_tifs = 0;
 
 int hard_left_limit = -1024;
 int memsize = 0x100000;	/* Default to 1M of tape if otherwise unspecified. */
@@ -194,6 +195,7 @@ void calculate_stats(void);
 void pointer_scan(void);
 void pointer_regen(void);
 void invariants_scan(void);
+void delete_tifs(void);
 void trim_trailing_sets(void);
 int scan_one_node(struct bfi * v, struct bfi ** move_v);
 int find_known_calc_state(struct bfi * v);
@@ -374,6 +376,8 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("        Regenerate pointer move tokens to remove offsets to loops.\n");
     printf("   -fpointer-rescan\n");
     printf("        Rerun the pointer scan pass after other optimisations.\n");
+    printf("   -fdelete-tifs\n");
+    printf("        Delete trivial infinite loops '[]' from output after optimisation.\n");
 #ifndef NO_EXT_BE
 #ifdef BE_CCODE
     printf("\n");
@@ -594,6 +598,7 @@ checkarg(char * opt, char * arg)
     } else if (!strcmp(opt, "-fno-loop-classify")) { opt_no_loop_classify = 1; return 1;
     } else if (!strcmp(opt, "-fno-kv-mov")) { opt_no_kvmov = 1; return 1;
     } else if (!strcmp(opt, "-fpointer-rescan")) { opt_pointerrescan = 1; return 1;
+    } else if (!strcmp(opt, "-fdelete-tifs")) { opt_delete_tifs = 1; return 1;
     } else if (!strcmp(opt, "-fno-loop-offset")) { opt_regen_mov = 1; return 1;
     } else if (!strcmp(opt, "-floop-offset")) { opt_regen_mov = 0; return 1;
     } else if (!strcmp(opt, "-fintio")) { iostyle = 3; opt_no_litprt = 1; default_io=0; return 1;
@@ -896,6 +901,17 @@ static int dld, inp, rle = 0, num = -1, ov_flg, loopid, zstate;
 		    n->count = pending_mov;
 		    pending_mov = 0;
 		}
+
+		if (zstate == 1 && ch == T_END && !opt_no_endif) {
+		    p = n = new_node(p, T_IF, curr_line, curr_col);
+		    n->jmp=jst; jst = n; n->count = ++loopid;
+		    p = n = new_node(p, T_STOP, curr_line, curr_col);
+		    p = n = new_node(p, T_ENDIF, curr_line, curr_col);
+		    n->jmp = jst; jst = jst->jmp; n->jmp->jmp = n;
+		    zstate = 0;
+		    continue;
+		}
+
 		p = n = new_node(p, T_WHL, curr_line, curr_col);
 		{ n->jmp=jst; jst = n; n->count = ++loopid; }
 
@@ -1201,6 +1217,9 @@ process_file(void)
 	    tickstart();
 	    invariants_scan();
 	    tickend("Time for invariant scan");
+
+	    if (opt_delete_tifs && node_type_counts[T_STOP] != 0)
+		delete_tifs();
 
 	    if (opt_pointerrescan) {
 		tickstart();
@@ -1744,7 +1763,7 @@ pointer_scan(void)
 
 	    case T_PRT: case T_CHR: case T_INP:
 	    case T_ADD: case T_SET:
-	    case T_DUMP:
+	    case T_DUMP: case T_STOP:
 		if(verbose>4)
 		    fprintf(stderr, "Push past command.\n");
 		/* Put movement after a normal cmd. */
@@ -1770,21 +1789,6 @@ pointer_scan(void)
 		    n2->offset2 += n->count;
 		if (n2->count3)
 		    n2->offset3 += n->count;
-		n3 = n->prev;
-		n4 = n2->next;
-		if(n3) n3->next = n2; else bfprog = n2;
-		n2->next = n;
-		n->next = n4;
-		n2->prev = n3;
-		n->prev = n2;
-		if(n4) n4->prev = n;
-		continue;
-
-	    case T_STOP:
-		if(verbose>4)
-		    fprintf(stderr, "Push past command.\n");
-		/* Put movement after a normal cmd. */
-		n2 = n->next;
 		n3 = n->prev;
 		n4 = n2->next;
 		if(n3) n3->next = n2; else bfprog = n2;
@@ -1906,6 +1910,7 @@ pointer_regen(void)
 	case T_PRT: case T_INP:
 	case T_CHR: case T_DUMP:
 	case T_ADD: case T_SET:
+	case T_STOP:
 	    n->offset -= current_shift;
 	    break;
 
@@ -1915,7 +1920,6 @@ pointer_regen(void)
 	    if(n->count3 != 0) n->offset3 -= current_shift;
 	    break;
 
-	case T_STOP:
 	case T_MOV:
 	    break;
 
@@ -2027,6 +2031,30 @@ invariants_scan(void)
 	}
 	else if (node_changed && n && n->prev)
 	    n = n->prev;
+    }
+}
+
+void
+delete_tifs(void)
+{
+    struct bfi * n = bfprog, *n2, *n3, *n4;
+    while(n) {
+	if ( n->type == T_IF && n->next->type == T_STOP &&
+	     n->next->next->type == T_ENDIF && n->prev) {
+	    n2 = n->next;
+	    n3 = n2->next;
+	    n4 = n3->next;
+	    if (n4) {
+		n->prev->next = n4;
+		n4->prev = n->prev;
+		free(n);
+		free(n2);
+		free(n3);
+		n = n4;
+		continue;
+	    }
+	}
+	n=n->next;
     }
 }
 
@@ -2236,6 +2264,21 @@ find_known_value_recursion(struct bfi * n, int v_offset,
 		int known_value2 = 0, non_zero_unsafe2 = 0, hit_stop2 = 0, base_shift2 = 0;
 
 		if (verbose>5) fprintf(stderr, "%d: T_END: searching for double known\n", __LINE__);
+		if (n->prev->type == T_STOP) {
+		    /* We are unreachable from inside the loop. */
+		    if (verbose>5) fprintf(stderr, "%d: T_STOP found in loop; continuing.\n", __LINE__);
+		    n_used = 1;
+		    if (n->jmp->offset == v_offset) {
+			/* The loop is for this offset, so it must be zero */
+			if (unmatched_ends) goto break_break;
+			known_value = 0;
+			const_found = 1;
+			goto break_break;
+		    }
+		    n = n->jmp;
+		    break;
+		}
+
 		find_known_value_recursion(n->prev, v_offset,
 		    0, &const_found, &known_value2, &non_zero_unsafe2,
 		    allow_recursion-1, n->jmp, &hit_stop2, &base_shift2, &n_used,
