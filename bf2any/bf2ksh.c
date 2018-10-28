@@ -26,6 +26,7 @@ static void
 shcode() {
     if (!in_arith) return;
     in_arith = 0;
+    ind--;
     pr("1))");
 }
 
@@ -34,6 +35,7 @@ arith() {
     if (in_arith) return;
     in_arith = 1;
     pr("((");
+    ind++;
 }
 
 void
@@ -76,31 +78,31 @@ outcmd(int ch, int count)
 
     case '=':
 	if (in_arith)
-	    prv("  M[P]=%d,", count);
+	    prv("M[P]=%d,", count);
 	else
 	    prv("M[P]=%d", count);
 	break;
 
     case 'B':
 	arith();
-	if(bytecell) pr("  M[P]&=255,");
-	pr("  V=M[P],");
+	if(bytecell) pr("M[P]&=255,");
+	pr("V=M[P],");
 	break;
-    case 'M': arith(); prv("  M[P]+=V*%d,", count); break;
-    case 'N': arith(); prv("  M[P]-=V*%d,", count); break;
-    case 'S': arith(); pr("  M[P]+=V,"); break;
-    case 'T': arith(); pr("  M[P]-=V,"); break;
-    case '*': arith(); pr("  M[P]*=V,"); break;
+    case 'M': arith(); prv("M[P]+=V*%d,", count); break;
+    case 'N': arith(); prv("M[P]-=V*%d,", count); break;
+    case 'S': arith(); pr("M[P]+=V,"); break;
+    case 'T': arith(); pr("M[P]-=V,"); break;
+    case '*': arith(); pr("M[P]*=V,"); break;
 
-    case 'C': arith(); prv("  M[P]=V*%d,", count); break;
-    case 'D': arith(); prv("  M[P]=-V*%d,", count); break;
-    case 'V': arith(); pr("  M[P]=V,"); break;
-    case 'W': arith(); pr("  M[P]=-V,"); break;
+    case 'C': arith(); prv("M[P]=V*%d,", count); break;
+    case 'D': arith(); prv("M[P]=-V*%d,", count); break;
+    case 'V': arith(); pr("M[P]=V,"); break;
+    case 'W': arith(); pr("M[P]=-V,"); break;
 
-    case '+': arith(); prv("  M[P]+=%d,", count); break;
-    case '-': arith(); prv("  M[P]-=%d,", count); break;
-    case '>': arith(); prv("  P+=%d,", count); break;
-    case '<': arith(); prv("  P-=%d,", count); break;
+    case '+': arith(); prv("M[P]+=%d,", count); break;
+    case '-': arith(); prv("M[P]-=%d,", count); break;
+    case '>': arith(); prv("P+=%d,", count); break;
+    case '<': arith(); prv("P-=%d,", count); break;
     case '.': shcode(); pr("o $((M[P]&255))"); do_output++; break;
     case ',': shcode(); pr("getch"); do_input++; break;
     case '"': shcode(); print_string(); break;
