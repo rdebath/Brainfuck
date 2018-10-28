@@ -438,17 +438,21 @@ run_supertree(void)
     uint_cell mask_value = -1;
     int do_mask = 0, mask_offset = 0;
 
-    ints_per_cell = ((unsigned)cell_length + sizeof(uint_cell)*CHAR_BIT -1)
-		    / (sizeof(uint_cell)*CHAR_BIT);
+    if (cell_length == INT_MAX) {
+	ints_per_cell = ((unsigned)INT_MAX+1)/sizeof(uint_cell)/CHAR_BIT;
+	byte_per_cell = sizeof(uint_cell)*ints_per_cell;
+    } else {
+	ints_per_cell = ((unsigned)cell_length + sizeof(uint_cell)*CHAR_BIT -1)
+			/ (sizeof(uint_cell)*CHAR_BIT);
 
-    byte_per_cell = sizeof(uint_cell)*ints_per_cell;
+	byte_per_cell = sizeof(uint_cell)*ints_per_cell;
 
-    if (byte_per_cell*CHAR_BIT != cell_length) {
-	do_mask = 1;
-	mask_offset = ints_per_cell-1;
-	mask_value >>= (byte_per_cell*CHAR_BIT - cell_length);
+	if (byte_per_cell*CHAR_BIT != cell_length) {
+	    do_mask = 1;
+	    mask_offset = ints_per_cell-1;
+	    mask_value >>= (byte_per_cell*CHAR_BIT - cell_length);
+	}
     }
-
 #ifndef NO_BIG_INT
     if (verbose)
 	fprintf(stderr, "Maxtree variant: %dx%d byte int/cell (hardmult)\n",
