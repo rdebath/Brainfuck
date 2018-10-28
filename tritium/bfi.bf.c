@@ -15,6 +15,7 @@ int
 checkarg_bf(char * opt, char * arg UNUSED)
 {
     if (!strcmp(opt, "-fbfbasic")) { BFBasic = 1; return 1; }
+    if (!strcmp(opt, "-fbftif")) { BFBasic = 2; return 1; }
     if (!strcmp(opt, "-bfrle")) { bfrle = 1; return 1; }
     return 0;
 }
@@ -102,11 +103,18 @@ print_bf(void)
 	     * fragment explicitly zeros those cells so the optimiser can
 	     * easily see this is true. */
 	    if (BFBasic)
-		if (n->offset == 2)
-		    ps("[-]+> [-]>[-]>[-]>[-]>[-]>[-]>[-]><<<<<<< <");
+		if (n->offset == 2) {
+		    if (BFBasic == 1)
+			ps("[-]+> [-]>[-]>[-]>[-]>[-]>[-]>[-]><<<<<<< <");
+		    else
+			ps("[-]+> []>[]>[]>[]>[]>[]>[]><<<<<<< <");
+		}
 	    break;
 
 	case T_END:
+	    if (BFBasic > 1)
+		if (n->offset == 2)
+		    ps("[]");
 	    pc(']');
 	    break;
 
