@@ -132,9 +132,10 @@ else
 UNSAFE += $(call cc-option,$(WERROR) -fno-strict-overflow,-fno-strict-overflow)
 endif
 
-# Optimise for this machine, set MARCH if you want different.
+ifeq ($(findstring -march,$(TARGET_ARCH))$(findstring -mcpu,$(TARGET_ARCH)),)
 MARCH =$(call cc-option,$(WERROR) -march=native,-march=native)
 UNSAFE += $(MARCH)
+endif
 
 # GCC complains about flex generated code.
 NOSGN := $(call cc-option,$(WERROR) -Wno-sign-compare,-Wno-sign-compare)

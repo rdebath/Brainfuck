@@ -32,7 +32,8 @@
 
 # More knobs to twiddle (the makefile uses INSTALL like the cp(1) command)
 TARGETFILE=bfi
-INSTALL=install -p -s
+INSTALL=install -p
+ISTRIP=-s
 INSTALLDIR=/usr/local/bin
 INSTALLEXT=
 # DEFS=
@@ -80,7 +81,7 @@ clean:
 	-rm -f *.o bfi.dasm.c .build-opts.*
 
 install: $(TARGETFILE)
-	$(INSTALL) $(TARGETFILE) $(INSTALLDIR)/$(TARGETFILE)$(INSTALLEXT)
+	$(INSTALL) $(ISTRIP) $(TARGETFILE) $(INSTALLDIR)/$(TARGETFILE)$(INSTALLEXT)
 
 bfi.dasm.o:	bfi.dasm.c bfi.tree.h bfi.dasm.h bfi.run.h
 	$(CC) $(CFLAGS) -I $(TOOLDIR) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ bfi.dasm.c
@@ -179,6 +180,7 @@ WERROR := $(call cc-option,-Werror,-Werror)
 UNSAFE +=$(call cc-option,$(WERROR) -Wextra,-Wextra)
 UNSAFE +=$(call cc-option,$(WERROR) -fno-delete-null-pointer-checks,-fno-delete-null-pointer-checks)
 UNSAFE +=$(call cc-option,$(WERROR) -Wno-null-pointer-arithmetic,-Wno-null-pointer-arithmetic)
+UNSAFE +=$(call cc-option,$(WERROR) $(OPTFLG) -g3,-g3)
 
 # -fwrapv and -fno-strict-overflow may conflict (clang)
 ifeq ($(call cc-option,$(WERROR) -fwrapv,ok,fail),ok)
@@ -211,14 +213,15 @@ try-run = $(shell set -e;               \
 
 ################################################################################
 
+ifeq ($(findstring -march,$(TARGET_ARCH))$(findstring -mcpu,$(TARGET_ARCH)),)
 MNATIVE := $(call try-run,\
         { echo 'int main(){return 0;}'; } > $(TMP).c ; \
 	$(CC) $(TARGET_ARCH) -march=native $(TMP).c -o $(TMP),1)
 
 ifneq ($(MNATIVE),)
-# Optimise for this machine, set MARCH if you want different.
 MARCH = -march=native
 UNSAFE += $(MARCH)
+endif
 endif
 
 ################################################################################
@@ -301,6 +304,7 @@ DO_BN := $(call try-run,\
 endif	# CC
 else
 INSTALL=cp
+ISTRIP=
 GNULGT := -w
 endif	# CALLOK
 
