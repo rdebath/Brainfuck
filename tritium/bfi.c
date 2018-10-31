@@ -3852,12 +3852,15 @@ update_opt_runner(struct bfi * n, int * mem, int offset)
  *
  *  bfi -A pgm.b | gcc -include macro.rb.cpp -E -P - > pgm.out
  *
- * The default header generates some C code.
+ * The default header generates some C or C++ code.
  */
 void
 print_codedump(void)
 {
     struct bfi * n = bfprog;
+    const char * cpp_type = "Cell";	/* Boost library uses "C" */
+    /* Boost library segfaults if defined bitsize is over about 250000 */
+    const unsigned max_cpp_bits = 250000;
 
     if (!noheader) {
 	int add_mask = 0, unknown_type = 0;
@@ -3869,6 +3872,7 @@ print_codedump(void)
 	    add_mask = 1;
 	}
 	unknown_type = (strcmp(cell_type, "C") == 0);
+	if (!unknown_type) cpp_type = cell_type;
 
 	puts("#ifndef bf_start");
 	puts("#include <stdlib.h>");
@@ -3877,23 +3881,60 @@ print_codedump(void)
 	    puts("#include <stdint.h>");
 
 	if (unknown_type) {
-	    puts("#ifndef C");
-	    puts("#define C uintmax_t");
+	    puts("#ifdef __cplusplus");
+	    puts("#define register");
+	    puts("#include <boost/multiprecision/cpp_int.hpp>");
+	    puts("  using namespace boost::multiprecision;");
+	    /* Use the Boost predefined uint123_t types or manufacture
+	     * a new one of exactly the right number of bits. */
+
+	    /* BEWARE: The signed types are not compliant with the C,
+	     * C++ or POSIX standards. For the C and C++ standards they
+	     * are one bit too large for their advertised size and in
+	     * addition the POSIX standard requires that the types use
+	     * twos-complement operations.
+	     */
+	    if ( cell_length > 0 && cell_length != 128 &&
+		 cell_length != 256 && cell_length != 512 &&
+		 cell_length != 1024 && cell_length <= max_cpp_bits) {
+		printf("%s%d%s%d%s%d%s\n",
+		    "  typedef number<cpp_int_backend<", cell_length,
+		    ", ", cell_length, ",\n"
+		    "  unsigned_magnitude, unchecked, void> >"
+		    " uint", cell_length,"_t;"
+		);
+	    }
+	    puts("#endif");
+
+	    printf("#ifndef %s\n", cpp_type);
+	    puts("#ifdef __cplusplus");
+	    if (cell_length > max_cpp_bits)
+		printf("#define %s cpp_int\n", cpp_type);
+	    else
+		printf("#define %s uint%d_t\n", cpp_type,
+		    cell_length?cell_length:1024);
+	    puts("#else");
+	    printf("#define %s uintmax_t\n", cpp_type);
+	    puts("#endif");
+	    puts("#endif");
+	} else {
+	    puts("#ifdef __cplusplus");
+	    puts("#define register");
 	    puts("#endif");
 	}
 
 	puts("#define bf_end() return 0;}");
 	printf("%s%s%s\n",
-	    "#define bf_start(msz,moff,bits) ",cell_type," mem[msz+moff]; \\");
+	    "#define bf_start(msz,moff,bits) ",cpp_type," mem[msz+moff]; \\");
 
 	if (node_type_counts[T_CHR] || node_type_counts[T_PRT])
-	    puts("  void putch(int c) {char s=c; write(1,&s,1);} \\");
+	    printf("  void putch(%s c) {char s=(int)c; write(1,&s,1);} \\\n", cpp_type);
 
 	if (node_type_counts[T_CHR])
-	    puts("  void putstr(char *s) {char *p=s; while(*p)p++; write(1,s,p-s);}\\");
+	    puts("  void putstr(const char *s) {const char *p=s; while(*p)p++; write(1,s,p-s);}\\");
 
 	printf("%s%s%s\n",
-	    "  int main(void){register ",cell_type,"*p=mem+moff;");
+	    "  int main(void){register ",cpp_type,"*p=mem+moff;");
 
 	if (enable_trace)
 	    puts("#define posn(l,c) /* Line l Column c */");
@@ -3906,7 +3947,7 @@ print_codedump(void)
 	    puts("#define add_i(x,y) p[x] += y;");
 
 	if (node_type_counts[T_SET])
-	    puts("#define set_i(x,y) p[x] = y;");
+	    printf("#define set_i(x,y) p[x] = (%s)y;\n", cpp_type);
 
 	/* See:  opt_no_calc */
 	if (node_type_counts[T_CALC])
@@ -3992,7 +4033,8 @@ print_codedump(void)
 	}
 
 	puts("#endif");
-	puts("/* ###################### CUT HERE ###################### */");
+	puts(" /* ############################### CUT "
+	     "HERE ############################### */");
     }
 
     printf("bf_start(%d,%d,%d)\n", memsize, -most_neg_maad_loop, cell_size);
@@ -4152,7 +4194,7 @@ print_codedump(void)
 	    break;
 
 	default:
-	    printf("%s\t%d,%d,%d,%d,%d,%d\n",
+	    printf("%s(%d,%d,%d,%d,%d,%d)\n",
 		tokennames[n->type],
 		    n->offset, n->count,
 		    n->offset2, n->count2,
