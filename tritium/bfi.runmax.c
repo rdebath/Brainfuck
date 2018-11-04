@@ -20,7 +20,7 @@
 static void run_supertree(void);
 
 /*
- * First check if convert_tree_to_runarray() has an extended cell variant.
+ * First check if run_tree_as_array() has an extended cell variant.
  */
 void
 run_maxtree(void)
@@ -29,7 +29,7 @@ run_maxtree(void)
 	if (verbose)
 	    fprintf(stderr, "Extended array interpreter: %d byte int/cell\n",
 			    (int)sizeof(C));
-	convert_tree_to_runarray();
+	run_tree_as_array();
 	return;
     }
 

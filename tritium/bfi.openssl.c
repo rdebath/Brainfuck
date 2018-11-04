@@ -14,7 +14,7 @@
 #include "bfi.openssl.h"
 #include "clock.h"
 
-#if !defined(DISABLE_BN)
+#if !defined(DISABLE_SSL)
 
 #include <openssl/bn.h>
 #include <openssl/crypto.h>

@@ -3,7 +3,8 @@
 #define DISABLE_TCCLIB
 #define DISABLE_DLOPEN
 #define DISABLE_DYNASM
-#define DISABLE_BN
+#define DISABLE_SSL
+#define DISABLE_GMP
 #endif
 
 #if defined(__GNUC__) \

@@ -321,11 +321,7 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("        Default for running now (-r/-rc/-j/-q) is %dbits.\n",
 			opt_bytedefault? CHAR_BIT:
 			(int)sizeof(int)*CHAR_BIT);
-#ifdef DISABLE_BN
-    printf("        Other bitwidths also work (including 1..32 and maybe 64/128)\n");
-#else
-    printf("        Any other bitwidth will work too (1..2048 tested)\n");
-#endif
+    printf("        Other bit widths will work too (1..2048 tested)\n");
     printf("        Full Unicode characters need 21 bits.\n");
 #ifndef NO_EXT_BE
     printf("        The default for generated C code is to use the largest type found\n");
@@ -1317,7 +1313,7 @@ process_file(void)
 	    } else {
 		if (verbose)
 		    fprintf(stderr, "Starting array interpreter\n");
-		convert_tree_to_runarray();
+		run_tree_as_array();
 	    }
 
 	    unmap_hugeram();

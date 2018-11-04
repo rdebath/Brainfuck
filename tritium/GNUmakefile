@@ -56,10 +56,11 @@ MOREGCC=$(MOREDEFS) -Wstack-usage=512 -Wunsafe-loop-optimizations -Wold-style-de
 MORECLANG=$(MOREDEFS) -fsanitize=integer -Wpadded
 
 OBJECTS=bfi.o bfi.version.o bfi.ccode.o bfi.nasm.o bfi.bf.o bfi.dc.o \
-	bfi.dd.o bfi.runarray.o bfi.runmax.o bfi.openssl.o clock.o taperam.o
+	bfi.dd.o bfi.runarray.o bfi.runmax.o clock.o taperam.o \
+	bfi.openssl.o bfi.gmp.o
 
-CONF=-DCNF $(CONF_DYNASM) $(CONF_LIGHTNING) $(CONF_TCCLIB) $(CONF_BNLIB) $(CONF_LIBDL)
-LDLIBS=$(GNUSTK) $(LIBS_LIGHTNING) $(LIBS_TCCLIB) $(LIBS_BNLIB) $(GNUDYN) $(LIBS_LIBDL)
+CONF=-DCNF $(CONF_DYNASM) $(CONF_LIGHTNING) $(CONF_TCCLIB) $(CONF_SSLLIB) $(CONF_GMPLIB) $(CONF_LIBDL)
+LDLIBS=$(GNUSTK) $(LIBS_LIGHTNING) $(LIBS_TCCLIB) $(LIBS_SSLLIB) $(LIBS_GMPLIB) $(GNUDYN) $(LIBS_LIBDL)
 
 $(TARGETFILE): $(OBJECTS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(TARGETFILE) $(OBJECTS) $(LDLIBS) $(TARGET_ARCH)
@@ -95,7 +96,7 @@ bfi.version.o: bfi.version.h
 bfi.o: \
     bfi.c bfi.tree.h bfi.run.h bfi.be.def bfi.ccode.h bfi.gnulit.h \
     bfi.nasm.h bfi.bf.h bfi.dc.h bfi.dd.h clock.h ov_int.h \
-    bfi.runarray.h bfi.runmax.h bfi.dd.h bfi.openssl.h
+    bfi.runarray.h bfi.runmax.h bfi.dd.h bfi.openssl.h bfi.gmp.h
 bfi.bf.o: bfi.bf.c bfi.tree.h bfi.bf.h
 bfi.ccode.o: bfi.ccode.c bfi.tree.h bfi.run.h bfi.ccode.h clock.h
 bfi.dc.o: bfi.dc.c bfi.tree.h bfi.run.h bfi.dc.h
@@ -107,6 +108,7 @@ bfi.runmax.o: bfi.runmax.c bfi.tree.h bfi.run.h bfi.runmax.h \
     ov_int.h clock.h big_int.h
 bfi.dd.o: bfi.dd.c bfi.tree.h bfi.run.h bfi.dd.h
 bfi.openssl.o: bfi.openssl.c bfi.tree.h bfi.run.h bfi.openssl.h clock.h
+bfi.gmp.o: bfi.gmp.c bfi.tree.h bfi.run.h bfi.gmp.h clock.h
 
 clock.o: clock.c clock.h
 taperam.o: taperam.c bfi.tree.h bfi.run.h
@@ -296,10 +298,16 @@ endif
 endif
 
 # Open SSL big numbers ?
-DO_BN := $(call try-run,\
+DO_SSL := $(call try-run,\
 	{ echo '\#include <openssl/bn.h>'; 				\
 	  echo 'int main(){BIGNUM*t1=BN_new();BN_is_negative(t1);return(0);}'; \
 	  } > $(TMP).c ; $(TRYCC2) $(WERROR) -o $(TMP) -lcrypto,1)
+
+# Open GMP big numbers ?
+DO_GMP := $(call try-run,\
+	{ echo '\#include <gmp.h>'; 				\
+	  echo 'int main(){mpz_t t1;mpz_init(t1);return(0);}'; \
+	  } > $(TMP).c ; $(TRYCC2) $(WERROR) -o $(TMP) -lgmp,1)
 
 endif	# CC
 else
@@ -370,12 +378,20 @@ $(TARGETFILE): $(LIGHTNING_OBJ)
 OBJECTS += $(LIGHTNING_OBJ)
 endif
 
-ifeq ($(DO_BN),)
-CONF_BNLIB=-DDISABLE_BN
-LIBS_BNLIB=
+ifeq ($(DO_SSL),)
+CONF_SSLLIB=-DDISABLE_SSL
+LIBS_SSLLIB=
 else
-CONF_BNLIB=
-LIBS_BNLIB=-lcrypto
+CONF_SSLLIB=
+LIBS_SSLLIB=-lcrypto
+endif
+
+ifeq ($(DO_GMP),)
+CONF_GMPLIB=-DDISABLE_GMP
+LIBS_GMPLIB=
+else
+CONF_GMPLIB=
+LIBS_GMPLIB=-lgmp
 endif
 
 ifneq ($(findstring X86,$(CPUFOUND)),)

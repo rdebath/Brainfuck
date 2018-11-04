@@ -40,7 +40,27 @@
 #undef EXTENDED_MASK
 
 void
-convert_tree_to_runarray(void)
+run_tree_as_array(void)
+{
+    int * progarray = convert_tree_to_runarray(1);
+
+    delete_tree();
+    start_runclock();
+    if (cell_size == CHAR_BIT) {
+	run_charprog(progarray, map_hugeram());
+    } else if (cell_size == sizeof(int)*CHAR_BIT) {
+	run_intprog(progarray, map_hugeram());
+    } else if (cell_length <= sizeof(int)*CHAR_BIT) {
+	run_maskprog(progarray, map_hugeram());
+    } else {
+	run_supermask(progarray, map_hugeram());
+    }
+    finish_runclock(&run_time, &io_time);
+    free(progarray);
+}
+
+int *
+convert_tree_to_runarray(int merge_mov)
 {
     struct bfi * n = bfprog;
     size_t arraylen = 0;
@@ -55,6 +75,7 @@ convert_tree_to_runarray(void)
 	switch(n->type)
 	{
 	case T_MOV:
+	    if (!merge_mov) arraylen += 2;
 	    break;
 
 	case T_CALC:
@@ -83,23 +104,35 @@ convert_tree_to_runarray(void)
 	int * pp = p;
 #endif
 
-	if (n->type != T_MOV) {
-	    *p++ = (n->offset - last_offset);
-	    last_offset = n->offset;
-	}
-	else {
-	    last_offset -= n->count;
-	    n = n->next;
-	    continue;
+	if (merge_mov) {
+	    if (n->type != T_MOV) {
+		*p++ = (n->offset - last_offset);
+		last_offset = n->offset;
+	    }
+	    else {
+		last_offset -= n->count;
+		n = n->next;
+		continue;
+	    }
 	}
 
 	*p++ = n->type;
 	switch(n->type)
 	{
 	case T_INP: case T_PRT:
+	    if (!merge_mov) *p++ = n->offset;
 	    break;
 
-	case T_CHR: case T_ADD: case T_SET:
+	case T_CHR:
+	    *p++ = n->count;
+	    break;
+
+	case T_ADD: case T_SET:
+	    if (!merge_mov) *p++ = n->offset;
+	    *p++ = n->count;
+	    break;
+
+	case T_MOV:
 	    *p++ = n->count;
 	    break;
 
@@ -123,6 +156,7 @@ convert_tree_to_runarray(void)
 
 		    if (n2->type == T_END) {
 			p[-1] = T_ZFIND;
+			if (!merge_mov) *p++ = n->offset;
 			*p++ = n1->count;
 			n = n->jmp;
 			break;
@@ -131,6 +165,7 @@ convert_tree_to_runarray(void)
 
 		if (n1->type == T_ADD && n2->type == T_MOV && n3->type == T_END) {
 		    p[-1] = T_ADDWZ;
+		    if (!merge_mov) *p++ = n->offset;
 		    *p++ = n1->offset - last_offset;
 		    *p++ = n1->count;
 		    *p++ = n2->count;
@@ -145,6 +180,7 @@ convert_tree_to_runarray(void)
 		    n->offset == n2->offset - n3->count
 		) {
 		    p[-1] = T_MFIND;
+		    if (!merge_mov) *p++ = n->offset;
 		    *p++ = n3->count;
 		    n = n->jmp;
 		    break;
@@ -153,22 +189,26 @@ convert_tree_to_runarray(void)
 
 	    /* Storing the location of the instruction in the T_END's count
 	     * field; it's not normally used */
+	    if (!merge_mov) *p++ = n->offset;
 	    n->jmp->count = p-progarray;
 	    *p++ = 0;
 	    break;
 
 	case T_IF:
 	    p[-1] = T_WHL;
+	    if (!merge_mov) *p++ = n->offset;
 	    n->jmp->count = p-progarray;
 	    *p++ = 0;
 	    break;
 
 	case T_ENDIF:
-	    if (p[-2] == 0) p -= 2;
+	    if (!merge_mov) p--;
+	    else if (p[-2] == 0) p -= 2;
 	    progarray[n->count] = (p-progarray) - n->count -1;
 	    break;
 
 	case T_END:
+	    if (!merge_mov) *p++ = n->offset;
 	    progarray[n->count] = (p-progarray) - n->count;
 	    *p++ = -progarray[n->count];
 	    break;
@@ -178,10 +218,12 @@ convert_tree_to_runarray(void)
 		if (n->count == 0 && n->count2 == 1) {
 		    /*  m[off] = m[off2] */
 		    p[-1] = T_CALC4;
+		    if (!merge_mov) *p++ = n->offset;
 		    *p++ = n->offset2 - last_offset;
 		} else {
 		    /*  m[off] = m[off2]*count2 + count2 */
 		    p[-1] = T_CALC2;
+		    if (!merge_mov) *p++ = n->offset;
 		    *p++ = n->count;
 		    *p++ = n->offset2 - last_offset;
 		    *p++ = n->count2;
@@ -190,14 +232,17 @@ convert_tree_to_runarray(void)
 		if (n->count3 == 1) {
 		    /*  m[off] += m[off3] */
 		    p[-1] = T_CALC5;
+		    if (!merge_mov) *p++ = n->offset;
 		    *p++ = n->offset3 - last_offset;
 		} else {
 		    /*  m[off] += m[off3]*count3 */
 		    p[-1] = T_CALC3;
+		    if (!merge_mov) *p++ = n->offset;
 		    *p++ = n->offset3 - last_offset;
 		    *p++ = n->count3;
 		}
 	    } else {
+		if (!merge_mov) *p++ = n->offset;
 		*p++ = n->count;
 		*p++ = n->offset2 - last_offset;
 		*p++ = n->count2;
@@ -207,6 +252,7 @@ convert_tree_to_runarray(void)
 	    break;
 
 	case T_CALCMULT:
+	    if (!merge_mov) *p++ = n->offset;
 	    *p++ = n->offset2 - last_offset;
 	    *p++ = n->offset3 - last_offset;
 
@@ -215,6 +261,7 @@ convert_tree_to_runarray(void)
 	    break;
 
 	case T_LT:
+	    if (!merge_mov) *p++ = n->offset;
 	    *p++ = n->offset2 - last_offset;
 	    *p++ = n->offset3 - last_offset;
 
@@ -222,7 +269,11 @@ convert_tree_to_runarray(void)
 		fprintf(stderr, "Invalid %s node counts found\n", tokennames[n->type]);
 	    break;
 
-	case T_STOP: case T_NOP:
+	case T_STOP:
+	    break;
+
+	case T_NOP:
+	    if (!merge_mov) p--;
 	    break;
 
 	default:
@@ -231,42 +282,43 @@ convert_tree_to_runarray(void)
 	}
 
 #ifdef ARRAY_DUMP
-	if (verbose>1)
-	{
-	    if (pp[0])
-		fprintf(stderr, "T_MOV(%d): ", pp[0]);
+	if (verbose>1) {
+	    fprintf(stderr, "%4d:", p-progarray);
+	    if (merge_mov) {
+		if (pp[0])
+		    fprintf(stderr, "T_MOV(%d): ", pp[0]);
 
-	    if (pp[1] >= 0 && pp[1] < TCOUNT)
-		fprintf(stderr, "%s", tokennames[pp[1]]);
-	    else
-		fprintf(stderr, "TOKEN(%d)", pp[1]);
+		if (pp[1] >= 0 && pp[1] < TCOUNT)
+		    fprintf(stderr, "%s", tokennames[pp[1]]);
+		else
+		    fprintf(stderr, "TOKEN(%d)", pp[1]);
 
-	    for(pp+=2; pp<p; pp++) fprintf(stderr, " %d", pp[0]);
+		for(pp+=2; pp<p; pp++) fprintf(stderr, " %d", pp[0]);
 
-	    if(n->line || n->col)
-		fprintf(stderr, " @(%d,%d)", n->line, n->col);
+		if(n->line || n->col)
+		    fprintf(stderr, " @(%d,%d)", n->line, n->col);
 
-	    fprintf(stderr, "\n");
+		fprintf(stderr, "\n");
+	    } else {
+		if (pp[0] >= 0 && pp[0] < TCOUNT)
+		    fprintf(stderr, "%s", tokennames[pp[0]]);
+		else
+		    fprintf(stderr, "TOKEN(%d)", pp[0]);
+
+		for(pp+=1; pp<p; pp++) fprintf(stderr, " %d", pp[0]);
+
+		if(n->line || n->col)
+		    fprintf(stderr, " @(%d,%d)", n->line, n->col);
+
+		fprintf(stderr, "\n");
+	    }
 	}
 #endif
 
 	n = n->next;
     }
-    *p++ = 0;
+    if (merge_mov) *p++ = 0;
     *p++ = T_STOP;
 
-    delete_tree();
-    start_runclock();
-    if (cell_size == CHAR_BIT) {
-	run_charprog(progarray, map_hugeram());
-    } else if (cell_size == sizeof(int)*CHAR_BIT) {
-	run_intprog(progarray, map_hugeram());
-    } else if (cell_length <= sizeof(int)*CHAR_BIT) {
-	run_maskprog(progarray, map_hugeram());
-    } else {
-	run_supermask(progarray, map_hugeram());
-    }
-    finish_runclock(&run_time, &io_time);
-    free(progarray);
+    return progarray;
 }
-

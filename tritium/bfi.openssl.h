@@ -1,4 +1,4 @@
-#if !defined(DISABLE_BN)
+#if !defined(DISABLE_SSL)
 
 #ifndef _BFI_OPENSSL_H
 #define _BFI_OPENSSL_H
