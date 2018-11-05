@@ -175,6 +175,7 @@ int max_indent = 0;
 int node_type_counts[TCOUNT+1];
 int node_profile_counts[TCOUNT+1];
 int min_pointer = 0, max_pointer = 0;
+int min_safe_mem = 0, max_safe_mem = 0;
 int most_negative_mov = 0, most_positive_mov = 0;
 int most_neg_maad_loop = 0;
 double profile_hits = 0.0;
@@ -1330,6 +1331,9 @@ calculate_stats(void)
 
 	n=n->next;
     }
+
+    min_safe_mem = min_pointer + most_negative_mov;
+    max_safe_mem = max_pointer + most_positive_mov;
 }
 
 void
@@ -1344,6 +1348,9 @@ print_tree_stats(void)
 
     if (total_nodes) {
 	fprintf(stderr, "Offset range %d..%d", min_pointer, max_pointer);
+	if (most_positive_mov != 0 || most_negative_mov != 0)
+	    fprintf(stderr, ", T_MOV range %d..%d",
+		    most_negative_mov, most_positive_mov);
 	fprintf(stderr, ", Minimum MAAD offset %d\n", most_neg_maad_loop);
 	if (profile_hits > 0 && run_time>0)
 	    fprintf(stderr, "Run time %.6fs, cycles %.0f, %.3fns/cycle\n",

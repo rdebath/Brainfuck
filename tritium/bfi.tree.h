@@ -29,6 +29,7 @@
 extern const char * bfname;
 extern int noheader, enable_trace, hard_left_limit, memsize, most_neg_maad_loop;
 extern int min_pointer, max_pointer;
+extern int min_safe_mem, max_safe_mem;
 extern int opt_level;
 extern int iostyle, eofcell;
 extern char * input_string;

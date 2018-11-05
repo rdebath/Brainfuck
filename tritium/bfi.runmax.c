@@ -99,10 +99,10 @@ alloc_ptr(mem_cell *p)
 static inline mem_cell *
 move_ptr(mem_cell *p, int off) {
     p += off;
-    if (off>=0 && p+max_pointer >= mem+dyn_memsize)
-        p = alloc_ptr(p+max_pointer)-max_pointer;
-    if (off<=0 && p+min_pointer <= mem)
-        p = alloc_ptr(p+min_pointer)-min_pointer;
+    if (off>=0 && p+max_safe_mem >= mem+dyn_memsize)
+        p = alloc_ptr(p+max_safe_mem)-max_safe_mem;
+    if (off<=0 && p+min_safe_mem <= mem)
+        p = alloc_ptr(p+min_safe_mem)-min_safe_mem;
     return p;
 }
 

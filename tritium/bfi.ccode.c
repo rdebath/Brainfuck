@@ -618,8 +618,8 @@ print_c_header(FILE * ofd)
 	} else {
 
 	    printf("#define CELL %s\n", cell_type);
-	    printf("#define MINOFF (%d)\n", min_pointer);
-	    printf("#define MAXOFF (%d)\n", max_pointer);
+	    printf("#define MINOFF (%d)\n", min_safe_mem);
+	    printf("#define MAXOFF (%d)\n", max_safe_mem);
 	    printf("#define MINALLOC 16\n");
 
 	    puts( "\n"	"CELL * mem = 0;"
