@@ -15,7 +15,7 @@ INSTALL=install -p -s
 INSTALLDIR=/usr/local/bin
 INSTALLEXT=
 ALLEXE=bf2run \
-	bf2ada bf2asmjs bf2awk bf2bas bf2bf bf2bn bf2cgmp bf2clojure \
+	bf2ada bf2asmjs bf2awk bf2bas bf2bf bf2bn bf2cgmp \
 	bf2cmd bf2cobol bf2crun bf2cs bf2csh bf2d bf2dc bf2dump bf2elf \
 	bf2f90 bf2gas bf2go bf2java bf2julia bf2ksh bf2ksh88 bf2lua \
 	bf2nav bf2neko bf2oldsh bf2pas bf2perl bf2php bf2ps1 bf2py \
