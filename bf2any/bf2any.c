@@ -195,7 +195,7 @@ main(int argc, char ** argv)
     if (!opt_optim)
 	opt_optim = enable_optim = 1;
 
-    tapeinit = (enable_optim && !backend_only)?BOFF:0;
+    tapeinit = (!be_interface.disable_be_optim && !backend_only)?BOFF:0;
 
     if (be_interface.bytesonly) bytecell = 1;
 
