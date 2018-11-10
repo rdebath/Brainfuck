@@ -1592,6 +1592,15 @@ static trivbf roadrunner[1] = {{
     .help = "Roadrunner -- https://esolangs.org/wiki/Roadrunner",
 }};
 
+/* Language "CGALang" */
+static trivbf cgalang[1] = {{
+    .name = "cga",
+    .class = L_CDWORDS,
+    .bf = { "文明", "和谐", "爱国", "自由", "诚信", "友善", "富强", "民主"},
+    /* *p+=5 敬业, *p-=5 平等 */
+    .help = "CGALang -- https://gloomyghost.com/CGALang/",
+}};
+
 /* Language brainbool: http://esolangs.org/wiki/Brainbool */
 static trivbf brainbool[1] = {{
     .name = "brainbool",
@@ -1843,6 +1852,7 @@ static trivbf * trivlist[] = {
     bc, bc_rle, fish, dotty, lisp0, bewbs, moo, chinese, zero, yolang,
     k_on_fuck, petooh, arabic, dc1, dc2, dc3, dc4, nyan, atpling, cupid,
     ternary, pikalang, spoon, troll, roadrunner, brainbool, clojure,
+    cgalang,
 
     bfout, doubler_12, doubler_copy_LXXH, doubler_12nz, doubler_12r,
     doubler_17a, doubler_17b, doubler_copy, doubler_copynz,
