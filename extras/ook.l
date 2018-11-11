@@ -51,6 +51,7 @@ size_t bf_prefilter(char * buf, size_t maxsize);
 %x BEWBS
 %x LISP
 %x WORDLIST
+%x WSWORDLIST
 
 w	[\t ]*
 ws	[\t ]+
@@ -327,6 +328,13 @@ ook	B?[Oo]ok
     .		commentch(yytext[0]);
 }
 
+<WSWORDLIST>{
+    [^ \t\n\001]+	wordlist();
+
+    \001.*	|
+    [ \t\n]+	{int i; for(i=0; i<yyleng; i++) commentch(yytext[i]);}
+}
+
 \001.*		|
 [A-Za-z0-9]+	|
 [ \t\n]+	{int i; for(i=0; i<yyleng; i++) commentch(yytext[i]);}
@@ -452,11 +460,24 @@ int main(int argc, char ** argv)
 	    }
 	    else if (!strncmp(argv[1], "-al=", 4)) {
 		char * s;
+		int has_upper = 0, has_lower = 0;
 		mode = WORDLIST;
 		bflist = strdup(argv[1]+4);
-		for(s=bflist; *s; s++)
-		    if (isupper(*s))
-			*s = tolower(*s);
+		for(s=bflist; *s; s++) {
+		    if(*s==',') continue;
+		    if ((*s>='0' && *s<='9') || ((*s & 0x80) != 0)) continue;
+		    if (*s>='a' && *s<='z') { has_lower = 1; continue; }
+		    if (*s>='A' && *s<='Z') { has_upper = 1; continue; }
+		    mode = WSWORDLIST;
+		    break;
+		}
+
+		if (mode == WORDLIST && (!has_upper || !has_lower)) {
+		    for(s=bflist; *s; s++)
+			if (isupper(*s))
+			    *s = tolower(*s);
+		} else
+		    bflist_ic = 0;
 	    }
 	    else if (!strcmp(argv[1], "-petooh")) {
 		mode = PETOOH;
