@@ -63,7 +63,7 @@ pock	([ \t\n]*pock!)*
 ook	B?[Oo]ok
 
 %%
-<INITIAL>[]<+,-.>[]		pc(yytext[0]);
+<INITIAL>[]<+,-.#>[]		pc(yytext[0]);
 
 <BFRLE>{
     \[				{
@@ -359,14 +359,18 @@ char * character_prefilter = 0;
 char * character_conversion = 0;
 int line_cc = EOF;
 
+int sc_pending_off = 0;
+char * sc_pending_buf = 0;
+
 char bf[] = "><+-.,[]#";
 char *bflist = 0;
 int bflist_ic = 1;
 
 size_t (*custom_prefilter)(char *, size_t) = 0;
+size_t utf8_conversion(char * buf, size_t max_size);
+size_t string_conversion(char * buf, size_t max_size);
 size_t tiny_bf_to_bf(char * buf, size_t max_size);
 size_t qqq_to_bf(char * buf, size_t max_size);
-size_t utf8_conversion(char * buf, size_t max_size);
 size_t headsecks_to_bf(char * buf, size_t max_size);
 
 int main(int argc, char ** argv)
@@ -400,6 +404,7 @@ int main(int argc, char ** argv)
 	    else if (!strcmp(argv[1], "-nocom")) line_cc = EOF;
 
 	    else if (!strcmp(argv[1], "-bfrle")) { mode = BFRLE; }
+	    else if (!strcmp(argv[1], "-R")) { mode = BFRLE; }
 
 	    else if (!strcmp(argv[1], "-ook")) { mode = OOK; line_cc = '/'; }
 	    else if (!strcmp(argv[1], "-blub")) mode = BLUB;
@@ -452,11 +457,18 @@ int main(int argc, char ** argv)
 		character_conversion = bf;
 		custom_prefilter = utf8_conversion;
 	    }
+
 	    else if (!strncmp(argv[1], "-bf=", 4)) {
 		mode = INITIAL;
 		character_prefilter = argv[1]+4;
 		character_conversion = bf;
 		custom_prefilter = utf8_conversion;
+	    }
+	    else if (!strncmp(argv[1], "-match=", 7) && argv[1][7]) {
+		mode = INITIAL;
+		character_prefilter = argv[1]+7;
+		character_conversion = bf;
+		custom_prefilter = string_conversion;
 	    }
 	    else if (!strncmp(argv[1], "-al=", 4)) {
 		char * s;
@@ -472,13 +484,15 @@ int main(int argc, char ** argv)
 		    break;
 		}
 
-		if (mode == WORDLIST && (!has_upper || !has_lower)) {
+		if (!has_upper || !has_lower) {
+		    bflist_ic = 1;
 		    for(s=bflist; *s; s++)
 			if (isupper(*s))
 			    *s = tolower(*s);
 		} else
 		    bflist_ic = 0;
 	    }
+
 	    else if (!strcmp(argv[1], "-petooh")) {
 		mode = PETOOH;
 		character_prefilter = "adehkKoOru";
@@ -603,7 +617,18 @@ Usage(void)
     fprintf(stderr, "            Note: Uses UTF8 codepoints.\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "   -al=right,left,up,down,out,in,begin,end\n");
-    fprintf(stderr, "            Input using any simple word substitution.\n");
+    fprintf(stderr, "            Input using a simple word substitution.\n");
+    fprintf(stderr, "            Words must normally be separated by whitespace but if they're\n");
+    fprintf(stderr, "            alphanumeric separating by any non-alphanumeric character works.\n");
+    fprintf(stderr, "            Note: Uses order: '><+-.,[]#'\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "   -match=,right,left,up,down,out,in,begin,end\n");
+    fprintf(stderr, "            Match exact strings without any separation.\n");
+    fprintf(stderr, "            The first character after the '=' separates the commands in\n");
+    fprintf(stderr, "            the command line option. The commands do not have to have unique\n");
+    fprintf(stderr, "            prefixes. Extra words can be added after the standard to block\n");
+    fprintf(stderr, "            conversions that might break alignment. The first of those is\n");
+    fprintf(stderr, "            translated as a '#' command, the rest are ignored.\n");
     fprintf(stderr, "            Note: Uses order: '><+-.,[]'\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "   -blub    Input using blub.\n");
@@ -644,6 +669,7 @@ pc(int ch)
 	if (sof == 2) printf("\n]");
 	sof = 0;
     }
+    if (ch == '#' && !debug) return;
     if (ccol) putchar('\n'), ccol = col = 0;
     putchar(ch);
     if (++col >= MAXCOL) putchar('\n'), col = 0;
@@ -773,109 +799,12 @@ bf_prefilter(char * buf, size_t max_size)
     return n;
 }
 
-size_t
-tiny_bf_to_bf(char * buf, size_t max_size)
-{
-    static int tbf_dir = 0;
-    static int lookahead[8];
-    static int lookahead_len;
-
-    size_t n;
-    int c, more;
-
-    for(n=0; n<max_size;) {
-	c = getc(yyin);
-	if (c == EOF) return n;
-	if (c == '\n') {
-	    buf[n++] = c;	       /* Keep shorter lines. */
-	    continue;
-	} else
-	if (c != '=' && c != '+' && c != '>' && c != '|')
-	    continue;
-
-	lookahead[lookahead_len++] = c;
-
-	for(more=0; !more && n<max_size;)
-	{
-	    int eat=1;
-	    c = *lookahead;
-	    switch(c)
-	    {
-	    case '+': buf[n++] = "+-"[tbf_dir]; break;
-	    case '>': buf[n++] = "><"[tbf_dir]; break;
-	    case '=':
-		switch(lookahead[1])
-		{
-		case 0: eat=0; break;
-		case '=': buf[n++] = '.'; eat=2; break;
-		default: tbf_dir = !tbf_dir; break;
-		}
-		break;
-	    case '|':
-		if (tbf_dir) {
-		    buf[n++] = ']';
-		} else
-		    switch(lookahead[1])
-		    {
-		    case 0: eat=0; break;
-		    case '=':
-			switch(lookahead[2])
-			{
-			case 0: eat=0; break;
-			case '|': buf[n++] = '.'; eat=3; break;
-			default: buf[n++] = '['; break;
-			}
-			break;
-		    default: buf[n++] = "[]"[tbf_dir]; break;
-		    }
-		break;
-	    }
-
-	    more = !eat;
-	    for(; eat>0; eat--) {
-		int i;
-		for(i=1; STFU(lookahead[i-1] = lookahead[i]); i++) ;
-		lookahead_len--;
-	    }
-	    if (!*lookahead) more = 1;
-	}
-    }
-    return n;
-}
-
-size_t
-qqq_to_bf(char * buf, size_t max_size)
-{
-    static int qqq_state = 0;
-
-    size_t n;
-    int c;
-
-    for(n=0; n<max_size;) {
-	c = getc(yyin);
-	if (c == EOF) return n;
-
-	switch(c)
-	{
-	case '\n': buf[n++] = '\n'; break;	/* Keep shorter lines. */
-	case ';': buf[n++] = '>'; break;
-	case '-': buf[n++] = '<'; break;
-	case '.': buf[n++] = '+'; break;
-	case ',': buf[n++] = '-'; break;
-	case '!': buf[n++] = '.'; break;
-	case '?': buf[n++] = ','; break;
-
-	case '\'': qqq_state = 1-qqq_state; break;
-	case '"':
-	    if (qqq_state == 0)
-		buf[n++] = '[';
-	    else
-		buf[n++] = ']';
-	}
-    }
-    return n;
-}
-
+/*
+ * This preprocesses the source before lex gets to see it.
+ *
+ * Unlike the previous function the "character_prefilter" variable
+ * contains a list of UTF-8 characters that are the BF instructions.
+ */
 size_t
 utf8_conversion(char * buf, size_t max_size)
 {
@@ -947,6 +876,194 @@ utf8_conversion(char * buf, size_t max_size)
     return n;
 }
 
+/*
+ * This preprocesses the source before lex gets to see it.
+ *
+ * This time the "character_prefilter" variable contains a list of
+ * strings which are the BF instructions. They are matched on the
+ * basis of "longest wins". (NB: no control characters!)
+ *
+ * Flex does this much better, but the list needs to be known at compile time.
+ * For a large input building a regex would be faster; but large inputs
+ * are very uncommon!
+ */
+size_t
+string_conversion(char * buf, size_t max_size)
+{
+    size_t n;
+    int c = 0xDEADBEEF;
+    int match_flg, match_id, match_len;
+    int cnt;
+    char *s, *e;
+
+    if (sc_pending_buf == 0) sc_pending_buf = strdup(character_prefilter);
+
+    for ( n = 0; n < max_size && (c = getc( yyin )) != EOF;) {
+	if (c == line_cc) { buf[n++] = '\001'; continue; }
+	else if (c == '\n' && line_cc != EOF) { buf[n++] = '\n'; continue; }
+	else if (c>=0 && c<' ') c = ' ';
+
+	c = (unsigned char)c;
+
+	/* Multiple whitespace are compacted. */
+	if (sc_pending_off>0 && c == ' ' && sc_pending_buf[sc_pending_off-1] == ' ')
+	    continue;
+
+	sc_pending_buf[sc_pending_off++] = (char) c;
+	match_flg = 0;
+	match_id = 0;
+	match_len = 0;
+	s = character_prefilter+1;
+	cnt = 0;
+
+	for(;;)
+	{
+	    for(e = s; *e && *e != *character_prefilter;) e++;
+	    if (e-s <= sc_pending_off && !strncmp(sc_pending_buf, s, e-s)) {
+		if ((e-s > match_len && match_flg < 2) || match_flg == 0) {
+		    match_flg = 1;
+		    match_id = cnt;
+		    match_len = e-s;
+		}
+	    }
+	    if (e-s > sc_pending_off &&
+		    !strncmp(sc_pending_buf, s, sc_pending_off)) {
+		match_flg = 2;
+	    }
+	    if (!*e) break;
+	    s = e+1; cnt++;
+	}
+
+	if (match_flg == 1) {
+	    if (match_len < sc_pending_off) {
+		memmove(sc_pending_buf, sc_pending_buf+match_len, sc_pending_off-match_len);
+		sc_pending_off -= match_len;
+	    } else
+		sc_pending_off = 0;
+
+	    if (match_id < sizeof(bf))
+		buf[n++] = bf[match_id];
+	    else
+		buf[n++] = ' ';
+	} else if (match_flg == 0) {
+	    if (sc_pending_off > 1) {
+		memmove(sc_pending_buf, sc_pending_buf+1, sc_pending_off-1);
+		sc_pending_off--;
+	    } else
+		sc_pending_off = 0;
+	}
+    }
+    if ( c == EOF && ferror( yyin ) )
+        YY_FATAL_ERROR( "input in flex scanner failed" );
+    return n;
+}
+
+/* This character conversion function is a manual conversion from TinyBF */
+size_t
+tiny_bf_to_bf(char * buf, size_t max_size)
+{
+    static int tbf_dir = 0;
+    static int lookahead[8];
+    static int lookahead_len;
+
+    size_t n;
+    int c, more;
+
+    for(n=0; n<max_size;) {
+	c = getc(yyin);
+	if (c == EOF) return n;
+	if (c == '\n') {
+	    buf[n++] = c;	       /* Keep shorter lines. */
+	    continue;
+	} else
+	if (c != '=' && c != '+' && c != '>' && c != '|')
+	    continue;
+
+	lookahead[lookahead_len++] = c;
+
+	for(more=0; !more && n<max_size;)
+	{
+	    int eat=1;
+	    c = *lookahead;
+	    switch(c)
+	    {
+	    case '+': buf[n++] = "+-"[tbf_dir]; break;
+	    case '>': buf[n++] = "><"[tbf_dir]; break;
+	    case '=':
+		switch(lookahead[1])
+		{
+		case 0: eat=0; break;
+		case '=': buf[n++] = '.'; eat=2; break;
+		default: tbf_dir = !tbf_dir; break;
+		}
+		break;
+	    case '|':
+		if (tbf_dir) {
+		    buf[n++] = ']';
+		} else
+		    switch(lookahead[1])
+		    {
+		    case 0: eat=0; break;
+		    case '=':
+			switch(lookahead[2])
+			{
+			case 0: eat=0; break;
+			case '|': buf[n++] = '.'; eat=3; break;
+			default: buf[n++] = '['; break;
+			}
+			break;
+		    default: buf[n++] = "[]"[tbf_dir]; break;
+		    }
+		break;
+	    }
+
+	    more = !eat;
+	    for(; eat>0; eat--) {
+		int i;
+		for(i=1; STFU(lookahead[i-1] = lookahead[i]); i++) ;
+		lookahead_len--;
+	    }
+	    if (!*lookahead) more = 1;
+	}
+    }
+    return n;
+}
+
+/* This character conversion function is a manual conversion from ??? */
+size_t
+qqq_to_bf(char * buf, size_t max_size)
+{
+    static int qqq_state = 0;
+
+    size_t n;
+    int c;
+
+    for(n=0; n<max_size;) {
+	c = getc(yyin);
+	if (c == EOF) return n;
+
+	switch(c)
+	{
+	case '\n': buf[n++] = '\n'; break;	/* Keep shorter lines. */
+	case ';': buf[n++] = '>'; break;
+	case '-': buf[n++] = '<'; break;
+	case '.': buf[n++] = '+'; break;
+	case ',': buf[n++] = '-'; break;
+	case '!': buf[n++] = '.'; break;
+	case '?': buf[n++] = ','; break;
+
+	case '\'': qqq_state = 1-qqq_state; break;
+	case '"':
+	    if (qqq_state == 0)
+		buf[n++] = '[';
+	    else
+		buf[n++] = ']';
+	}
+    }
+    return n;
+}
+
+/* This character conversion function is a manual conversion from Headsecks */
 size_t
 headsecks_to_bf(char * buf, size_t max_size)
 {
