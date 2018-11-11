@@ -43,6 +43,7 @@ outcmd(int ch, int count)
 
     case '=': I; printf("%s = %d\n", mc, count); break;
     case 'B':
+	if(bytecell) { I; printf("%s %%= 256\n", mc); }
 	I; printf("v = %s\n", mc);
 	break;
     case 'M': I; printf("%s = %s+v*%d\n", mc, mc, count); break;
@@ -67,6 +68,7 @@ outcmd(int ch, int count)
     case '<': I; printf("p -= %d\n", count); break;
     case '>': I; printf("p += %d\n", count); break;
     case '[':
+	if (bytecell) { I; printf("%s %%= 256\n", mc); }
 	I; printf("while(%s != 0){\n", mc);
 	ind++;
 	break;
@@ -76,9 +78,11 @@ outcmd(int ch, int count)
 	} else if (count < 0) {
 	    I; printf("p -= %d\n", -count);
 	}
+	if (bytecell) { I; printf("%s %%= 256\n", mc); }
 	ind--; I; printf("}\n");
 	break;
     case 'I':
+	if (bytecell) { I; printf("%s %%= 256\n", mc); }
 	I; printf("if(%s != 0){\n", mc);
 	ind++;
 	break;
@@ -98,7 +102,6 @@ outcmd(int ch, int count)
     case '"': print_cstring(get_string()); break;
 
     case '!':
-	puts("#!/usr/bin/bc");
 	puts( "define x() {");
 	ind++;
 	I; printf("%s%d%s", "p = ", tapeinit, "\n");
@@ -159,10 +162,9 @@ print_cstring(char * str)
 	}
 	if (!*str) break;
 
-	if (*str == '"' || *str < ' ' || *str > '~') {
+	if ((*str == '"' || *str < ' ' || *str > '~') && *str != '\n')
 	    badchar = *str;
-	} else {
+	else
 	    buf[outlen++] = *str;
-	}
     }
 }
