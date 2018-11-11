@@ -1601,6 +1601,37 @@ static trivbf cgalang[1] = {{
     .help = "CGALang -- https://gloomyghost.com/CGALang/",
 }};
 
+/* Language "brainfuq" */
+static trivbf brainfuq[1] = {{
+    .name = "brainfuq",
+    .class = L_CDWORDS,
+    .bf = { "👉", "👈", "👆", "👇", "🌚", "🌝", "🌜", "🌛"},
+    .help = "Brainfuq -- https://github.com/allenx/Brainfuq",
+}};
+
+/* Language "emojifuck" */
+static trivbf emojifuck[1] = {{
+    .name = "emoji",
+    .class = L_JNWORD,
+    .bf = { "👉", "👈", "👍", "👎", "🙊", "🙉", "⏩", "⏪"},
+    .help = "Emojifuck -- https://github.com/kbarrette/emojifuck",
+}};
+
+/* Language "trigrams" */
+static trivbf trigram[1] = {{
+    .name = "trigram",
+    .class = L_JNWORD,
+    .bf = { "☰", "☱", "☲", "☳", "☴", "☵", "☶", "☷"},
+}};
+
+/* Language "babylang" */
+static trivbf babylang[1] = {{
+    .name = "babylang",
+    .class = L_WORDS,
+    .bf = { "gaga", "gugu", "aaag", "uuug", "guuu", "gaaa", "gagu", "guga"},
+    .zero_cell = "unga",
+}};
+
 /* Language brainbool: http://esolangs.org/wiki/Brainbool */
 static trivbf brainbool[1] = {{
     .name = "brainbool",
@@ -1852,7 +1883,7 @@ static trivbf * trivlist[] = {
     bc, bc_rle, fish, dotty, lisp0, bewbs, moo, chinese, zero, yolang,
     k_on_fuck, petooh, arabic, dc1, dc2, dc3, dc4, nyan, atpling, cupid,
     ternary, pikalang, spoon, troll, roadrunner, brainbool, clojure,
-    cgalang,
+    cgalang, brainfuq, emojifuck, trigram, cbyte_rle, babylang,
 
     bfout, doubler_12, doubler_copy_LXXH, doubler_12nz, doubler_12r,
     doubler_17a, doubler_17b, doubler_copy, doubler_copynz,
