@@ -253,6 +253,7 @@ char * hello_world_byte[] = {
     ">++[[++++++++>]+[<]>+]",
     ">+[>[-------->]+[<]>+]",
     "+>-[>>+>+[++>-<<]-<+<+]",		/* http://inversed.ru/InvMem.htm#InvMem_7 */
+    "+[>>>->-[>->----<<<]>>]",		/* https://github.com/kannagikazuko/one-line-wonders/blob/master/brainfuck/hello_world.bf */
     ">++[[++++++++>]+[<]>++]",
     ">+++[>[-------->]-[<]>+]",
     ">++++[[++++++++>]++[<]>+]",
@@ -663,17 +664,17 @@ main(int argc, char ** argv)
 	    fprintf(stderr, "-q      Toggle two cells method\n");
 	    fprintf(stderr, "-Q      Toggle simple two cells method\n");
 	    fprintf(stderr, "\n");
-	    fprintf(stderr, "-mult   Toggle multiply loops\n");
-	    fprintf(stderr, "-mult2  Search long multiply loops (slow)\n");
-	    fprintf(stderr, "-mult3  Search long multiply loops (slow)\n");
 	    fprintf(stderr, "-slip   Toggle short slip loops\n");
 	    fprintf(stderr, "-slip2  Search long slip loops (slow)\n");
 	    fprintf(stderr, "-N      Toggle nested loops (very slow)\n");
 	    fprintf(stderr, "-tri    Search nested and tri-slip/nest loops\n");
 	    fprintf(stderr, "-s10    Try just one subrange multiply size\n");
-	    fprintf(stderr, "-M+99   Specify multiply loop max increment\n");
-	    fprintf(stderr, "-M*99   Specify multiply loop max loops\n");
-	    fprintf(stderr, "-M=99   Specify multiply loop max cells\n");
+	    fprintf(stderr, "-mult   Toggle multiply loops\n");
+	    fprintf(stderr, "-mult2  Search long multiply loops (slow)\n");
+	    fprintf(stderr, "-mult3  Search long multiply loops (slow)\n");
+	    fprintf(stderr, " -multincr=99 Specify multiply loop max increment\n");
+	    fprintf(stderr, " -multloop=99 Specify multiply loop max loops\n");
+	    fprintf(stderr, " -multcell=99 Specify multiply loop max cells\n");
 	    fprintf(stderr, "-zoned  Use zones to pick cell to use.\n");
 	    fprintf(stderr, "-lookahead Use lookahead when picking cells.\n");
 	    exit(0);
@@ -704,7 +705,7 @@ main(int argc, char ** argv)
 
 	while((c = fgetc(ifd)) != EOF) {
 	    if (!flg_binary) {
-		if (c == '\r') { eatnl = 1; c = '\n'; }
+		if (c == '\r') { c = eatnl?0:'\n'; eatnl = 1; }
 		else if (c == '\n' && eatnl) { eatnl = 0; continue; }
 		else eatnl = 0;
 	    }
@@ -860,6 +861,9 @@ find_best_conversion(char * linebuf)
 	if (!enable_special && multloop_maxloop >= 35 &&
 		multloop_maxcell >= 4 && multloop_maxinc >= 3)
 	    gen_special(linebuf, RUNNERCODE5, "Fourcell", 0);
+	if (!enable_special && multloop_maxloop >= 13 &&
+		multloop_maxcell >= 6 && multloop_maxinc >= 8)
+	    gen_special(linebuf, RUNNERCODE1, "mult English", 0);
 	gen_multonly(linebuf);
     }
 
@@ -987,7 +991,7 @@ check_if_best(char * buf, char * name)
 		else if (c=='"' || c=='\\')
 		    fprintf(stderr ,"\\%c", c);
 		else
-		    fprintf(stderr ,"\\%03o", c);
+		    fprintf(stderr ,"\\%03o", c&255);
 	    }
 	    fprintf(stderr, "\"\n");
 	    exit(99);
