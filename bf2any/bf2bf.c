@@ -1838,8 +1838,8 @@ static trivbf clojure[1] = {{
     "(let [ch (int (. System/in read))] (if-not (= ch -1) (do (set-pointer ch))))\n",
     "((fn [] "
 	"(loop [] "
-	    "(if (> (set-or-zero) 0) (do\n",
-    "(recur)) nil))))\n"
+	    "(if (= (set-or-zero) 0) nil (do\n",
+    "(recur))))))\n"
     },
     .eight_bit = "(set-pointer (mod (set-or-zero) 256))\n",
     .set_cell = "(set-pointer %d)\n",
