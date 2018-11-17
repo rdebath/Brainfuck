@@ -105,6 +105,7 @@ static struct instruction *pgm = 0, *last = 0;
 static trivbf * doubler = doubler_copy;
 static trivbf * bfquad = bfquadz;
 
+static void generic_output(int ch, int count);
 static void risbf(int ch, int count);
 static void tinybf(int ch, int count);
 static void headsecks(int ch, int count);
@@ -354,35 +355,6 @@ pmc(const char * s)
 void
 outcmd(int ch, int count)
 {
-    char * p;
-
-    if (ch == '!' && (langclass & C_HEADERS) != 0) {
-	int i,j;
-	if (bytecell)
-	    printf("#include<unistd.h>\n");
-	else
-	    printf("#include<stdio.h>\n");
-	if (lang && (langclass & C_DEFINES)) {
-	    for (j=0; j<8; j++){
-		i=(14-j)%8;
-		printf("#define %s %s\n", lang->bf[i], c->bf[i]);
-	    }
-	    if (lang->rle_one) {
-		printf("#define %s %s\n", lang->rle_one, c->rle_one);
-		printf("#define _ ;return 0;}\n");
-	    } else
-		printf("#define _ return 0;}\n");
-	}
-	if (bytecell)
-	    printf("char mem[%d];int main(){register char*m=mem;\n", tapesz);
-	else
-	    printf("int mem[%d];int main(){register int*m=mem;\n", tapesz);
-	if (tapeinit)
-	    printf("m += %d;\n", tapeinit);
-    }
-
-    if (ch == '!' && lang && lang->gen_hdr) ps(lang->gen_hdr);
-
     if (L_BASE != L_TOKENS && L_BASE != L_BFRLE &&
 	L_BASE != L_HANOILOVE && L_BASE != L_BINRLE)
     {
@@ -411,8 +383,64 @@ outcmd(int ch, int count)
     case L_WORDS:
     case L_JNWORD:
     case L_LINES:
+    case L_CHARS:
+    case L_BFCHARS:     generic_output(ch, count); break;
+
+    case L_TOKENS:	printf("%c %d\n", ch, count); break;
+    case L_RISBF:	risbf(ch, count); break;
+    case L_TINYBF:	tinybf(ch, count); break;
+    case L_HEADSECKS:	headsecks(ch, count); break;
+    case L_BF:		bftranslate(ch, count); break;
+    case L_BFRLE:	bfrle(ch, count); break;
+    case L_BFXML:	bfxml(ch, count); break;
+    case L_UGLYBF:	bfugly(ch, count); break;
+    case L_MALBRAIN:	malbrain(ch, count); break;
+    case L_HANOILOVE:	hanoilove(ch, count); break;
+    case L_DOWHILE:	bfdowhile(ch, count); break;
+    case L_BINRLE:	bfbinrle(ch, count); break;
+    case L_QQQ:		qqq(ch, count); break;
+    }
+
+    if (ch == '~' && col) pc('\n');
+}
+
+void
+generic_output(int ch, int count)
+{
+    if (ch == '!' && (langclass & C_HEADERS) != 0) {
+	int i,j;
+	if (bytecell)
+	    printf("#include<unistd.h>\n");
+	else
+	    printf("#include<stdio.h>\n");
+	if (lang && (langclass & C_DEFINES)) {
+	    for (j=0; j<8; j++){
+		i=(14-j)%8;
+		printf("#define %s %s\n", lang->bf[i], c->bf[i]);
+	    }
+	    if (lang->rle_one) {
+		printf("#define %s %s\n", lang->rle_one, c->rle_one);
+		printf("#define _ ;return 0;}\n");
+	    } else
+		printf("#define _ return 0;}\n");
+	}
+	if (bytecell)
+	    printf("char mem[%d];int main(){register char*m=mem;\n", tapesz);
+	else
+	    printf("int mem[%d];int main(){register int*m=mem;\n", tapesz);
+	if (tapeinit)
+	    printf("m += %d;\n", tapeinit);
+    }
+
+    if (ch == '!' && lang && lang->gen_hdr) ps(lang->gen_hdr);
+
+    switch (L_BASE) {
+    case L_WORDS:
+    case L_JNWORD:
+    case L_LINES:
 	{
 	    int v;
+	    char * p;
 	    if (!(p = strchr(bf,ch))) {
 		if (ch != '=') break;
 		if (lang->set_cell && (count != 0 || !lang->zero_cell)) {
@@ -452,24 +480,13 @@ outcmd(int ch, int count)
 
     case L_CHARS:
     case L_BFCHARS:
-	if (ch == '=') pmc(lang->zero_cell);
-	if (!(p = strchr(bf,ch))) break;
-	while(count-->0) pmc(lang->bf[p-bf]);
+	{
+	    char * p;
+	    if (ch == '=') pmc(lang->zero_cell);
+	    if (!(p = strchr(bf,ch))) break;
+	    while(count-->0) pmc(lang->bf[p-bf]);
+	}
 	break;
-
-    case L_TOKENS:	printf("%c %d\n", ch, count); break;
-    case L_RISBF:	risbf(ch, count); break;
-    case L_TINYBF:	tinybf(ch, count); break;
-    case L_HEADSECKS:	headsecks(ch, count); break;
-    case L_BF:		bftranslate(ch, count); break;
-    case L_BFRLE:	bfrle(ch, count); break;
-    case L_BFXML:	bfxml(ch, count); break;
-    case L_UGLYBF:	bfugly(ch, count); break;
-    case L_MALBRAIN:	malbrain(ch, count); break;
-    case L_HANOILOVE:	hanoilove(ch, count); break;
-    case L_DOWHILE:	bfdowhile(ch, count); break;
-    case L_BINRLE:	bfbinrle(ch, count); break;
-    case L_QQQ:		qqq(ch, count); break;
     }
 
     if (ch == '~' && lang && lang->gen_foot) ps(lang->gen_foot);
@@ -480,7 +497,6 @@ outcmd(int ch, int count)
 	    col += printf("%s%s", col?" ":"", "_");
 	else if (langclass & C_HEADERS)
 	    col += printf("%s%s", col?" ":"", "return 0;}");
-	if(col) pc('\n');
     }
 }
 
