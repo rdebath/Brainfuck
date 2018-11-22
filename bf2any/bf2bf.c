@@ -141,8 +141,7 @@ fn_check_arg(const char * arg)
 	}
 
 	if (L_BASE == L_BFRLE || L_BASE == L_HANOILOVE || L_BASE == L_BINRLE ||
-	    L_BASE == L_BFXML || (langclass & C_ADDRLE) == C_ADDRLE ||
-	    (lang && lang->rle_one != 0))
+	    L_BASE == L_BFXML || (langclass & C_ADDRLE) == C_ADDRLE)
 	{
 	    be_interface.disable_fe_optim = 0;
 	}
