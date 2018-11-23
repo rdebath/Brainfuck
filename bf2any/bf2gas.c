@@ -62,7 +62,7 @@
 #define DI	(use_64bit?DI64:DI32)
 
 static int ind = 0, text_labels = 1, use_64bit = USE64;
-struct stkdat { struct stkdat * up; int id; } *sp = 0;
+static struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
 static check_arg_t fn_check_arg;
 struct be_interface_s be_interface = {.bytesonly=1,.disable_be_optim=1,
