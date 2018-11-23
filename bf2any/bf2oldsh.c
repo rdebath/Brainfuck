@@ -16,13 +16,7 @@
  * significant problem for '>' and '<' and probably an insoluble problem
  * for ',' without using external programs.
  *
- * The 'printf' command in the ',' command could be replaced by a "case".
- *
  * If external programs are allowed it becomes a lot simpler.
- *
- * The 'left' and 'right' commands are limited to 100000 cells, however, this
- * limitation is due to performance reasons so this does show the shell is
- * Turing complete even though it doesn't prove it directly.
  */
 
 #define MAXPRLE	25
@@ -85,37 +79,30 @@ outcmd(int ch, int count)
 	printf("}\n");
 
 	if (MAXPRLE>1) {
+	    printf("\n");
 	    for (i=2; i<=MAXPRLE; i++) {
-		printf("u%d() { u1 ; u%d; }\n", i, i-1);
-		printf("d%d() { d1 ; d%d; }\n", i, i-1);
-		printf("l%d() { l1 ; l%d; }\n", i, i-1);
-		printf("r%d() { r1 ; r%d; }\n", i, i-1);
+		printf("u%d() { u%d ; u%d; }\n", i, i-i/2, i/2);
+		printf("d%d() { d%d ; d%d; }\n", i, i-i/2, i/2);
+		printf("l%d() { l%d ; l%d; }\n", i, i-i/2, i/2);
+		printf("r%d() { r%d ; r%d; }\n", i, i-i/2, i/2);
 	    }
 	}
 
-	printf("u1() { eval \"A=\\$M$P\"; inc; eval \"M$P=$A\" ; }\n");
-	printf("d1() { eval \"A=\\$M$P\"; dec; eval \"M$P=$A\" ; }\n");
+	printf("\n");
+	for(i=0; i<256; i++)
+	    printf("inc_%d=%d\n", i, ((i+1) & 0xFF));
+	printf("inc_=1\n");
+
+	printf("\n");
+	for(i=0; i<256; i++)
+	    printf("dec_%d=%d\n", i, ((i-1) & 0xFF));
+	printf("dec_=255\n");
+
+	printf("\n");
+	printf("u1() { eval \"A=\\$M$P\"; eval \"M$P=\\$inc_$A\"; }\n");
+	printf("d1() { eval \"A=\\$M$P\"; eval \"M$P=\\$dec_$A\"; }\n");
 	printf("f1() { eval \"A=\\$M$P\"; [ \".$A\" = . ] && A=0; }\n");
 
-	printf("\n");
-	printf("inc() {\n");
-	printf("case \"$A\" in\n");
-	for(i=0; i<256; i++)
-	    printf("%d ) A=%d ;;\n", i, ((i+1) & 0xFF));
-	printf("* ) A=1 ;;\n");
-	printf("esac\n");
-	printf("}\n");
-
-	printf("\n");
-	printf("dec() {\n");
-	printf("case \"$A\" in\n");
-	for(i=0; i<256; i++)
-	    printf("%d ) A=%d ;;\n", i, ((i-1) & 0xFF));
-	printf("* ) A=255 ;;\n");
-	printf("esac\n");
-	printf("}\n");
-
-	printf("\n");
 	printf("%s\n",
 
 "\n"	    "r1() {"
