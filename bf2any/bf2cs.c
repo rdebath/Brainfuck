@@ -34,10 +34,7 @@ outcmd(int ch, int count)
     case 'X': pr("throw new System.InvalidOperationException(\"Infinite Loop detected.\");"); break;
 
     case '=': prv("M[P] = %d;", count); break;
-    case 'B':
-	if(bytecell) pr("M[P] = (M[P] & 255);");
-	pr("V = M[P];");
-	break;
+    case 'B': pr("V = M[P];"); break;
     case 'M': prv("M[P] += V*%d;", count); break;
     case 'N': prv("M[P] -= V*%d;", count); break;
     case 'S': pr("M[P] += V;"); break;
@@ -53,35 +50,20 @@ outcmd(int ch, int count)
     case '-': prv("M[P] -= %d;", count); break;
     case '>': prv("P += %d;", count); break;
     case '<': prv("P -= %d;", count); break;
-    case '.': pr("Console.Write(Char.ConvertFromUtf32( (ulong)M[P]>0x10FFFF?0xFFFD:(int)M[P] ));"); break;
+    case '.':
+	prv("Console.Write(Char.ConvertFromUtf32(%s));",
+	    bytecell?"(byte)M[P]":"(ulong)M[P]>0x10FFFF?0xFFFD:(int)M[P]");
+	break;
     case ',': pr("M[P]=Console.Read();"); break;
     case '"': print_cstring(); break;
 
-    case '[':
-	if(bytecell) pr("M[P] = (M[P] & 255);");
-	pr("while(M[P]!=0) {");
-	ind++;
-	break;
-    case ']':
-	if(bytecell) pr("M[P] = (M[P] & 255);");
-	ind--;
-	pr("}");
-	break;
+    case '[': prv("while(%sM[P]!=0) {", bytecell?"(byte)":""); ind++; break;
+    case ']': ind--; pr("}"); break;
 
-    case 'I':
-	if(bytecell) pr("M[P] = (M[P] & 255);");
-	pr("if(M[P]!=0) {");
-	ind++;
-	break;
-    case 'E':
-	ind--;
-	pr("}");
-	break;
+    case 'I': prv("if(%sM[P]!=0) {", bytecell?"(byte)":""); ind++; break;
+    case 'E': ind--; pr("}"); break;
 
-    case '~':
-	ind--; pr("}");
-	ind--; pr("}");
-	break;
+    case '~': ind--; pr("}"); ind--; pr("}"); break;
     }
 }
 
@@ -114,17 +96,15 @@ print_cstring(void)
 	}
 	if (!*str) break;
 
-	if (*str == '\n') gotnl = 1;
 	if (*str == '"' || *str == '\\') {
 	    buf[outlen++] = '\\'; buf[outlen++] = *str;
 	} else if (*str >= ' ' && *str <= '~') {
 	    buf[outlen++] = *str;
 	} else if (*str == '\n') {
-	    buf[outlen++] = '\\'; buf[outlen++] = 'n';
+	    gotnl = 1; buf[outlen++] = '\\'; buf[outlen++] = 'n';
 	} else if (*str == '\t') {
 	    buf[outlen++] = '\\'; buf[outlen++] = 't';
-	} else {
+	} else
 	    badchar = *str;
-	}
     }
 }
