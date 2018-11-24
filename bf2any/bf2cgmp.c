@@ -82,10 +82,12 @@ outcmd(int ch, int count)
 	    printf("static mpz_t cell_and;\n");
 	    printf("#define mpz_and_BPC(c) mpz_and(c, c, cell_and)\n");
 	} else {
-	    printf("#ifndef BPC\n");
-	    printf("#define BPC %d\n", bpc);
-	    printf("#endif\n");
-	    printf("#if BPC > 0\n");
+	    if (bpc) {
+		printf("#ifndef BPC\n");
+		printf("#define BPC %d\n", bpc);
+		printf("#endif\n");
+	    }
+	    printf("#if defined(BPC) && (BPC > 0)\n");
 	    printf("enum { CellsTooSmall=1/((BPC)>=32) };\n");
 	    printf("static mpz_t cell_and;\n");
 	    printf("#define mpz_and_BPC(c) mpz_and(c, c, cell_and)\n");
@@ -169,7 +171,7 @@ outcmd(int ch, int count)
 	I; printf("register int c;\n");
 	I; printf("mpz_t v;\n");
 	I; printf("mpz_init(v);\n");
-	   printf("#if BPC > 0\n");
+	   printf("#if defined(BPC) && (BPC > 0)\n");
 	I; printf("mpz_init(cell_and);\n");
 	I; printf("mpz_ui_pow_ui(cell_and, 2, BPC);\n");
 	I; printf("mpz_sub_ui(cell_and, cell_and, 1);\n");

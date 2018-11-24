@@ -80,10 +80,12 @@ outcmd(int ch, int count)
         if(bytecell)
 	    printf("#define mp_mask_BPC(c) mp_mod_2d(c, 8, c)\n");
 	else {
-	    printf("#ifndef BPC\n");
-	    printf("#define BPC %d\n", bpc);
-	    printf("#endif\n");
-	    printf("#if BPC > 0\n");
+	    if (bpc) {
+		printf("#ifndef BPC\n");
+		printf("#define BPC %d\n", bpc);
+		printf("#endif\n");
+	    }
+	    printf("#if defined(BPC) && (BPC > 0)\n");
 	    printf("enum { CellsTooSmall=1/((BPC)>=32) };\n");
 	    printf("#define mp_mask_BPC(c) mp_mod_2d(c, BPC, c)\n");
 	    printf("#else\n");
