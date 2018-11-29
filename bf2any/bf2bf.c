@@ -76,7 +76,7 @@ typedef struct {
     char * zero_cell;
     char * name2;
     char * help;
-    int class, multi;
+    int class, multi, bytesonly;
 } trivbf;
 
 static trivbf * trivlist[];
@@ -126,6 +126,9 @@ fn_check_arg(const char * arg)
 {
     if (strcmp(arg, "+init") == 0) {
 	if (maxcol < 0) maxcol = 72;
+
+	if (lang && lang->bytesonly)
+	    be_interface.bytesonly = 1;
 
 	if (!lang || !lang->rle_one) {
 	    if (bytecell) c = cbyte; else c = cint;
@@ -1892,13 +1895,128 @@ static trivbf clojure[1] = {{
     .help = "Clojure translation from BF",
 }};
 
+static trivbf nasm[1] = {{
+    .name = "nasm",
+    .class = L_LINES+C_NUMRLE,
+    .gen_hdr =
+	"; asmsyntax=nasm"
+"\n"	"; nasm brainfuck.s && chmod +x brainfuck"
+"\n"
+"\n"	"BITS 32"
+"\n"
+"\n"	"memsize equ     0x100000"
+"\n"	"orgaddr equ     0x08048000"
+"\n"	"        org     orgaddr"
+"\n"
+"\n"	"; A nice legal ELF header here, bit short, but that's okay."
+"\n"	"; Based on the headers from ..."
+"\n"	"; http://www.muppetlabs.com/~breadbox/software/tiny/teensy.html"
+"\n"	"; but with RX and RW segments. See also ..."
+"\n"	"; http://blog.markloiseau.com/2012/05/tiny-64-bit-elf-executables"
+"\n"
+"\n"	"ehdr:                                   ; Elf32_Ehdr"
+"\n"	"        db      0x7F, \"ELF\", 1, 1, 1, 0 ;   e_ident"
+"\n"	"        times 8 db      0"
+"\n"	"        dw      2                       ;   e_type"
+"\n"	"        dw      3                       ;   e_machine"
+"\n"	"        dd      1                       ;   e_version"
+"\n"	"        dd      _start                  ;   e_entry"
+"\n"	"        dd      phdr - $$               ;   e_phoff"
+"\n"	"        dd      0                       ;   e_shoff"
+"\n"	"        dd      0                       ;   e_flags"
+"\n"	"        dw      ehdrsize                ;   e_ehsize"
+"\n"	"        dw      phdrsize                ;   e_phentsize"
+"\n"	"        dw      2                       ;   e_phnum"
+"\n"	"        dw      40                      ;   e_shentsize"
+"\n"	"        dw      0                       ;   e_shnum"
+"\n"	"        dw      0                       ;   e_shstrndx"
+"\n"
+"\n"	"ehdrsize        equ     $ - ehdr"
+"\n"
+"\n"	"phdr:                                   ; Elf32_Phdr"
+"\n"	"        dd      1                       ;   p_type"
+"\n"	"        dd      0                       ;   p_offset"
+"\n"	"        dd      $$                      ;   p_vaddr"
+"\n"	"        dd      0                       ;   p_paddr"
+"\n"	"        dd      filesize                ;   p_filesz"
+"\n"	"        dd      ramsize                 ;   p_memsz"
+"\n"	"        dd      5                       ;   p_flags"
+"\n"	"        dd      0x1000                  ;   p_align"
+"\n"
+"\n"	"phdrsize        equ     $ - phdr"
+"\n"
+"\n"	"        dd      1                       ;   p_type"
+"\n"	"        dd      0                       ;   p_offset"
+"\n"	"        dd      section..bss.start      ;   p_vaddr"
+"\n"	"        dd      0                       ;   p_paddr"
+"\n"	"        dd      0                       ;   p_filesz"
+"\n"	"        dd      memsize                 ;   p_memsz"
+"\n"	"        dd      6                       ;   p_flags"
+"\n"	"        dd      0x1000                  ;   p_align"
+"\n"
+"\n"	"        section .text"
+"\n"	"        section .bftext align=64"
+"\n"	"        section .bftail align=1"
+"\n"
+"\n"	"exit_prog:"
+"\n"	"        mov     bl, 0           ; Exit status"
+"\n"	"        xor     eax, eax"
+"\n"	"        inc     eax             ; syscall 1, exit"
+"\n"	"        int     0x80            ; exit(0)"
+"\n"
+"\n"	"        section .bflast align=1"
+"\n"	"        section .bss align=4096"
+"\n"	"ramsize equ     section..bss.start-orgaddr"
+"\n"	"filesize equ    section..bflast.start-orgaddr"
+"\n"	"mem:"
+"\n"
+"\n"	"%macro while 0"
+"\n"
+"\n"	"    %push   while"
+"\n"	"    cmp dh, byte [ecx]"
+"\n"	"    jz    %$endw"
+"\n"	"    %$begin:"
+"\n"
+"\n"	"%endmacro"
+"\n"
+"\n"	"%macro endwhile 0"
+"\n"
+"\n"	"    cmp dh, byte [ecx]"
+"\n"	"    jnz    %$begin"
+"\n"	"    %$endw:"
+"\n"	"    %pop"
+"\n"	"%endmacro"
+"\n"
+"\n"	"        section .bftext"
+"\n"	"_start:"
+"\n"	"        xor     eax, eax        ; EAX = 0 ;don't change high bits."
+"\n"	"        cdq                     ; EDX = 0 ;sign bit of EAX"
+"\n"	"        inc     edx             ; EDX = 1 ;ARG4 for system calls"
+"\n"	"        mov     ecx,mem"
+"\n",
+
+    .bf = {
+	"add ecx, %d\n",
+	"sub ecx, %d\n",
+	"add byte [ecx], %d\n",
+	"sub byte [ecx], %d\n",
+	"mov al, 4\nmov ebx, edx\nint 0x80\n",
+	"mov al, 3\nxor ebx, ebx\nint 0x80\n",
+	"while\n",
+	"endwhile\n"
+	},
+    .set_cell = "mov byte [ecx], %d\n",
+    .help = "Nasm x86 assembler",
+    .bytesonly = 1
+}};
+
 static trivbf * trivlist[] = {
 
     rhoprime, cbyte, ook, blub, f__k, f__krle, pogaack, trip, nice,
     bc, bc_rle, fish, dotty, lisp0, bewbs, moo, chinese, zero, yolang,
     k_on_fuck, petooh, arabic, dc1, dc2, dc3, dc4, nyan, atpling, cupid,
     ternary, pikalang, spoon, troll, roadrunner, brainbool, clojure,
-    cgalang, brainfuq, emojifuck, trigram, cbyte_rle, babylang,
+    nasm, cgalang, brainfuq, emojifuck, trigram, cbyte_rle, babylang,
 
     bfout, doubler_12, doubler_copy_LXXH, doubler_12nz, doubler_12r,
     doubler_17a, doubler_17b, doubler_copy, doubler_copynz,
