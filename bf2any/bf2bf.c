@@ -2010,6 +2010,43 @@ static trivbf nasm[1] = {{
     .bytesonly = 1
 }};
 
+static trivbf matlab[1] = {{
+    .name = "matlab", .name2="octave",
+    .class = L_LINES+C_NUMRLE,
+    .bf = {
+	"x = x + %d;\n",
+	"x = x - %d;\n",
+	"A(x) = bitand(A(x) + %d, 255);\n",
+	"A(x) = bitand(A(x) + 256 - %d, 255);\n",
+	"fprintf(A(x));\n",
+	"getch;\n",
+	"while A(x) ~= 0,\n",
+	"end;\n"},
+    .set_cell = "A(x) = %d;\n",
+    .gen_hdr =
+	"function bf\n"
+	"A = char(zeros(2^16, 1));\n"
+	"x = 1;\n"
+	"l = -1;\n"
+	"y = [];\n",
+	"function getch\n"
+	"  if l == -1\n"
+	"    y=input('','s');\n"
+	"    l = 0;\n"
+	"  endif\n"
+	"  if l >= length(y)\n"
+	"    l = -1;\n"
+	"    A(x) = 10;\n"
+	"  else\n"
+	"    l = l + 1;\n"
+	"    A(x) = y(l);\n"
+	"  endif\n"
+	"endfunction\n"
+	"endfunction\n",
+    .help = "Matlab or Octave translation",
+    .bytesonly = 1
+}};
+
 static trivbf * trivlist[] = {
 
     rhoprime, cbyte, ook, blub, f__k, f__krle, pogaack, trip, nice,
@@ -2017,6 +2054,7 @@ static trivbf * trivlist[] = {
     k_on_fuck, petooh, arabic, dc1, dc2, dc3, dc4, nyan, atpling, cupid,
     ternary, pikalang, spoon, troll, roadrunner, brainbool, clojure,
     nasm, cgalang, brainfuq, emojifuck, trigram, cbyte_rle, babylang,
+    matlab,
 
     bfout, doubler_12, doubler_copy_LXXH, doubler_12nz, doubler_12r,
     doubler_17a, doubler_17b, doubler_copy, doubler_copynz,
