@@ -2397,7 +2397,7 @@ find_known_value_recursion(struct bfi * n, int v_offset,
 	}
 
 	/* How did we get this far! */
-	if (++distance > SEARCHRANGE) goto break_break;
+	if (++distance > (1<<(allow_recursion+2))) goto break_break;
     }
 
     known_value = 0;
