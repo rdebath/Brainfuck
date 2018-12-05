@@ -16,10 +16,8 @@
  *  without functions the getch() function has to be inlined.
  */
 
-/* Do this by default as getch() is rare. */
-#define INLINEGETCH
-
 static int do_input = 0;
+static int done_init = 0;
 static int ind = 0;
 static int old_awk = 0;
 #define I printf("%*s", ind*4, "")
@@ -69,12 +67,16 @@ outcmd(int ch, int count)
     move_opt(&ch, &count, &mov);
     if (ch == 0) return;
 
+    if (!done_init && ch != '"' && ch != '!' && ch != '~') {
+	I; printf("p = %d\n", tapeinit);
+	done_init = 1;
+    }
+
     cm = cell(mov);
     switch(ch) {
     case '!':
 	printf("#!/usr/bin/awk -f\n");
 	printf("BEGIN {\n"); ind++;
-	I; printf("p=%d\n",tapeinit); break;
 	break;
 
     case '=': I; printf("%s = %d\n", cm, count); break;
@@ -93,7 +95,10 @@ outcmd(int ch, int count)
     case 'V': I; printf("%s = v\n", cm); break;
     case 'W': I; printf("%s = -v\n", cm); break;
 
-    case 'X': I; printf("print \"Abort: Infinite Loop.\\n\" >\"/dev/stderr\"; exit;\n"); break;
+    case 'X':
+	I; printf("print \"Abort: Infinite Loop.\" >\"/dev/stderr\"\n");
+	I; printf("exit\n");
+	break;
 
     case '+': I; printf("%s += %d\n", cm, count); break;
     case '-': I; printf("%s -= %d\n", cm, count); break;
@@ -101,7 +106,7 @@ outcmd(int ch, int count)
     case '>': I; printf("p += %d\n", count); break;
     case '[':
 	if(bytecell) { I; printf("%s %%= 256\n", cm); }
-	I; printf("while(%s!=0){\n", cm);
+	I; printf("while(%s != 0){\n", cm);
 	ind++;
 	break;
     case ']':
@@ -117,7 +122,7 @@ outcmd(int ch, int count)
 	break;
     case 'I':
 	if(bytecell) { I; printf("%s %%= 256\n", cm); }
-	I; printf("if(%s!=0){\n", cm);
+	I; printf("if(%s != 0){\n", cm);
 	ind++;
 	break;
     case 'E':
@@ -132,31 +137,30 @@ outcmd(int ch, int count)
 	break;
 
     case '~':
-	I; printf("exit 0\n");
 	ind--;
 	printf("}\n");
 
 	if (do_input) {
 	    printf("\n");
 	    printf("function getch(mov) {\n");
-	    printf("    if (goteof) return;\n");
+	    printf("    if (goteof) return\n");
 	    printf("    if (!gotline) {\n");
 	    printf("        gotline = getline line\n");
 	    printf("        goteof = !gotline\n");
 	    printf("        if (goteof) return\n");
 	    printf("    }\n");
 	    printf("    if (line == \"\") {\n");
-	    printf("        gotline=0\n");
-	    printf("        m[p+mov]=10\n");
+	    printf("        gotline = 0\n");
+	    printf("        m[p+mov] = 10\n");
 	    printf("        return\n");
 	    printf("    }\n");
 	    printf("    if (!genord) {\n");
 	    printf("        for(i=1; i<256; i++)\n");
 	    printf("            ord[sprintf(\"%%c\",i)] = i\n");
-	    printf("        genord=1\n");
+	    printf("        genord = 1\n");
 	    printf("    }\n");
 	    printf("    c = substr(line, 1, 1)\n");
-	    printf("    line=substr(line, 2)\n");
+	    printf("    line = substr(line, 2)\n");
 	    printf("    m[p+mov] = ord[c]\n");
 	    printf("}\n");
 	}
