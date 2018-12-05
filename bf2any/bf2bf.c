@@ -2010,6 +2010,91 @@ static trivbf nasm[1] = {{
     .bytesonly = 1
 }};
 
+static trivbf nasmmagic[1] = {{
+    .name = "nasmqmagic", .name2 = "qmagic",
+    .class = L_LINES+C_NUMRLE,
+    .gen_hdr =
+	"; asmsyntax=nasm"
+"\n"	"; nasm brainfuck.s && chmod +x brainfuck"
+"\n"
+"\n"	"BITS 32"
+"\n"	"memsize equ     1048576"
+"\n"
+"\n"	"orgaddr equ     0x0001000"
+"\n"	"        org     orgaddr"
+"\n"
+"\n"	"        dd      0x006400CC      ; a_info"
+"\n"	"        dd      a_text          ; a_text"
+"\n"	"        dd      a_data          ; a_data"
+"\n"	"        dd      a_bss           ; a_bss"
+"\n"	"        dd      0               ; a_syms"
+"\n"	"        dd      _start          ; a_entry"
+"\n"	"        dd      0               ; a_trsize"
+"\n"	"        dd      0               ; a_drsize"
+"\n"
+"\n"	"%macro while 0"
+"\n"
+"\n"	"    %push   while"
+"\n"	"    cmp dh, byte [ecx]"
+"\n"	"    jz    %$endw"
+"\n"	"    %$begin:"
+"\n"
+"\n"	"%endmacro"
+"\n"
+"\n"	"%macro endwhile 0"
+"\n"
+"\n"	"    cmp dh, byte [ecx]"
+"\n"	"    jnz    %$begin"
+"\n"	"    %$endw:"
+"\n"	"    %pop"
+"\n"	"%endmacro"
+"\n"
+"\n"	"        section .text"
+"\n"	"        section .rodata"
+"\n"	"        section .textlib align=32"
+"\n"	"        section .bftext align=32"
+"\n"	"        section .bftail align=1"
+"\n"
+"\n"	"exit_prog:"
+"\n"	"        mov     bl, 0           ; Exit status"
+"\n"	"        xor     eax, eax"
+"\n"	"        inc     eax             ; syscall 1, exit"
+"\n"	"        int     0x80            ; exit(0)"
+"\n"
+"\n"	"        section .data align=4096"
+"\n"	"        db      0xFF"
+"\n"
+"\n"	"datapad equ     4096-(($-$$)&4095)"
+"\n"	"a_text  equ     $$-orgaddr"
+"\n"	"a_data  equ     $-$$"
+"\n"	"a_bss   equ     memsize+datapad"
+"\n"	"        section .datapad align=1 nobits"
+"\n"	"        resb    datapad"
+"\n"
+"\n"	"        section .bss align=4096"
+"\n"	"mem:"
+"\n"	"        section .bftext"
+"\n"	"_start:"
+"\n"	"        xor     eax, eax        ; EAX = 0 ;don't change high bits."
+"\n"	"        cdq                     ; EDX = 0 ;sign bit of EAX"
+"\n"	"        inc     edx             ; EDX = 1 ;ARG4 for system calls"
+"\n"	"        mov     ecx,mem"
+"\n",
+    .bf = {
+	"add ecx, %d\n",
+	"sub ecx, %d\n",
+	"add byte [ecx], %d\n",
+	"sub byte [ecx], %d\n",
+	"mov al, 4\nmov ebx, edx\nint 0x80\n",
+	"mov al, 3\nxor ebx, ebx\nint 0x80\n",
+	"while\n",
+	"endwhile\n"
+	},
+    .set_cell = "mov byte [ecx], %d\n",
+    .help = "Nasm x86 assembler",
+    .bytesonly = 1
+}};
+
 static trivbf matlab[1] = {{
     .name = "matlab", .name2="octave",
     .class = L_LINES+C_NUMRLE,
@@ -2053,8 +2138,8 @@ static trivbf * trivlist[] = {
     bc, bc_rle, fish, dotty, lisp0, bewbs, moo, chinese, zero, yolang,
     k_on_fuck, petooh, arabic, dc1, dc2, dc3, dc4, nyan, atpling, cupid,
     ternary, pikalang, spoon, troll, roadrunner, brainbool, clojure,
-    nasm, cgalang, brainfuq, emojifuck, trigram, cbyte_rle, babylang,
-    matlab,
+    nasm, nasmmagic, cgalang, brainfuq, emojifuck, trigram, cbyte_rle,
+    babylang, matlab,
 
     bfout, doubler_12, doubler_copy_LXXH, doubler_12nz, doubler_12r,
     doubler_17a, doubler_17b, doubler_copy, doubler_copynz,
