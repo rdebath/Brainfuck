@@ -9,7 +9,7 @@
  * Perl translation from BF, runs at about 14,000,000 instructions per second.
  */
 
-static int ind = 0;
+static int ind = 0, done_init = 0;
 #define I printf("%*s", ind*4, "")
 
 struct be_interface_s be_interface = {};
@@ -37,14 +37,18 @@ outcmd(int ch, int count)
     move_opt(&ch, &count, &mov);
     if (ch == 0) return;
 
-    mc = cell(mov);
-    switch(ch) {
-    case '!':
+    if (!done_init && ch != '"' && ch != '!' && ch != '~') {
 	printf( "%s%d%s",
-		"#!/usr/bin/perl\n"
 		"$|++;    # Turn on autoflush.\n"
 		"$^W = 0; # Turn off warnings.\n"
 		"$p = ", tapeinit, ";\n");
+	done_init = 1;
+    }
+
+    mc = cell(mov);
+    switch(ch) {
+    case '!':
+	printf("#!/usr/bin/perl\n");
 	break;
 
     case '=': I; printf("%s = %d;\n", mc, count); break;
