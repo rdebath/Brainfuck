@@ -96,13 +96,13 @@ check_argv(const char * arg)
 	tapelen = strtoul(arg+2, 0, 10);
 	if (tapelen < 1) tapelen = TAPELEN;
 	return 1;
-    } else if (check_arg(arg)) {
-	;
     } else if (strcmp(arg, "-be-pipe") == 0) {
 	if (be_interface.disable_be_optim) return 0;
 	backend_only = 1;
 	enable_rle++;
 	enable_debug = 1;
+    } else if (check_arg(arg)) {
+	;
     }
     else return 0;
     return 1;
