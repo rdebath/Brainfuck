@@ -87,7 +87,7 @@ outcmd(int ch, int count)
 	    }
 	    printf("#if defined(BPC) && (BPC > 0)\n");
 	    printf("enum { CellsTooSmall=1/((BPC)>=32) };\n");
-	    printf("#define mp_mask_BPC(c) mp_mod_2d(c, BPC, c)\n");
+	    printf("#define mp_mask_BPC(c) E(mp_mod_2d(c, BPC, c))\n");
 	    printf("#else\n");
 	    printf("#define mp_mask_BPC(c)\n");
 	    printf("#endif\n");
@@ -179,23 +179,37 @@ outcmd(int ch, int count)
 	    );
 	ind ++;
 	I; printf("register mp_int * p;\n");
-	I; printf("register int c;\n");
+	I; printf("register int c, bn_err = 0;\n");
 	I; printf("mp_int v[1], t1[1], t2[1];\n");
 	I; printf("mp_init_multi(v, t1, t2, 0);\n");
 	I; printf("setbuf(stdout, 0);\n");
 	I; printf("p = move_ptr(mem,0);\n");
+
+	printf("#define E(X) if ((bn_err = (X)) != MP_OKAY) goto bn_fail\n");
+
+	I; printf("if (0) {\n");
+	   printf("bn_fail:\n");
+	ind++;
+	I; printf("fprintf(stderr, \"LibTomMath: %%s\\n\",\n");
+	ind++;
+	I; printf("mp_error_to_string(bn_err));\n");
+	ind--;
+	I; printf("exit(255);\n");
+	ind--;
+	I; printf("}\n");
+
 	break;
 
     case '~': I; printf("return 0;\n}\n"); break;
 
     case '=':
-	if (count >= 127 && count <= 127) {
+	if (count >= 0 && count <= 127) {
 	    I; printf("mp_set(p, %d);\n", abs(count));
 	} else {
 	    I; printf("mp_set_int(p, %d);\n", abs(count));
 	}
 	if (count < 0) {
-	    I; printf("mp_neg(p, p);\n");
+	    I; printf("E(mp_neg(p, p));\n");
 	}
 	break;
 
@@ -205,37 +219,39 @@ outcmd(int ch, int count)
 	break;
 
     case 'M':
-    case 'S':
 	if (count > 1 && count <= 127) {
-	    I; printf("mp_copy(v, t1);\n");
-	    I; printf("mp_mul_d(t1, %d, t1);\n", count);
-	    I; printf("mp_add(p, t1, p);\n");
+	    I; printf("E(mp_mul_d(v, %d, t1));\n", count);
+	    I; printf("E(mp_add(p, t1, p));\n");
 	} else
 	if (count != 1) {
-	    I; printf("mp_copy(v, t1);\n");
-	    I; printf("mp_set_int(t2, %d);\n", count);
-	    I; printf("mp_mul(t1, t2, t1);\n");
-	    I; printf("mp_add(p, t1, p);\n");
+	    I; printf("E(mp_set_int(t2, %d));\n", count);
+	    I; printf("E(mp_mul(v, t2, t1));\n");
+	    I; printf("E(mp_add(p, t1, p));\n");
 	} else {
-	    I; printf("mp_add(p, v, p);\n");
+	    I; printf("E(mp_add(p, v, p));\n");
 	}
 	break;
 
+    case 'S':
+	I; printf("E(mp_add(p, v, p));\n");
+	break;
+
     case 'N':
-    case 'T':
 	if (count > 1 && count <= 127) {
-	    I; printf("mp_copy(v, t1);\n");
-	    I; printf("mp_mul_d(t1, %d, t1);\n", count);
-	    I; printf("mp_sub(p, t1, p);\n");
+	    I; printf("E(mp_mul_d(v, %d, t1));\n", count);
+	    I; printf("E(mp_sub(p, t1, p));\n");
 	} else
 	if (count != 1) {
-	    I; printf("mp_copy(v, t1);\n");
-	    I; printf("mp_set_int(t2, %d);\n", count);
-	    I; printf("mp_mul(t1, t2, t1);\n");
-	    I; printf("mp_sub(p, t1, p);\n");
+	    I; printf("E(mp_set_int(t2, %d));\n", count);
+	    I; printf("E(mp_mul(v, t2, t1));\n");
+	    I; printf("E(mp_sub(p, t1, p));\n");
 	} else {
-	    I; printf("mp_sub(p, v, p);\n");
+	    I; printf("E(mp_sub(p, v, p));\n");
 	}
+	break;
+
+    case 'T':
+	I; printf("E(mp_sub(p, v, p));\n");
 	break;
 
     case 'C':
@@ -243,21 +259,21 @@ outcmd(int ch, int count)
     case 'V':
     case 'W':
 	if (count > 1 && count <= 127) {
-	    I; printf("mp_mul_d(v, %d, p);\n", count);
+	    I; printf("E(mp_mul_d(v, %d, p));\n", count);
 	} else
 	if (count != 1) {
-	    I; printf("mp_set_int(t2, %d);\n", count);
-	    I; printf("mp_mul(v, t2, p);\n");
+	    I; printf("E(mp_set_int(t2, %d));\n", count);
+	    I; printf("E(mp_mul(v, t2, p));\n");
 	} else {
-	    I; printf("mp_copy(v, p);\n");
+	    I; printf("E(mp_copy(v, p));\n");
 	}
 	if (ch == 'D' || ch == 'W') {
-	    I; printf("mp_neg(p, p);\n");
+	    I; printf("E(mp_neg(p, p));\n");
 	}
 	break;
 
     case '*':
-	I; printf("mp_mul(p, v, p);\n");
+	I; printf("E(mp_mul(p, v, p));\n");
 	I; printf("mp_mask_BPC(p);\n");
 	break;
 
@@ -265,18 +281,18 @@ outcmd(int ch, int count)
 
     case '+':
 	if (count <= 127) {
-	    I; printf("mp_add_d(p, %d, p);\n", count);
+	    I; printf("E(mp_add_d(p, %d, p));\n", count);
 	} else {
-	    I; printf("mp_set_int(t2, %d);\n", count);
-	    I; printf("mp_add(p, %d, p);\n", count);
+	    I; printf("E(mp_set_int(t2, %d));\n", count);
+	    I; printf("E(mp_add(p, %d, p));\n", count);
 	}
 	break;
     case '-':
 	if (count <= 127) {
-	    I; printf("mp_sub_d(p, %d, p);\n", count);
+	    I; printf("E(mp_sub_d(p, %d, p));\n", count);
 	} else {
-	    I; printf("mp_set_int(t2, %d);\n", count);
-	    I; printf("mp_sub(p, %d, p);\n", count);
+	    I; printf("E(mp_set_int(t2, %d));\n", count);
+	    I; printf("E(mp_sub(p, %d, p));\n", count);
 	}
 	break;
 
@@ -313,7 +329,7 @@ outcmd(int ch, int count)
 	I; printf("c = getchar();\n");
 	I; printf("if (c != EOF)\n");
 	ind++;
-	I; printf("mp_set_int(p, c);\n");
+	I; printf("E(mp_set_int(p, c));\n");
 	ind--;
 	break;
     }
