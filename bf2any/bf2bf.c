@@ -1650,6 +1650,22 @@ static trivbf babylang[1] = {{
     .zero_cell = "unga",
 }};
 
+/* Language "tmcc" */
+static trivbf tmcc[1] = {{
+    .name = "tmcc",
+    .class = L_JNWORD,
+    .bf = { "しの", "さばにき", "SMD", "にゃんこ", "ゲェジ", "がりん", "NEMO", "キュゥ"},
+    .help = "Tmcc -- https://github.com/k-mrm/tmcc-bf",
+}};
+
+/* Language "heartfuck" */
+static trivbf heart[1] = {{
+    .name = "heart",
+    .class = L_JNWORD,
+    .bf = { "💗", "💜", "💖", "❤", "💌", "❣", "💛", "💙"},
+    .help = "heart -- https://github.com/heartfuck/heartfuck",
+}};
+
 /* Language brainbool: http://esolangs.org/wiki/Brainbool */
 static trivbf brainbool[1] = {{
     .name = "brainbool",
@@ -2139,7 +2155,7 @@ static trivbf * trivlist[] = {
     k_on_fuck, petooh, arabic, dc1, dc2, dc3, dc4, nyan, atpling, cupid,
     ternary, pikalang, spoon, troll, roadrunner, brainbool, clojure,
     nasm, nasmmagic, cgalang, brainfuq, emojifuck, trigram, cbyte_rle,
-    babylang, matlab,
+    babylang, matlab, tmcc, heart,
 
     bfout, doubler_12, doubler_copy_LXXH, doubler_12nz, doubler_12r,
     doubler_17a, doubler_17b, doubler_copy, doubler_copynz,

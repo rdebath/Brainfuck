@@ -457,6 +457,12 @@ int main(int argc, char ** argv)
 		character_conversion = bf;
 		custom_prefilter = utf8_conversion;
 	    }
+	    else if (!strcmp(argv[1], "-heart")) {
+		mode = INITIAL;
+		character_prefilter = "💗💜💖❤💌❣💛💙";
+		character_conversion = bf;
+		custom_prefilter = utf8_conversion;
+	    }
 
 	    else if (!strncmp(argv[1], "-bf=", 4)) {
 		mode = INITIAL;
@@ -642,6 +648,7 @@ Usage(void)
     fprintf(stderr, "   -bewbs   Input using Bewbs\n");
     fprintf(stderr, "   -chi     Input using some random Chinese\n");
     fprintf(stderr, "   -arabic  Input using some random Arabic letters\n");
+    fprintf(stderr, "   -heart   Input using heartfuck https://github.com/heartfuck/heartfuck\n");
     fprintf(stderr, "   -lisp    Input using lots of parentheses\n");
     fprintf(stderr, "   -mini    Input using just the first letters of -nice\n");
     fprintf(stderr, "   -alphuck Input using yet another single letter substitution.\n");
