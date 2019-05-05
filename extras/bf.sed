@@ -26,6 +26,8 @@ s/%\(.\)/\1%/
 }
 
 /%</ { 
+    # Support going left of the start point
+    s/:=/:0000|=/
     s/\([^|:]*|\)=/=\1/
     b next
 }
