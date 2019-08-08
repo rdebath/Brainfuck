@@ -1,6 +1,8 @@
 /*
  *  This one isn't strictly "broken", but it is unusual enough that I need
  *  to specifically test against it.
+ *
+ *  Specifically it errors if '-' goes negative or '+' exceeds 255.
  */
 #define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
