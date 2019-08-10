@@ -135,7 +135,7 @@ main(int argc, char ** argv)
 	if (argv[ar][0] != '-' || argv[ar][1] == '\0' || mm) {
 	    filelist[filecount++] = argv[ar];
 
-	} else if (strcmp(argv[ar], "-h") == 0) {
+	} else if (strcmp(argv[ar], "-h") == 0 || strcmp(argv[ar], "--help") == 0) {
 
 	    fprintf(stderr, "%s: [options] [File]\n", pgm);
 	    fprintf(stderr, "%s\n",
