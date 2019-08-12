@@ -531,6 +531,39 @@ outcmd(int ch, int count)
 	|.endif
 	break;
 
+    case '"':
+	{
+	    char * str = get_string();
+	    if (!str) break;
+	    clean_acc();
+	    move_tape();
+	    acc_loaded = 0;
+
+	    for(; *str; str++) {
+
+		|.if I386
+		| mov eax, *str
+		| push eax
+		| call &putchar
+		| pop eax
+		|.else
+#ifndef _WIN32
+		| mov PRM, *str
+#else
+		| mov rcx, *str
+#endif
+#if (defined(__code_model_small__) && !defined(__PIC__)) || defined(__ILP32__)
+		| mov	eax, (uintptr_t) putchar
+		| call  rax
+#else
+		| mov64 rax, (uintptr_t) putchar
+		| call  rax
+#endif
+		|.endif
+	    }
+	}
+	break;
+
     case '~':
 	clean_acc();
 	|.if I386

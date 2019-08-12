@@ -120,6 +120,15 @@ outcmd(int ch, int count)
 	if(bytecell) { I; printf("set @ccell = @ccell & 255\n"); }
 	I; printf("EXEC #pch @ccell,@linebuf OUTPUT\n");
 	break;
+    case '"':
+        {
+            char * str = get_string();
+            if (!str) break;
+            for(; *str; str++) {
+		I; printf("EXEC #pch %d,@linebuf OUTPUT\n", *str & 0xFF);
+            }
+            break;
+        }
     case ',':
 	I; printf("RAISERROR ('Input command not implemented', 16, 1) RETURN\n");
 	break;

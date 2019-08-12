@@ -16,6 +16,7 @@ struct instruction {
     int has_inp;
     struct instruction * next;
     struct instruction * loop;
+    char * cstr;
 };
 static struct instruction *pgm = 0, *last = 0, *jmpstack = 0;
 
@@ -75,7 +76,8 @@ outcmd(int ch, int count)
 	    j->has_inp++;
 	    j=j->loop;
 	}
-    }
+    } else if (ch == '"')
+	n->cstr = strdup(get_string());
 
     if (ch != '~') return;
 
@@ -101,6 +103,8 @@ outcmd(int ch, int count)
     while(pgm) {
 	n = pgm;
 	pgm = pgm->next;
+	if (n->cstr)
+	    free(n->cstr);
 	memset(n, '\0', sizeof*n);
 	free(n);
     }
@@ -128,6 +132,14 @@ loutcmd(int ch, int count, struct instruction *n)
     case '<': prv("p := p - %d;", count); break;
     case '>': prv("p := p + %d;", count); break;
     case '.': pr("Write(m[p]);"); break;
+    case '"':
+        {
+            char * str = n->cstr;
+            if (!str) break;;
+            for(; *str; str++)
+		prv("Write(%d);", *str & 0xFF);
+            break;
+        }
 
     case 'X': pr("ERROR('Abort: Infinite Loop');"); break;
     }

@@ -24,6 +24,7 @@ static int lineinc = 1;
 
 static int enable_linenos = 0;
 static int do_input = 0;
+static int do_output = 0;
 static int do_indent = 0;
 
 static char tapecell[16]="M(P)";
@@ -40,6 +41,8 @@ static enum { end_none, end_end, end_system, end_vb }
     end_style = end_end;
 static enum { io_ansi, io_bbc, io_vb, io_fbas, io_bas256, io_bacon }
     io_style = io_ansi;
+
+static void print_string(void);
 
 static struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
@@ -271,7 +274,7 @@ outcmd(int ch, int count)
 		I; printf("End Module\n");
 		break;
 	}
-	if (io_style == io_bbc) {
+	if (do_output && io_style == io_bbc) {
 	    I; printf("DEF PROCPRT(C%%)\n");
 	    I; printf("IF C%%=10 THEN PRINT ELSE PRINT CHR$(C%%);\n");
 	    I; printf("ENDPROC\n");
@@ -345,9 +348,11 @@ outcmd(int ch, int count)
 	    break;
 	case io_bbc:
 	    I; printf("PROCPRT(%s)\n", tapecell);
+	    do_output = 1;
 	    break;
 	case io_fbas:
 	    I; printf("PrtCh(%s)\n", tapecell);
+	    do_output = 1;
 	    break;
 	case io_bas256:
 	    I; printf("IF %s <> 10 THEN PRINT CHR(%s);\n", tapecell, tapecell);
@@ -359,6 +364,7 @@ outcmd(int ch, int count)
 	    break;
 	}
 	break;
+    case '"': print_string(); break;
     case ',':
 	switch(io_style) {
 	case io_ansi:
@@ -515,5 +521,52 @@ outcmd(int ch, int count)
 		break;
 	}
 	break;
+    }
+}
+
+static void
+print_string(void)
+{
+    char * str = get_string();
+    char buf[256];
+    int gotnl = 0, badchar = 0;
+    size_t outlen = 0;
+
+    if (!str) return;
+
+    for(;; str++) {
+	if (outlen && (*str == 0 || gotnl || badchar || outlen > sizeof(buf)-8))
+	{
+	    if (gotnl) {
+		buf[--outlen] = 0;
+		if (outlen == 0) {
+		    I; printf("PRINT\n");
+		} else {
+		    I; printf("PRINT \"%s\"\n", buf);
+		}
+	    } else {
+		buf[outlen] = 0;
+		I; printf("PRINT \"%s\";\n", buf);
+	    }
+	    gotnl = 0; outlen = 0;
+	}
+	if (badchar) {
+	    switch(io_style) {
+	    case io_vb: I; printf("Console.Write(Chr(%d))\n", badchar); break;
+	    case io_bas256: I; printf("PRINT CHR(%d);\n", badchar); break;
+	    default: I; printf("PRINT CHR$(%d);\n", badchar); break;
+	    }
+	    badchar = 0;
+	}
+	if (!*str) break;
+
+	if (*str == '\n') {
+	    gotnl = 1;
+	    buf[outlen++] = *str;
+	} else if (*str >= ' ' && *str <= '~' && *str != '"') {
+	    buf[outlen++] = *str;
+	} else {
+	    badchar = (*str & 0xFF);
+	}
     }
 }

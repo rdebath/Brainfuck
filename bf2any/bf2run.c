@@ -23,7 +23,7 @@ static size_t tapealloc;
 #define TOKEN_LIST(Mac) \
     Mac(STOP) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
     Mac(SET) Mac(BEG) Mac(MUL) Mac(MUL1) Mac(SETNV) Mac(MULV) Mac(SETV) \
-    Mac(ZFIND) Mac(RAILC) Mac(RAILZ) Mac(DUMP) Mac(NOP)
+    Mac(ZFIND) Mac(RAILC) Mac(RAILZ) Mac(CHR) Mac(DUMP) Mac(NOP)
 
 #define GEN_TOK_ENUM(NAME) T_ ## NAME,
 enum token { TOKEN_LIST(GEN_TOK_ENUM) TCOUNT};
@@ -70,11 +70,7 @@ fn_check_arg(const char * arg)
     return 0;
 }
 
-void
-outcmd(int ch, int count)
-{
-    int t = -1;
-
+static void testmem() {
     if (memlen < mptr-mem + 8) {
 	size_t s = memlen + 1024;
 	int * p;
@@ -85,8 +81,16 @@ outcmd(int ch, int count)
 	mem = p;
 	memlen = s;
     }
+}
 
-    if (ch != '>' && ch != '<') {
+void
+outcmd(int ch, int count)
+{
+    int t = -1;
+
+    testmem();
+
+    if (ch != '>' && ch != '<' && ch != '"') {
 	*mptr++ = imov;
 	imov = 0;
     }
@@ -116,6 +120,18 @@ outcmd(int ch, int count)
     case ',': *mptr++ = t = T_INP; break;
     case '.': *mptr++ = t = T_PRT; break;
     case '#': *mptr++ = t = T_DUMP; checklimits = 1; break;
+    case '"':
+	{
+	    char * str = get_string();
+	    if (!str) break;
+	    for(; *str; str++) {
+		testmem();
+		*mptr++ = 0;
+		*mptr++ = T_CHR;
+		*mptr++ = *str;
+	    }
+	    break;
+	}
     case '~':
 	*mptr++ = t = T_STOP;
 	if (do_dump) {
@@ -251,7 +267,7 @@ dumpprog(int * p, int * ep)
 	    p++;
 	    break;
 	case T_SET: case T_ADD: case T_MUL: case T_SETNV:
-	case T_ZFIND: case T_RAILC: case T_RAILZ:
+	case T_ZFIND: case T_RAILC: case T_RAILZ: case T_CHR:
 	    printf(" %d", *p++);
 	    break;
 	default:
@@ -325,6 +341,7 @@ runprog_int(register int * p, register tcell *mp)
 	case T_RAILC: while(M(*mp)) {*mp -=1; mp += p[2]; } p+=3; break;
 	case T_RAILZ: while(M(*mp)) {*mp =0; mp += p[2]; } p+=3; break;
 	case T_PRT: putchar(*mp); p+=2; break;
+	case T_CHR: putchar(p[2]); p+=3; break;
 	case T_INP: {int i; if((i=getchar()) != EOF) *mp = i; } p+=2; break;
 	case T_NOP: p += 2; break;
 	case T_STOP: return;

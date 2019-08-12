@@ -43,6 +43,7 @@ outcmd(int ch, int count)
 
 	puts(":put\r");
 	puts("SET /A CH=MEMORY%PTR%^&127\r");
+	puts(":putch\r");
 	puts("SET /A AC=%CH%-34\r");
 
 	puts("IF %CH% EQU 10 (\r");
@@ -62,6 +63,10 @@ outcmd(int ch, int count)
 	puts(")\r");
 
 	puts("EXIT /B 0\r");
+	puts("\r");
+	puts(":get\r");
+	puts("ECHO Input command not implemented\r");
+	puts("PAUSE & EXIT\r");
 	puts("\r");
 	puts(":STARTCODE\r");
 	break;
@@ -143,11 +148,20 @@ outcmd(int ch, int count)
 	do_output = 1;
 	break;
     case ',':
-	puts("ECHO Input command not implemented & EXIT\r");
 	puts("CALL :get\r");
 	do_input = 1;
 	break;
     case '~':
 	break;
+    case '"':
+	{
+	    char * str = get_string();
+	    if (!str) return;
+	    for(; *str; str++) {
+		printf("SET /A CH=%d\r\n", *str & 0x7F);
+		puts("CALL :putch\r");
+	    }
+	    break;
+	}
     }
 }
