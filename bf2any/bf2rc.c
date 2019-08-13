@@ -9,7 +9,7 @@
  *
  * Large input files give:
  *      line 18551: yacc stack overflow near end of line
- * To workaround set a MAXPRLE of 128
+ * To workaround set a max_prle of 128
  *
  * This back end has no input function.
  * There is no built in function to read a line from the stdin and there is
@@ -23,11 +23,12 @@
  * not required for TC.
  */
 
-#define MAXPRLE	128
-
 static int do_input = 0;
 static int do_output = 0;
 static int ind = 0;
+static int max_prle = 128;
+
+static void print_string(void);
 
 struct be_interface_s be_interface = {.bytesonly=1,.disable_be_optim=1};
 
@@ -38,7 +39,7 @@ outcmd(int ch, int count)
         count &= 255;
     } else {
 
-	while (count>MAXPRLE) { outcmd(ch, MAXPRLE); count -= MAXPRLE; }
+	while (count>max_prle) { outcmd(ch, max_prle); count -= max_prle; }
 
 	if (count > 1) {
 	    switch(ch) {
@@ -52,7 +53,8 @@ outcmd(int ch, int count)
     }
 
     switch(ch) {
-    case '=': printf("f\nv=%d\ns\n", count); break;
+    case '"': print_string(); break;
+    case '=': printf("s %d\n", count); break;
     case '+': printf("u\n"); break;
     case '-': printf("d\n"); break;
     case '>': printf("r\n"); break;
@@ -84,8 +86,14 @@ outcmd(int ch, int count)
 	    "    if (~ $v ()) v=0\n"
 	    "}\n"
 	    "\n"
-	    "fn s {\n"
+	    "fn w {\n"
 	    "    $p=$v\n"
+	    "}\n"
+	    "\n"
+	    "fn s {\n"
+	    "    f\n"
+	    "    v=$1\n"
+	    "    w\n"
 	    "}\n"
 	    "\n"
 	    "fn r {\n"
@@ -151,7 +159,7 @@ outcmd(int ch, int count)
 	    printf("    } else {\n");
 	    printf("        v=$inc($v)\n");
 	    printf("    }\n");
-	    printf("    s\n" "}\n" "\n");
+	    printf("    w\n" "}\n" "\n");
 	}
 
 	{
@@ -169,10 +177,10 @@ outcmd(int ch, int count)
 	    printf("    } else {\n");
 	    printf("        v=$dec($v)\n");
 	    printf("    }\n");
-	    printf("    s\n" "}\n" "\n");
+	    printf("    w\n" "}\n" "\n");
 	}
 
-	printf("fn o {\n" "    f\n" "    switch ($v) {\n");
+	printf("fn e {\n" "    switch ($1) {\n");
 	{
 	    int i;
 	    for (i=0; i<256; i++) {
@@ -184,20 +192,21 @@ outcmd(int ch, int count)
 		    printf("    case %d\n\techo -n '%c'\n", i, i);
 		else if (i == '\'')
 		    printf("    case %d\n\techo -n ''''\n", i);
-		/* else
-		 *  Missing characters can be generated using AWK if required.
-		 */
 	    }
+	    printf("    # Use awk for the rest\n");
+	    printf("    case *\n\tawk -v 'v='$1 'BEGIN{printf \"%%c\",v;}'\n");
 	}
 	printf("    }\n" "}\n" "\n");
+
+	printf("fn o {\n" "    f\n" "    e $v\n" "}\n\n");
 
 	printf("fn i {\n");
 	printf("    f\n");
 	printf("    v=`{dd 'bs=1' 'count=1' >[2]/dev/null | od -t d1 | cut -d ' ' -s -f 2- }\n");
-	printf("    s\n");
+	printf("    w\n");
 	printf("}\n" "\n");
 
-	if (MAXPRLE>1) {
+	if (max_prle>1) {
 	    int i;
 	    printf("fn u2 { u ; u; }\n");
 	    printf("fn d2 { d ; d; }\n");
@@ -208,16 +217,61 @@ outcmd(int ch, int count)
 	    printf("fn l3 { l2 ; l; }\n");
 	    printf("fn r3 { r2 ; r; }\n");
 
-	    for (i=4; i<=MAXPRLE; i++) {
+	    for (i=4; i<=max_prle; i++) {
 		printf("fn u%d { u%d ; u%d; }\n", i, i-i/2, i/2);
 		printf("fn d%d { d%d ; d%d; }\n", i, i-i/2, i/2);
 		printf("fn l%d { l%d ; l%d; }\n", i, i-i/2, i/2);
 		printf("fn r%d { r%d ; r%d; }\n", i, i-i/2, i/2);
 	    }
+	    printf("\n");
 	}
 	break;
 
     case '~':
 	break;
+    }
+}
+
+static void
+print_string(void)
+{
+    char * str = get_string();
+    char buf[256];
+    int gotnl = 0, badchar = 0;
+    size_t outlen = 0;
+
+    if (!str) return;
+
+    for(;; str++) {
+	if (outlen && (*str == 0 || gotnl || badchar || outlen > sizeof(buf)-8))
+	{
+	    if (gotnl) {
+		buf[--outlen] = 0;
+		if (outlen == 0) {
+		    printf("echo\n");
+		} else {
+		    printf("echo '%s'\n", buf);
+		}
+	    } else {
+		buf[outlen] = 0;
+		printf("echo -n '%s'\n", buf);
+	    }
+	    gotnl = 0; outlen = 0;
+	}
+	if (badchar) {
+	    printf("e %d\n", badchar);
+	    badchar = 0;
+	    do_output = 1;
+	}
+	if (!*str) break;
+
+	if (*str == '\n') {
+	    gotnl = 1;
+	    buf[outlen++] = *str;
+	} else if (*str >= ' ' && *str <= '~' && *str != '\'' && *str != '\\' && *str != '-') {
+	    buf[outlen++] = *str;
+	} else {
+	    badchar = (*str & 0xFF);
+	}
     }
 }

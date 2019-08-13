@@ -25,6 +25,12 @@ static int do_input = 0;
 static int do_output = 0;
 static int ind = 0;
 
+static int do_f1 = 0, do_arr = 0;
+static int max_u = 0, max_d = 0, max_l = 0, max_r = 0;
+#define setmax(max_x, val) if(val>max_x) max_x = val;
+
+static void print_string(void);
+
 struct be_interface_s be_interface = {.bytesonly=1,.disable_be_optim=1};
 
 void
@@ -40,28 +46,29 @@ outcmd(int ch, int count)
 
 	if (count > 1) {
 	    switch(ch) {
-	    case '+': printf("u%d\n", count); break;
-	    case '-': printf("d%d\n", count); break;
-	    case '>': printf("r%d\n", count); break;
-	    case '<': printf("l%d\n", count); break;
+	    case '+': printf("u%d\n", count); setmax(max_u, count); break;
+	    case '-': printf("d%d\n", count); setmax(max_d, count); break;
+	    case '>': printf("r%d\n", count); setmax(max_r, count); break;
+	    case '<': printf("l%d\n", count); setmax(max_l, count); break;
 	    }
 	    return;
 	}
     }
 
     switch(ch) {
-    case '=': printf("eval \"M$P=%d\"\n", count); break;
-    case '+': printf("u1\n"); break;
-    case '-': printf("d1\n"); break;
-    case '>': printf("r1\n"); break;
-    case '<': printf("l1\n"); break;
+    case '"': print_string(); break;
+    case '=': printf("eval \"M$P=%d\"\n", count); do_arr = 1; break;
+    case '+': printf("u1\n"); setmax(max_u, 1); break;
+    case '-': printf("d1\n"); setmax(max_d, 1); break;
+    case '>': printf("r1\n"); setmax(max_r, 1); break;
+    case '<': printf("l1\n"); setmax(max_l, 1); break;
     case '[':
-	printf("f1\n");
+	printf("f1\n"); do_f1 = 1;
 	printf("while [ \"$A\" != 0 ] ; do\n");
 	ind++;
 	break;
     case ']':
-	printf("f1\n");
+	printf("f1\n"); do_f1 = 1;
 	ind--; printf("done\n");
 	break;
     case '.': printf("o1\n"); do_output = 1; break;
@@ -81,29 +88,47 @@ outcmd(int ch, int count)
 	if (MAXPRLE>1) {
 	    printf("\n");
 	    for (i=2; i<=MAXPRLE; i++) {
-		printf("u%d() { u%d ; u%d; }\n", i, i-i/2, i/2);
-		printf("d%d() { d%d ; d%d; }\n", i, i-i/2, i/2);
-		printf("l%d() { l%d ; l%d; }\n", i, i-i/2, i/2);
-		printf("r%d() { r%d ; r%d; }\n", i, i-i/2, i/2);
+		if (i <= max_u)
+		    printf("u%d() { u%d ; u%d; }\n", i, i-i/2, i/2);
+		if (i <= max_d)
+		    printf("d%d() { d%d ; d%d; }\n", i, i-i/2, i/2);
+		if (i <= max_l)
+		    printf("l%d() { l%d ; l%d; }\n", i, i-i/2, i/2);
+		if (i <= max_r)
+		    printf("r%d() { r%d ; r%d; }\n", i, i-i/2, i/2);
 	    }
 	}
 
-	printf("\n");
-	for(i=0; i<256; i++)
-	    printf("inc_%d=%d\n", i, ((i+1) & 0xFF));
-	printf("inc_=1\n");
+	if (max_u>0) {
+	    do_arr = 1;
+	    printf("\n");
+	    for(i=0; i<256; i++)
+		printf("inc_%d=%d\n", i, ((i+1) & 0xFF));
+	    printf("inc_=1\n");
+	    printf("\n");
+	    printf("u1() { eval \"A=\\$M$P\"; eval \"M$P=\\$inc_$A\"; }\n");
+	}
 
-	printf("\n");
-	for(i=0; i<256; i++)
-	    printf("dec_%d=%d\n", i, ((i-1) & 0xFF));
-	printf("dec_=255\n");
+	if (max_d>0) {
+	    do_arr = 1;
+	    printf("\n");
+	    for(i=0; i<256; i++)
+		printf("dec_%d=%d\n", i, ((i-1) & 0xFF));
+	    printf("dec_=255\n");
+	    printf("\n");
+	    printf("d1() { eval \"A=\\$M$P\"; eval \"M$P=\\$dec_$A\"; }\n");
+	}
 
-	printf("\n");
-	printf("u1() { eval \"A=\\$M$P\"; eval \"M$P=\\$inc_$A\"; }\n");
-	printf("d1() { eval \"A=\\$M$P\"; eval \"M$P=\\$dec_$A\"; }\n");
-	printf("f1() { eval \"A=\\$M$P\"; [ \".$A\" = . ] && A=0; }\n");
+	if (do_f1) {
+	    do_arr = 1;
+	    printf("\n");
+	    printf("f1() { eval \"A=\\$M$P\"; [ \".$A\" = . ] && A=0; }\n");
+	}
 
-	printf("%s\n",
+	if (max_r>0 || max_l>0)
+	    do_arr = 1;
+
+	if (max_r>0) printf("%s\n",
 
 "\n"	    "r1() {"
 "\n"	    "    C=1 ; B= ; P="
@@ -130,7 +155,9 @@ outcmd(int ch, int count)
 "\n"	    "    [ \"$C\" = 1 ] && { B=\"$B 1\" ; P=\"1${P}\" ; }"
 "\n"	    "    PS=\"$B\""
 "\n"	    "}"
-"\n"	    ""
+	    );
+
+	if (max_l>0) printf("%s\n",
 "\n"	    "l1() {"
 "\n"	    "    C=1 ; B= ; P= ; LZ= ; LZP="
 "\n"	    "    for v in $PS"
@@ -180,12 +207,18 @@ outcmd(int ch, int count)
 		);
 	    printf("\n");
 
+	    do_arr = 1;
+	    printf("o1() {\n");
+	    printf("eval \"A=\\$M$P\"\n");
+	    printf("o2 $A\n");
+	    printf("}\n");
+	    printf("\n");
+
             printf("if [ \".$(echoe '\\171')\" = .y ]\n");
             printf("then\n\n");
 
-	    printf("o1() {\n");
-	    printf("eval \"A=\\$M$P\"\n");
-	    printf("case \"$A\" in\n");
+	    printf("o2() {\n");
+	    printf("case \"$1\" in\n");
 	    for(i=0; i<256; i++) {
 		if (i >= ' ' && i <= '~' && i != '\'' && i != '\\' && i != '-')
 		    printf("%d ) echon '%c' ;;\n", i, i);
@@ -197,9 +230,8 @@ outcmd(int ch, int count)
 	    printf("esac\n}\n");
             printf("else\n\n");
 
-	    printf("o1() {\n");
-	    printf("eval \"A=\\$M$P\"\n");
-	    printf("case \"$A\" in\n");
+	    printf("o2() {\n");
+	    printf("case \"$1\" in\n");
 	    for(i=0; i<256; i++) {
 		if (i >= ' ' && i <= '~' && i != '\'' && i != '\\' && i != '-')
 		    printf("%d ) echon '%c' ;;\n", i, i);
@@ -215,21 +247,71 @@ outcmd(int ch, int count)
             printf("fi\n\n");
 	}
 
-	if (do_input)
-	    printf("\n%s\n%s\n%s\n%s\n%s\n",
+	if (do_input) {
+	    do_arr = 1;
+	    printf("\n%s\n%s\n%s\n%s\n%s\n\n",
 		"# Use other tools here, input is not needed for TC",
 		"i1() {",
 		"A=`dd bs=1 count=1 2>/dev/null | od -t d1 | awk '{print $2;}'`",
 	        "eval \"M$P=$A\"",
 		"}");
+	}
 
+	if (do_arr)
+	    printf("P=\n");
 
-	printf("\nP=\n");
-	printf("# Everything should be ready so do a final sanity check\n");
-	printf("(r2;u2;r1;u1;l1;f1;[ \"$A\" = 2 ]) 2>/dev/null ||");
-	printf("{ echo Broken shell, more insane than normal. >&2; exit 1;}\n");
+	if (max_r>=2 && max_l>=1 && max_u>=2 && max_l>=1 && do_f1) {
+	    printf("# Everything should be ready so do a final sanity check\n");
+	    printf("(r2;u2;r1;u1;l1;f1;[ \"$A\" = 2 ]) 2>/dev/null ||");
+	    printf("{ echo Broken shell, more insane than normal. >&2; exit 1;}\n");
+	}
+
 	printf("bf\n");
 	break;
+    }
+}
+
+static void
+print_string(void)
+{
+    char * str = get_string();
+    char buf[256];
+    int gotnl = 0, badchar = 0;
+    size_t outlen = 0;
+
+    if (!str) return;
+
+    for(;; str++) {
+	if (outlen && (*str == 0 || gotnl || badchar || outlen > sizeof(buf)-8))
+	{
+	    if (gotnl) {
+		buf[--outlen] = 0;
+		if (outlen == 0) {
+		    printf("echo\n");
+		} else {
+		    printf("echo '%s'\n", buf);
+		}
+	    } else {
+		buf[outlen] = 0;
+		printf("echon '%s'\n", buf);
+	    }
+	    gotnl = 0; outlen = 0;
+	}
+	if (badchar) {
+	    printf("o2 %d\n", badchar);
+	    badchar = 0;
+	    do_output = 1;
+	}
+	if (!*str) break;
+
+	if (*str == '\n') {
+	    gotnl = 1;
+	    buf[outlen++] = *str;
+	} else if (*str >= ' ' && *str <= '~' && *str != '\'' && *str != '\\' && *str != '-') {
+	    buf[outlen++] = *str;
+	} else {
+	    badchar = (*str & 0xFF);
+	}
     }
 }
 
