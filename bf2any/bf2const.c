@@ -83,65 +83,19 @@ void add_string(int ch)
     sav_str_str[sav_str_len++] = ch;
 }
 
-char *
-get_string(void)
-{
-    if (sav_str_len) {
-	sav_str_len = 0;
-	return sav_str_str;
-    } else return 0;
-}
-
-static void
+void
 flush_string(void)
 {
     if (sav_str_len<=0) return;
     add_string(0);
-    outcmd('"', 0);
-    if (sav_str_len<=0) return;
+    (*be_interface.gen_code)('"', 0, sav_str_str);
+    sav_str_len = 0;
+}
 
-    {
-	int outoff = 0, tapeoff = 0;
-	int direction = 1;
-	int flipcount = 1;
-	struct mem* p = tapezero;
-
-	for(;;)
-	{
-	    if (p->is_set)
-		break;
-
-	    if (direction > 0 && p->n) {
-		p=p->n; tapeoff ++;
-	    } else
-	    if (direction < 0 && p->p) {
-		p=p->p; tapeoff --;
-	    } else
-	    if (flipcount) {
-		flipcount--;
-		direction = -direction;
-	    } else {
-		fprintf(stderr, "FAILED\n");
-		exit(1);
-	    }
-	}
-
-	if (tapeoff > outoff) { outcmd('>', tapeoff-outoff); outoff=tapeoff; }
-	if (tapeoff < outoff) { outcmd('<', outoff-tapeoff); outoff=tapeoff; }
-	tapezero = p;
-	curroff -= tapeoff;
-    }
-
-    {
-	char c=0, *p = sav_str_str;
-	while(*p) {
-	    outcmd('=', (c = *p++));
-	    outcmd('.', 0);
-	}
-	tapezero->cleaned = 1;
-	tapezero->cleaned_val = c;
-	sav_str_len = 0;
-    }
+void
+outcmd(int ch, int count)
+{
+    (*be_interface.gen_code)(ch, count, 0);
 }
 
 static void
@@ -151,6 +105,8 @@ flush_tape(int no_output, int keep_knowns)
     int direction = 1;
     int flipcount = 2;
     struct mem *p;
+
+    if (first_run) outcmd('!', no_output);
 
     if (sav_str_len>0)
 	flush_string();
@@ -248,6 +204,7 @@ void outopt(int ch, int count)
 	if (ch == '!') {
 	    flush_tape(1,0);
 	    tape->cleaned = tape->is_set = first_run = !disable_init_optim;
+	    if (first_run) return;
 	} else if (ch == '~' && enable_optim && !disable_init_optim)
 	    flush_tape(1,0);
 	else
@@ -272,7 +229,9 @@ void outopt(int ch, int count)
 	return;
 
     case '.':
-	if (tape->is_set) {
+	if (tape->is_set &&
+		(!be_interface.disable_be_optim ||
+		be_interface.enable_chrtok)) {
 	    int c = tape->v;
 	    if (bytecell) c &= 0xFF;
 	    if (c > 0 && c < 128) {

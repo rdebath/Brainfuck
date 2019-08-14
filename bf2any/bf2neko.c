@@ -14,23 +14,25 @@
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
-struct be_interface_s be_interface = {};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code};
 
-static void print_cstring(void);
+static void print_cstring(char * str);
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
-	printf( "%s%d%s%d%s",
-	    "var m = $amake(",tapesz,");\n"
-	    "var p = 0;\n"
-	    "var s = $smake(1);\n"
-	    "var file_read_char = $loader.loadprim(\"std@file_read_char\",1)\n"
-	    "var file_stdin = $loader.loadprim(\"std@file_stdin\",0)\n"
-	    "while p < $asize(m) {m[p] = 0; p+=1 } p = ",tapeinit,";\n"
-	    );
+	if (!count)
+	    printf( "%s%d%s%d%s",
+		"var m = $amake(",tapesz,");\n"
+		"var p = 0;\n"
+		"var s = $smake(1);\n"
+		"var file_read_char = $loader.loadprim(\"std@file_read_char\",1)\n"
+		"var file_stdin = $loader.loadprim(\"std@file_stdin\",0)\n"
+		"while p < $asize(m) {m[p] = 0; p+=1 } p = ",tapeinit,";\n"
+		);
 	break;
 
     case '=': I; printf("m[p] = %d\n", count); break;
@@ -73,7 +75,7 @@ outcmd(int ch, int count)
 	ind--; I; printf("}\n");
 	break;
     case '.': I; printf("$sset(s,0,m[p]) $print(s)\n"); break;
-    case '"': print_cstring(); break;
+    case '"': print_cstring(strn); break;
     case ',':
 	I; printf("try m[p] = file_read_char(file_stdin()) catch e 0\n");
 	break;
@@ -81,9 +83,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_cstring(void)
+print_cstring(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0;
     size_t outlen = 0;

@@ -14,12 +14,13 @@ static int ind = 0;
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
 
-struct be_interface_s be_interface = {};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code};
 
-static void print_string(void);
+static void print_string(char * str);
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
@@ -73,7 +74,7 @@ outcmd(int ch, int count)
     case '<': prv(": $((P-=%d))", count); break;
     case '.': pr("o $((M[P]&255))"); break;
     case ',': pr("getch"); do_input++; break;
-    case '"': print_string(); break;
+    case '"': print_string(strn); break;
 
     case '[':
 	if(bytecell) { pr("while (( (M[P]&=255) != 0)) ; do"); }
@@ -128,9 +129,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_string(void)
+print_string(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int badchar = 0, badecho = 0;
     size_t outlen = 0;
@@ -163,7 +163,10 @@ print_string(void)
 	    outlen = 0;
 	}
 	if (badchar) {
-	    prv("o %d", badchar);
+	    if (badchar == 10)
+		pr("echo");
+	    else
+		prv("o %d", badchar);
 	    badchar = 0;
 	}
 	if (!*str) break;

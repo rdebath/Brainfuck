@@ -34,7 +34,8 @@ static char * boilerplate;
 #define prv2(s,v,v2)    printf("%*s" s "\n", ind*2, "", (v), (v2))
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {.bytesonly=1, .check_arg = fn_check_arg};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {fn_check_arg, gen_code, .bytesonly=1};
 
 static int
 fn_check_arg(const char * arg)
@@ -43,8 +44,8 @@ fn_check_arg(const char * arg)
     return 0;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     struct instruction * n = calloc(1, sizeof*n);
     if (!n) { perror("bf2nav"); exit(42); }
@@ -77,7 +78,7 @@ outcmd(int ch, int count)
 	    j=j->loop;
 	}
     } else if (ch == '"')
-	n->cstr = strdup(get_string());
+	n->cstr = strdup(strn);
 
     if (ch != '~') return;
 

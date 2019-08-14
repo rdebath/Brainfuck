@@ -17,15 +17,15 @@
  */
 
 static int do_input = 0;
-static int done_init = 0;
 static int ind = 0;
 static int old_awk = 0;
 #define I printf("%*s", ind*4, "")
 
-static void print_cstring(void);
+static void print_cstring(char * str);
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {.check_arg=fn_check_arg};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.check_arg=fn_check_arg,.gen_code=gen_code};
 
 static int
 fn_check_arg(const char * arg)
@@ -58,8 +58,8 @@ cell(int mov)
     return buf;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     int mov = 0;
     char * cm;
@@ -67,16 +67,14 @@ outcmd(int ch, int count)
     move_opt(&ch, &count, &mov);
     if (ch == 0) return;
 
-    if (!done_init && ch != '"' && ch != '!' && ch != '~') {
-	I; printf("p = %d\n", tapeinit);
-	done_init = 1;
-    }
-
     cm = cell(mov);
     switch(ch) {
     case '!':
 	printf("#!/usr/bin/awk -f\n");
 	printf("BEGIN {\n"); ind++;
+	if (!count) {
+	    I; printf("p = %d\n", tapeinit);
+	}
 	break;
 
     case '=': I; printf("%s = %d\n", cm, count); break;
@@ -167,14 +165,12 @@ outcmd(int ch, int count)
 	break;
 
     case '.':
-	if (old_awk) {
-	    I; printf("printf \"%%c\",((%s %% 256) + 256) %% 256\n", cm);
-	} else {
-	    if(bytecell) { I; printf("%s %%= 256\n", cm); }
-	    I; printf("printf \"%%c\",%s\n", cm);
+	if(bytecell) {
+	    I; printf("%s = ((%s %% 256) + 256) %% 256\n", cm, cm);
 	}
+	I; printf("printf \"%%c\",%s\n", cm);
 	break;
-    case '"': print_cstring(); break;
+    case '"': print_cstring(strn); break;
 
     case ',':
 	if (!old_awk) {
@@ -210,9 +206,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_cstring(void)
+print_cstring(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0, gotperc = 0, badchar = 0;
     size_t outlen = 0;

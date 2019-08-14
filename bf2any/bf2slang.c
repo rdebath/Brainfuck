@@ -11,24 +11,27 @@
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
-struct be_interface_s be_interface = {};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code};
 
-static void print_cstring(void);
+static void print_cstring(char * str);
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
 	printf("#!/usr/bin/env slsh\n");
-	I; printf("variable p=%d;\n",tapeinit);
-	I; printf("variable v;\n");
-	I;
-	if (bytecell)
-	    printf("variable m = UChar_Type [%d];\n", tapesz);
-	else
-	    printf("variable m = Integer_Type [%d];\n", tapesz);
-	I; printf("variable goteof = 0, gotline = 0, line = \"\", c;\n");
+	if (!count) {
+	    I; printf("variable p=%d;\n",tapeinit);
+	    I; printf("variable v;\n");
+	    I;
+	    if (bytecell)
+		printf("variable m = UChar_Type [%d];\n", tapesz);
+	    else
+		printf("variable m = Integer_Type [%d];\n", tapesz);
+	    I; printf("variable goteof = 0, gotline = 0, line = \"\", c;\n");
+	}
 	break;
 
     case '=': I; printf("m[p] = %d;\n", count); break;
@@ -58,7 +61,7 @@ outcmd(int ch, int count)
     case '~': break;
 
     case '.': I; printf("()=printf(\"%%c\",m[p]);\n"); break;
-    case '"': print_cstring(); break;
+    case '"': print_cstring(strn); break;
 
     case ',':
 	I; printf("while(1) {\n");
@@ -83,9 +86,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_cstring(void)
+print_cstring(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0, gotperc = 0;
     size_t outlen = 0;

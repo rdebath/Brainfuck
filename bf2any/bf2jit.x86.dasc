@@ -21,7 +21,8 @@
  * dasm64 translation from BF, runs at about 5,000,000,000 instructions per second.
  */
 
-struct be_interface_s be_interface = {.cells_are_ints=1 };
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code, .cells_are_ints=1 };
 
 #if defined(__x86_64__) || defined(__amd64__) || defined(_M_AMD64)
 #define CPUCHECK 64
@@ -35,7 +36,7 @@ struct be_interface_s be_interface = {.cells_are_ints=1 };
 
 #ifndef DETECT_ONLY
 #if !CPUCHECK
-void outcmd(int ch, int count) {
+void outcmd(int ch, int count, char * strn) {
     fprintf(stderr, "Build failed: Supported processor not detected.\n");
     exit(255);
 }
@@ -228,8 +229,8 @@ move_tape(void)
 static void failout(void) { fprintf(stderr, "STOP Command executed.\n"); exit(1); }
 
 /* Called from the front end as normal */
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
@@ -533,7 +534,7 @@ outcmd(int ch, int count)
 
     case '"':
 	{
-	    char * str = get_string();
+	    char * str = strn;
 	    if (!str) break;
 	    clean_acc();
 	    move_tape();

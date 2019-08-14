@@ -56,10 +56,11 @@ static int tapealloc = 32768;
 #define I printf("%*s", ind*4, "")
 #define IO(d) printf("%*s", (ind+(d))*4, "")
 
-struct be_interface_s be_interface = {};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code};
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     struct instruction * n = calloc(1, sizeof*n);
     if (!n) { perror("bf2asmjs"); exit(42); }
@@ -91,7 +92,7 @@ outcmd(int ch, int count)
 	    j=j->loop;
 	}
     } else if (ch == '"')
-	n->cstr = strdup(get_string());
+	n->cstr = strdup(strn);
 
     if (ch != '~') return;
 

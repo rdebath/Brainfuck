@@ -41,7 +41,7 @@ static void compile_and_run_libtcc(void);
 #ifndef DISABLE_DLOPEN
 static void compile_and_run(void);
 #endif
-static void print_cstring(void);
+static void print_cstring(char * str);
 static void open_ofd(void);
 
 static int verbose = 0;
@@ -64,7 +64,8 @@ static size_t ccodesize = 0;
 #endif
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = { .check_arg = fn_check_arg,
+static gen_code_t gen_code;
+struct be_interface_s be_interface = { fn_check_arg, gen_code,
     .cells_are_ints=1, .hasdebug=1};
 
 static int
@@ -124,8 +125,8 @@ fn_check_arg(const char * arg)
 	return 0;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     int mov = 0;
 
@@ -244,7 +245,7 @@ outcmd(int ch, int count)
     case '>': prv("m += %d;", count); break;
     case '<': prv("m -= %d;", count); break;
     case '.': prv("PUTC(m[%d]);", mov); return;
-    case '"': print_cstring(); break;
+    case '"': print_cstring(strn); break;
     case ',': prv("GETC(m[%d]);", mov); break;
     case '#': pr("do_dump();"); break;
 
@@ -339,9 +340,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_cstring(void)
+print_cstring(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0, gotperc = 0;
     size_t outlen = 0;

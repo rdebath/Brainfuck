@@ -12,21 +12,24 @@ static int ind = 0;
 /* NB: f90 has a maximum line length */
 #define I printf("%*s", (ind>40?40:ind)*2, "")
 
-struct be_interface_s be_interface = {};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code};
 
-static void print_cstring(void);
+static void print_cstring(char * str);
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
-	printf("%s%d%s%d%s",
-		"PROGRAM brainfuck\n"
-		"  INTEGER, DIMENSION(0:",tapesz,") :: m = 0\n"
-		"  INTEGER :: r, v, p = ", tapeinit, "\n"
-		"  CHARACTER :: ch\n\n"
-	    );
+	printf("PROGRAM brainfuck\n");
+	if (!count) {
+	    printf("%s%d%s%d%s",
+		    "  INTEGER, DIMENSION(0:",tapesz,") :: m = 0\n"
+		    "  INTEGER :: r, v, p = ", tapeinit, "\n"
+		    "  CHARACTER :: ch\n\n"
+		);
+	}
 	ind ++;
 	break;
     case '~':
@@ -73,7 +76,7 @@ outcmd(int ch, int count)
 	ind--; I; printf("END IF\n");
 	break;
     case '.': I; printf("WRITE (*,'(A)',advance='no') CHAR(m(p))\n"); break;
-    case '"': print_cstring(); break;
+    case '"': print_cstring(strn); break;
     case ',': I; printf("READ (*, '(A)',advance='no',iostat=r) ch\n");
               I; printf("IF (r .EQ. 0) THEN\n");
               I; printf("  m(p) = ICHAR(ch)\n");
@@ -85,9 +88,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_cstring(void)
+print_cstring(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int badchar = 0;
     size_t outlen = 0;

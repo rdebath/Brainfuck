@@ -12,27 +12,29 @@ static int ind = 0;
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
 
-struct be_interface_s be_interface = {};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code};
 
-static void print_string(void);
+static void print_string(char * str);
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
 	pr("#!/bin/csh");
-	pr("set M=(0 0) V=0 P=1 E=1 L=()");
-	pr("");
 	pr("# OH! the quoting!!");
 	pr("alias outchar 'awk -v c=\\!^ '\"'\"'BEGIN{printf \"%%c\",c;}'\"'\"");
 
 	pr("");
-	prv("@ P=%d", tapeinit);
-	pr("while ($P > $E)");
-	pr("    @ E += 1");
-	pr("    set M=( $M 0 )");
-	pr("end");
+	if (!count) {
+	    pr("set M=(0 0) V=0 P=1 E=1 L=()");
+	    prv("@ P=%d", tapeinit);
+	    pr("while ($P > $E)");
+	    pr("    @ E += 1");
+	    pr("    set M=( $M 0 )");
+	    pr("end");
+	}
 	break;
 
     case 'X': pr("sh -c 'echo Infinite Loop 1>&2' ; exit 1"); break;
@@ -77,7 +79,7 @@ outcmd(int ch, int count)
 	    pr("    shift L");
 	    pr("endif");
 	    break;
-    case '"': print_string(); break;
+    case '"': print_string(strn); break;
 
     case '[':
 	if(bytecell) pr("@ M[$P] = ($M[$P] %% 256 + 256) %% 256");
@@ -106,9 +108,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_string(void)
+print_string(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int badchar = 0;
     size_t outlen = 0;

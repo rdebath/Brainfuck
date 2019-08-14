@@ -11,10 +11,11 @@
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
-struct be_interface_s be_interface = {};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code};
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
@@ -122,7 +123,7 @@ outcmd(int ch, int count)
 	break;
     case '"':
         {
-            char * str = get_string();
+            char * str = strn;
             if (!str) break;
             for(; *str; str++) {
 		I; printf("EXEC #pch %d,@linebuf OUTPUT\n", *str & 0xFF);

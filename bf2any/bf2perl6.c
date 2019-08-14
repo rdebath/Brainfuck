@@ -12,9 +12,10 @@
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
-struct be_interface_s be_interface = {};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code};
 
-static void print_cstring(void);
+static void print_cstring(char * str);
 
 static char *
 cell(int mov)
@@ -28,8 +29,8 @@ cell(int mov)
     return buf;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     int mov = 0;
     char * mc;
@@ -40,14 +41,15 @@ outcmd(int ch, int count)
     mc = cell(mov);
     switch(ch) {
     case '!':
-	printf( "%s",
-		"#!/usr/bin/env perl6\n"
-		"my int32 ($p, $v, $c);\n");
-	if (bytecell)
-	    printf("my uint8 @m;\n");
-	else
-	    printf("my int32 @m;\n");
-	printf("%s%d%s", "$p = ", tapeinit, ";\n");
+	printf( "%s\n", "#!/usr/bin/env perl6");
+	if (!count) {
+	    printf( "%s\n", "my int32 ($p, $v, $c);");
+	    if (bytecell)
+		printf("my uint8 @m;\n");
+	    else
+		printf("my int32 @m;\n");
+	    printf("%s%d%s", "$p = ", tapeinit, ";\n");
+	}
 	break;
 
     case '=': I; printf("%s = %d;\n", mc, count); break;
@@ -95,16 +97,17 @@ outcmd(int ch, int count)
 	}
 	ind--; I; printf("};\n");
 	break;
-    case '.': I; printf("print chr(%s) if %s > 0;\n", mc, mc); break;
+    case '.':
+	I; printf("print chr((%s >= 0 && %s <= 0x10FFFF) && %s || 0xFFFD);\n", mc, mc, mc);
+	break;
     case ',': I; printf("%s = ord($_) if defined $_ = $*IN.getc;\n", mc); break;
-    case '"': print_cstring(); break;
+    case '"': print_cstring(strn); break;
     }
 }
 
 static void
-print_cstring(void)
+print_cstring(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0;
     size_t outlen = 0;
@@ -133,7 +136,7 @@ print_cstring(void)
 	} else {
 	    char buf2[16];
 	    int n;
-	    sprintf(buf2, "\\%03o", *str & 0xFF);
+	    sprintf(buf2, "\\x[%x]", *str & 0xFF);
 	    for(n=0; buf2[n]; n++)
 		buf[outlen++] = buf2[n];
 	}

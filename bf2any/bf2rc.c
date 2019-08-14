@@ -28,18 +28,20 @@ static int do_output = 0;
 static int ind = 0;
 static int max_prle = 128;
 
-static void print_string(void);
+static void print_string(char * str);
 
-struct be_interface_s be_interface = {.bytesonly=1,.disable_be_optim=1};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code,
+	.bytesonly=1, .disable_be_optim=1, .enable_chrtok=1};
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     if (ch == '=') {
         count &= 255;
     } else {
 
-	while (count>max_prle) { outcmd(ch, max_prle); count -= max_prle; }
+	while (count>max_prle) { gen_code(ch, max_prle, 0); count -= max_prle; }
 
 	if (count > 1) {
 	    switch(ch) {
@@ -53,7 +55,7 @@ outcmd(int ch, int count)
     }
 
     switch(ch) {
-    case '"': print_string(); break;
+    case '"': print_string(strn); break;
     case '=': printf("s %d\n", count); break;
     case '+': printf("u\n"); break;
     case '-': printf("d\n"); break;
@@ -233,9 +235,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_string(void)
+print_string(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0, badchar = 0;
     size_t outlen = 0;

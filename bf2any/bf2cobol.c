@@ -25,10 +25,11 @@ static int use_decimal = 0;
 static int do_input = 0;
 static int maxinpline = MAXINPLINE;
 
-static void print_cstring(void);
+static void print_cstring(char * str);
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {.check_arg=fn_check_arg};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {fn_check_arg, gen_code};
 
 static int
 fn_check_arg(const char * arg)
@@ -53,46 +54,47 @@ fn_check_arg(const char * arg)
     return 0;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
 	I; printf("PROGRAM-ID. brainfuck.\n");
-	I; printf("DATA DIVISION.\n");
-	I; printf("WORKING-STORAGE SECTION.\n");
+	if (!count) {
+	    I; printf("DATA DIVISION.\n");
+	    I; printf("WORKING-STORAGE SECTION.\n");
 
-	if (use_decimal) {
-	    I; printf("01 DEC-TAPE.\n");
-	    I; printf("  02 m    PIC S9(3) OCCURS %d TIMES.\n", tapesz);
-	    I; printf("01 p      PIC 9(9) VALUE %d.\n", tapeinit);
-	    I; printf("01 v      PIC S9(3).\n");
-	    I; printf("01 chr    PIC S9(3) GLOBAL.\n");
-	} else if (bytecell) {
-	    I; printf("01 CHAR-TAPE.\n");
-	    I; printf("  02 m    BINARY-CHAR UNSIGNED OCCURS %d TIMES.\n", tapesz);
-	    I; printf("01 p      BINARY-LONG VALUE %d.\n", tapeinit);
-	    I; printf("01 v      BINARY-CHAR UNSIGNED.\n");
-	    I; printf("01 chr    BINARY-LONG GLOBAL.\n");
-	} else {
-	    I; printf("01 WORD-TAPE.\n");
-	    I; printf("  02 m    BINARY-LONG OCCURS %d TIMES.\n", tapesz);
-	    I; printf("01 p      BINARY-LONG VALUE %d.\n", tapeinit);
-	    I; printf("01 v      BINARY-LONG.\n");
-	    I; printf("01 chr    BINARY-LONG GLOBAL.\n");
+	    if (use_decimal) {
+		I; printf("01 DEC-TAPE.\n");
+		I; printf("  02 m    PIC S9(3) OCCURS %d TIMES.\n", tapesz);
+		I; printf("01 p      PIC 9(9) VALUE %d.\n", tapeinit);
+		I; printf("01 v      PIC S9(3).\n");
+		I; printf("01 chr    PIC S9(3) GLOBAL.\n");
+	    } else if (bytecell) {
+		I; printf("01 CHAR-TAPE.\n");
+		I; printf("  02 m    BINARY-CHAR UNSIGNED OCCURS %d TIMES.\n", tapesz);
+		I; printf("01 p      BINARY-LONG VALUE %d.\n", tapeinit);
+		I; printf("01 v      BINARY-CHAR UNSIGNED.\n");
+		I; printf("01 chr    BINARY-LONG GLOBAL.\n");
+	    } else {
+		I; printf("01 WORD-TAPE.\n");
+		I; printf("  02 m    BINARY-LONG OCCURS %d TIMES.\n", tapesz);
+		I; printf("01 p      BINARY-LONG VALUE %d.\n", tapeinit);
+		I; printf("01 v      BINARY-LONG.\n");
+		I; printf("01 chr    BINARY-LONG GLOBAL.\n");
+	    }
+	    I; printf("01 inpl   PIC X(%d) GLOBAL.\n", maxinpline);
+	    I; printf("01 goteof PIC 9 GLOBAL.\n");
+	    I; printf("01 gotln  PIC 9 GLOBAL.\n");
 	}
-	I; printf("01 inpl   PIC X(%d) GLOBAL.\n", maxinpline);
-	I; printf("01 goteof PIC 9 GLOBAL.\n");
-	I; printf("01 gotln  PIC 9 GLOBAL.\n");
-
 	I; printf("PROCEDURE DIVISION.\n");
 	break;
 
     case '~':
 	I; printf("STOP RUN.\n");
-	   printf("\n");
 
 	if (do_input) {
+	    printf("\n");
 	    I; printf("PROGRAM-ID. getchr.\n");
 	    I; printf("PROCEDURE DIVISION.\n");
 	    I; printf("MOVE -1 TO chr\n");
@@ -113,7 +115,7 @@ outcmd(int ch, int count)
 	    I; printf("MOVE inpl (2:) TO inpl\n");
 	    I; printf("EXIT PROGRAM.\n");
 
-	       printf("\n");
+	    printf("\n");
 	    I; printf("END PROGRAM getchr.\n");
 	    I; printf("END PROGRAM brainfuck.\n");
 	}
@@ -163,7 +165,7 @@ outcmd(int ch, int count)
 	      I; printf("ADD 1 TO chr\n");
 	      I; printf("DISPLAY FUNCTION CHAR(chr) WITH NO ADVANCING\n");
 	      break;
-    case '"': print_cstring(); break;
+    case '"': print_cstring(strn); break;
     case ',':
 	      I; printf("CALL 'getchr'\n");
 	      I; printf("IF chr GREATER THAN OR EQUAL TO ZERO THEN\n");
@@ -175,9 +177,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_cstring(void)
+print_cstring(char * str)
 {
-    char * str = get_string();
     char buf[60];
     int badchar = 0;
     size_t outlen = 0;

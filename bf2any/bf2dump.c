@@ -6,30 +6,29 @@
 #include "move_opt.h"
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = { .check_arg = fn_check_arg};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = { fn_check_arg, gen_code};
 
 static int c_header = 0;
-static int no_quote = 0;
 static int no_mov = 0;
 static int data_dump = 0;
 static int tokens = 1;
 static int col = 0;
 static int maxcol = 76;
 
-static void ddump(int ch, int count);
+static void ddump(int ch, int count, char * strn);
 
 static int
 fn_check_arg(const char * arg)
 {
     if (strcmp(arg, "-no-be") == 0) {
 	be_interface.disable_be_optim = 1;
-	no_quote = 1;
 	return 1;
     }
-    if (strcmp(arg, "-no-q") == 0) { no_quote = 1; return 1; }
-    if (strcmp(arg, "-no-mov") == 0) { no_mov = 1; return 1; }
-    if (strcmp(arg, "-q") == 0) { no_quote = 0; return 1; }
     if (strcmp(arg, "-int") == 0) { be_interface.cells_are_ints = 1; return 1; }
+    if (strcmp(arg, "-chr") == 0) { be_interface.enable_chrtok = 1; return 1; }
+
+    if (strcmp(arg, "-no-mov") == 0) { no_mov = 1; return 1; }
     if (strcmp(arg, "-dd") == 0) { data_dump = 1; return 1; }
     if (strcmp(arg, "-c") == 0) { c_header = 1; return 1; }
     if (strcmp(arg, "-c-only") == 0) { tokens = 0; c_header = 1; return 1; }
@@ -39,8 +38,10 @@ fn_check_arg(const char * arg)
         fprintf(stderr, "%s\n",
         "\n\t"  "-no-be  Turn off BE optimisation."
         "\n\t"  "-no-q   Turn off \" command."
+        "\n\t"  "-q      Turn on \" command."
         "\n\t"  "-no-mov Turn off move optimisation."
         "\n\t"  "-int    Turn on cell==int flag."
+        "\n\t"  "-chr    Turn on chrtok flag."
         "\n\t"  "-#      Enable debug flag."
         "\n\t"  "-c      Add a C header for compiling."
         "\n\t"  "-c-only Only print C code."
@@ -60,13 +61,13 @@ cell(int mov)
     return buf;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
 static int ind = 0;
     int mov = 0;
 
-    if (data_dump) { ddump(ch, count); return; }
+    if (data_dump) { ddump(ch, count, strn); return; }
 
     if (ch == '!' && c_header)
     {
@@ -154,13 +155,8 @@ static int ind = 0;
 	break;
 
     case '"':
-	if (no_quote) {
-	    puts("/* Ignored string. */");
-	    break;
-	}
-
 	{
-	    char * s = get_string(), *p=s;
+	    char * s = strn, *p=s;
 	    int percent = 0;
 	    for(p=s;*p && !percent;p++) percent = (*p == '%');
 	    printf("printf(%s\"", percent?"\"%s\",":"");
@@ -188,12 +184,11 @@ static int ind = 0;
 }
 
 static void
-ddump(int ch, int count)
+ddump(int ch, int count, char * strn)
 {
     char ibuf[sizeof(int)*3+6];
     int l;
 
-    if (ch == '"' && (no_quote || be_interface.disable_be_optim)) return;
     if (ch == '!') return;
 
     if (ch == '~') {
@@ -204,7 +199,7 @@ ddump(int ch, int count)
     }
 
     if (ch == '"') {
-	char * s = get_string();
+	char * s = strn;
 	if (!s || !*s) return;
 
 	if (col+3>maxcol) {

@@ -42,12 +42,13 @@ static enum { end_none, end_end, end_system, end_vb }
 static enum { io_ansi, io_bbc, io_vb, io_fbas, io_bas256, io_bacon }
     io_style = io_ansi;
 
-static void print_string(void);
+static void print_string(char * str);
 
 static struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {fn_check_arg, gen_code};
 
 static void
 line_no_indent(void)
@@ -171,8 +172,8 @@ fn_check_arg(const char * arg)
 	return 0;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
@@ -364,7 +365,7 @@ outcmd(int ch, int count)
 	    break;
 	}
 	break;
-    case '"': print_string(); break;
+    case '"': print_string(strn); break;
     case ',':
 	switch(io_style) {
 	case io_ansi:
@@ -525,9 +526,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_string(void)
+print_string(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0, badchar = 0;
     size_t outlen = 0;

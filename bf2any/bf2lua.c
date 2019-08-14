@@ -60,7 +60,8 @@ static size_t luacodesize = 0;
 #endif
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {fn_check_arg, gen_code};
 
 static int
 fn_check_arg(const char * arg)
@@ -82,8 +83,8 @@ fn_check_arg(const char * arg)
     return 0;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     struct instruction * n = calloc(1, sizeof*n), *n2;
     if (!n) { perror("bf2lua"); exit(42); }
@@ -93,7 +94,7 @@ outcmd(int ch, int count)
     n->count = count;
     n->icount = icount;
     if (ch == '"')
-	n->cstr = strdup(get_string());
+	n->cstr = strdup(strn);
     else if (ch != '!' && ch != '~')
 	do_tape=1;
     if (!last) {

@@ -42,7 +42,9 @@ static void dumpprog(int * p, int *ep);
 static void dumpmem(icell *tp);
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = { .check_arg=fn_check_arg,
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {
+    .check_arg=fn_check_arg, .gen_code=gen_code,
     .cells_are_ints=1, .hasdebug=1};
 
 static int
@@ -83,8 +85,8 @@ static void testmem() {
     }
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     int t = -1;
 
@@ -122,7 +124,7 @@ outcmd(int ch, int count)
     case '#': *mptr++ = t = T_DUMP; checklimits = 1; break;
     case '"':
 	{
-	    char * str = get_string();
+	    char * str = strn;
 	    if (!str) break;
 	    for(; *str; str++) {
 		testmem();

@@ -12,12 +12,13 @@ static int ind = 0;
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
 
-struct be_interface_s be_interface = {};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code};
 
-static void print_cstring(void);
+static void print_cstring(char * str);
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
@@ -26,9 +27,11 @@ outcmd(int ch, int count)
 	ind++;
 	pr("public static void Main() {");
 	ind++;
-	prv("var M = new long[%d];", tapesz);
-	prv("var P = %d;", tapeinit);
-	pr("long V = 0;");
+	if (!count) {
+	    prv("var M = new long[%d];", tapesz);
+	    prv("var P = %d;", tapeinit);
+	    pr("long V = 0;");
+	}
 	break;
 
     case 'X': pr("throw new System.InvalidOperationException(\"Infinite Loop detected.\");"); break;
@@ -55,7 +58,7 @@ outcmd(int ch, int count)
 	    bytecell?"(byte)M[P]":"(ulong)M[P]>0x10FFFF?0xFFFD:(int)M[P]");
 	break;
     case ',': pr("M[P]=Console.Read();"); break;
-    case '"': print_cstring(); break;
+    case '"': print_cstring(strn); break;
 
     case '[': prv("while(%sM[P]!=0) {", bytecell?"(byte)":""); ind++; break;
     case ']': ind--; pr("}"); break;
@@ -68,9 +71,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_cstring(void)
+print_cstring(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0;
     int badchar = 0;
@@ -84,9 +86,9 @@ print_cstring(void)
 	    buf[outlen] = 0;
 	    if (gotnl) {
 		buf[outlen-2] = 0;
-		prv("Console.Write(\"%s\\n\");\n", buf);
+		prv("Console.Write(\"%s\\n\");", buf);
 	    } else {
-		prv("Console.Write(\"%s\");\n", buf);
+		prv("Console.Write(\"%s\");", buf);
 	    }
 	    gotnl = 0; outlen = 0;
 	}

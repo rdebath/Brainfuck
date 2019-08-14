@@ -13,12 +13,13 @@ static FILE * ofd;
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
 
-struct be_interface_s be_interface = {};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code};
 
-static void print_string(void);
+static void print_string(char * str);
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
@@ -77,7 +78,7 @@ outcmd(int ch, int count)
     case '<': prv("m -= %d", count); break;
 
     case '.': pr("putchar(Int32(mem[m]))"); break;
-    case '"': print_string(); break;
+    case '"': print_string(strn); break;
     case ',':
 	pr("c = getchar()");
 	if (bytecell)
@@ -108,9 +109,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_string(void)
+print_string(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0;
     size_t outlen = 0;

@@ -133,7 +133,9 @@ static size_t  stack[1024];
 static size_t *st;
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {.check_arg=fn_check_arg,.bytesonly=1,.disable_be_optim=1};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {fn_check_arg, gen_code,
+    .bytesonly=1,.disable_be_optim=1};
 
 static int
 fn_check_arg(const char * arg)
@@ -145,8 +147,8 @@ fn_check_arg(const char * arg)
     return 0;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     FILE * ofd;
 #if _POSIX_VERSION >= 199506L
@@ -159,7 +161,7 @@ outcmd(int ch, int count)
 
     /* limit count to the range of the byte arg */
     if (ch == '>' || ch == '<') {
-	while (count>127) { outcmd(ch, 127); count -= 127; }
+	while (count>127) { gen_code(ch, 127, 0); count -= 127; }
     } else if (ch == '-' && count > 127) {
 	ch = '+';
 	count = 256 - count;

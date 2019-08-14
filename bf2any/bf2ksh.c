@@ -15,9 +15,10 @@ static int ind = 0;
 static int in_arith = 0;
 static int curr_offset = -1;
 
-struct be_interface_s be_interface = {};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code};
 
-static void print_string(void);
+static void print_string(char * str);
 
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
@@ -38,8 +39,8 @@ arith() {
     ind++;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     if (curr_offset >= 0) {
 	if (ch == '>') { curr_offset += count; return; }
@@ -105,7 +106,7 @@ outcmd(int ch, int count)
     case '<': arith(); prv("P-=%d,", count); break;
     case '.': shcode(); pr("o $((M[P]&255))"); do_output++; break;
     case ',': shcode(); pr("getch"); do_input++; break;
-    case '"': shcode(); print_string(); break;
+    case '"': shcode(); print_string(strn); break;
 
     case '[':
 	shcode();
@@ -201,9 +202,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_string(void)
+print_string(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int badchar = 0;
     size_t outlen = 0;

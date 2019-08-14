@@ -12,38 +12,47 @@
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
-struct be_interface_s be_interface = {};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code};
 
+static const char * modulename = "Fuck";
 static const char * ctype = "mod 2**32";
 static const char * charmod = " mod 256";
 static int msk = -1;
 
-static void print_cstring(void);
+static void print_cstring(char *);
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char *strn)
 {
     switch(ch) {
     case '!':
 	if (bytecell) { ctype = "mod 2**8"; charmod = ""; msk = 255; }
 
-	printf("%s%s%s%d%s%d%s%s%s",
+	printf("%s%s%s%s%s",
 	    "with Ada.Text_IO,\n"
 	    "     Ada.Strings.Unbounded;\n"
 	    "\n"
-	    "procedure Fuck is\n"
+	    "procedure ",modulename," is\n"
 	    "    use Ada.Text_IO,\n"
 	    "        Ada.Strings.Unbounded;\n"
 	    "\n"
 	    "    type Cell is ",ctype,";\n"
-	    "    type Tape_Type is array (0 .. ",tapesz,") of Cell;\n"
-	    "    m : Tape_Type := (others => 0);\n"
-	    "    p : Natural := ",tapeinit,";\n"
-	    "    v : Cell := 0;\n"
-	    "    Infinite_loop : exception;\n"
-	    "    GotEOF : Boolean := False;\n"
-	    "    GotLine : Boolean := False;\n"
-	    "    InpLine : Unbounded_String;\n"
+	    );
+
+	if (!count)
+	    printf("%s%d%s%d%s",
+		"    type Tape_Type is array (0 .. ",tapesz,") of Cell;\n"
+		"    m : Tape_Type := (others => 0);\n"
+		"    p : Natural := ",tapeinit,";\n"
+		"    v : Cell := 0;\n"
+		"    Infinite_loop : exception;\n"
+		"    GotEOF : Boolean := False;\n"
+		"    GotLine : Boolean := False;\n"
+		"    InpLine : Unbounded_String;\n"
+		);
+
+	printf("%s%s%s",
 	    "\n"
 	    "procedure putch(ch : Cell) is\n"
 	    "begin\n"
@@ -54,36 +63,41 @@ outcmd(int ch, int count)
 	    "    end if;\n"
 	    "end putch;\n"
 	    "\n"
-	    "function getch(oldch : Cell) return Cell is\n"
-	    "    ch : Cell;\n"
-	    "begin\n"
-	    "    ch := oldch;\n"
-	    "    if GotEOF then return ch ; end if;\n"
-	    "    if Not GotLine then\n"
-	    "        begin\n"
-	    "            InpLine := To_Unbounded_String(Get_line);\n"
-	    "            GotLine := True;\n"
-	    "        exception\n"
-	    "            when End_Error =>\n"
-	    "                GotEOF := True;\n"
-	    "                return oldch;\n"
-	    "        end;\n"
-	    "    end if;\n"
-	    "    if InpLine = \"\" then\n"
-	    "        GotLine := False;\n"
-	    "        return 10;\n"
-	    "    end if;\n"
-	    "    ch := Character'Pos (Slice(InpLine, 1, 1)(1));\n"
-	    "    InpLine := Delete(InpLine, 1, 1);\n"
-	    "    return ch;\n"
-	    "end getch;\n"
-	    "\n"
-	    "begin\n");
+	    );
 
+	if (!count)
+	    printf("%s",
+		"function getch(oldch : Cell) return Cell is\n"
+		"    ch : Cell;\n"
+		"begin\n"
+		"    ch := oldch;\n"
+		"    if GotEOF then return ch ; end if;\n"
+		"    if Not GotLine then\n"
+		"        begin\n"
+		"            InpLine := To_Unbounded_String(Get_line);\n"
+		"            GotLine := True;\n"
+		"        exception\n"
+		"            when End_Error =>\n"
+		"                GotEOF := True;\n"
+		"                return oldch;\n"
+		"        end;\n"
+		"    end if;\n"
+		"    if InpLine = \"\" then\n"
+		"        GotLine := False;\n"
+		"        return 10;\n"
+		"    end if;\n"
+		"    ch := Character'Pos (Slice(InpLine, 1, 1)(1));\n"
+		"    InpLine := Delete(InpLine, 1, 1);\n"
+		"    return ch;\n"
+		"end getch;\n"
+		"\n"
+		);
+
+	printf("begin\n");
 	ind++;
 	break;
 
-    case '~': ind--; printf("end Fuck;\n"); break;
+    case '~': ind--; printf("end %s;\n", modulename); break;
     case '=': I; printf("m(p) := %d;\n", count & msk); break;
     case 'B': I; printf("v := m(p);\n"); break;
     case 'M': I; printf("m(p) := m(p)+v*%d;\n", count & msk); break;
@@ -93,7 +107,7 @@ outcmd(int ch, int count)
     case '*': I; printf("m(p) := m(p)*v;\n"); break;
 
     case 'C': I; printf("m(p) := v*%d;\n", count & msk); break;
-    case 'D': I; printf("m(p) := -v*%d;\n", count & msk); break;
+    case 'D': I; printf("m(p) := (-v)*%d;\n", count & msk); break; //WTF brackets?
     case 'V': I; printf("m(p) := v;\n"); break;
     case 'W': I; printf("m(p) := -v;\n"); break;
 
@@ -107,15 +121,14 @@ outcmd(int ch, int count)
     case 'I': I; printf("if m(p) /= 0 then\n"); ind++; break;
     case 'E': ind--; I; printf("end if;\n"); break;
     case '.': I; printf("putch (m(p));\n"); break;
-    case '"': print_cstring(); break;
+    case '"': print_cstring(strn); break;
     case ',': I; printf("m(p) := getch(m(p));\n"); break;
     }
 }
 
 static void
-print_cstring(void)
+print_cstring(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0, badchar = 0;
     size_t outlen = 0;

@@ -21,7 +21,8 @@
 #define MAXINSTR (12+65536/80)
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {.check_arg = fn_check_arg};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {fn_check_arg, gen_code};
 
 struct instruction {
     int ch;
@@ -90,13 +91,13 @@ node_calloc(void)
     return n;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     struct instruction * n;
 
     /* I need to count 'print' commands for the java functions */
-    if (ch == '"') { add_cstring(get_string()); return; }
+    if (ch == '"') { add_cstring(strn); return; }
 
     n = node_calloc();
     n->ch = ch;

@@ -9,12 +9,13 @@
  * Perl translation from BF, runs at about 14,000,000 instructions per second.
  */
 
-static int ind = 0, done_init = 0;
+static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
-struct be_interface_s be_interface = {};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code};
 
-static void print_cstring(void);
+static void print_cstring(char * str);
 
 static char *
 cell(int mov)
@@ -28,8 +29,8 @@ cell(int mov)
     return buf;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     int mov = 0;
     char * mc;
@@ -37,18 +38,15 @@ outcmd(int ch, int count)
     move_opt(&ch, &count, &mov);
     if (ch == 0) return;
 
-    if (!done_init && ch != '"' && ch != '!' && ch != '~') {
-	printf( "%s%d%s",
-		"$|++;    # Turn on autoflush.\n"
-		"$^W = 0; # Turn off warnings.\n"
-		"$p = ", tapeinit, ";\n");
-	done_init = 1;
-    }
-
     mc = cell(mov);
     switch(ch) {
     case '!':
 	printf("#!/usr/bin/perl\n");
+	if (!count)
+	    printf( "%s%d%s",
+		    "$|++;    # Turn on autoflush.\n"
+		    "$^W = 0; # Turn off warnings.\n"
+		    "$p = ", tapeinit, ";\n");
 	break;
 
     case '=': I; printf("%s = %d;\n", mc, count); break;
@@ -102,14 +100,13 @@ outcmd(int ch, int count)
 	break;
     case '.': I; printf("print chr(%s&255);\n", mc); break;
     case ',': I; printf("$c = getc(STDIN); if(defined $c){ %s = ord($c); }\n", mc); break;
-    case '"': print_cstring(); break;
+    case '"': print_cstring(strn); break;
     }
 }
 
 static void
-print_cstring(void)
+print_cstring(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0;
     size_t outlen = 0;

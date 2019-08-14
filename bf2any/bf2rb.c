@@ -12,12 +12,12 @@
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
 static int safetapeoff = 0, curtapeoff = 0;
-static int init_done = 0;
 
-static void print_cstring(void);
+static void print_cstring(char * str);
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {.check_arg=fn_check_arg};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {fn_check_arg, gen_code};
 
 static int
 fn_check_arg(const char * arg)
@@ -41,8 +41,8 @@ cell(int mov)
     return buf;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     int mov = 0;
     char * cm;
@@ -50,24 +50,22 @@ outcmd(int ch, int count)
     if (tapelen>0) move_opt(&ch, &count, &mov);
     if (ch == 0) return;
 
-    if (!init_done && ch != '!' && ch != '"' && ch != '~')
-    {
-	/* Using push is about 20% slower, using a Hash is a LOT slower! */
-	if (tapelen > 0)
-	    printf("m = Array.new(%d, 0)\n",tapesz);
-	else {
-	    puts("m = Array.new");
-	}
-	printf("%s%d%s", "p = ", tapeinit, "\n");
-	if (tapelen <= 0)
-	    puts("m.push(0) while p>=m.length");
-	init_done = 1;
-    }
-
     cm = cell(mov);
     switch(ch) {
     case '!':
 	puts("#!/usr/bin/ruby");
+	if (!count)
+	{
+	    /* Using push is about 20% slower, using a Hash is a LOT slower! */
+	    if (tapelen > 0)
+		printf("m = Array.new(%d, 0)\n",tapesz);
+	    else {
+		puts("m = Array.new");
+	    }
+	    printf("%s%d%s", "p = ", tapeinit, "\n");
+	    if (tapelen <= 0)
+		puts("m.push(0) while p>=m.length");
+	}
 	break;
 
     case '=': I; printf("%s = %d\n", cm, count); break;
@@ -134,7 +132,7 @@ outcmd(int ch, int count)
 	ind--; I; printf("end\n");
 	curtapeoff = safetapeoff = 0;
 	break;
-    case '"': print_cstring(); break;
+    case '"': print_cstring(strn); break;
     case '.':
 	I;
 	if(bytecell) printf("putc %s\n", cm);
@@ -149,9 +147,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_cstring(void)
+print_cstring(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0;
     size_t outlen = 0;

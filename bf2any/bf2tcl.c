@@ -21,6 +21,7 @@ static int ind = 0;
 #define I fprintf(ofd, "%*s", ind*4, "")
 #define oputs(str) fprintf(ofd, "%s\n", (str))
 static int do_dump = 0;
+static int hello_world = 0;
 
 static FILE * ofd;
 static int use_utf8 = 0;
@@ -29,10 +30,11 @@ static char * tclcode = 0;
 static size_t tclcodesize = 0;
 #endif
 
-static void print_cstring(void);
+static void print_cstring(char * str);
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {.check_arg=fn_check_arg};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {fn_check_arg, gen_code};
 
 static int
 fn_check_arg(const char * arg)
@@ -54,11 +56,12 @@ fn_check_arg(const char * arg)
     return 0;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
+	hello_world = (count!=0);
 #ifndef DISABLE_LIBTCL
 	if (!do_dump) {
 #ifndef DISABLE_OPENMEMSTREAM
@@ -69,24 +72,27 @@ outcmd(int ch, int count)
 	} else
 #endif
 	    ofd = stdout;
-	fprintf(ofd, "%s",
-		"#!/usr/bin/tclsh\n"
-		"package require Tcl 8.5\n"
-		"fconfigure stdout -buffering none\n"
-		"fconfigure stdin -buffering none\n");
+	fprintf(ofd, "#!/usr/bin/tclsh\n");
+	if (!hello_world) {
+	    fprintf(ofd, "%s",
+		    "package require Tcl 8.5\n"
+		    "fconfigure stdout -buffering none\n"
+		    "fconfigure stdin -buffering none\n");
 
-	if (use_utf8) {
-	    oputs("fconfigure stdin -encoding utf-8");
-	    oputs("fconfigure stdout -encoding utf-8");
+	    if (use_utf8) {
+		oputs("fconfigure stdin -encoding utf-8");
+		oputs("fconfigure stdout -encoding utf-8");
+	    }
+
+	    fprintf(ofd, "%s%d%s%d%s",
+		    "proc run_bf {} {\n"
+		    "set d [lrepeat ",tapesz," 0]\n"
+		    "set dc ", tapeinit, "\n");
 	}
-
-	fprintf(ofd, "%s%d%s%d%s",
-		"proc run_bf {} {\n"
-		"set d [lrepeat ",tapesz," 0]\n"
-		"set dc ", tapeinit, "\n");
 	break;
     case '~':
-	oputs("}\nrun_bf");
+	if (!hello_world)
+	    oputs("}\nrun_bf");
 	break;
 
     case '=': I; fprintf(ofd, "lset d $dc %d\n", count); break;
@@ -135,7 +141,7 @@ outcmd(int ch, int count)
 	if(bytecell) { I; oputs("lset d $dc [expr {[lindex $d $dc] & 255}]"); }
 	I; oputs("puts -nonewline [format %c [lindex $d $dc]]");
 	break;
-    case '"': print_cstring(); break;
+    case '"': print_cstring(strn); break;
     case ',':
 	I; oputs("set c [scan [read stdin 1] %c]");
 	I; oputs("if {$c != {}} {lset d $dc $c}");
@@ -160,9 +166,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_cstring(void)
+print_cstring(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0;
     size_t outlen = 0;

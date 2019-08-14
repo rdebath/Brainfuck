@@ -45,7 +45,8 @@ static char cmdsuffix[] =
 #endif
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {.check_arg=fn_check_arg};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {fn_check_arg, gen_code};
 
 static int
 fn_check_arg(const char * arg)
@@ -55,8 +56,8 @@ fn_check_arg(const char * arg)
     return 0;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
@@ -110,7 +111,7 @@ outcmd(int ch, int count)
 	    I; printf("outchar $m[$p]\n");
 	}
 	break;
-    case '"': print_string(get_string()); break;
+    case '"': print_string(strn); break;
     case ',':
 	I; printf("inchar\n");
 	do_input = 1;

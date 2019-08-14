@@ -34,10 +34,13 @@ static int lblcount = 0;
 static int icount = 0;
 static int has_inp = 0;
 
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code};
+
 static void print_string(char *);
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     struct instruction * n = calloc(1, sizeof*n), *n2;
     if (!n) { perror("bf2pas"); exit(42); }
@@ -47,7 +50,7 @@ outcmd(int ch, int count)
     n->count = count;
     n->icount = icount;
     if (ch == '"')
-	n->cstr=strdup(get_string());
+	n->cstr=strdup(strn);
     if (!last) {
 	pgm = n;
     } else {

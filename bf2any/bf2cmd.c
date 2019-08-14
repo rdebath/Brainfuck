@@ -16,10 +16,11 @@ static int loopid = 0;
 
 static struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
-struct be_interface_s be_interface = {};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code};
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
@@ -155,7 +156,7 @@ outcmd(int ch, int count)
 	break;
     case '"':
 	{
-	    char * str = get_string();
+	    char * str = strn;
 	    if (!str) return;
 	    for(; *str; str++) {
 		printf("SET /A CH=%d\r\n", *str & 0x7F);

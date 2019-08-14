@@ -13,7 +13,8 @@ static int ind = 0;
 #define I printf("%*s", ind*4, "")
 static int used_o = 0;
 
-struct be_interface_s be_interface = {};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code};
 
 static void print_cstring(char * str);
 
@@ -29,8 +30,8 @@ cell(int mov)
     return buf;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     int mov = 0, i;
     char * mc;
@@ -99,12 +100,14 @@ outcmd(int ch, int count)
 	I; puts("\"Input command unimplementable.\n\"\nreturn(0)\n");
 	I; printf("%s = i(%s)\n", mc, mc); break;
 	break;
-    case '"': print_cstring(get_string()); break;
+    case '"': print_cstring(strn); break;
 
     case '!':
 	puts( "define x() {");
 	ind++;
-	I; printf("%s%d%s", "p = ", tapeinit, "\n");
+	if (!count) {
+	    I; printf("%s%d%s", "p = ", tapeinit, "\n");
+	}
 	break;
 
     case '~':

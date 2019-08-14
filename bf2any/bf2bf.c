@@ -9,8 +9,10 @@
 #include "bf2any.h"
 
 static check_arg_t fn_check_arg;
+static gen_code_t gen_code;
 struct be_interface_s be_interface = {
     .check_arg = fn_check_arg,
+    .gen_code = gen_code,
     .disable_be_optim=1,
     .disable_fe_optim=1,
     .hasdebug=1
@@ -354,24 +356,24 @@ pmc(const char * s)
     while (*s) pc(*s++);
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     if (L_BASE != L_TOKENS && L_BASE != L_BFRLE &&
 	L_BASE != L_HANOILOVE && L_BASE != L_BINRLE)
     {
 	if (ch == '=') {
 	    if (lang==0 || (lang->set_cell==0 && lang->zero_cell == 0)) {
-		outcmd('[', 1);
-		outcmd('-', 1);
-		outcmd(']', 1);
-		if (count>0) outcmd('+', count);
-		else if(count<0) outcmd('-', -count);
+		gen_code('[', 1, 0);
+		gen_code('-', 1, 0);
+		gen_code(']', 1, 0);
+		if (count>0) gen_code('+', count, 0);
+		else if(count<0) gen_code('-', -count, 0);
 		return;
 	    } else if (lang->set_cell)
 		;
 	    else if(count) {
-		outcmd('=', 0);
+		gen_code('=', 0, 0);
 		if (count>0) ch = '+';
 		else { ch = '-'; count = -count; }
 	    }

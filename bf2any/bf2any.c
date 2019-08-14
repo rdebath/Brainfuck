@@ -131,6 +131,11 @@ main(int argc, char ** argv)
 
     filelist = calloc(argc, sizeof*filelist);
 
+    if (be_interface.gen_code == 0) {
+	fprintf(stderr, "Compiler failure\n");
+	exit(255);
+    }
+
     for(ar=1;ar<argc;ar++) {
 	if (argv[ar][0] != '-' || argv[ar][1] == '\0' || mm) {
 	    filelist[filecount++] = argv[ar];
@@ -340,23 +345,8 @@ pipe_to_be(char ** filelist, int filecount)
 		    if (qstring == 3) qstring = 1;
 		}
 		if (qstring == 2) {
-		    char * gs;
 		    qstring = 0;
-		    add_string(0);
-		    outcmd('"', 0);
-		    if ( (gs = get_string()) ) {
-			/* The backend doesn't know about '"', save the
-			 * current cell then use it to print the string
-			 * before restoring it.
-			 */
-			outcmd('B', 0);
-			while(*gs) {
-			    outcmd('=', *gs++);
-			    outcmd('.', 0);
-			}
-			outcmd('=', 0);
-			outcmd('S', 0);
-		    }
+		    flush_string();
 		} else {
 		    add_string(ch);
 		    continue;
@@ -460,7 +450,7 @@ pipe_to_be(char ** filelist, int filecount)
     commands are just pass to the BE.
 */
 static void
-outopt(int ch, int count)
+out2opt(int ch, int count)
 {
     if (!enable_optim) outcmd(ch, count);
     else outtxn(ch, count);
@@ -479,25 +469,25 @@ static int icount = 0;
 	    if (ch == '+') { zstate=3; icount = count; return; }
 	}
 	if (count == 1 && ch == '-') { zstate=2; icount = count; return; }
-	outopt('[', 0);
+	out2opt('[', 0);
 	break;
     case 2:
 	if (ch == ']') { zstate=4; return; }
-	outopt('[', 0);
-	outopt('-', icount);
+	out2opt('[', 0);
+	out2opt('-', icount);
 	break;
     case 3:
 	if (ch == ']') { zstate=4; return; }
-	outopt('[', 0);
-	outopt('+', icount);
+	out2opt('[', 0);
+	out2opt('+', icount);
 	break;
     case 4:
-	if (ch == '+') { outopt('=', count); zstate=0; return; }
-	if (ch == '-') { outopt('=', -count); zstate=0; return; }
-	outopt('=', 0);
+	if (ch == '+') { out2opt('=', count); zstate=0; return; }
+	if (ch == '-') { out2opt('=', -count); zstate=0; return; }
+	out2opt('=', 0);
 	break;
     }
     zstate=0;
     if (ch == '[') { zstate++; return; }
-    outopt(ch, count);
+    out2opt(ch, count);
 }

@@ -29,12 +29,15 @@ static int do_f1 = 0, do_arr = 0;
 static int max_u = 0, max_d = 0, max_l = 0, max_r = 0;
 #define setmax(max_x, val) if(val>max_x) max_x = val;
 
-static void print_string(void);
+static void print_string(char * str);
 
-struct be_interface_s be_interface = {.bytesonly=1,.disable_be_optim=1};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {
+    .gen_code=gen_code,
+    .bytesonly=1, .disable_be_optim=1, .enable_chrtok=1};
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     int i;
 
@@ -42,7 +45,7 @@ outcmd(int ch, int count)
 	count &= 255;
     else {
 
-	while (count>MAXPRLE) { outcmd(ch, MAXPRLE); count -= MAXPRLE; }
+	while (count>MAXPRLE) { gen_code(ch, MAXPRLE, 0); count -= MAXPRLE; }
 
 	if (count > 1) {
 	    switch(ch) {
@@ -56,7 +59,7 @@ outcmd(int ch, int count)
     }
 
     switch(ch) {
-    case '"': print_string(); break;
+    case '"': print_string(strn); break;
     case '=': printf("eval \"M$P=%d\"\n", count); do_arr = 1; break;
     case '+': printf("u1\n"); setmax(max_u, 1); break;
     case '-': printf("d1\n"); setmax(max_d, 1); break;
@@ -272,9 +275,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_string(void)
+print_string(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0, badchar = 0;
     size_t outlen = 0;

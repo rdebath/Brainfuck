@@ -13,13 +13,14 @@ static FILE * ofd;
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
 
-static void print_dstring(void);
+static void print_dstring(char * str);
 
+static gen_code_t gen_code;
 /* Assume same machine, same int */
-struct be_interface_s be_interface = { .cells_are_ints=1};
+struct be_interface_s be_interface = {.gen_code=gen_code, .cells_are_ints=1};
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
@@ -30,15 +31,17 @@ outcmd(int ch, int count)
 	pr("import std.stdio;");
 	pr("void main(){");
 	ind++;
-	if (bytecell) {
-	    prv("char[] mem; mem.length = %d; mem[] = 0;", tapesz);
-	    prv("int m = %d;", tapeinit);
-	    pr("int v;");
-	} else {
-	    prv("int[] mem; mem.length = %d; mem[] = 0;", tapesz);
-	    prv("int v, m = %d;", tapeinit);
+	if (!count) {
+	    if (bytecell) {
+		prv("char[] mem; mem.length = %d; mem[] = 0;", tapesz);
+		prv("int m = %d;", tapeinit);
+		pr("int v;");
+	    } else {
+		prv("int[] mem; mem.length = %d; mem[] = 0;", tapesz);
+		prv("int v, m = %d;", tapeinit);
+	    }
+	    pr("stdout.setvbuf(0, _IONBF);");
 	}
-	pr("stdout.setvbuf(0, _IONBF);");
 	break;
 
     case '~':
@@ -67,7 +70,7 @@ outcmd(int ch, int count)
     case '<': prv("m -= %d;", count); break;
 
     case '.': pr("write(cast(char)mem[m]);"); break;
-    case '"': print_dstring(); break;
+    case '"': print_dstring(strn); break;
     case ',': pr("v = getchar(); if(v!=EOF) mem[m] = v;"); break;
 
     case '[': pr("while(mem[m]) {"); ind++; break;
@@ -79,9 +82,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_dstring(void)
+print_dstring(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0;
     size_t outlen = 0;

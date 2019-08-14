@@ -33,7 +33,7 @@ static int ind = 0;
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
 
-static void print_dcstring(void);
+static void print_dcstring(char * str);
 
 static FILE * ofd;
 static int outputmode = 2;
@@ -41,7 +41,8 @@ static int inputmode = 2;
 static int stackdepth = 0;
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {.check_arg=fn_check_arg};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {fn_check_arg, gen_code};
 
 static int
 fn_check_arg(const char * arg)
@@ -97,8 +98,8 @@ dc_ltoa(long val)
     return buf;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
@@ -165,7 +166,7 @@ outcmd(int ch, int count)
 	break;
 
     case '.': if (outputmode == 2) pr("lp;aaP"); else pr("lox"); do_output=1; break;
-    case '"': print_dcstring(); break;
+    case '"': print_dcstring(strn); break;
     }
 
     if (ch != '~') return;
@@ -278,9 +279,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_dcstring(void)
+print_dcstring(char * str)
 {
-    char * str = get_string();
     char buf[BUFSIZ];
     size_t outlen = 0;
     int badchar = 0;

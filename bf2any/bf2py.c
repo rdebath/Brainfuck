@@ -36,10 +36,11 @@ static char * pycode = 0;
 static size_t pycodesize = 0;
 #endif
 
-static void print_string(void);
+static void print_string(char * str);
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {.check_arg=fn_check_arg};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {fn_check_arg, gen_code};
 
 static int
 fn_check_arg(const char * arg)
@@ -77,8 +78,8 @@ cell(int mov)
     return buf;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     int mov = 0;
     char * mc;
@@ -305,7 +306,7 @@ outcmd(int ch, int count)
 	ind--;
 	break;
 
-    case '"': print_string(); break;
+    case '"': print_string(strn); break;
     case '.':
 	I; fprintf(ofd, "putcell(%s)\n", mc);
 	use_putcell = 1;
@@ -342,9 +343,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_string()
+print_string(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0;
     size_t outlen = 0;

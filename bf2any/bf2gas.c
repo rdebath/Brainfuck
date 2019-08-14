@@ -65,8 +65,9 @@ static int ind = 0, text_labels = 1, use_64bit = USE64;
 static struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
 static check_arg_t fn_check_arg;
+static gen_code_t gen_code;
 struct be_interface_s be_interface = {.bytesonly=1,.disable_be_optim=1,
-    .check_arg=fn_check_arg};
+    .check_arg=fn_check_arg, .gen_code=gen_code};
 
 static int
 fn_check_arg(const char * arg)
@@ -88,8 +89,8 @@ fn_check_arg(const char * arg)
     return 0;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':

@@ -14,29 +14,35 @@
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
-struct be_interface_s be_interface = {};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {.gen_code=gen_code};
 
 static const char * ctype = "int";
 static int vmask = -1;
 
-static void print_cstring(void);
+static void print_cstring(char * str);
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
 	if (bytecell) { ctype = "byte"; vmask = 255; }
 
-	printf( "%s%d%s%s%s%d%s%s%s",
+	printf( "%s",
 		"package main\n"
 		"import(\"fmt\"\n"
 		"    \"os\")\n"
-		"var m [",tapesz,"]", ctype, "\n"
-		"var p = ",tapeinit,"\n"
-		"var v ", ctype, "\n"
-		"func main() {\n"
 		);
+
+	if (!count)
+	    printf( "%s%d%s%s%s%d%s%s%s",
+		    "var m [",tapesz,"]", ctype, "\n"
+		    "var p = ",tapeinit,"\n"
+		    "var v ", ctype, "\n"
+		    );
+
+	printf("func main() {\n");
 	ind++;
 	break;
 
@@ -85,15 +91,14 @@ outcmd(int ch, int count)
 	ind--; I; printf("}\n");
 	break;
     case '.': I; printf("fmt.Print(string(m[p]))\n"); break;
-    case '"': print_cstring(); break;
+    case '"': print_cstring(strn); break;
     case ',': I; printf("fmt.Scanf(\"%%c\", &m[p])\n"); break;
     }
 }
 
 static void
-print_cstring(void)
+print_cstring(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0;
     size_t outlen = 0;

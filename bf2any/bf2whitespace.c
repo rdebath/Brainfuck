@@ -18,7 +18,7 @@ static enum {no_init, quick_init, full_init} init_type = full_init;
 
 static struct stkdat { struct stkdat * up; int id; } *sp = 0;
 
-static void print_string(void);
+static void print_string(char * str);
 static void prttok(char *, char *);
 static void putsnum(long val);
 static void putunum(unsigned long num);
@@ -87,7 +87,8 @@ static void putlabel(unsigned long num);
 #define PRTTOK(s)	prttok("(" #s ")", semicolon? SCMD_##s : CMD_##s);
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {fn_check_arg};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {fn_check_arg, gen_code};
 
 static int
 fn_check_arg(const char * arg)
@@ -150,8 +151,8 @@ do_bytewrap(void)
     }
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     if (embed_tokens) {
 	if (count == 1)
@@ -177,7 +178,7 @@ outcmd(int ch, int count)
 
     switch(ch) {
     case '!':
-
+	if (count) break;
 	if (tapelen) {
 	    switch(init_type)
 	    {
@@ -398,7 +399,7 @@ outcmd(int ch, int count)
         }
         break;
 
-    case '"': print_string(); break;
+    case '"': print_string(strn); break;
 
     case '.':
 	PRTTOK(DUP);
@@ -414,9 +415,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_string(void)
+print_string(char * str)
 {
-    char * str = get_string();
 
     if (!str) return;
 

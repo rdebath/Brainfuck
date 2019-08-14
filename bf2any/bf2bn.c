@@ -28,12 +28,13 @@ static int ind = 0;
 #define I        printf("%*s", ind*4, "")
 #define prv(s,v) printf("%*s" s "\n", ind*4, "", (v))
 
-static void print_cstring(void);
+static void print_cstring(char * str);
 static int use_macro = 0;
 static int bpc = 0;
 
 static check_arg_t fn_check_arg;
-struct be_interface_s be_interface = {.check_arg=fn_check_arg};
+static gen_code_t gen_code;
+struct be_interface_s be_interface = {fn_check_arg, gen_code};
 
 static int
 fn_check_arg(const char * arg)
@@ -60,8 +61,8 @@ fn_check_arg(const char * arg)
     return 0;
 }
 
-void
-outcmd(int ch, int count)
+static void
+gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
@@ -290,7 +291,7 @@ outcmd(int ch, int count)
 
     case '.': I; printf("putchar8(*p);\n"); break;
 
-    case '"': print_cstring(); break;
+    case '"': print_cstring(strn); break;
     case ',':
 	I; printf("c = getchar();\n");
 	I; printf("if (c != EOF)\n");
@@ -302,9 +303,8 @@ outcmd(int ch, int count)
 }
 
 static void
-print_cstring(void)
+print_cstring(char * str)
 {
-    char * str = get_string();
     char buf[256];
     int gotnl = 0, gotperc = 0;
     size_t outlen = 0;
