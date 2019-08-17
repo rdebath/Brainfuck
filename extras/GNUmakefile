@@ -17,11 +17,17 @@ all: build
 	git diff --stat HEAD `" ; \
 	:;}
 
+# Install all we can make, but don't fail if some can't be built.
 install:
 	-@$(MAKE) -k all
 	-@echo Installing: $(ALLEXE) to $(INSTALLDIR)
 	-@for i in $(ALLEXE) ; do \
-	$(INSTALL) $$i $(INSTALLDIR)/$$i$(INSTALLEXT) ; \
+	if [ "$(INSTALLEXT)" != '' -a -f "$$i$(INSTALLEXT)" ] ; then \
+	    $(INSTALL) "$$i$(INSTALLEXT)" $(INSTALLDIR)/$$i$(INSTALLEXT) ; \
+	    rm "$$i$(INSTALLEXT)" ; \
+	else \
+	    $(INSTALL) $$i $(INSTALLDIR)/$$i$(INSTALLEXT) ; \
+	fi ; \
 	done
 
 clean:

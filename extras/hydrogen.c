@@ -697,7 +697,11 @@ tcalloc(size_t nmemb, size_t size)
     m = calloc(nmemb, size);
     if (m) return m;
 
+#ifdef __linux__
     fprintf(stderr, "Allocate of %zd*%zd bytes failed, ABORT\n", nmemb, size);
+#else
+    fprintf(stderr, "Allocate of some bytes failed, ABORT\n");
+#endif
     exit(42);
 }
 
