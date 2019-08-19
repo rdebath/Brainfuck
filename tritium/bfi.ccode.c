@@ -1221,10 +1221,10 @@ print_ccode(FILE * ofd)
 	use_functions = 0;
 #if defined(__GNUC__) && __GNUC__ < 3
     if (use_functions<0)
-	use_functions = (total_nodes >= 1000);
+	use_functions = (total_nodes-node_type_counts[T_CHR] >= 1000);
 #else
     if (use_functions<0)
-	use_functions = (total_nodes >= 3000);
+	use_functions = (total_nodes-node_type_counts[T_CHR] >= 5000);
 #endif
 
     if (verbose)
