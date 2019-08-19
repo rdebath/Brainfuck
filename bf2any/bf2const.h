@@ -7,3 +7,4 @@ struct mem { struct mem *p, *n; int is_set; int v; int cleaned, cleaned_val;};
 extern struct mem *tape;
 
 extern int disable_init_optim;
+extern int tape_is_all_blank;

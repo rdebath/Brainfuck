@@ -17,6 +17,7 @@ static int qcnt = 0;
 
 static void process_loop(void);
 static int try_constant_loop(int loopz, int inc, int mov, int has_zmode);
+static int try_constant_slider(int loopz, int inc, int mov, int has_zmode);
 
 static int madd_offset[32];
 static int madd_inc[32];
@@ -136,7 +137,13 @@ static void process_loop()
 	return;
     }
 
-    if (mov) { outtxn(0, 0); return; }  /* Unbalanced loop -- Nope. */
+    if (mov) {
+	if (qcnt == 3 && (qcmd[1] == '<' || qcmd[1] == '>'))
+	    if (try_constant_slider(loopz, inc, mov, has_zmode))
+		return;
+	outtxn(0, 0);  /* Unbalanced loop -- Nope. */
+	return;
+    }
 
     if (   (loopz != 0 && inc != 0)	/* Um, infinite loop? */
 	|| (loopz == 0 && inc == 0)	/* This too */
@@ -372,6 +379,46 @@ try_constant_loop(int loopz, int inc, int mov, int has_zmode)
 	    /* And forward the converted loop */
 	    outtxn(0, 0);
 	    return 1;
+	}
+    }
+    return 0;
+}
+
+static int
+try_constant_slider(int loopz, int inc, int mov, int has_zmode)
+{
+    struct mem *ctape = tape;
+    int i, steps = 0;
+    if (qcmd[1] == '<') mov = -mov;
+    if (mov < 1) return 0;
+
+    while ((!ctape && tape_is_all_blank) || (ctape && ctape->is_set)) {
+	if (ctape == 0 || ctape->v == 0) {
+	    qcnt = 1;
+	    qcmd[0] = qcmd[1];
+	    qrep[0] = steps;
+	    outtxn(0, 0);
+	    return 1;
+	}
+	for(i=0; i<mov; i++) {
+	    if (qcmd[1] == '>') {
+		if (!ctape || ctape->n == 0) {
+		    if (!tape_is_all_blank)
+			return 0;
+		    ctape = 0;
+	        } else
+		    ctape = ctape->n;
+		steps ++;
+	    }
+	    if (qcmd[1] == '<') {
+		if (!ctape || ctape->p == 0) {
+		    if (!tape_is_all_blank)
+			return 0;
+		    ctape = 0;
+		} else
+		    ctape = ctape->p;
+		steps ++;
+	    }
 	}
     }
     return 0;

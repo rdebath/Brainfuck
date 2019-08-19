@@ -27,7 +27,7 @@
  *  convert '-' commands into '+' commands as a matter of routine.
  */
 
-static int first_run = 0;
+int tape_is_all_blank = 0;
 
 struct mem *tape = 0;
 static struct mem *tapezero = 0, *freelist = 0;
@@ -50,8 +50,8 @@ new_n(struct mem *p) {
     if (!p->n) { perror("bf2any: new_n()"); exit(1); }
     p->n->p = p;
     p->n->n = 0;
-    p->n->is_set = first_run;
-    p->n->cleaned = first_run;
+    p->n->is_set = tape_is_all_blank;
+    p->n->cleaned = tape_is_all_blank;
 }
 
 static void
@@ -64,8 +64,8 @@ new_p(struct mem *p) {
     if (!p->p) { perror("bf2any: new_p()"); exit(1); }
     p->p->n = p;
     p->p->p = 0;
-    p->p->is_set = first_run;
-    p->p->cleaned = first_run;
+    p->p->is_set = tape_is_all_blank;
+    p->p->cleaned = tape_is_all_blank;
 }
 
 static void clear_cell(struct mem *p)
@@ -106,7 +106,7 @@ flush_tape(int no_output, int keep_knowns)
     int flipcount = 2;
     struct mem *p;
 
-    if (first_run) outcmd('!', no_output);
+    if (tape_is_all_blank) outcmd('!', no_output);
 
     if (sav_str_len>0)
 	flush_string();
@@ -180,7 +180,7 @@ flush_tape(int no_output, int keep_knowns)
 
     tapezero = tape;
     curroff = 0;
-    first_run = 0;
+    tape_is_all_blank = 0;
 }
 
 void
@@ -204,8 +204,8 @@ outopt(int ch, int count)
     case 'I': case 'E':
 	if (ch == '!') {
 	    flush_tape(1,0);
-	    tape->cleaned = tape->is_set = first_run = !disable_init_optim;
-	    if (first_run) return;
+	    tape->cleaned = tape->is_set = tape_is_all_blank = !disable_init_optim;
+	    if (tape_is_all_blank) return;
 	} else if (ch == '~' && enable_optim && !disable_init_optim)
 	    flush_tape(1,0);
 	else

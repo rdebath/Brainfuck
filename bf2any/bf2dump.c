@@ -176,6 +176,8 @@ static int ind = 0;
     case '!': puts("{"); ind++; break;
     case '~': puts("}"); break;
 
+    case '#': puts("/*DEBUG*/"); break;
+
     default:
 	printf("/* Unknown token 0x%02x.%d */\n", ch, count);
 	fprintf(stderr, "ERROR: Unknown token 0x%02x.%d\n", ch, count);
