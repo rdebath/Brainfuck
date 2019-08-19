@@ -183,7 +183,8 @@ flush_tape(int no_output, int keep_knowns)
     first_run = 0;
 }
 
-void outopt(int ch, int count)
+void
+outopt(int ch, int count)
 {
     if (deadloop) {
 	if (ch == '[') deadloop++;

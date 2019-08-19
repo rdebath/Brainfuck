@@ -4,6 +4,7 @@
 #include <limits.h>
 
 #include "bf2any.h"
+#include "bf2const.h"
 #include "bf2loop.h"
 #include "ov_int.h"
 
@@ -16,15 +17,9 @@
 #endif
 
 static int opt_optim = 0;
-
-int tapelen = TAPELEN;
-int tapeinit = 0;
-int enable_optim = 0;
 int disable_init_optim = 0;
-int enable_debug;
-int bytecell = 0;
-const char * current_file;
-char * extra_commands = 0;
+static const char * current_file;
+struct fe_interface_s fe_interface = {.tape_len = TAPELEN};
 
 /* Brainfuck loader.
  *

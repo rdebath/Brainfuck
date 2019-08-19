@@ -521,7 +521,7 @@ static void
 bftranslate(int ch, int count)
 {
     char * p;
-    if ((p = strchr(bf,ch)) || ch == '=' || (enable_debug && ch == '#')) {
+    if ((p = strchr(bf,ch)) || ch == '=' || ch == '#') {
 	if (bf_multi) {
 	    struct instruction * n = calloc(1, sizeof*n);
 	    if (!n) { perror("bf2multi"); exit(42); }
@@ -549,7 +549,6 @@ bftranslate(int ch, int count)
     }
 
     if (ch == '!') {
-	if (disable_init_optim) tmp_clean = 0;
 	if (bf_multi == 1 || bf_multi == 2 || bf_multi == 4)
 	    bf_multi = 0;
     }
@@ -1140,7 +1139,7 @@ bfdowhile(int ch, int count)
 {
     char * p;
 
-    if ((p = strchr(bf,ch)) || (enable_debug && ch == '#')) {
+    if ((p = strchr(bf,ch)) || ch == '#') {
 	struct instruction * n = calloc(1, sizeof*n);
 	if (!n) { perror("bf2dowhile"); exit(42); }
 
