@@ -3,10 +3,7 @@
 #include <string.h>
 #include <limits.h>
 
-#include "bf2any.h"
-#include "bf2loop.h"
-#include "bf2const.h"
-#include "ov_int.h"
+#include "bf2any_ex.h"
 
 /* Brainfuck loop optimiser
  *

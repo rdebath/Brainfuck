@@ -44,9 +44,9 @@ fn_check_arg(const char * arg)
     }
 
     if (strcmp("-h", arg) ==0) {
-        fprintf(stderr, "%s\n",
+        fprintf(stderr, "%s%d%s%d%s\n",
         "\t"    "-decimal Generate decimal type"
-        "\n\t"  "-l999    Input size of 999 characters/line"
+        "\n\t"  "-l",maxinpline,"    Input size of ",maxinpline," characters/line"
         );
         return 1;
     }

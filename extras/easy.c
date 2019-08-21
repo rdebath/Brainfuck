@@ -53,10 +53,10 @@ char * bf(char * p, int r) {
 	    s=p+1;
 	    if(mem[m]) do p=bf(s,1); while(mem[m]);
 	    else {
-		int b=0;
+		int b=0, c;
 		for(p++;*p!=']'||b;) {
 		    if (*p!=':') { b += (*p=='[')-(*p==']'); p++; }
-		    else if((*p = getc(f)) == EOF) exit(2); else p[1]=':';
+		    else if((c = getc(f)) != EOF) *p=c,p[1]=':'; else exit(2);
 		}
 	    }
 	    if(!r) { *(p=pgm)=':'; continue; }

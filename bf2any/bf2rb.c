@@ -135,8 +135,8 @@ gen_code(int ch, int count, char * strn)
     case '"': print_cstring(strn); break;
     case '.':
 	I;
-	if(bytecell) printf("putc %s\n", cm);
-	else printf("begin print '' << %s rescue putc %s end\n", cm, cm);
+	if(bytecell) printf("print (%s & 255).chr\n", cm);
+	else printf("begin print '' << %s rescue print (%s & 255).chr end\n", cm, cm);
 	break;
     case ',':
 	I;

@@ -137,6 +137,10 @@ gen_code(int ch, int count, char * strn)
     case 'E':
 	ind--; I; fprintf(ofd, "}\n");
 	break;
+    case 'X':
+	I; fprintf(ofd, "puts stderr \"STOP command executed\"\n");
+	I; fprintf(ofd, "exit 255\n");
+	break;
     case '.':
 	if(bytecell) { I; oputs("lset d $dc [expr {[lindex $d $dc] & 255}]"); }
 	I; oputs("puts -nonewline [format %c [lindex $d $dc]]");

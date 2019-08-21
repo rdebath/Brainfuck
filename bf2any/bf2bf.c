@@ -14,7 +14,6 @@ struct be_interface_s be_interface = {
     .check_arg = fn_check_arg,
     .gen_code = gen_code,
     .disable_be_optim=1,
-    .disable_fe_optim=1,
     .hasdebug=1
 };
 
@@ -145,10 +144,11 @@ fn_check_arg(const char * arg)
 		enable_bf_mov = 1;
 	}
 
-	if (L_BASE == L_BFRLE || L_BASE == L_HANOILOVE || L_BASE == L_BINRLE ||
-	    L_BASE == L_BFXML || (langclass & C_ADDRLE) == C_ADDRLE)
+	if (! ( L_BASE == L_BFRLE || L_BASE == L_HANOILOVE ||
+		L_BASE == L_BINRLE || L_BASE == L_BFXML ||
+		(langclass & C_ADDRLE) == C_ADDRLE))
 	{
-	    be_interface.disable_fe_optim = 0;
+	    fe_interface.disable_fe_optim = 1;
 	}
 
 	return 1;
@@ -1641,6 +1641,7 @@ static trivbf trigram[1] = {{
     .name = "trigram",
     .class = L_JNWORD,
     .bf = { "☰", "☱", "☲", "☳", "☴", "☵", "☶", "☷"},
+    .help = "Trivial BF substitution using Trigrams",
 }};
 
 /* Language "babylang" */
@@ -1649,6 +1650,7 @@ static trivbf babylang[1] = {{
     .class = L_WORDS,
     .bf = { "gaga", "gugu", "aaag", "uuug", "guuu", "gaaa", "gagu", "guga"},
     .zero_cell = "unga",
+    .help = "Babylang -- https://esolangs.org/wiki/Babylang",
 }};
 
 /* Language "tmcc" */

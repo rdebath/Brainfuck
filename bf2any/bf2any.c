@@ -3,10 +3,7 @@
 #include <string.h>
 #include <limits.h>
 
-#include "bf2any.h"
-#include "bf2const.h"
-#include "bf2loop.h"
-#include "ov_int.h"
+#include "bf2any_ex.h"
 
 #ifndef TAPELEN
 #define TAPELEN 0x100000
@@ -189,7 +186,7 @@ main(int argc, char ** argv)
     check_arg("+init");	/* Callout to BE for soft init. */
 
     /* Defaults if not told */
-    if (!opt_optim && be_interface.disable_fe_optim)
+    if (!opt_optim && fe_interface.disable_fe_optim)
 	opt_optim = disable_init_optim = 1;
 
     if (!opt_optim)
@@ -437,6 +434,12 @@ pipe_to_be(char ** filelist, int filecount)
 	if (ifd != stdin) fclose(ifd);
     }
     outcmd('~', 0);
+}
+
+void
+outcmd(int ch, int count)
+{
+    (*be_interface.gen_code)(ch, count, 0);
 }
 
 /*

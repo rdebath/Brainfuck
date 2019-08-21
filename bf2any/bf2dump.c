@@ -37,15 +37,13 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-h") == 0) {
         fprintf(stderr, "%s\n",
         "\n\t"  "-no-be  Turn off BE optimisation."
-        "\n\t"  "-no-q   Turn off \" command."
-        "\n\t"  "-q      Turn on \" command."
         "\n\t"  "-no-mov Turn off move optimisation."
         "\n\t"  "-int    Turn on cell==int flag."
         "\n\t"  "-chr    Turn on chrtok flag."
         "\n\t"  "-#      Enable debug flag."
         "\n\t"  "-c      Add a C header for compiling."
         "\n\t"  "-c-only Only print C code."
-        "\n\t"  "-dd     Data dump mode."
+        "\n\t"  "-dd     Data dump mode (as -be-pipe data)."
 	);
 	return 1;
     }
@@ -191,7 +189,24 @@ ddump(int ch, int count, char * strn)
     char ibuf[sizeof(int)*3+6];
     int l;
 
-    if (ch == '!') return;
+    if (ch == '!') {
+	printf(
+	    "{[    This is not brainfuck, use bf2any's -be-pipe option     ]}\n"
+	    "{ ++++[>++++<-]>[>++>[++++++++>]++[<]>-]>>>>>>>++.<<<--.+.<<-- }\n"
+	    "{ -----.<.>>>.<<.<.>>----.+.<+.<.>>>>.<<<--.>>>-.<.<-.>---.<<+ }\n"
+	    "{ ++.>>---.<---.<<++++++++++++.------------.>.--.>>++.<<<.++++ }\n"
+	    "{ +++++++++.>>>>+.<.<<<.>---.>--.<.>>.[>]<<.                [] }\n"
+	);
+
+	if (bytecell) {
+	    printf("%s", "8%");
+	    col += 2;
+	} else if (be_interface.cells_are_ints) {
+	    printf("%s", "32%");
+	    col += 2;
+	}
+	return;
+    }
 
     if (ch == '~') {
 	if (col)

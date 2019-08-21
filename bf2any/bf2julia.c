@@ -147,7 +147,7 @@ loutcmd(int ch, int count, struct instruction *n)
     case 999:
 	if (bytecell)
 	    printf( "%s%d%s%d%s",
-		    "m = zeros(Uint8, ",tapesz,")\n"
+		    "m = zeros(UInt8, ",tapesz,")\n"
 		    "p = ", tapeinit, "\n");
 	else
 	    printf( "%s%d%s%d%s",

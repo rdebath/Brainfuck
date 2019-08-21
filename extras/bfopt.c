@@ -34,6 +34,7 @@ int enabled_rle = 0;
 int enable_initopt = 1;
 int enable_opt = 1;
 int delay_clean = 0;
+int fwd_flush = 0;
 int maxcol=72;
 
 void outrun(int ch, int count);
@@ -58,17 +59,15 @@ check_argv(const char * arg)
 	enable_initopt=0;
     } else if (strcmp(arg, "-O2") == 0) {
 	enable_opt = enable_initopt = 1;
-    } else if (strcmp(arg, "-d") == 0) {
+    } else if (strcmp(arg, "-dc") == 0 || strcmp(arg, "-delay-clean") == 0) {
 	delay_clean=1;
+    } else if (strcmp(arg, "-ff") == 0 || strcmp(arg, "-fwd-flush") == 0) {
+	fwd_flush=1;
     } else if (strcmp(arg, "-w") == 0) {
 	maxcol=0;
     } else if (strncmp(arg, "-w", 2) == 0 && arg[2] >= '0' && arg[2] <= '9') {
         maxcol = atol(arg+2);
-
-    } else if (strcmp(arg, "-h") == 0) {
-	return 0;
-    }
-    else return 0;
+    } else return 0;
     return 1;
 }
 
@@ -111,6 +110,10 @@ main(int argc, char ** argv)
 	    "\n\t"  "-m -O0  Turn off optimisation"
 	    "\n\t"  "-p -O1  This is a part of a BF program"
 	    "\n\t"  "-O2     Normal optimisation"
+	    "\n\t"  "-fwd-flush"
+	    "\n\t"  "-ff     Flush cells current first rather than current last."
+	    "\n\t"  "-delay-clean"
+	    "\n\t"  "-dc     Delay cleaning cells as much as possible."
 	    ""
 	    );
 
@@ -314,7 +317,7 @@ flush_tape(int no_output, int keep_knowns)
 	    if (no_output) clear_cell(p);
 
 	    if ((p->v || p->is_set) &&
-		    (curroff != 0 || (tapeoff != 0 || flipcount == 0)) &&
+		    (curroff != 0 || (tapeoff != 0 || flipcount == 0 || fwd_flush)) &&
 		    (!keep_knowns || p == tape || !delay_clean)) {
 		if (p->cleaned && p->cleaned_val == p->v && p->is_set) {
 		    if (!keep_knowns) clear_cell(p);

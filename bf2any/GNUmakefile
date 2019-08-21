@@ -80,7 +80,7 @@ MOREDEFS=-Wextra -Wfloat-equal -Wundef -Wpointer-arith -Wcast-align \
 % : %.c
 
 $(ALLEXE): $(COREOBJ)
-$(COREOBJ): bf2any.h bf2const.h bf2loop.h
+$(COREOBJ): bf2any_ex.h bf2any.h ov_int.h
 $(patsubst %.c,%.o,$(wildcard *.c)): bf2any.h
 
 bf2crun.o bf2dump.o bf2py.o bf2php.o bf2perl.o bf2perl6.o bf2rb.o: move_opt.h
@@ -283,7 +283,7 @@ BUILDOPT=$(CC) $(CFLAGS) $(LDFLAGS) $(LDLIBS) $(TARGET_ARCH) \
     $(TCLLIBS$) $(PYLIBLIBS) $(LUALIBLIBS) $(LIBDLLIBS) $(TCCLIBS)
 BUILDFLG :=.build-opts.$(shell echo '$(BUILDOPT)' | sum | tr -d '\040\055' )
 $(patsubst %.c,%.o,$(wildcard *.c)): $(BUILDFLG)
-bf2jit.c bf2gas32.o bf2gas64.o: $(BUILDFLG)
+bf2jit.c: $(BUILDFLG)
 $(BUILDFLG):
 	-@rm -f .build-opts.*
 	-@echo '$(BUILDOPT)' > $(BUILDFLG)

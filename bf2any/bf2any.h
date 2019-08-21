@@ -8,7 +8,6 @@ struct be_interface_s {
     int cells_are_ints;
     int bytesonly;
     int disable_be_optim;
-    int disable_fe_optim;
     int hasdebug;
     int enable_chrtok;
 } be_interface;
@@ -18,6 +17,7 @@ extern struct fe_interface_s {
     int tape_len;
     int fe_enable_optim;
     int fe_bytecell;
+    int disable_fe_optim;	/* Only for bf2bf */
     int fe_enable_debug;        /* Only for C generator */
     char * fe_extra_commands;   /* Only for C generator */
 } fe_interface;

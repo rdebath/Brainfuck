@@ -104,6 +104,9 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-d") == 0) {
 	runmode = no_run; return 1;
     } else
+    if (strcmp(arg, "-b64") == 0) {
+	be_interface.cells_are_ints = 0; return 1;
+    } else
     if (strcmp(arg, "-unix") == 0) {
 	use_unistd = 1; return 1;
     } else
@@ -179,13 +182,22 @@ gen_code(int ch, int count, char * strn)
 	pr("#endif");
 	prv("#define TAPEOFF %d", tapeinit);
 
+	if (!bytecell && !be_interface.cells_are_ints) {
+	    pr("#include <stdint.h>");
+	    pr("#ifndef C");
+	    pr("#define C uintmax_t");
+	    pr("#endif");
+	}
+
 	if (enable_debug) {
 	    pr("#ifndef do_dump");
 	    pr("#define do_dump() call_dump(mem,m)");
 	    if (bytecell)
 		pr("void call_dump(char *mem, char *m)");
-	    else
+	    else if (be_interface.cells_are_ints)
 		pr("void call_dump(int *mem, int *m)");
+	    else
+		pr("void call_dump(C *mem, int *m)");
 	    pr("{");
 	    ind++;
 	    pr("int i;");
@@ -212,9 +224,12 @@ gen_code(int ch, int count, char * strn)
 	    pr("static unsigned char mem[TAPELEN+TAPEOFF];");
 	    pr("register unsigned char *m = mem + TAPEOFF;");
 	    pr("register int v;");
-	} else {
+	} else if (be_interface.cells_are_ints) {
 	    pr("static unsigned int mem[TAPELEN+TAPEOFF];");
 	    pr("register unsigned int v, *m = mem + TAPEOFF;");
+	} else {
+	    pr("static C mem[TAPELEN+TAPEOFF];");
+	    pr("register C v, *m = mem + TAPEOFF;");
 	}
 	if (runmode == no_run && !use_unistd)
 	    pr("setbuf(stdout,0);");

@@ -3,9 +3,7 @@
 #include <string.h>
 #include <limits.h>
 
-#include "bf2any.h"
-#include "bf2const.h"
-#include "ov_int.h"
+#include "bf2any_ex.h"
 
 /*
  *  Simple constant folding.
@@ -90,12 +88,6 @@ flush_string(void)
     add_string(0);
     (*be_interface.gen_code)('"', 0, sav_str_str);
     sav_str_len = 0;
-}
-
-void
-outcmd(int ch, int count)
-{
-    (*be_interface.gen_code)(ch, count, 0);
 }
 
 static void

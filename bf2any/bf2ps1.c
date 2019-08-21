@@ -9,7 +9,7 @@
  */
 
 static int do_input = 0;
-static int do_batfile = 0, do_unbuffered = 0;
+static int do_batfile = 0, do_unbuffered = 0, do_milliseconds = 0;
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
 
@@ -52,6 +52,7 @@ static int
 fn_check_arg(const char * arg)
 {
     if (strcmp(arg, "-bat") == 0) { do_batfile = 1; return 1; }
+    if (strcmp(arg, "-ms") == 0) { do_milliseconds = 1; return 1; }
     if (strcmp(arg, "-nb") == 0) { do_unbuffered = 1; return 1; }
     return 0;
 }
@@ -137,6 +138,10 @@ gen_code(int ch, int count, char * strn)
 	    printf("        $script:line = Read-Host\n");
 	    printf("        $script:gotline = $true\n");
 	    printf("        $script:goteof = $false\n");
+	    printf("        if ( $script:line -eq $null ) {\n");
+	    printf("            $script:goteof = $true\n");
+	    printf("            return\n");
+	    printf("        }\n");
 	    printf("        # Well crap -- no EOF, I'll fake it.\n");
 	    printf("        if ( $script:line.Length -eq 1 -And "
 		"26 -eq [int]($script:line.Substring(0,1).ToCharArray()[0])"
@@ -170,7 +175,17 @@ gen_code(int ch, int count, char * strn)
 	    printf("}\n");
 	    printf("\n");
 	}
+
+	if (do_milliseconds) {
+	    I; printf("$sw = [Diagnostics.Stopwatch]::StartNew()\n");
+	}
+
 	I; printf("brainfuck\n");
+
+	if (do_milliseconds) {
+	    I; printf("$sw.Stop()\n");
+	    I; printf("Write-Host \"Time: \" $sw.Elapsedmilliseconds \"ms\"\n");
+	}
 
 	if (do_batfile)
 	    printf("%s\n", cmdsuffix);
