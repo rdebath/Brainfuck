@@ -1,5 +1,5 @@
 /* This is the deadbeef brainfuck interpreter.
- * Robert de Bath (c) 2014-2017 GPL v2 or later.  */
+ * Robert de Bath (c) 2014-2019 GPL v2 or later.  */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,26 +12,25 @@ int pgmlen = 0, on_eof = 1, debug = 0;
 int main(int argc, char **argv)
 {
    FILE * ifd;
-   int ch;
-   int p= -1, n= -1, j= -1, i = 0;
+   int ch, p= -1, n= -1, j= -1, i = 0;
    for (;;) {
       if (argc < 2 || argv[1][0] != '-' || argv[1][1] == '\0') break;
       else if (!strcmp(argv[1], "-e")) { argc--; argv++; on_eof = -1; }
       else if (!strcmp(argv[1], "-z")) { argc--; argv++; on_eof = 0; }
       else if (!strcmp(argv[1], "-n")) { argc--; argv++; on_eof = 1; }
+      else if (!strcmp(argv[1], "-x")) { argc--; argv++; on_eof = 2; }
       else if (!strcmp(argv[1], "-d")) { argc--; argv++; debug = 1; }
       else if (argv[1][0] == '-') {
 	 fprintf(stderr, "Unknown option '%s'\n", argv[1]);
 	 exit(1);
-      }
-      else break;
+      } else break;
    }
    ifd = argc>1 && strcmp(argv[1], "-") ? fopen(argv[1], "r") : stdin;
    if(!ifd) perror(argv[1]); else {
-      while((ch=getc(ifd)) != EOF && (ifd!=stdin || ch != '!' || j>=0 || !i)) {
+      while((ch = getc(ifd)) != EOF && (ifd!=stdin || ch!='!' || j>=0 || !i)) {
 	 int r = (ch == '<' || ch == '>' || ch == '+' || ch == '-');
-	 if (r || (debug && ch == '#') || (ch == ']' && j>=0) ||
-	       ch == '[' || ch == ',' || ch == '.') {
+	 if (r || ch == '[' || ch == ',' || ch == '.' ||
+	       (debug && ch == '#') || (ch == ']' && j>=0)) {
 	    if (ch == '<') { ch = '>'; r = -r; }
 	    if (ch == '-') { ch = '+'; r = -r; }
 	    if (r && p>=0 && pgm[p].cmd == ch) { pgm[p].arg += r; continue; }
@@ -87,8 +86,8 @@ void run(void)
 	 case '?':  while(t[m]) m += pgm[n].arg; break;
 	 case '>':  m += pgm[n].arg; break;
 	 case '.':  putchar(t[m]); break;
-	 case ',':  if((ch=getchar())!=EOF) t[m]=ch;
-		    else if (on_eof != 1) t[m]=on_eof;
+	 case ',':  t[m] = ((ch=getchar())!=EOF)?ch:on_eof<1?on_eof:t[m];
+		    if (ch == EOF && on_eof == 2) return;
 		    break;
 	 case '!':  if(t[m]) return; break;
 	 case '#':
