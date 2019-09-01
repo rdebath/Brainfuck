@@ -125,7 +125,7 @@ static void emit(void const *bytes, size_t size)
 
 /* File to deposit the final executable.
  */
-static const char * filename = "a.out";
+static const char * filename = 0;
 
 /* Stack for holding addresses of while loops.
  */
@@ -216,6 +216,7 @@ gen_code(int ch, int count, char * strn)
 	p = pos + base_address + tapeinit;
 	insertobj(sizeof(elfheader) + sizeof(start) + prolog_meminit_offset, p);
 
+	if(filename)
 	{
 #ifndef _WIN32
 	    mode_t umsk = umask(S_IRWXG + S_IRWXO);
@@ -234,6 +235,15 @@ gen_code(int ch, int count, char * strn)
 #ifndef _WIN32
 	    umask(umsk);
 #endif
+	} else {
+	    int i, j;
+	    for(i=0; i<pos; i+=30) {
+		for(j=0; j<30; j++) {
+		    if (i+j<pos)
+			printf("%02x", 0xFF & textbuf[i+j]);
+		}
+		printf("\n");
+	    }
 	}
 	break;
     }
