@@ -99,7 +99,7 @@ static int disable_optim = 0;
 
 static int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
 
-static int bf_multi = 0, tmp_clean = 1;
+static int bf_multi = 0, tmp_clean = 1, bf_space = 0;
 static struct instruction *pgm = 0, *last = 0;
 
 /* Default double and quad to the easiest to prove algorithms. */
@@ -178,6 +178,11 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-dbr") == 0) {
 	bf_multi |= 2 + 8;
 	lang = doubler = doubler_12; langclass = L_BF; return 1;
+    } else
+    if (strcmp(arg, "-multi+") == 0) {
+	bf_multi |= 7;
+	bf_space = 1;
+	lang = bfout; langclass = L_BF; return 1;
     } else
 
     if (strcmp(arg, "-head") == 0) {
@@ -568,7 +573,9 @@ bftranslate(int ch, int count)
 	    pmc("[-]\n\n");
 
 	    pc(0); puts("// This code may be replaced by the original source");
+	    if (bf_space) pmc(">>>");
 	    lang = bfout; bfreprint();
+	    if (bf_space) pmc("<<<");
 	    pc('\n'); puts("// to here");
 
 	    pmc("\n[-]]\n\n");
@@ -583,8 +590,10 @@ bftranslate(int ch, int count)
 	    pmc("[[-]");
 	    pmc("\n\n");
 
+	    if (bf_space) pmc(">>");
 	    lang = doubler;
 	    if (bf_multi & 8) bfpackprint(); else bfreprint();
+	    if (bf_space) pmc("<<");
 
 	    pmc("\n\n");
 	    pmc("[-]]\n\n");
@@ -594,7 +603,9 @@ bftranslate(int ch, int count)
 	    pmc("[-]>[-]++++++++[<++++++++>-]<[>++++<-]+>[<->[-]]<[[-]");
 	    pmc("\n\n");
 
+	    if (bf_space) pmc(">>");
 	    lang = bfquad; bfreprint();
+	    if (bf_space) pmc("<<");
 
 	    pmc("\n\n");
 	    pmc("[-]]");
