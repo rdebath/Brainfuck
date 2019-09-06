@@ -66,13 +66,8 @@ int main(int argc, char **argv)
 
 void run(void)
 {
-#if ((__UINTPTR_MAX__+0) > UINT_MAX) && (UINT_MAX > 65535)
-   static unsigned char t[UINT_MAX+(__UINTPTR_TYPE__)1];
-   unsigned int m = 0;
-#else
    static unsigned char t[(sizeof(int)>sizeof(short))+USHRT_MAX];
    unsigned short m = 0;
-#endif
    int n, ch;
    for(n=0; ; n++) {
       m += pgm[n].mov;
