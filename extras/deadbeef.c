@@ -12,21 +12,21 @@ int pgmlen = 0, on_eof = 1, debug = 0;
 int main(int argc, char **argv)
 {
    FILE * ifd;
+   char * fn = 0, *ar0 = argv[0];
    int ch, p= -1, n= -1, j= -1, i = 0;
-   for (;;) {
-      if (argc < 2 || argv[1][0] != '-' || argv[1][1] == '\0') break;
-      else if (!strcmp(argv[1], "-e")) { argc--; argv++; on_eof = -1; }
-      else if (!strcmp(argv[1], "-z")) { argc--; argv++; on_eof = 0; }
-      else if (!strcmp(argv[1], "-n")) { argc--; argv++; on_eof = 1; }
-      else if (!strcmp(argv[1], "-x")) { argc--; argv++; on_eof = 2; }
-      else if (!strcmp(argv[1], "-d")) { argc--; argv++; debug = 1; }
-      else if (argv[1][0] == '-') {
-	 fprintf(stderr, "Unknown option '%s'\n", argv[1]);
+   for (; argc > 1; argc--, argv++) {
+      if (!strcmp(argv[1], "-e")) on_eof = -1;
+      else if (!strcmp(argv[1], "-z")) on_eof = 0;
+      else if (!strcmp(argv[1], "-n")) on_eof = 1;
+      else if (!strcmp(argv[1], "-x")) on_eof = 2;
+      else if (!strcmp(argv[1], "-d")) debug = 1;
+      else if ((argv[1][0] == '-' && argv[1][1] != '\0') || fn) {
+	 fprintf(stderr, "%s: Unexpected argument: '%s'\n", ar0, argv[1]);
 	 exit(1);
-      } else break;
+      } else fn = argv[1];
    }
-   ifd = argc>1 && strcmp(argv[1], "-") ? fopen(argv[1], "r") : stdin;
-   if(!ifd) perror(argv[1]); else {
+   ifd = fn && strcmp(fn, "-") ? fopen(fn, "r") : stdin;
+   if(!ifd) { perror(fn); exit(1); } else {
       while((ch = getc(ifd)) != EOF && (ifd!=stdin || ch!='!' || j>=0 || !i)) {
 	 int r = (ch == '<' || ch == '>' || ch == '+' || ch == '-');
 	 if (r || ch == '[' || ch == ',' || ch == '.' ||
@@ -61,7 +61,7 @@ int main(int argc, char **argv)
       setbuf(stdout, NULL);
       if (pgm) { pgm[n+1].cmd = 0; run(); }
    }
-   return !ifd;
+   return 0;
 }
 
 void run(void)
@@ -82,9 +82,9 @@ void run(void)
 	 case '>':  m += pgm[n].arg; break;
 	 case '.':  putchar(t[m]); break;
 	 case ',':  t[m] = ((ch=getchar())!=EOF)?ch:on_eof<1?on_eof:t[m];
-		    if (ch == EOF && on_eof == 2) return;
+		    if (ch == EOF && on_eof == 2) exit(-1);
 		    break;
-	 case '!':  if(t[m]) return; break;
+	 case '!':  if(t[m]) exit(2); break;
 	 case '#':
 	    fprintf(stderr, "\n%3d %3d %3d %3d %3d %3d %3d %3d %3d %3d\n%*s\n",
 	       t[0],t[1],t[2],t[3],t[4],t[5],t[6],t[7],t[8],t[9],4*m+3,"^");
