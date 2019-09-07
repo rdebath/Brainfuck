@@ -1876,6 +1876,40 @@ static trivbf bfquadnz[1] = {{
     .help = "BF to BF translation, cell size *4. (no tmp wipe)"
 }};
 
+static trivbf bitbf8[1] = {{
+    .name = "bit8",
+    .class = L_BF,
+    .help = "BF to BF translation, set cell size to 8 bits.",
+
+    .bf = {
+	">>>>>>>>>", "<<<<<<<<<",
+	">[>]+<[-<]>>>>>>>>>[-]<<<<<<<<<",
+	">>>>>>>>>+<<<<<<<<-[++>-]<[<]>>>>>>>>>[-]<<<<<<<<<",
+	">>>>>>>>.<.<.<.<.<.<.<.<", // MSB first, OK?
+	">>>>>>>>,<,<,<,<,<,<,<,<",
+	">>>>>>>>>+<<<<<<<<-[++>-]<[<]>>>>>>>>>"	// DEC
+	    "[-<<<<<<<<<"				// Check CF & zero
+	    ">[>]+<[-<]",				// INC, won't wrap
+	">>>>>>>>>+<<<<<<<<-[++>-]<[<]>>>>>>>>>"	// DEC
+	    "]"						// Check CF
+	    "<[-<]"					// INC back to zero
+    }
+}};
+
+static trivbf bitbf[1] = {{
+    .name = "bit",
+    .class = L_BF,
+    .help = "BF to BF translation, set cell size to 1 bit.",
+
+    .bf = {
+	">>", "<<",
+	">+<[>-<-]>[<+>-]<",	// Careful to use only values 0 and 1
+	">+<[>-<-]>[<+>-]<",	// '-' is identical to '+'
+	"[->+>>+<<<]>>>[-<<<+>>>]++++++[-<<++++++++>>]<<.[-]<", ",",
+	"[", "]"
+    }
+}};
+
 /*
  * Clojure translation from BF, runs at about 140,000 instructions per second.
  */
@@ -2171,6 +2205,6 @@ static trivbf * trivlist[] = {
 
     bfout, doubler_12, doubler_copy_LXXH, doubler_12nz, doubler_12r,
     doubler_17a, doubler_17b, doubler_copy, doubler_copynz,
-    doubler_esolang, bfquadz, bfquadnz,
+    doubler_esolang, bfquadz, bfquadnz, bitbf, bitbf8,
 
 0};
