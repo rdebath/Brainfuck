@@ -121,6 +121,8 @@ char * hello_world2[] = {
     "++++[>+++++<-]>[>[++++++>]++[<]>-]",
     "+++[>++++++<-]>[>[+++++++>]++[<]>-]",
     "++++[>++++++<-]>[>[+++++>]+++[<]>-]",
+    "++++++[>++++<-]>[>[+++++>]+[<]>-]",
+    "++++[>++++<-]>[>[++++++++>]+[<]>-]",
 
     "++++[>++++++<-]>[>++>[+++++>]+++[<]>-]",
     "++++[>++++<-]>[>++>[++++++++>]++[<]>-]",
@@ -515,10 +517,10 @@ main(int argc, char ** argv)
 	    flg_clear = !flg_clear;
 	    argc--; argv++;
 	} else if (strcmp(argv[1], "-sc") == 0) {
-	    flg_signed = 1;
+	    flg_signed = 1; bytewrap = 0;
 	    argc--; argv++;
 	} else if (strcmp(argv[1], "-uc") == 0) {
-	    flg_signed = 0;
+	    flg_signed = 0; bytewrap = 0;
 	    argc--; argv++;
 	} else if (strcmp(argv[1], "-b") == 0) {
 	    bytewrap = !bytewrap;
@@ -659,7 +661,6 @@ main(int argc, char ** argv)
 	    fprintf(stderr, "-rtz    Set/clear Return to cell zero\n");
 	    fprintf(stderr, "-sc/-uc Assume input chars are signed/unsigned\n");
 	    fprintf(stderr, "-b      Assume cells are bytes\n");
-	    fprintf(stderr, "-nb     Assume cells are non-wrapping unsigned bytes\n");
 	    fprintf(stderr, "\n");
 	    fprintf(stderr, "-q      Toggle two cells method\n");
 	    fprintf(stderr, "-Q      Toggle simple two cells method\n");
