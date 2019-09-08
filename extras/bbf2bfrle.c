@@ -16,9 +16,6 @@
     \n\s\r...	Whitespace is ignored.
  */
 
-#if __STDC_VERSION__ < 199901L
-#error This program needs at least the C99 standard.
-#else
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -27,14 +24,16 @@ void do_file(FILE *fd);
 int
 main(int argc, char** argv)
 {
+    int ar;
     if (argc == 1)
 	do_file(stdin);
-    else for(int ar=1; ar<argc; ar++) {
+    else for(ar=1; ar<argc; ar++) {
 	FILE * fd = fopen(argv[ar], "r");
 	if (!fd) { perror("fopen"); break; }
 	do_file(fd);
 	fclose(fd);
     }
+    return 0;
 }
 
 void
@@ -87,5 +86,3 @@ do_file(FILE *fd)
     }
     if (col) {col=0; putchar('\n');}
 }
-
-#endif

@@ -67,7 +67,7 @@ lightning: lightning.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ $(LIBS_LIGHTNING) -o $@
 
 bbf2bfrle: bbf2bfrle.c
-	$(CC) $(GNUC99) $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
 
 qtable.h: byte2byte.tmp
 	./byte2byte.tmp -d > qtable.tmp
