@@ -709,6 +709,35 @@ run_dynasm(void)
 	    |.endif
 	    break;
 
+	case T_PRTI:
+	    clean_acc();
+	    load_acc_offset(offset);
+	    acc_loaded = 0;
+
+	    |.if I386
+#ifndef APPLE_i386_stackalign
+	    | push REG_A
+	    | call &putint
+	    | pop eax
+#else
+	    | mov dword [esp], REG_A
+	    | call &putint
+#endif
+	    |.else
+#ifndef _WIN32
+	    | mov PRM_D, REG_A
+#else
+	    | mov REG_C, REG_A
+#endif
+#if (defined(__code_model_small__) && !defined(__PIC__)) || defined(__ILP32__)
+	    | mov   eax, (uintptr_t) putint
+#else
+	    | mov64 rax, (uintptr_t) putint
+#endif
+	    | call  rax
+	    |.endif
+	    break;
+
 #ifndef APPLE_i386_stackalign
 	case T_CHR:
 	    clean_acc();
@@ -812,6 +841,35 @@ run_dynasm(void)
 	    | mov   eax, (uintptr_t) getch
 #else
 	    | mov64 rax, (uintptr_t) getch
+#endif
+	    | call  rax
+	    |.endif
+	    /* Note: REG_A must be eax/rax */
+	    break;
+
+	case T_INPI:
+	    load_acc_offset(offset);
+	    set_acc_offset(offset);
+
+	    |.if I386
+#ifndef APPLE_i386_stackalign
+	    | push REG_A
+	    | call &getint
+	    | pop REG_D
+#else
+	    | mov dword [esp], REG_A
+	    | call &getint
+#endif
+	    |.else
+#ifndef _WIN32
+	    | mov PRM_D, REG_A
+#else
+	    | mov REG_C, REG_A
+#endif
+#if (defined(__code_model_small__) && !defined(__PIC__)) || defined(__ILP32__)
+	    | mov   eax, (uintptr_t) getint
+#else
+	    | mov64 rax, (uintptr_t) getint
 #endif
 	    | call  rax
 	    |.endif

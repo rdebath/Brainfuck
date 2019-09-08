@@ -499,23 +499,26 @@ run_gmparray(void)
 	    break;
 
 	case T_INP:
-	    if (iostyle != 3) {
+	    {
 		int nv = -256;
 		nv = getch(nv);
 		if( nv != -256 ) {
 		    m[p[1]].f = 0;
 		    m[p[1]].v = nv;
 		}
-	    } else {
-		// Input number
-		if (!m[p[1]].i)
-		    mpz_init(m[p[1]].b);
-		m[p[1]].i = m[p[1]].f = 1;
-		mpz_inp_str(m[p[1]].b, stdin, 0);
-		if (mpz_fits_slong_p(m[p[1]].b)) {
-		    m[p[1]].f = 0;
-		    m[p[1]].v = mpz_get_si(m[p[1]].b);
-		}
+	    }
+	    p += 2;
+	    break;
+
+	case T_INPI:
+	    // Input number
+	    if (!m[p[1]].i)
+		mpz_init(m[p[1]].b);
+	    m[p[1]].i = m[p[1]].f = 1;
+	    mpz_inp_str(m[p[1]].b, stdin, 0);
+	    if (mpz_fits_slong_p(m[p[1]].b)) {
+		m[p[1]].f = 0;
+		m[p[1]].v = mpz_get_si(m[p[1]].b);
 	    }
 	    p += 2;
 	    break;
@@ -523,13 +526,18 @@ run_gmparray(void)
 	case T_PRT:
 	    if (!m[p[1]].f)
 		putch(m[p[1]].v);
-	    else if (iostyle != 3)
+	    else
 		putch(mpz_get_si(m[p[1]].b));
+	    p += 2;
+	    break;
+
+	case T_PRTI:
+	    if (!m[p[1]].f)
+		printf("%ld", m[p[1]].v);
 	    else {
 		// Output number
 		if(do_mask) mpz_and(m[p[1]].b, m[p[1]].b, cell_and);
 		mpz_out_str(stdout, 10, m[p[1]].b);
-		putchar('\n');
 	    }
 	    p += 2;
 	    break;

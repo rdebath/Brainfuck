@@ -46,6 +46,7 @@ extern int cell_type_iso;
 
 #define UM(vx) ((vx) & cell_mask)
 #define SM(vx) ((UM(vx) ^ cell_smask) - cell_smask)
+#define XM(vx) (cell_size<=8?UM(vx):SM(vx))
 
 #define TOKEN_LIST(Mac) \
     Mac(MOV) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
@@ -53,7 +54,7 @@ extern int cell_type_iso;
     Mac(IF) Mac(ENDIF) Mac(MULT) Mac(CMULT) \
     Mac(ZFIND) Mac(MFIND) Mac(ADDWZ) Mac(LT) \
     Mac(CALC2) Mac(CALC3) Mac(CALC4) Mac(CALC5) \
-    Mac(STOP) Mac(SUSP) Mac(DUMP) \
+    Mac(PRTI) Mac(INPI) Mac(STOP) Mac(SUSP) Mac(DUMP) \
     Mac(NOP) Mac(DEAD) Mac(CALL)
 
 #define GEN_TOK_ENUM(NAME) T_ ## NAME,

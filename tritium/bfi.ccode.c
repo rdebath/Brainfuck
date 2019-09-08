@@ -250,7 +250,6 @@ print_c_header(FILE * ofd)
 
 	    if (n->type == T_CHR && (n->count <= 0 || n->count > 127))
 		ascii_only = 0;
-	    if (n->type == T_INP) ascii_only = 0;
 
 	    n = n->next;
 	}
@@ -346,6 +345,7 @@ print_c_header(FILE * ofd)
     else
 	mask_defined = 0;
 
+    /* Add the debugging lib routines */
     if (enable_trace || node_type_counts[T_DUMP] != 0) {
 	fprintf(ofd, "%s * imem;\n", cell_type);
 	fprintf(ofd, "%s%s%s%s%s\n",
@@ -417,9 +417,10 @@ print_c_header(FILE * ofd)
 	fputs("\n", ofd);
     }
 
-    if (node_type_counts[T_STOP] != 0)
-	fputs("const char stopped[] = \"STOP Command executed.\\n\";\n\n", ofd);
+    /* Anything special needed for putch? */
+    if(l_iostyle != 1) putname = "putchar";
 
+    /* Interface/headers for T_PRT and T_INP */
     if (do_run) {
 	if (use_dlopen) {
 	    /* The structure defined in this chunk of code should be put into
@@ -427,7 +428,7 @@ print_c_header(FILE * ofd)
 	     * a string so it can be included into the generated code ...
 	     * TODO: configure make to do this.
 	     */
-	    fprintf(ofd, "%s%s%s%s%s\n",
+	    fprintf(ofd, "%s%s%s\n",
 		"typedef int (*runfnp)(void);\n"
 		"typedef int (*getfnp)(int ch);\n"
 		"typedef void (*putfnp)(int ch);\n"
@@ -438,14 +439,11 @@ print_c_header(FILE * ofd)
 		"#define mem ((", cell_type, "*)bf_init.memptr)\n"
 		"#define putch (*bf_init.bf_putch)\n"
 		"#define getch (*bf_init.bf_getch)\n"
-		"static int brainfuck(void){\n"
-		"  register ", cell_type, " * m = mem;\n");
+		);
 	} else {
 	    fprintf(ofd, "extern void putch(int ch);\n");
 	    fprintf(ofd, "extern int getch(int ch);\n");
 	    fprintf(ofd, "extern %s mem[];\n", cell_type);
-	    fprintf(ofd, "int main(){\n");
-	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
 	}
     }
     else
@@ -459,8 +457,11 @@ print_c_header(FILE * ofd)
 		fprintf(ofd, "\n");
 	    }
 	}
+    }
 
-	if (node_type_counts[T_INP] != 0 && iostyle != 3)
+    /* Standalone routines for Input and Print */
+    if (!do_run) {
+	if (node_type_counts[T_INP] != 0)
 	{
 	    if (l_iostyle == 2 && (eofcell == 4 || (eofcell == 2 && EOF == -1))) {
 		use_direct_getchar = 1;
@@ -526,53 +527,61 @@ print_c_header(FILE * ofd)
 	    }
 	}
 
-	if (node_type_counts[T_INP] != 0 && iostyle == 3)
-	{
-	    fprintf(ofd, "#ifdef __STDC__\n");
-	    fprintf(ofd, "static int\n");
-	    fprintf(ofd, "getch(int oldch)\n");
-	    fprintf(ofd, "#else\n");
-	    fprintf(ofd, "static int getch(oldch) int oldch;\n");
-	    fprintf(ofd, "#endif\n");
-	    fprintf(ofd, "{\n");
-	    fprintf(ofd, "  int ch;\n");
-	    fprintf(ofd, "  if (scanf(\"%%d\", &ch)) return ch;\n");
-	    fprintf(ofd, "  return oldch;\n");
-	    fprintf(ofd, "}\n\n");
+	if ((node_type_counts[T_CHR] != 0 || node_type_counts[T_PRT] != 0) &&
+	    l_iostyle == 1) {
+	    fputs(
+		"#if defined(__STDC__) && defined(__STDC_ISO_10646__)\n"
+		"static void putch(int ch)\n"
+		"{\n"
+		"  if(ch>127)\n"
+		"\tprintf(\"%lc\",ch);\n"
+		"  else\n"
+		"\tputchar(ch);\n"
+		"}\n"
+		"#else\n"
+		"#define putch(ch) putchar(ch)\n"
+		"#endif\n"
+		"\n", ofd);
 	}
+    }
 
-	if (node_type_counts[T_CHR] != 0 || node_type_counts[T_PRT] != 0) {
-	    switch(l_iostyle)
-	    {
-	    case 0: case 2:
-		putname = "putchar";
-		break;
-	    case 1:
-		fputs(
-		    "#if defined(__STDC__) && defined(__STDC_ISO_10646__)\n"
-		    "static void putch(int ch)\n"
-		    "{\n"
-		    "  if(ch>127)\n"
-		    "\tprintf(\"%lc\",ch);\n"
-		    "  else\n"
-		    "\tputchar(ch);\n"
-		    "}\n"
-		    "#else\n"
-		    "#define putch(ch) putchar(ch)\n"
-		    "#endif\n"
-		    "\n", ofd);
-		break;
-	    case 3:
-		fputs(
-		    "static void putch(int ch)\n"
-		    "{\n"
-		    "  printf(\"%d\\n\", ch);\n"
-		    "}\n"
-		    "\n", ofd);
-		break;
-	    }
-	}
+    /* Are we using T_PRTI ? */
+    if (node_type_counts[T_PRTI] != 0) {
+	fprintf(ofd, "%s%s%s%s%s%s%s\n",
+	    "static void putint(",cell_type," ch)\n"
+	    "{\n"
+	    "    char buf[4+3*sizeof(",cell_type,")], *sp=buf;\n"
+	    "    do {\n"
+	    "        *sp++ = '0' + ch % 10;\n"
+	    "    } while((ch /= 10) != 0);\n"
+	    "    do {\n"
+	    "        ",putname,"(*--sp);\n"
+	    "    } while(sp>buf);\n"
+	    "}\n"
+	    );
+    }
 
+    if (node_type_counts[T_INPI] != 0)
+    {
+	fprintf(ofd, "#ifdef __STDC__\n");
+	fprintf(ofd, "static int\n");
+	fprintf(ofd, "getint(int oldch)\n");
+	fprintf(ofd, "#else\n");
+	fprintf(ofd, "static int getint(oldch) int oldch;\n");
+	fprintf(ofd, "#endif\n");
+	fprintf(ofd, "{\n");
+	fprintf(ofd, "  int ch;\n");
+	fprintf(ofd, "  if (scanf(\"%%d\", &ch)) return ch;\n");
+	fprintf(ofd, "  return oldch;\n");
+	fprintf(ofd, "}\n\n");
+    }
+
+    /* Are we using T_STOP ? */
+    if (node_type_counts[T_STOP] != 0)
+	fputs("const char stopped[] = \"STOP Command executed.\\n\";\n\n", ofd);
+
+    /* Choose the mem representation and start main() for standalone */
+    if (!do_run) {
 	if (node_type_counts[T_MOV] == 0) {
 	    if (min_pointer < 0)
 		memoffset = -min_pointer;
@@ -582,6 +591,9 @@ print_c_header(FILE * ofd)
 
 	if (node_type_counts[T_MOV] == 0 && memoffset == 0 &&
 		    !enable_trace && node_type_counts[T_DUMP] == 0) {
+	    if (verbose && use_dynmem)
+		fprintf(stderr, "Ignoring -dynmem as all cells are static\n");
+
 	    if (!use_functions) {
 		int i;
 		fprintf(ofd, "static %s", cell_type);
@@ -671,9 +683,6 @@ print_c_header(FILE * ofd)
 		"\n"	"  register CELL * m = move_ptr(alloc_ptr(mem),0);" );
 	}
 
-	if (node_type_counts[T_INP] != 0 && iostyle != 3) {
-	    fprintf(ofd, "  setbuf(stdout, 0);\n");
-	}
 	if (node_type_counts[T_INP] != 0 || node_type_counts[T_PRT] != 0)
 	    if (l_iostyle == 1) {
 		if (knr_c_ok)
@@ -682,11 +691,28 @@ print_c_header(FILE * ofd)
 		if (knr_c_ok)
 		    fprintf(ofd, "#endif\n");
 	    }
+
+	fprintf(ofd, "  setbuf(stdout, 0);\n");
+    }
+
+    /* Start main() for runing now. */
+    if (do_run) {
+	if (use_dlopen) {
+	    fprintf(ofd, "%s%s%s",
+		"static int brainfuck(void){\n"
+		"  register ", cell_type, " * m = mem;\n");
+	} else {
+	    fprintf(ofd, "int main(){\n");
+	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
+	}
     }
 
     if (enable_trace || node_type_counts[T_DUMP] != 0) {
 	fprintf(ofd, "  imem = m;\n");
     }
+
+    if (!use_functions)
+	fprintf(ofd, "\n");
 }
 
 static void
@@ -912,6 +938,11 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    }
 	    break;
 
+	case T_PRTI:
+	    if (!disable_indent) pt(ofd, indent,n);
+	    fprintf(ofd, "putint(%s);\n", rvalmsk(n->offset));
+	    break;
+
 	case T_CHR:
 	    if (!disable_indent) pt(ofd, indent,n);
 	    if (!okay_for_cstr(n->count)) {
@@ -983,6 +1014,17 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		fprintf(ofd, "t(%d,%d,\"\",m+ %d)\n", n->line, n->col, n->offset);
 	    }
 	    break;
+
+	case T_INPI:
+	    if (!disable_indent) pt(ofd, indent,n);
+	    fprintf(ofd, "%s = getint(%s);\n", lval(n->offset), rval(n->offset));
+
+	    if (enable_trace) {
+		pt(ofd, indent,0);
+		fprintf(ofd, "t(%d,%d,\"\",m+ %d)\n", n->line, n->col, n->offset);
+	    }
+	    break;
+
 
 	case T_IF:
 	    pt(ofd, indent,n);

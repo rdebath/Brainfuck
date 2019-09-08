@@ -465,6 +465,23 @@ run_gnulightning(void)
 #endif
 	    break;
 
+	case T_PRTI:
+	    clean_acc();
+	    load_acc_offset(n->offset);
+	    acc_loaded = 0;
+
+#ifdef GNULIGHTv1
+	    jit_prepare_i(1);
+	    jit_pusharg_i(REG_ACC);
+	    jit_finish(putint);
+#endif
+#ifdef GNULIGHTv2
+	    jit_prepare();
+	    jit_pushargr(REG_ACC);
+	    jit_finishi(putint);
+#endif
+	    break;
+
 	case T_CHR:
 	    clean_acc();
 	    acc_const = acc_loaded = 0;
@@ -538,6 +555,24 @@ run_gnulightning(void)
 	    jit_prepare();
 	    jit_pushargr(REG_ACC);
 	    jit_finishi(getch);
+	    jit_retval(REG_ACC);
+#endif
+	    break;
+
+	case T_INPI:
+	    load_acc_offset(n->offset);
+	    set_acc_offset(n->offset);
+
+#ifdef GNULIGHTv1
+	    jit_prepare_i(1);
+	    jit_pusharg_i(REG_ACC);
+	    jit_finish(getint);
+	    jit_retval_i(REG_ACC);
+#endif
+#ifdef GNULIGHTv2
+	    jit_prepare();
+	    jit_pushargr(REG_ACC);
+	    jit_finishi(getint);
 	    jit_retval(REG_ACC);
 #endif
 	    break;

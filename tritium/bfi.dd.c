@@ -168,6 +168,12 @@ print_dd(void)
 	    outcmd('<', n->offset);
 	    break;
 
+	case T_PRTI:
+	    outcmd('>', n->offset);
+	    outcmd(':', 0);
+	    outcmd('<', n->offset);
+	    break;
+
 	case T_CHR:
 	    {
 		unsigned i = 0;
@@ -195,7 +201,17 @@ print_dd(void)
 
 	case T_INP:
 	    outcmd('>', n->offset);
+	    if (eofcell == 3)
+		outcmd('=', 0);
+	    else if (eofcell == 2 || eofcell == 4)
+		outcmd('=', -1);
 	    outcmd(',', 0);
+	    outcmd('<', n->offset);
+	    break;
+
+	case T_INPI:
+	    outcmd('>', n->offset);
+	    outcmd(';', 0);
 	    outcmd('<', n->offset);
 	    break;
 

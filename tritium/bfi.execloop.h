@@ -111,8 +111,51 @@ FNAME(int * p, void * mem)
 	    p += 2;
 	    break;
 
+	case T_INPI:
+	    if (sizeof(*m) <= sizeof(int))
+		*m = getint(*m);
+	    else {
+		int ch, ret_eof = 1, do_neg = 0;
+		icell a = 0;
+		while((ch = getchar()) != EOF) {
+		    if (ch >= '0' && ch <= '9') {
+			if (!ret_eof)
+			    a *= 10;
+			if (ch != '0')
+			    a += ch - '0';
+			ret_eof = 0;
+		    } else if (ret_eof && ch == '-') {
+			do_neg = 1;
+			ret_eof = 0;
+		    } else if (!ret_eof)
+			break;
+		}
+		ungetc(ch, stdin);
+		if (do_neg)
+		    a = -a;
+
+		if (!ret_eof)
+		    *m = a;
+	    }
+	    p += 2;
+	    break;
+
 	case T_PRT:
 	    putch(*m);
+	    p += 2;
+	    break;
+
+	case T_PRTI:
+	    {
+		char buf[4+3*sizeof(icell)], *sp=buf;
+		icell ch = *m;
+		do {;
+		    *sp++ = '0' + ch % 10;
+		} while((ch /= 10) != 0);
+		do {;
+		    putch(*--sp);
+		} while(sp>buf);
+	    }
 	    p += 2;
 	    break;
 

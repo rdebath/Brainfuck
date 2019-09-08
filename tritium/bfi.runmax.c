@@ -411,7 +411,7 @@ static inline int BI_input(uint_cell ** pa)
     int ch, ret_eof = 1, do_neg = 0;
     BI_zero(pa);
     while((ch = getchar()) != EOF) {
-	if (ch >= '0' && ch < '9') {
+	if (ch >= '0' && ch <= '9') {
 	    if (!ret_eof)
 		BI_mul_uint(pa, 10);
 	    if (ch != '0')
@@ -428,6 +428,33 @@ static inline int BI_input(uint_cell ** pa)
 	BI_neg(pa);
     return ret_eof;
 }
+
+#ifndef NO_BIG_INT
+static inline void BI_div_uint(uint_cell ** pa, unsigned int b, unsigned int * r)
+{
+    uint_cell *a;
+    uint_long d = 0;
+    int i;
+
+    /* Div by zero */
+    if (b == 0) BI_zero(pa);
+    /* or Div by one or zero div by any */
+    if (b == 0 || b == 1 || BI_is_zero(pa) ) {
+	*r = 0;
+	return;
+    }
+
+    a = *pa;
+    for(i=ints_per_cell-1; i>=0; i--) {
+	d = (d << (sizeof(uint_cell) * CHAR_BIT) ) + a[i];
+	if (d != 0) {
+	    a[i] = d / b;
+	    d = d % b;
+	}
+    }
+    *r = d;
+}
+#endif
 
 static void
 run_supertree(void)
@@ -702,8 +729,36 @@ run_supertree(void)
 		else
 		    putch(m[n->offset].b[0][0]);
 		break;
-	    case T_INP:
-		if (iostyle == 3) {
+	    case T_PRTI:
+		if (!m[n->offset].f)
+		    putint(m[n->offset].v);
+		else {
+#ifndef NO_BIG_INT
+		    char * number = calloc(byte_per_cell*25/10 + 16, 1);
+		    char * sp = number;
+		    unsigned int r = 0;
+		    BI_copy(t1, m[n->offset].b);
+
+		    do {
+			BI_div_uint(t1, 10, &r);
+			*sp++ = '0' + r;
+		    } while(!BI_is_zero(t1));
+		    do {
+			putch(*--sp);
+		    } while(sp>number);
+
+		    free(number);
+#else
+		    /* Don't bother supporting "softmult". */
+		    int i;
+		    for(i=0; i< (int)sizeof(uint_cell)*25/10; i++)
+			putch('*');
+#endif
+		}
+		break;
+
+	    case T_INPI:
+		{
 		    int eof = BI_input(t1), c = 1;
 		    if (!eof) {
 			m[n->offset].f = 1;
@@ -720,7 +775,11 @@ run_supertree(void)
 			m[n->offset].f = 0;
 			m[n->offset].v = c;
 		    }
-		} else {   /* Cell is too large for an int */
+		}
+		break;
+
+	    case T_INP:
+		{   /* Cell is too large for an int */
 		    int ch = -256;
 		    ch = getch(ch);
 		    if (ch != -256) {

@@ -98,7 +98,7 @@ print_dc(void)
     struct bfi * n = bfprog;
     int stackdepth = 0;
     int hello_world;
-    int used_lix = 0, used_lox = 0;
+    int used_ldx = 0, used_lix = 0, used_lox = 0;
     int use_lmx = 0;
     ofd = stdout;
 
@@ -256,12 +256,18 @@ print_dc(void)
 	case T_PRT:
 	    fetch_cell(n->offset);
 	    if (use_lmx && cell_length<8) fprintf(ofd, "lmx ");
-	    if (no_v7 && iostyle != 3)
+	    if (no_v7)
 		fprintf(ofd, "aP\n");
 	    else {
 		fprintf(ofd, "lox\n");
 		used_lox = 1;
 	    }
+	    break;
+
+	case T_PRTI:
+	    fetch_cell(n->offset);
+	    if (use_lmx && cell_length<8) fprintf(ofd, "lmx ");
+	    fprintf(ofd, "n\n");
 	    break;
 
 	case T_CHR:
@@ -298,7 +304,15 @@ print_dc(void)
 	case T_INP:
 	    fprintf(ofd, "lix");
 	    used_lix = 1;
+	    fprintf(ofd, "[");
+	    save_cell(n->offset);
+	    fprintf(ofd, "]SA d _1!=A ");
+	    fprintf(ofd, "0sALAc");
+	    break;
 
+	case T_INPI:
+	    fprintf(ofd, "ldx");
+	    used_ldx = 1;
 	    fprintf(ofd, "[");
 	    save_cell(n->offset);
 	    fprintf(ofd, "]SA d _1!=A ");
@@ -336,13 +350,7 @@ print_dc(void)
 
     fprintf(ofd, "q]SF\n");
 
-    if (iostyle == 3) {
-	/* Output and Input integers, -1 on EOF */
-	if (used_lox) fprintf(ofd, "[pd!=.]so\n");
-	if (used_lix) fprintf(ofd, "[? z [_1]SA 0=A 0sALA+ ]si\n");
-    }
-
-    if (used_lox && iostyle != 3) {
+    if (used_lox) {
 	int i;
 	/* Setup the Z register with a script to create the C array */
 	fprintf(ofd, "[");
@@ -382,7 +390,12 @@ print_dc(void)
 	}
     }
 
-    if (used_lix && iostyle != 3) {
+    if (used_ldx) {
+	/* Input integers, -1 on EOF */
+	fprintf(ofd, "[? z [_1]SA 0=A 0sALA+ ]sd\n");
+    }
+
+    if (used_lix) {
 	if (input_string) {
 	    char * p = input_string;
 	    int c = 0;

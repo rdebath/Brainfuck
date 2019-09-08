@@ -317,8 +317,19 @@ run_openssltree(void)
 	    case T_CHR:
 		putch(n->count);
 		break;
+
 	    case T_PRT:
-		if (iostyle == 3) {
+		{
+		    int temp_chr;
+		    BN_zero(t2);
+		    temp_chr = BN_get_word(m[n->offset]);
+		    if(BN_cmp(m[n->offset],t2) < 0) temp_chr = -temp_chr;
+		    putch(temp_chr);
+		}
+		break;
+
+	    case T_PRTI:
+		{
 		    char * dec_num;
 		    if(do_mask) {
 			BN_mask_bits(m[n->offset], cell_length);
@@ -334,18 +345,13 @@ run_openssltree(void)
 			}
 		    }
 		    dec_num = BN_bn2dec(m[n->offset]);
-		    printf("%s\n", dec_num);
+		    printf("%s", dec_num);
 		    OPENSSL_free(dec_num);
-		} else {
-		    int input_chr;
-		    BN_zero(t2);
-		    input_chr = BN_get_word(m[n->offset]);
-		    if(BN_cmp(m[n->offset],t2) < 0) input_chr = -input_chr;
-		    putch(input_chr);
 		}
 		break;
-	    case T_INP:
-		if (iostyle == 3) {
+
+	    case T_INPI:
+		{
 		    char * bntxtptr = 0;
 		    int rv;
 		    rv = scanf("%ms", &bntxtptr);
@@ -367,7 +373,12 @@ run_openssltree(void)
 			    BN_mask_bits(m[n->offset], cell_length);
 			free(bntxtptr);
 		    }
-		} else {   /* Cell is too large for an int */
+		}
+		break;
+
+	    case T_INP:
+		/* Cell is too large for an int */
+		{
 		    int ch = -256;
 		    ch = getch(ch);
 		    if (ch > 0)

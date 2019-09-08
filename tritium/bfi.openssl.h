@@ -8,7 +8,7 @@ void run_openssltree(void);
 
 #ifdef XX
 X(openssl,OPENSSL,
-    printf("   -fopenssl Run using OpenSSL bignums\n");			,
+    printf("   -fopenssl Run using OpenSSL bignums (cell size 64Mbit)\n"); ,
     /* No short option */						,
     /* No code dump */							,
     case c_openssl: run_openssltree(); break;                           )
@@ -21,6 +21,8 @@ X(openssl,OPENSSL,
         do_codestyle = c_openssl;
     }
     if (do_codestyle == c_openssl && do_run == -1) do_run = 1;
+    if (do_codestyle == c_openssl && cell_length == 0)
+	set_cell_size(64*1024*1024);
 #endif
 #if XX == 9
     if (!strcmp(opt, "-fopenssl")) {

@@ -8,7 +8,7 @@ void run_gmparray(void);
 
 #ifdef XX
 X(gmp,LIBGMP,
-    printf("   -fgmp Run using libgmp bignums\n");			,
+    printf("   -fgmp Run using libgmp bignums (cell size unlimited)\n"); ,
     /* No short option */						,
     /* No code dump */							,
     case c_gmp: run_gmparray(); break;                           )
@@ -20,6 +20,7 @@ X(gmp,LIBGMP,
         do_codestyle = c_gmp;
     }
     if (do_codestyle == c_gmp && do_run == -1) do_run = 1;
+    if (do_codestyle == c_gmp && cell_length == 0) set_cell_size(INT_MAX);
 #endif
 #if XX == 9
     if (!strcmp(opt, "-fgmp")) {

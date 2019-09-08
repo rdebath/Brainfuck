@@ -119,7 +119,7 @@ convert_tree_to_runarray(int merge_mov)
 	*p++ = n->type;
 	switch(n->type)
 	{
-	case T_INP: case T_PRT:
+	case T_INP: case T_INPI: case T_PRT: case T_PRTI:
 	    if (!merge_mov) *p++ = n->offset;
 	    break;
 
