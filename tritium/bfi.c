@@ -4448,7 +4448,7 @@ SetupVT100Console(int l_iostyle)
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
     DWORD dwMode = 0, dwDelta;
 
-    if (l_iostyle > 2) { iostyle = l_iostyle; return; }
+    if (l_iostyle > 2) { iostyle = l_iostyle; return 0; }
     iostyle = 2;
 
     if (hOut == INVALID_HANDLE_VALUE)

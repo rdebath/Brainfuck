@@ -31,7 +31,7 @@
 #       make VERSION=v1.2.3.4 VERSIONID=Your_Name_or_ORG
 
 # More knobs to twiddle (the makefile uses INSTALL like the cp(1) command)
-TARGETFILE=bfi
+TARGETFILE=tritium
 INSTALL=install -p
 ISTRIP=-s
 INSTALLDIR=/usr/local/bin
@@ -39,7 +39,9 @@ INSTALLEXT=
 # DEFS=
 # LDFLAGS=
 
-all: $(TARGETFILE)
+EXEFILE=bfi.out
+
+all: $(EXEFILE)
 
 # for: make DEFS='$(MOREDEFS)'
 # Note: This turns on -fsanitize=integer and turns off -fwrapv
@@ -62,27 +64,22 @@ OBJECTS=bfi.o bfi.version.o bfi.ccode.o bfi.nasm.o bfi.bf.o bfi.dc.o \
 CONF=-DCNF $(CONF_DYNASM) $(CONF_LIGHTNING) $(CONF_TCCLIB) $(CONF_SSLLIB) $(CONF_GMPLIB) $(CONF_LIBDL)
 LDLIBS=$(GNUSTK) $(LIBS_LIGHTNING) $(LIBS_TCCLIB) $(LIBS_SSLLIB) $(LIBS_GMPLIB) $(GNUDYN) $(LIBS_LIBDL)
 
-$(TARGETFILE): $(OBJECTS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $(TARGETFILE) $(OBJECTS) $(LDLIBS) $(TARGET_ARCH)
+$(EXEFILE): $(OBJECTS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $(EXEFILE) $(OBJECTS) $(LDLIBS) $(TARGET_ARCH)
 
-pristine:
-	$(MAKE) realclean
+clean realclean:
+	-rm -f $(EXEFILE) *.o bfi.dasm.c .build-opts.*
 
-realclean: clean
-	-rm -f bfi
-ifneq ($(TARGETFILE),bfi)
-	-rm -f $(TARGETFILE)
-endif
 # This is generated BEFORE the rules start, so "realclean all" would fail
 ifeq ($(MAKECMDGOALS),realclean)
 	-rm -f bfi.version.h
 endif
+ifeq ($(MAKECMDGOALS),clean)
+	-rm -f bfi.version.h
+endif
 
-clean:
-	-rm -f *.o bfi.dasm.c .build-opts.*
-
-install: $(TARGETFILE)
-	$(INSTALL) $(ISTRIP) $(TARGETFILE) $(INSTALLDIR)/$(TARGETFILE)$(INSTALLEXT)
+install: $(EXEFILE)
+	$(INSTALL) $(ISTRIP) $(EXEFILE) $(INSTALLDIR)/$(TARGETFILE)$(INSTALLEXT)
 
 bfi.dasm.o:	bfi.dasm.c bfi.tree.h bfi.dasm.h bfi.run.h
 	$(CC) $(CFLAGS) -I $(TOOLDIR) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ bfi.dasm.c
@@ -373,7 +370,7 @@ endif
 
 CONF_LIGHTNING=
 LIGHTNING_OBJ=bfi.gnulit.o
-$(TARGETFILE): $(LIGHTNING_OBJ)
+$(EXEFILE): $(LIGHTNING_OBJ)
 OBJECTS += $(LIGHTNING_OBJ)
 endif
 
@@ -400,7 +397,7 @@ ifneq ($(DO_DYNASM),)
 DYNASM_OBJ=bfi.dasm.o
 
 OBJECTS += $(DYNASM_OBJ)
-$(TARGETFILE): $(DYNASM_OBJ)
+$(EXEFILE): $(DYNASM_OBJ)
 
 ifneq ($(findstring X86_64,$(CPUFOUND)),)
 bfi.dasm.c: bfi.dasm.x86.dasc
