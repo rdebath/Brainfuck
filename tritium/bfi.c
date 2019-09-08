@@ -279,16 +279,16 @@ void LongUsage(FILE * fd, const char * errormsg)
 #ifndef NO_EXT_BE
     printf("\n");
     printf("   -r   Run in interpreter.\n");
-    printf("        There are two normal interpreters a tree based one with full profiling\n");
-    printf("        and tracing support and a faster array based one.\n");
-    printf("        The array based one will be used unless:\n");
+    printf("        There are two types of normal interpreter a tree based one with\n");
+    printf("        int32 cells, full profiling and tracing support and faster array\n");
+    printf("        based ones. Slightly different array based variants are used for\n");
+    printf("        different cell sizes.\n");
+    printf("        The tree based one will be used if:\n");
     printf("            * The -# option is used.\n");
     printf("            * The -T option is used.\n");
     printf("            * Three or more -v options are used.\n");
+    printf("            * The cell size is NOT more than 32bits.\n");
 #endif
-    printf("\n");
-    printf("   -A   Generate output to be compiled or assembled.\n");
-    printf("        Includes '#define' lines for C compilation.\n");
     printf("\n");
 #ifndef NO_EXT_BE
 #define XX 2
