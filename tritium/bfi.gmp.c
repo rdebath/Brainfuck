@@ -527,6 +527,7 @@ run_gmparray(void)
 		putch(mpz_get_si(m[p[1]].b));
 	    else {
 		// Output number
+		if(do_mask) mpz_and(m[p[1]].b, m[p[1]].b, cell_and);
 		mpz_out_str(stdout, 10, m[p[1]].b);
 		putchar('\n');
 	    }
