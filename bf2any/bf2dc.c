@@ -29,6 +29,7 @@
 static int do_run = 0;
 static int do_output = 0;
 static int do_input = 0;
+static int do_trailer = 0;
 static int max_input_depth = 0;
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
@@ -113,9 +114,16 @@ gen_code(int ch, int count, char * strn)
 	if (do_run) ofd = popen("dc", "w"); else
 #endif
 	    ofd = stdout;
-	if (outputmode == 2)
-	    pr("#!/usr/bin/dc");
-	prv("[%dsp", tapeinit);
+	if (outputmode == 2) {
+	    if (!count || do_run) {
+		pr("#!/usr/bin/dc");
+		prv("[%dsp", tapeinit);
+		do_trailer = 1;
+	    }
+	} else {
+	    prv("[%dsp", tapeinit);
+	    do_trailer = 1;
+	}
 	break;
 
     case '=': prv("%slp:a", dc_ltoa(count)); break;
@@ -178,7 +186,8 @@ gen_code(int ch, int count, char * strn)
 
     if (ch != '~') return;
 
-    pr("q]SF");
+    if (do_trailer)
+	pr("q]SF");
 
     if ((do_output && outputmode != 2) || bytecell)
 	fprintf(ofd, "[256+]sM [lp;a 256 %% d0>M]sm\n");
@@ -295,9 +304,9 @@ gen_code(int ch, int count, char * strn)
 	pr("]si");
     }
 
-    fprintf(ofd, "LFx ");
 #ifndef _WIN32
     if (do_run) {
+	fprintf(ofd, "LFx ");
 
 	if (do_run>1) {
 	    signal(SIGCHLD, endprog);
@@ -311,7 +320,8 @@ gen_code(int ch, int count, char * strn)
 	pclose(ofd);
     } else
 #endif
-	fprintf(ofd, "\n");
+    if (do_trailer)
+	fprintf(ofd, "LFx\n");
 }
 
 static void
