@@ -720,11 +720,16 @@ main(int argc, char ** argv)
 #include "bfi.be.def"
 #endif
 
+    if (input_string && iostyle == 3)
+	fprintf(stderr, "WARNING: Ignoring -I option (not supported by -fintio)\n");
+
     {
 	int first=1;
 
-	if (filecount == 1 && strcmp(filelist[0], "-"))
-	    bfname = filelist[0];	/* From argv */
+	if (filecount == 1 && strcmp(filelist[0], "-") &&
+		strncmp(filelist[0], "/dev/", 5) &&
+		strncmp(filelist[0], "/proc/", 6))
+	    bfname = filelist[0];	/* From argv and not a fake file. */
 
 	if(program_string) {
 	    load_file(0, 1, (filecount==0), program_string);
@@ -1923,7 +1928,7 @@ pointer_regen(void)
 	switch(n->type)
 	{
 	case T_WHL: case T_MULT: case T_CMULT: case T_END:
-	case T_IF: case T_ENDIF:
+	case T_IF: case T_ENDIF: case T_DUMP: case T_STOP:
 	    if (n->offset != current_shift) {
 		if (n->prev && n->prev->type == T_MOV) {
 		    v = n->prev;
@@ -1940,8 +1945,7 @@ pointer_regen(void)
 
 	case T_PRT: case T_PRTI: case T_CHR:
 	case T_INP: case T_INPI:
-	case T_DUMP: case T_ADD:
-	case T_SET: case T_STOP:
+	case T_ADD: case T_SET:
 	    n->offset -= current_shift;
 	    break;
 
@@ -1952,6 +1956,11 @@ pointer_regen(void)
 	    break;
 
 	case T_MOV:
+	    if (current_shift) {
+		n->count -= current_shift;
+		current_shift = 0;
+		/* If count == 0 delete? */
+	    }
 	    break;
 
 	default:
@@ -2098,8 +2107,6 @@ trim_trailing_sets(void)
     int search_back = 1;
     while(n)
     {
-	if (n->type == T_MOV) search_back = 0; /* Why was this now ? */
-
 	if (min_offset > n->offset) min_offset = n->offset;
 	if (max_offset < n->offset) max_offset = n->offset;
 	lastn = n;
