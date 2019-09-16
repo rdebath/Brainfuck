@@ -68,13 +68,12 @@ static const char bf[] = "><+-.,[]";
 typedef struct {
     char * name;
     char * bf[8];
-    char * rle_one;
     char * gen_hdr, * gen_foot;
-    char * rle_init;
-    char * set_zero;
-    char * eight_bit;
+    char * wrap_eight_bit;
+    char * clean_tmps;
     char * set_cell;
     char * zero_cell;
+    char * repeat_prev;
     char * name2;
     char * help;
     int class, multi, bytesonly;
@@ -131,7 +130,7 @@ fn_check_arg(const char * arg)
 	if (lang && lang->bytesonly)
 	    be_interface.bytesonly = 1;
 
-	if (!lang || !lang->rle_one) {
+	if (!lang || !lang->repeat_prev) {
 	    if (bytecell) c = cbyte; else c = cint;
 	} else {
 	    if (bytecell) c = cbyte_rle; else c = cint_rle;
@@ -427,8 +426,8 @@ generic_output(int ch, int count)
 		i=(14-j)%8;
 		printf("#define %s %s\n", lang->bf[i], c->bf[i]);
 	    }
-	    if (lang->rle_one) {
-		printf("#define %s %s\n", lang->rle_one, c->rle_one);
+	    if (lang->repeat_prev) {
+		printf("#define %s %s\n", lang->repeat_prev, c->repeat_prev);
 		printf("#define _ ;return 0;}\n");
 	    } else
 		printf("#define _ return 0;}\n");
@@ -476,13 +475,13 @@ generic_output(int ch, int count)
 		ps(sbuf);
 		break;
 	    }
-	    if (lang->eight_bit && bytecell && (ch == '[' || ch == ']'))
-		ps(lang->eight_bit);
+	    if (lang->wrap_eight_bit && bytecell && (ch == '[' || ch == ']'))
+		ps(lang->wrap_eight_bit);
 
 	    while(count-->0){
 		ps(lang->bf[v]);
-		if (lang->rle_one)
-		    while(count-->0) ps(lang->rle_one);
+		if (lang->repeat_prev)
+		    while(count-->0) ps(lang->repeat_prev);
 	    }
 	}
 	break;
@@ -535,20 +534,20 @@ bftranslate(int ch, int count)
 	    n->count = count;
 	    if (!last) pgm = n; else last->next = n;
 	    last = n;
-	} else {
-	    if (ch == '>' || ch == '<' || ch == ',') tmp_clean = 0;
-	    else if (ch == '.' || ch == '#') ;
-	    else if (!tmp_clean && lang->rle_init) {
-		pmc(lang->rle_init); tmp_clean = 1;
+	} else if (p) {
+	    if (ch == '>' || ch == '<' || ch == ' ') tmp_clean = 0;
+	    else if (ch == '.') ;
+	    else if (!tmp_clean && lang->clean_tmps) {
+		pmc(lang->clean_tmps); tmp_clean = 1;
 	    }
-	    if (ch == '#') pc('\n');
-	    if (p)
-		while(count-->0) pmc(lang->bf[p-bf]);
+	    while(count-->0) pmc(lang->bf[p-bf]);
+	} else {
+	    if (ch == '#')
+		pmc("\n#\n");
 	    else if (ch == '=')
 		pmc(lang->zero_cell);
 	    else
 		pc(ch);
-	    if (ch == '#') pc('\n');
 	}
 	return;
     }
@@ -683,17 +682,17 @@ bfreprint(void)
 	if ((p = strchr(bf,ch))) {
 	    if (ch == '>' || ch == '<' || ch == ',') tmp_clean = 0;
 	    else if (ch == '.') ;
-	    else if (!tmp_clean && lang->rle_init) {
-		pmc(lang->rle_init); tmp_clean = 1;
+	    else if (!tmp_clean && lang->clean_tmps) {
+		pmc(lang->clean_tmps); tmp_clean = 1;
 	    }
 	    while(count-->0) pmc(lang->bf[p-bf]);
 	} else {
-	    if (ch == '#') pc('\n');
-	    if (ch == '=')
+	    if (ch == '#')
+		pmc("\n#\n");
+	    else if (ch == '=')
 		pmc(lang->zero_cell);
 	    else
 		pc(ch);
-	    if (ch == '#') pc('\n');
 	}
     }
 }
@@ -1329,7 +1328,7 @@ static trivbf cbyte_rle[1] = {{
     .class = L_CWORDS,
     .bf = {";m+=1", ";m-=1", ";*m+=1", ";*m-=1",
 	";write(1,m,1)", ";read(0,m,1)", ";while(*m){", ";}" },
-    .rle_one = "+1",
+    .repeat_prev = "+1",
     .help = "Plain C with rle"
 }};
 
@@ -1339,7 +1338,7 @@ static trivbf cint_rle[1] = {{
     .bf = { ";m+=1", ";m-=1", ";*m+=1", ";*m-=1",
         ";putchar(*m)", ";{int _c=getchar();if(_c!=EOF)*m=_c;}",
         ";while(*m){", ";}" },
-    .rle_one = "+1",
+    .repeat_prev = "+1",
     .help = "Plain C with int cells and rle"
 }};
 
@@ -1376,7 +1375,7 @@ static trivbf f__krle[1] = {{
     .name = "fk!",
     .class = L_JNWORD,
     .bf = {"f**k", "s**g", "b**b", "t**s", "c**k", "k**b", "a**e", "b**t"},
-    .rle_one = "!",
+    .repeat_prev = "!",
     .help = "Fuck fuck including RLE",
 }};
 
@@ -1386,7 +1385,7 @@ static trivbf pogaack[1] = {{
     .class = L_WORDS,
     .bf = {"pogack!", "pogaack!", "pogaaack!", "poock!",
     "pogaaack?", "poock?", "pogack?", "pogaack?"},
-    .rle_one = "pock!",
+    .repeat_prev = "pock!",
     .help = "Pogaack -- https://esolangs.org/wiki/POGAACK",
 }};
 
@@ -1417,7 +1416,7 @@ static trivbf bc_rle[1] = {{
     .name = "rle",
     .class = L_CDWORDS,
     .bf = { "r", "l", "u", "d", "o", "i", "b", "e"},
-    .rle_one = "x" ,
+    .repeat_prev = "x" ,
     .help = "Odd RLE C translation",
 }};
 
@@ -1518,7 +1517,7 @@ static trivbf dc1[1] = {{
     .bf = {   "lp%d+sp", "lp%d-sp", "lp;a%d+lp:a", "lp;a%d-lp:a",
     "lp;aaP", "", "[lp;a0=q", "lbx]dSbxLbs."},
     .gen_hdr = "0sp[q]sq",
-    .eight_bit = "lp;a256%lp:a",
+    .wrap_eight_bit = "lp;a256%lp:a",
     .zero_cell = "0lp:a",
     .help = "DC using an array and a pointer variable.",
 }};
@@ -1706,7 +1705,7 @@ static trivbf doubler_12[1] = {{
     ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "[+<",
     ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "]<"},
     .zero_cell = ">>>[-]<<<[-]",
-    .rle_init = ">[-]>[-]<<",
+    .clean_tmps = ">[-]>[-]<<",
 }};
 
 /* Copy cell cost, cells in LXXH order, with tmpzero */
@@ -1722,7 +1721,7 @@ static trivbf doubler_copy_LXXH[1] = {{
     "[>+<[->>+<<]]>>[-<<+>>]>[<<+>>[-<+>]]<[->+<]<[[-]<",
     "[>+<[->>+<<]]>>[-<<+>>]>[<<+>>[-<+>]]<[->+<]<]<"},
     .zero_cell = ">>>[-]<<<[-]",
-    .rle_init = ">[-]>[-]<<"
+    .clean_tmps = ">[-]>[-]<<"
 }};
 
 /* 12 cost, cells in LXXH order, no tmpzero */
@@ -1794,7 +1793,7 @@ static trivbf doubler_copy[1] = {{
     ">[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<" "[[-]",
     ">[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<" "]"},
     .zero_cell = ">[-]>[-]<<",
-    .rle_init = "[-]>>>[-]<<<"
+    .clean_tmps = "[-]>>>[-]<<<"
 }};
 
 /* Copy cell cost, cells in XLHX order, no tmpzero */
@@ -1857,7 +1856,7 @@ static trivbf bfquadz[1] = {{
     "<<[<<<+>>>[->>+<<]]>>[-<<+>>]" "<[<<<<+>>>>[->+<]]>[-<+>]" "<<<<<]"},
 
     .zero_cell = ">[-]>[-]>[-]>[-]<<<<",
-    .rle_init = "[-]>>>>>[-]<<<<<",
+    .clean_tmps = "[-]>>>>>[-]<<<<<",
     .help = "BF to BF translation, cell size double doubler."
 }};
 
@@ -1954,7 +1953,7 @@ static trivbf clojure[1] = {{
 	    "(if (= (set-or-zero) 0) nil (do\n",
     "(recur))))))\n"
     },
-    .eight_bit = "(set-pointer (mod (set-or-zero) 256))\n",
+    .wrap_eight_bit = "(set-pointer (mod (set-or-zero) 256))\n",
     .set_cell = "(set-pointer %d)\n",
     .help = "Clojure translation from BF",
 }};
