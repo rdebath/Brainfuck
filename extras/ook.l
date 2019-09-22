@@ -432,6 +432,11 @@ int main(int argc, char ** argv)
 		mode = WORDLIST;
 		bflist = "once,there,was,a,fish,dead,named,fred";
 	    }
+	    else if (!strcmp(argv[1], "-iuab")) {
+		mode = WORDLIST;
+		bflist = "i,use,arch,linux,btw,by,the,way,gentoo";
+		line_cc = ';';
+	    }
 	    else if (!strcmp(argv[1], "-bewbs")) { mode = BEWBS; }
 	    else if (!strcmp(argv[1], "-lisp")) { mode = LISP; character_prefilter="()"; }
 
@@ -642,6 +647,7 @@ Usage(void)
     fprintf(stderr, "   -fk      Input using fuck fuck.\n");
     fprintf(stderr, "   -zzz     Input using zzz.\n");
     fprintf(stderr, "   -nice    Input using up, down, left, right, in, out, begin, end.\n");
+    fprintf(stderr, "   -iuab    Input using IuAb with ';' comments. \n");
     fprintf(stderr, "   -eris    Input using BrainFNORD discordian buzzwords.\n");
     fprintf(stderr, "   -pika    Input using Pikalang, sounds made by Pikachu\n");
     fprintf(stderr, "   -fish    Input using There Once was a Fish Named Fred\n");

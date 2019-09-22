@@ -2148,6 +2148,15 @@ static trivbf matlab[1] = {{
     .bytesonly = 1
 }};
 
+/* Language "I use Arch btw" */
+static trivbf iuab[1] = {{
+    .name = "iuab",
+    .class = L_WORDS,
+    .bf = { "i", "use", "arch", "linux", "btw", "by", "the", "way" },
+    .help = "https://github.com/OverMighty/i-use-arch-btw",
+    /* .hashdebug = "gentoo" */
+}};
+
 static trivbf * trivlist[] = {
 
     rhoprime, cbyte, ook, blub, f__k, f__krle, pogaack, trip, nice,
@@ -2155,7 +2164,7 @@ static trivbf * trivlist[] = {
     k_on_fuck, petooh, arabic, dc1, dc2, dc3, dc4, nyan, atpling, cupid,
     ternary, pikalang, spoon, troll, roadrunner, brainbool, clojure,
     nasm, nasmmagic, cgalang, brainfuq, emojifuck, trigram, cbyte_rle,
-    babylang, matlab, tmcc, heart,
+    babylang, matlab, tmcc, heart, iuab,
 
     bfout, doubler_12, doubler_copy_LXXH, doubler_12nz, doubler_12r,
     doubler_17a, doubler_17b, doubler_copy, doubler_copynz,
