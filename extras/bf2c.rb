@@ -10,16 +10,16 @@ class BFCode
 	    (k[0] == ">") ? "p+="+k.length.to_s+";\n" :
 	    (k[0] == "<") ? "p-="+k.length.to_s+";\n" :
 	    (k[0..3] == "[-]+") ? "m[p]="+(k.length-3).to_s+";\n" :
-	    "#{k}\n" };
-	h['[-]'] = "m[p]=0;\n";
-	h['>'] = "p++;\n";
-	h['<'] = "p--;\n";
-	h['+'] = "m[p]++;\n";
-	h['-'] = "m[p]--;\n";
-	h['['] = "while(m[p]!=0){\n";
-	h[']'] = "}\n";
-	h['.'] = "putchar(m[p]);\n";
-	h[','] = "m[p]=getchar();\n";
+	    "#{k}\n" }.merge({
+		'[-]' => "m[p]=0;\n",
+		'>' => "p++;\n",
+		'<' => "p--;\n",
+		'+' => "m[p]++;\n",
+		'-' => "m[p]--;\n",
+		'[' => "while(m[p]!=0){\n",
+		']' => "}\n",
+		'.' => "putchar(m[p]);\n",
+		',' => "m[p]=getchar();\n"})
 
 	bfcode ="void bfprog() {\n" +
 		"static unsigned char m[100000];\n" +
