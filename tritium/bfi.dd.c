@@ -31,9 +31,10 @@ print_dd(void)
     puts("{ +++++++++.>>>>+.<.<<<.>---.>--.<.>>.[>]<<.                [] }");
     puts("\n");
 
-
     if (cell_size > 0)
 	outcmd('%', cell_size);
+    else if (cell_length > (int)sizeof(int)*CHAR_BIT)
+	outcmd('%', -(int)sizeof(int)*CHAR_BIT);
 
     if (node_type_counts[T_MOV] != 0 && most_neg_maad_loop)
 	outcmd('>', -most_neg_maad_loop);

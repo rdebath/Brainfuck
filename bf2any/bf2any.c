@@ -365,15 +365,25 @@ pipe_to_be(char ** filelist, int filecount)
 	    if (!di) {
 		if (ch == '\n') continue;
 		if (ch == '%' ) {
+		    /* Arg values
+		     *	>0 Compiled for specific bit size
+		     *	=0 Compiled for any bit size >= 8 bits. (default)
+		     *  <0 Compiled for any bit size >= -N bits.
+		     */
+
 		    if (number == 8)
+			bytecell = 1;
+		    else if (number == (int)sizeof(int)*CHAR_BIT &&
+			    be_interface.cells_are_ints)
+			bytecell = 0;
+		    else if (number < -8 && !be_interface.bytesonly)
+			bytecell = 0;
+		    else if (number == 0 || number == -8)
 			;
-		    else if (number == 32 && be_interface.cells_are_ints)
-			;
-		    else if (number <= 32) {
+		    else {
 			fprintf(stderr, "Bitsize of %d not supported for this backend.\n", number);
 			exit(1);
 		    }
-		    bytecell = (number == 8);
 		    number = 0; digits = 0;
 		    continue;
 		}
