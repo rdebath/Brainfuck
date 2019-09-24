@@ -2204,6 +2204,30 @@ static trivbf iuab[1] = {{
     /* .hashdebug = "gentoo" */
 }};
 
+/* Language "BCDFuck" */
+static trivbf bcdfuck[1] = {{
+    .name = "BCDFuck", .name2 = "bcdfuck",
+    .class = L_CHARS,
+    .bf = { "0", "A", "1A", "8A7A", "E", "D", "B", "C" },
+    .help = "https://esolangs.org/wiki/BCDFuck",
+    /* Humm, this has cmds 2..9 which add to the 4bit cell, this table can't
+     * cope with that form of RLE. Also BF normally assumes >=8bit cells. */
+}};
+
+/* Language "BCDFuck" bytewide. */
+static trivbf bcdbyte[1] = {{
+    .name = "bcd",
+    .class = L_CHARS,
+    .bf = { "0000", "AAAA",
+	"01AA1AB08A7AC0B8A701AACAA",
+	"01AAB08A7AC0B8A708A7AACAA8A7A",
+	"000EAAAE", "000DAAAD",
+	"01AAB08A7AC0B8A71BA8A7ACABAC0B8A7AA1CCA8A7AB1AA",
+	"01AAB08A7AC0B8A71BA8A7ACABAC0B8A7AA1CCA8A7ACA" },
+    .help = "Bytewide conversion of https://esolangs.org/wiki/BCDFuck",
+    .zero_cell = "000B1ACAAAB1AC",
+}};
+
 static trivbf * trivlist[] = {
 
     rhoprime, cbyte, ook, blub, f__k, f__krle, pogaack, trip, nice,
@@ -2211,7 +2235,7 @@ static trivbf * trivlist[] = {
     k_on_fuck, petooh, arabic, dc1, dc2, dc3, dc4, nyan, atpling, cupid,
     ternary, pikalang, spoon, troll, roadrunner, brainbool, clojure,
     nasm, nasmmagic, cgalang, brainfuq, emojifuck, trigram, cbyte_rle,
-    babylang, matlab, tmcc, heart, iuab,
+    babylang, matlab, tmcc, heart, iuab, bcdfuck, bcdbyte,
 
     bfout, doubler_12, doubler_copy_LXXH, doubler_12nz, doubler_12r,
     doubler_17a, doubler_17b, doubler_copy, doubler_copynz,

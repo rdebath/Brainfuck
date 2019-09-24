@@ -19,7 +19,7 @@ int pgmlen = 0, on_eof = 1, debug = 0;
 
 enum outtype {
     L_ASCII, L_DECIMAL, L_EXCON, L_ABCD, L_MINIMAL, L_DEADSIMPLE,
-    L_BINERDY, L_TICK, L_MSF, L_DOLLAR
+    L_BINERDY, L_TICK, L_MSF, L_DOLLAR, L_BCD
     } out_format = L_ASCII;
 
 int col = 0, maxcol = 72, in_ascii = 0, dump_code = 0, zcells = 0;
@@ -29,6 +29,7 @@ int main(int argc, char **argv)
     FILE * ifd;
     char * fn = 0, *ar0 = argv[0];
     int ch, p = -1, n = -1, j = -1, i = 0;
+    setbuf(stdout, NULL);
     for (; argc > 1; argc--, argv++) {
 	if (!strcmp(argv[1], "-e")) on_eof = -1;
 	else if (!strcmp(argv[1], "-z")) on_eof = 0;
@@ -46,6 +47,7 @@ int main(int argc, char **argv)
 	else if (!strcmp(argv[1], "-tick")) out_format = L_TICK;
 	else if (!strcmp(argv[1], "-msf")) out_format = L_MSF;
 	else if (!strcmp(argv[1], "-$")) out_format = L_DOLLAR;
+	else if (!strcmp(argv[1], "-bcd")) out_format = L_BCD;
 	else if (!strcmp(argv[1], "-dump")) dump_code = 1;
 	else if (!strcmp(argv[1], "-zcells")) zcells = 1;
 	else if (!strcmp(argv[1], "-#")) debug = 1;
@@ -66,6 +68,7 @@ int main(int argc, char **argv)
 	    fprintf(stderr, "    -tick    Output in Tick.\n");
 	    fprintf(stderr, "    -minimal Output in Minimal.\n");
 	    fprintf(stderr, "    -$       Output in $.\n");
+	    fprintf(stderr, "    -bcd     Output in BCDFuck.\n");
 	    exit(1);
 	} else fn = argv[1];
     }
@@ -104,7 +107,6 @@ int main(int argc, char **argv)
 	       { pgm[n+1].cmd = 0; pgm[n+1].mov = 0; run(); n=p= -1; }
 	}
 	if (ifd != stdin) fclose(ifd);
-	setbuf(stdout, NULL);
 	if (pgm) {
 	    pgm[n+1].cmd = 0;
 	    if (dump_code) dump(); else run();
@@ -338,6 +340,22 @@ putch(int v)
     case L_DOLLAR:
 	// https://esolangs.org/wiki/$
 	printf("0$+%d\n", v);
+	break;
+    case L_BCD:
+	{
+	    int nibble;
+	    for(nibble = 4; nibble>=0; nibble-=4) {
+		int d, n = (v>>nibble) & 0xF;
+		d = n - outch;
+		if (d<0) d += 0x10;
+		if (d>=9) { pc('0'+d/2); pc('A'); d-= d/2; }
+		if (d>0) { pc('0'+d); pc('A'); }
+		outch = n;
+		pc('E');
+	    }
+	    /* No need to add padding characters as the result of a byte
+	     * is always and even number of nibbles. */
+	}
 	break;
 
 	// https://esolangs.org/wiki/JR
