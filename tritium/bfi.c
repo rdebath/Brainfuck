@@ -946,12 +946,13 @@ static int dld, inp, rle = 0, num = -1, ov_flg, loopid, zstate;
 	    }
 
 	    /* RLE compacting of instructions. This is a huge win. */
-	    if (c && p && ch == p->type && pending_mov == p->offset &&
-		    (ch == T_MOV || ch == T_ADD)) {
+	    if (c && p && pending_mov == p->offset &&
+		((ch == p->type && (ch == T_MOV || ch == T_ADD)) ||
+		 (T_SET == p->type && ch == T_ADD))) {
 		int ov_flg_rle = 0, t = ov_iadd(p->count, c, &ov_flg_rle);
 		if (!ov_flg_rle) {
 		    p->count = t;
-		    if (p->count == 0) {
+		    if (p->count == 0 && p->type != T_SET) {
 			struct bfi *t1 = p;
 			p = p->prev;
 			if (p) p->next = 0; else bfprog = 0;
@@ -3332,6 +3333,32 @@ flatten_loop(struct bfi * v, int constant_count)
     }
 
     if (verbose>5) fprintf(stderr, "  Loop replaced with T_NOP. @(%d,%d)\n", v->line, v->col);
+
+    if (have_add && have_set) {
+	/* There might be a T_SET followed by a T_ADD on the same cell,
+	 * find them and fix the result. */
+	n = v->next;
+	while(1)
+	{
+	    if (n->type == T_END || n->type == T_ENDIF) break;
+	    if (n->type == T_ADD) {
+		struct bfi *n2 = n->prev;
+		while(1)
+		{
+		    if (n2 == v) break;
+		    if (n2->type == T_ADD && n2->offset == n->offset) break;
+		    if (n2->type == T_SET && n2->offset == n->offset) {
+			n->type = T_SET;
+			n->count += n2->count;
+			break;
+		    }
+		    n2=n2->prev;
+		}
+	    }
+	    n=n->next;
+	}
+    }
+
     n = v->next;
     while(1)
     {
