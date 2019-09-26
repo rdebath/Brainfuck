@@ -12,8 +12,10 @@ static int ind = 0;
 static FILE * ofd;
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
+#define prv2(s,v,v2)    fprintf(ofd, "%*s" s "\n", ind*4, "", (v), (v2))
 
 static void print_dstring(char * str);
+static char * dumbcast = "";
 
 static gen_code_t gen_code;
 /* Assume same machine, same int */
@@ -36,6 +38,7 @@ gen_code(int ch, int count, char * strn)
 		prv("char[] mem; mem.length = %d; mem[] = 0;", tapesz);
 		prv("int m = %d;", tapeinit);
 		pr("int v;");
+		dumbcast = "cast(char) ";
 	    } else {
 		prv("int[] mem; mem.length = %d; mem[] = 0;", tapesz);
 		prv("int v, m = %d;", tapeinit);
@@ -59,10 +62,10 @@ gen_code(int ch, int count, char * strn)
     case 'T': pr("mem[m] -= v;"); break;
     case '*': pr("mem[m] *= v;"); break;
 
-    case 'C': prv("mem[m] = v*%d;", count); break;
-    case 'D': prv("mem[m] = -v*%d;", count); break;
-    case 'V': pr("mem[m] = v;"); break;
-    case 'W': pr("mem[m] = -v;"); break;
+    case 'C': prv2("mem[m] = %s(v*%d);", dumbcast, count); break;
+    case 'D': prv2("mem[m] = %s(-v*%d);", dumbcast, count); break;
+    case 'V': prv("mem[m] = %sv;", dumbcast); break;
+    case 'W': prv("mem[m] = %s(-v);", dumbcast); break;
 
     case '+': prv("mem[m] +=%d;", count); break;
     case '-': prv("mem[m] -=%d;", count); break;
@@ -71,7 +74,7 @@ gen_code(int ch, int count, char * strn)
 
     case '.': pr("write(cast(char)mem[m]);"); break;
     case '"': print_dstring(strn); break;
-    case ',': pr("v = getchar(); if(v!=EOF) mem[m] = v;"); break;
+    case ',': prv("v = getchar(); if(v!=EOF) mem[m] = %sv;", dumbcast); break;
 
     case '[': pr("while(mem[m]) {"); ind++; break;
     case ']': ind--; pr("}"); break;

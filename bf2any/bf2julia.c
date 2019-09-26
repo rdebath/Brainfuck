@@ -18,6 +18,7 @@
  */
 
 #define MAXWHILE 256
+/* #define OLDBYTEMODE */
 
 struct instruction {
     int ch;
@@ -145,14 +146,17 @@ loutcmd(int ch, int count, struct instruction *n)
 {
     switch(ch) {
     case 999:
-	if (bytecell)
+#ifdef OLDBYTEMODE
+	if (bytecell) {
 	    printf( "%s%d%s%d%s",
 		    "m = zeros(UInt8, ",tapesz,")\n"
 		    "p = ", tapeinit, "\n");
-	else
-	    printf( "%s%d%s%d%s",
-		    "m = zeros(typeof(0), ",tapesz,")\n"
-		    "p = ", tapeinit, "\n");
+	    break;
+	}
+#endif
+	printf( "%s%d%s%d%s",
+		"m = zeros(Int, ",tapesz,")\n"
+		"p = ", tapeinit, "\n");
 	break;
     case 1000:
 	printf("function bf%d(m,p)\n", n->ino);
@@ -175,6 +179,9 @@ loutcmd(int ch, int count, struct instruction *n)
 
     case '=': I; printf("m[p] = %d\n", count); break;
     case 'B':
+#ifndef OLDBYTEMODE
+	if(bytecell) { I; printf("m[p] %%= 256;\n"); }
+#endif
 	I; printf("v = m[p]\n");
 	break;
     case 'M': I; printf("m[p] = m[p]+v*%d\n", count); break;
@@ -195,20 +202,44 @@ loutcmd(int ch, int count, struct instruction *n)
     case '<': I; printf("p -= %d\n", count); break;
     case '>': I; printf("p += %d\n", count); break;
     case '[':
+#ifndef OLDBYTEMODE
+	if(bytecell) { I; printf("m[p] %%= 256;\n"); }
+#endif
 	I; printf("while m[p] != 0\n");
 	ind++;
 	break;
     case ']':
+#ifndef OLDBYTEMODE
+	if(bytecell) { I; printf("m[p] %%= 256;\n"); }
+#endif
 	ind--; I; printf("end\n");
 	break;
     case 'I':
+#ifndef OLDBYTEMODE
+	if(bytecell) { I; printf("m[p] %%= 256;\n"); }
+#endif
 	I; printf("if m[p] != 0\n");
 	ind++;
 	break;
     case 'E':
 	ind--; I; printf("end\n");
 	break;
-    case '.': I; printf("print(Char(m[p]))\n"); break;
+    case '.':
+#ifndef OLDBYTEMODE
+	if (bytecell) {
+	    I; printf("m[p] = ( m[p] + 256 ) %% 256;\n");
+	    I; printf("print(Char(m[p]))\n");
+	} else {
+	    I; printf("if m[p] >= 0 && m[p] < 200000\n");
+	    I; printf("    print(Char(m[p]))\n");
+	    I; printf("else\n");
+	    I; printf("    print(Char(0xFFFD))\n");
+	    I; printf("end\n");
+	}
+#else
+	I; printf("print(Char(m[p]))\n");
+#endif
+	break;
     case '"': print_cstring(n->cstr); break;
     case ',': I; printf("if !eof(STDIN) ; m[p] = read(STDIN, Char) ; end\n"); break;
     }
