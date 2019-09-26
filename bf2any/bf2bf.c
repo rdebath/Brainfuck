@@ -145,10 +145,14 @@ fn_check_arg(const char * arg)
 
 	if (! ( L_BASE == L_BFRLE || L_BASE == L_HANOILOVE ||
 		L_BASE == L_BINRLE || L_BASE == L_BFXML ||
+		L_BASE == L_TOKENS ||
 		(langclass & C_ADDRLE) == C_ADDRLE))
 	{
 	    fe_interface.disable_fe_optim = 1;
 	}
+
+	if (langclass == L_TOKENS)
+	    be_interface.enable_chrtok = 1;
 
 	return 1;
     }
@@ -394,7 +398,17 @@ gen_code(int ch, int count, char * strn)
     case L_CHARS:
     case L_BFCHARS:     generic_output(ch, count); break;
 
-    case L_TOKENS:	printf("%c %d\n", ch, count); break;
+    case L_TOKENS:
+	if (ch == '"' && strn) {
+	    char * s = strn;
+	    putchar('"');
+	    for(;*s; s++)
+		printf(" %d", *s & 0xFF);
+	    putchar('\n');
+	} else
+	    printf("%c %d\n", ch, count);
+	break;
+
     case L_RISBF:	risbf(ch, count); break;
     case L_TINYBF:	tinybf(ch, count); break;
     case L_HEADSECKS:	headsecks(ch, count); break;
