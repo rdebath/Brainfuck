@@ -2827,6 +2827,11 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 		    return 1;
 		}
 	    }
+
+	    if (known_value != 0 && !non_zero_unsafe && verbose>1)
+		fprintf(stderr,
+			"Warning: Infinite loop at line %d col %d, value is %d\n",
+			v->line, v->col, known_value);
 	    break;
 
 	default:
