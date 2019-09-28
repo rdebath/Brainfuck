@@ -24,6 +24,9 @@
 #define MINALLOC 1024
 #define SAFE_CELL_MAX	((1<<30) -1)
 
+#define UM(vx) ((vx) & cell_mask)
+#define SM(vx) ((UM(vx) ^ cell_smask) - cell_smask)
+
 char * progname = "";
 CELL * mem = 0;
 int memsize = 0;
@@ -32,7 +35,7 @@ int memshift = 0;
 void run(void);
 void optimise(void);
 void print_summary(void);
-void hex_output(FILE * ofd, int ch);
+void hex_output(FILE * ofd, int ch, int eof);
 void start_runclock(void);
 void finish_runclock(double * prun_time, double *pwait_time);
 void pause_runclock(void);
@@ -50,6 +53,7 @@ int physical_max = 255;
 int quick_summary = 0;
 int quick_with_counts = 0;
 int cell_mask = 255;
+int cell_smask = 0;
 int all_cells = 0;
 int suppress_io = 0;
 int use_utf8 = 0;
@@ -61,6 +65,7 @@ int final_tape_pos = 0;	/* Where the tape pointer finished. */
 
 intmax_t overflows =0;	/* Number of detected overflows. */
 intmax_t underflows =0;	/* Number of detected underflows. */
+intmax_t neg_clear =0;	/* Number of detected underflows from [-]. */
 int hard_wrap = 0;	/* Have cell values gone outside 0..255 ? */
 int hard_max = 0, hard_min = 0;
 int do_optimise = 1;
@@ -68,6 +73,8 @@ int do_optimise = 1;
 char bf[] = "+-><[].,";
 intmax_t profile[256*4];
 int program_len;	/* Number of BF command characters */
+int found_comment = 0;
+int eof_count = 0;
 
 static struct timeval run_start, paused, run_pause;
 static double run_time, wait_time;
@@ -106,7 +113,9 @@ option(char *arg)
 	physical_min = -1;
 	return 1;
     } else if (!strcmp(arg, "-w")) {
-	cell_mask = (1<<16)-1; return 1;
+	cell_mask = (1<<16)-1;
+	physical_min = -1;
+	return 1;
     } else if (!strcmp(arg, "-h") || !strcmp(arg, "--help")) {
 	printf("Usage: %s [options] [file]\n", progname);
 	puts("    Runs the brainfuck program provided.");
@@ -150,7 +159,7 @@ int main(int argc, char **argv)
 {
     FILE * ifd;
     int ch, ar;
-    int p = -1, n = -1, j = -1;
+    int p = -1, n = -1, j = -1, lc = 0;
     char * datafile = 0;
     progname = argv[0];
 
@@ -181,9 +190,11 @@ int main(int argc, char **argv)
     if (physical_min == 0) {
 	physical_max = cell_mask;
 	physical_min = 0;
+	cell_smask = 0;
     } else {
 	physical_max = (cell_mask>>1);
 	physical_min = -1 - physical_max;
+	cell_smask = (cell_mask ^ (cell_mask>>1));
     }
 
     ifd = datafile && strcmp(datafile, "-") ? fopen(datafile, "r") : stdin;
@@ -212,11 +223,16 @@ int main(int argc, char **argv)
 
     while((ch = getc(ifd)) != EOF && (ifd != stdin || ch != '!' || j >= 0 || !pgm)) {
 	int r = (ch == '<' || ch == '>' || ch == '+' || ch == '-');
-	if (r || (debug && ch == '#') || (ch == ']' && j >= 0) ||
+	if (r || (debug && ch == '#') || (ch == ']' && (j >= 0 || lc)) ||
 	    ch == '[' || ch == ',' || ch == '.') {
 	    if (r && p >= 0 && pgm[p].cmd == ch) {
 		if (pgm[p].arg < 128 || ch == '<' || ch == '>')
 		    { pgm[p].arg += r; continue; }
+	    }
+	    if (lc || (ch == '[' && n == -1)) {
+		found_comment++;
+		lc += (ch=='[') - (ch==']');
+		continue;
 	    }
 	    n++;
 	    if (n >= pgmlen-2) pgm = realloc(pgm, (pgmlen = n+99)*sizeof *pgm);
@@ -368,7 +384,7 @@ void run(void)
 	    break;
 
 	case '=':
-	    if (mem[m] < 0) underflows++;
+	    if (mem[m] < 0) neg_clear++;
 
 	    if (mem[m] < 0) {
 		profile['='*4 + 3]++;
@@ -442,7 +458,12 @@ void run(void)
 	    pause_runclock();
 	    { int a = suppress_io?EOF:getchar();
 	      if(a != EOF) mem[m] = a;
-	      else if (on_eof != 1) mem[m] = on_eof; }
+	      else {
+		eof_count++;
+		if (eof_count > 100) return;
+		if (on_eof != 1) mem[m] = on_eof;
+	      }
+	    }
 
 	    unpause_runclock();
 	    break;
@@ -452,9 +473,9 @@ void run(void)
 		fprintf(stderr, "Debug dump ->\n");
 		hex_bracket = m;
 		for(a = 0; a <= tape_max-tape_min; a++) {
-		    hex_output(stderr, mem[a] & cell_mask);
+		    hex_output(stderr, mem[a] & cell_mask, 0);
 		}
-		hex_output(stderr, EOF);
+		hex_output(stderr, 0, 1);
 		fprintf(stderr, "\n");
 	    } else {
 		int a;
@@ -716,12 +737,15 @@ print_summary()
 	    fprintf(stderr, "Program size %d : ", program_len);
 	    print_pgm();
 	    fprintf(stderr, "\n");
-	} else
+	} else if (found_comment)
+	    fprintf(stderr, "Program size %d (+%d initial comment)\n",
+			    program_len, found_comment);
+	else
 	    fprintf(stderr, "Program size %d\n", program_len);
 	fprintf(stderr, "Final tape contents:\n");
 
 	{
-	    int pw = 3, cc = 0, pc = 0;
+	    int pw = 3, cc = 0, pc = 0, hex_ok = 0;
 	    {
 		char buf[64];
 		int i;
@@ -731,13 +755,24 @@ print_summary()
 		if (i > pw && i < (int)sizeof(buf)) pw = i;
 	    }
 
-	    if (all_cells && cell_mask == 0xFF && tape_min == 0) {
+	    if (all_cells && cell_mask != 0xFF && tape_min == 0) {
+		hex_ok = 1;
+		for(ch = 0; ch <= tape_max-tape_min; ch++) {
+		    int v = SM(mem[ch+memshift]);
+		    if (v < -9 || v > 255) {
+			hex_ok = 0;
+			break;
+		    }
+		}
+	    }
+
+	    if (all_cells && (cell_mask == 0xFF || hex_ok) && tape_min == 0) {
 		fprintf(stderr, "Pointer at: %d\n", final_tape_pos);
 		hex_bracket = final_tape_pos;
 		for(ch = 0; ch <= tape_max-tape_min; ch++) {
-		    hex_output(stderr, mem[ch+memshift] & cell_mask);
+		    hex_output(stderr, SM(mem[ch+memshift]), 0);
 		}
-		hex_output(stderr, EOF);
+		hex_output(stderr, 0, 1);
 	    } else {
 		if (tape_min < 0) cc += fprintf(stderr, " !");
 
@@ -751,7 +786,7 @@ print_summary()
 			cc += fprintf(stderr, " :");
 		    }
 		    cc += fprintf(stderr, " %*d",
-				  pw, mem[ch+memshift+tape_min] & cell_mask);
+				  pw, SM(mem[ch+memshift+tape_min]));
 		    if (final_tape_pos == ch+tape_min)
 			pc = cc;
 		}
@@ -763,9 +798,12 @@ print_summary()
 
 	if (tape_min < 0)
 	    fprintf(stderr, "WARNING: Tape pointer minimum %d, segfault.\n", tape_min);
-	fprintf(stderr, "Tape pointer maximum %d\n", tape_max);
+	fprintf(stderr, "Tape pointer maximum %d", tape_max);
+	if (!physical_overflow && !overflows && !underflows)
+	    fprintf(stderr, ", cell value range %d..%d", hard_min, hard_max);
+	fprintf(stderr, "\n");
 
-	if (overflows || underflows) {
+	if (overflows || underflows || neg_clear) {
 	    fprintf(stderr, "Range error: ");
 	    if (physical_overflow)
 		fprintf(stderr, "range %d..%d", physical_min, physical_max);
@@ -773,29 +811,10 @@ print_summary()
 		fprintf(stderr, "value check");
 	    if (overflows)
 		fprintf(stderr, ", overflows: %"PRIdMAX"", overflows);
-	    if (underflows)
-		fprintf(stderr, ", underflows: %"PRIdMAX"", underflows);
+	    if (underflows || neg_clear)
+		fprintf(stderr, ", underflows: %"PRIdMAX"",
+		    underflows + neg_clear);
 	    fprintf(stderr, "\n");
-	} else if (!physical_overflow && hard_wrap) {
-	    if (cell_mask == 255 && hard_min >= 0 && hard_max <= 255) {
-		fprintf(stderr, "Cell values fit in signed or unsigned bytes.\n");
-	    } else if (cell_mask == 255 && hard_min >= 0 && hard_max <= 255) {
-		fprintf(stderr, "Cell values fit in unsigned bytes.\n");
-	    } else if (cell_mask == 255 && hard_min >= -128 && hard_max <= 127) {
-		fprintf(stderr, "Cell values fit in signed bytes.\n");
-	    } else {
-		if (physical_min == 0 && physical_max == 255) {
-		    if (hard_min < 0 && hard_max > 127)
-			fprintf(stderr, "Hard wrapping would occur for byte");
-		    else
-			fprintf(stderr, "Hard wrapping would occur for unsigned byte");
-		} else if (physical_min == -128 && physical_max == 127)
-		    fprintf(stderr, "Hard wrapping would occur for signed byte");
-		else
-		    fprintf(stderr, "Hard wrapping would occur for (%d..%d)",
-			physical_min, physical_max);
-		fprintf(stderr, " cells; with range %d..%d\n", hard_min, hard_max);
-	    }
 	}
 
 	if (!physical_overflow) {
@@ -815,6 +834,14 @@ print_summary()
 	if (profile['['*4+1])
 	    fprintf(stderr, "Skipped loops (zero on '['): %"PRIdMAX"\n",
 		profile['['*4+1]);
+
+	if (eof_count>100)
+	    fprintf(stderr, "ERROR: Program aborted because too many "
+			    "EOFs ignored. Try using -z option?\n");
+	else if (eof_count>1)
+	    fprintf(stderr, "Input command read EOF %d times\n", eof_count);
+	else if (eof_count == 1)
+	    fprintf(stderr, "Input command read EOF\n");
 
 	for(n = 0; n < (int)sizeof(bf)-1; n++) {
 	    ch = bf[n];
@@ -845,7 +872,7 @@ print_summary()
 	    fprintf(stderr, "\n");
 	} else {
 	    int ch, nonwrap =
-		(overflows == 0 && underflows == 0 &&
+		(overflows == 0 && underflows == 0 && neg_clear == 0 &&
 		 (mem[final_tape_pos+memshift] & ~cell_mask) == 0);
 
 	    fprintf(stderr, "%d ", (mem[final_tape_pos+memshift] & cell_mask) );
@@ -872,14 +899,14 @@ print_summary()
 }
 
 void
-hex_output(FILE * ofd, int ch)
+hex_output(FILE * ofd, int ch, int eof)
 {
     static char lastbuf[80];
     static char linebuf[80];
     static char buf[20];
     static int pos = 0, addr = 0, lastmode = 0;
 
-    if( ch == EOF ) {
+    if( eof ) {
 	if(pos)
 	    fprintf(ofd, "%06x: %.67s\n", addr, linebuf);
 	pos = 0;
@@ -890,7 +917,10 @@ hex_output(FILE * ofd, int ch)
     } else {
 	if(!pos)
 	    memset(linebuf, ' ', sizeof(linebuf));
-	sprintf(buf, "%02x", ch&0xFF);
+	if (ch<0)
+	    sprintf(buf, "%2d", ch);
+	else
+	    sprintf(buf, "%02x", ch);
 	memcpy(linebuf+pos*3+(pos > 7)+1, buf, 2);
 	if (addr+pos == hex_bracket) {
 	    linebuf[pos*3+(pos > 7)] = '(';
