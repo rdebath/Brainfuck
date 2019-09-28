@@ -15,14 +15,12 @@ X(dc,DC,
     Nothing_Here						    )
 #if XX == 4
     if (do_codestyle == c_dc && iostyle != 3) {
-	if (eofcell == 0 && input_string == 0)
-	    eofcell = 6;
-	if (!default_io && iostyle != 2) {
+	if (iostyle > 0) {
 	    fprintf(stderr,
 		    "The -D option only supports integer or binary I/O.\n");
 	    exit(255);
 	}
-	iostyle = 2;
+	iostyle = 0;
     }
 #endif
 #if XX == 9

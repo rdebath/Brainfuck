@@ -465,7 +465,7 @@ print_c_header(FILE * ofd)
     if (!do_run) {
 	if (node_type_counts[T_INP] != 0 || node_type_counts[T_INPI] != 0)
 	{
-	    if (l_iostyle == 2 && node_type_counts[T_INPI] == 0 &&
+	    if (l_iostyle == 0 && node_type_counts[T_INPI] == 0 &&
 		(eofcell == 4 || (eofcell == 2 && EOF == -1))) {
 		use_direct_getchar = 1;
 	    } else {
@@ -729,7 +729,7 @@ print_lib_funcs(FILE * ofd)
 
 	fprintf(ofd, "{\n");
 	fprintf(ofd, "  int ch;\n");
-	if (iostyle == 2) {
+	if (iostyle == 0) {
 	    fprintf(ofd, "  ch = getchar();\n");
 	} else {
 	    fprintf(ofd, "  do {\n");

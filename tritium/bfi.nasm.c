@@ -830,6 +830,10 @@ print_nasm_footer(void)
 	    printf("\tjg .noeof\n");
 	    if (eofcell == 3)
 		printf("\tmov byte ptr [ecx], 0\n");
+#if EOF != -1
+	    else if (eofcell == 4)
+		printf("\tmov byte ptr [ecx], %d\n", EOF);
+#endif
 	    else
 		printf("\tmov byte ptr [ecx], 0xFF\n");
 	    printf(".noeof:\n");

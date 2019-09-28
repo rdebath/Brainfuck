@@ -301,15 +301,6 @@ print_dc(void)
 	    }
 	    break;
 
-	case T_INP:
-	    fprintf(ofd, "lix");
-	    used_lix = 1;
-	    fprintf(ofd, "[");
-	    save_cell(n->offset);
-	    fprintf(ofd, "]SA d _1!=A ");
-	    fprintf(ofd, "0sALAc");
-	    break;
-
 	case T_INPI:
 	    fprintf(ofd, "ldx");
 	    used_ldx = 1;
@@ -318,6 +309,18 @@ print_dc(void)
 	    fprintf(ofd, "]SA d _1!=A ");
 	    fprintf(ofd, "0sALAc");
 	    break;
+
+	case T_INP:
+	    if (input_string) {
+		fprintf(ofd, "lix");
+		used_lix = 1;
+		fprintf(ofd, "[");
+		save_cell(n->offset);
+		fprintf(ofd, "]SA d _1!=A ");
+		fprintf(ofd, "0sALAc");
+		break;
+	    }
+	    /*FALLTHROUGH*/
 
 	case T_STOP:
 	    fprintf(ofd, "[STOP command executed\n]P\n");
@@ -405,11 +408,14 @@ print_dc(void)
 	    fprintf(ofd, "0sn\n");
 	    fprintf(ofd, "[[d>.ln1+dsn;I]SN_1ln0;I>N0sNLNd>.]si\n");
 	} else {
+	    /* Unimplementable */
+	    fprintf(ofd, "[[INPUT command not implemented\n]P _1]si\n");
 
-	    /* New for GNU dc, character input ... soon */
+	    /* New for GNU dc, character input ... soon
 	    fprintf(ofd, "0dd:Isn\n");
 	    fprintf(ofd, "[[0$I0sn]SNln0;I!>N\n");
 	    fprintf(ofd, "[d>.ln1+dsn;I]sN_1ln0;I>N0sNLNd>.]si\n");
+	    */
 
 	    /* New for GNU dc, character I/O ... soon
 	    fprintf(ofd, "[1G [sB_1]SA [bAla]SB 0=A Bx 0sALAaBLB+ ]si\n");

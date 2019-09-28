@@ -15,13 +15,13 @@ X(dd,DD,
 #if XX == 4
     if (do_codestyle == c_dd) {
 	opt_no_lessthan = 1;
+	opt_no_fullprt = 1;
 	if (opt_regen_mov < 0) opt_regen_mov = 1;
 
         if (iostyle == 3) {
             fprintf(stderr, "The -d option does not support -fintio\n");
             exit(255);
         }
-	opt_no_fullprt = 1;
     }
 #endif
 #endif

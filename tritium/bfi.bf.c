@@ -54,7 +54,8 @@ print_bf(void)
     struct bfi *n = bfprog;
     int i, last_offset = 0;
 
-    printf("[ BF%s regenerated from %s ]\n", bfrle?"-RLE":"", bfname);
+    if (!noheader)
+	printf("[ BF%s regenerated from %s ]\n", bfrle?"-RLE":"", bfname);
 
     while(n)
     {

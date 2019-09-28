@@ -20,11 +20,11 @@ X(nasm,NASM,
 	    exit(255);
 	}
 	set_cell_size(8);
-	if (!default_io && iostyle != 2) {
+	if (iostyle > 0) {
 	    fprintf(stderr, "The 'nasm' generator only supports binary I/O.\n");
 	    exit(255);
 	}
-	iostyle = 2;
+	iostyle = 0;
     }
 #endif
 #if XX == 6

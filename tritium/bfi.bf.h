@@ -8,7 +8,8 @@ int checkarg_bf(char * opt, char * arg);
 
 #ifdef XX
 X(bf,BF,
-    printf("   -F   Attempt to regenerate BF code. (This disables a lot of optimisations.)\n");,
+    printf("   -F   Attempt to regenerate BF code. (This disables a lot of optimisations.)\n");
+    printf("   -bfrle Generate an RLE variant of BF\n");,
     case 'F': do_codestyle = c_bf; break;                           ,
     case c_bf: print_bf(); break;                                   ,
     Nothing_Here						    )
@@ -18,10 +19,11 @@ X(bf,BF,
 	opt_regen_mov = 0;
 	hard_left_limit = 0;
 
-	if (!default_io) {
-	    fprintf(stderr, "The -F option only supports default I/O.\n");
+	if (iostyle > 0) {
+	    fprintf(stderr, "The -F option only supports binary I/O.\n");
 	    exit(255);
 	}
+	iostyle = 0;
     }
 #endif
 #if XX == 9

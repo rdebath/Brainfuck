@@ -22,22 +22,24 @@ print_dd(void)
 {
     struct bfi * n = bfprog;
 
-    printf("{[ Code generated from %s ]}\n\n", bfname);
+    if (!noheader) {
+	printf("{[ Code generated from %s ]}\n\n", bfname);
 
-    puts("{[    This is not brainfuck, use bf2any's -be-pipe option     ]}");
-    puts("{ ++++[>++++<-]>[>++>[++++++++>]++[<]>-]>>>>>>>++.<<<--.+.<<-- }");
-    puts("{ -----.<.>>>.<<.<.>>----.+.<+.<.>>>>.<<<--.>>>-.<.<-.>---.<<+ }");
-    puts("{ ++.>>---.<---.<<++++++++++++.------------.>.--.>>++.<<<.++++ }");
-    puts("{ +++++++++.>>>>+.<.<<<.>---.>--.<.>>.[>]<<.                [] }");
-    puts("\n");
+	puts("{[    This is not brainfuck, use bf2any's -be-pipe option     ]}");
+	puts("{ ++++[>++++<-]>[>++>[++++++++>]++[<]>-]>>>>>>>++.<<<--.+.<<-- }");
+	puts("{ -----.<.>>>.<<.<.>>----.+.<+.<.>>>>.<<<--.>>>-.<.<-.>---.<<+ }");
+	puts("{ ++.>>---.<---.<<++++++++++++.------------.>.--.>>++.<<<.++++ }");
+	puts("{ +++++++++.>>>>+.<.<<<.>---.>--.<.>>.[>]<<.                [] }");
+	puts("\n");
 
-    if (cell_size > 0)
-	outcmd('%', cell_size);
-    else if (cell_length > (int)sizeof(int)*CHAR_BIT)
-	outcmd('%', -(int)sizeof(int)*CHAR_BIT);
+	if (cell_size > 0)
+	    outcmd('%', cell_size);
+	else if (cell_length > (int)sizeof(int)*CHAR_BIT)
+	    outcmd('%', -(int)sizeof(int)*CHAR_BIT);
 
-    if (node_type_counts[T_MOV] != 0 && most_neg_maad_loop)
-	outcmd('>', -most_neg_maad_loop);
+	if (node_type_counts[T_MOV] != 0 && most_neg_maad_loop)
+	    outcmd('>', -most_neg_maad_loop);
+    }
 
     while(n)
     {

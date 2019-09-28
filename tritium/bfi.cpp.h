@@ -7,8 +7,8 @@ void print_cpp(void);
 
 #ifdef XX
 X(cpp,CPP,
-    printf("   -A   Code for C++ with Boost cpp_int\n");,
-    case 'A': do_codestyle = c_cpp; break;			    ,
+    printf("   -C   Code for C or C++ with Boost cpp_int\n");,
+    case 'C': case 'A': do_codestyle = c_cpp; break;		    ,
     case c_cpp: print_cpp(); break;                                   ,
     Nothing_Here                                                    )
 
