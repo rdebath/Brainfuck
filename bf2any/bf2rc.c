@@ -27,6 +27,7 @@ static int do_input = 0;
 static int do_output = 0;
 static int ind = 0;
 static int max_prle = 128;
+static int have_fn_e = 0;
 
 static void print_string(char * str);
 
@@ -76,6 +77,9 @@ gen_code(int ch, int count, char * strn)
 
     switch(ch) {
     case '!':
+	if (count) break;
+
+	have_fn_e = 1;
 	printf("#!/usr/bin/rc\n");
 
 
@@ -188,8 +192,6 @@ gen_code(int ch, int count, char * strn)
 	    for (i=0; i<256; i++) {
 		if (i == 10 )
 		    printf("    case %d\n\techo\n", i);
-		else if (i == 27 )
-		    printf("    case %d\n\techo -n '%c'\n", i, i);
 		else if (i>= ' ' && i<= '~' && i != '\'')
 		    printf("    case %d\n\techo -n '%c'\n", i, i);
 		else if (i == '\'')
@@ -260,7 +262,12 @@ print_string(char * str)
 	    gotnl = 0; outlen = 0;
 	}
 	if (badchar) {
-	    printf("e %d\n", badchar);
+	    if (have_fn_e)
+		printf("e %d\n", badchar);
+	    else if (badchar == '-')
+		printf("echo -n '%c'\n", badchar);
+	    else
+		printf("awk 'BEGIN{printf \"%%c\",%d;}'\n", badchar);
 	    badchar = 0;
 	    do_output = 1;
 	}
@@ -269,7 +276,12 @@ print_string(char * str)
 	if (*str == '\n') {
 	    gotnl = 1;
 	    buf[outlen++] = *str;
-	} else if (*str >= ' ' && *str <= '~' && *str != '\'' && *str != '\\' && *str != '-') {
+	} else if (*str == '-' && outlen == 0) {
+	    badchar = (*str & 0xFF);
+	} else if (*str >= ' ' && *str <= '~' && *str != '\'') {
+	    buf[outlen++] = *str;
+	} else if (*str == '\'') {
+	    buf[outlen++] = *str;
 	    buf[outlen++] = *str;
 	} else {
 	    badchar = (*str & 0xFF);
