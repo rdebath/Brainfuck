@@ -7,4 +7,4 @@
 !GNUmakefile
 !Makefile
 # except generated code
-bf2jit.c
+tmp.*

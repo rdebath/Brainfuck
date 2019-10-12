@@ -254,7 +254,8 @@ load_and_run(char ** filelist, int filecount)
 		continue;
 	    }
 	    if (ch == ' ' || ch == '\t') continue;
-	    if (!digits || ov_flg) number = 1; digits=ov_flg=0;
+	    if (!digits || ov_flg) number = 1;
+	    /*GCC*/ digits=ov_flg=0;
 	    multi = enable_rle?number:1; number = 0;
 	    /* These chars are RLE */
 	    m = (ch == '>' || ch == '<' || ch == '+' || ch == '-');

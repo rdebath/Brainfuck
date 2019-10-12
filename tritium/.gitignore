@@ -1,6 +1,5 @@
 bfi
 bfi.out
-bfi.dasm.c
 bfi.version.h
 tmp.*
 .build-opts.*

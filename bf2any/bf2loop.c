@@ -337,9 +337,8 @@ try_constant_loop(int loopz, int inc, int mov, int has_zmode)
 	if (!be_interface.cells_are_ints)
 	    for(i=0; i<madd_count; i++)
 	    {
-		int res;
 		if (madd_zmode[i]) continue;
-		res = ov_imul(madd_inc[i], v, &ov);
+		/* res = */ ov_imul(madd_inc[i], v, &ov);
 		if (ov) break;
 	    }
 

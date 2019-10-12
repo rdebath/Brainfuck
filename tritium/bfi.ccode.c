@@ -1160,6 +1160,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		break;
 	    }
 	}
+	/*FALLTHROUGH*/
 
 	case T_CMULT:
 	case T_MULT:

@@ -41,13 +41,12 @@ all:	$(ALLEXE)
 
 clean:
 	-rm -f .build-opts.*
-	-rm -f $(ALLEXE)
+	-rm -f $(ALLEXE) bf2jit
 	-rm -f libtcc.lib-off libtcc.lib-on
 	-rm -f libtcl.lib-off libtcl.lib-on
 	-rm -f liblua.lib-off liblua.lib-on
 	-rm -f libpy.lib-off libpy.lib-on
-	-rm -f bf2jit.c bf2jit
-	-rm -f *.o
+	-rm -f tmp.* *.o
 
 # Install all we can make, but don't fail if some can't be built.
 install:
@@ -97,19 +96,20 @@ endif
 PKGCONF=pkg-config$(TARGET_ARCH)
 
 #-------------------------------------------------------------------------------
-# Assemble the dynasm machine code.
+# Assemble the dynasm machine code, not interested in warnings.
 ifneq ($(CPUFOUND),)
-bf2jit.o: bf2jit.c
-	$(CC) $(CFLAGS) -I$(TOOLDIR) $(TARGET_ARCH) -c -o $@ bf2jit.c
+DASMWARN=-w
+bf2jit.o: tmp.bf2jit.c
+	$(CC) $(CFLAGS) $(DASMWARN) -I$(TOOLDIR) $(TARGET_ARCH) -c -o $@ tmp.bf2jit.c
 
 ifneq ($(findstring X86_64,$(CPUFOUND)),)
-bf2jit.c: bf2jit.x86.dasc
-	$(TOOLDIR)/dynasm/dynasm -c -o bf2jit.c bf2jit.x86.dasc
+tmp.bf2jit.c: bf2jit.x86.dasc
+	$(TOOLDIR)/dynasm/dynasm -c -o tmp.bf2jit.c bf2jit.x86.dasc
 endif
 
 ifneq ($(findstring X86_32,$(CPUFOUND)),)
-bf2jit.c: bf2jit.x86.dasc
-	$(TOOLDIR)/dynasm/dynasm -c -D I386 -o bf2jit.c bf2jit.x86.dasc
+tmp.bf2jit.c: bf2jit.x86.dasc
+	$(TOOLDIR)/dynasm/dynasm -c -D I386 -o tmp.bf2jit.c bf2jit.x86.dasc
 endif
 endif
 
@@ -283,7 +283,7 @@ BUILDOPT=$(CC) $(CFLAGS) $(LDFLAGS) $(LDLIBS) $(TARGET_ARCH) \
     $(TCLLIBS$) $(PYLIBLIBS) $(LUALIBLIBS) $(LIBDLLIBS) $(TCCLIBS)
 BUILDFLG :=.build-opts.$(shell echo '$(BUILDOPT)' | sum | tr -d '\040\055' )
 $(patsubst %.c,%.o,$(wildcard *.c)): $(BUILDFLG)
-bf2jit.c: $(BUILDFLG)
+tmp.bf2jit.c: $(BUILDFLG)
 $(BUILDFLG):
 	-@rm -f .build-opts.*
 	-@echo '$(BUILDOPT)' > $(BUILDFLG)

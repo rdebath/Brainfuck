@@ -68,7 +68,7 @@ $(EXEFILE): $(OBJECTS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(EXEFILE) $(OBJECTS) $(LDLIBS) $(TARGET_ARCH)
 
 clean realclean:
-	-rm -f $(EXEFILE) *.o bfi.dasm.c .build-opts.*
+	-rm -f $(EXEFILE) tmp.* *.o .build-opts.*
 
 # This is generated BEFORE the rules start, so "realclean all" would fail
 ifeq ($(MAKECMDGOALS),realclean)
@@ -81,8 +81,8 @@ endif
 install: $(EXEFILE)
 	$(INSTALL) $(ISTRIP) $(EXEFILE) $(INSTALLDIR)/$(TARGETFILE)$(INSTALLEXT)
 
-bfi.dasm.o:	bfi.dasm.c bfi.tree.h bfi.dasm.h bfi.run.h
-	$(CC) $(CFLAGS) -I $(TOOLDIR) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ bfi.dasm.c
+bfi.dasm.o:	tmp.dasm.c bfi.tree.h bfi.dasm.h bfi.run.h
+	$(CC) $(CFLAGS) $(DASMFLAGS) -I $(TOOLDIR) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ tmp.dasm.c
 
 bfi.gnulit.o:	bfi.gnulit.c bfi.tree.h bfi.gnulit.h bfi.run.h
 	$(CC) $(CFLAGS) $(TYPE_LIGHTNING) $(CPPFLAGS) $(TARGET_ARCH) -c -o $@ bfi.gnulit.c
@@ -198,6 +198,10 @@ endif
 GNULGT := $(call cc-option,-Wno-unused-value,-Wno-unused-value,-w)
 GNULGT += $(call cc-option,-fno-strict-aliasing,-fno-strict-aliasing)
 GNULGT += $(call cc-option,-Wno-sign-compare,-Wno-sign-compare,-w)
+
+# Later GCCs are annoying.
+DASMFLAGS += $(call cc-option,-Wno-implicit-fallthrough,-Wno-implicit-fallthrough)
+DASMFLAGS += $(call cc-option,-Wno-array-bounds,-Wno-array-bounds)
 
 ################################################################################
 
@@ -400,13 +404,13 @@ OBJECTS += $(DYNASM_OBJ)
 $(EXEFILE): $(DYNASM_OBJ)
 
 ifneq ($(findstring X86_64,$(CPUFOUND)),)
-bfi.dasm.c: bfi.dasm.x86.dasc
-	$(TOOLDIR)/dynasm/dynasm -c -o bfi.dasm.c bfi.dasm.x86.dasc
+tmp.dasm.c: bfi.dasm.x86.dasc
+	$(TOOLDIR)/dynasm/dynasm -c -o tmp.dasm.c bfi.dasm.x86.dasc
 endif
 
 ifneq ($(findstring X86_32,$(CPUFOUND)),)
-bfi.dasm.c: bfi.dasm.x86.dasc
-	$(TOOLDIR)/dynasm/dynasm -c -D I386 -o bfi.dasm.c bfi.dasm.x86.dasc
+tmp.dasm.c: bfi.dasm.x86.dasc
+	$(TOOLDIR)/dynasm/dynasm -c -D I386 -o tmp.dasm.c bfi.dasm.x86.dasc
 endif
 
 else
@@ -425,7 +429,7 @@ endif
 ################################################################################
 BUILDOPT=$(CC) $(CFLAGS) $(LDFLAGS) $(LDLIBS) $(TARGET_ARCH) $(CVER)
 BUILDFLG :=.build-opts.$(shell echo '$(BUILDOPT)' | sum | tr -d '\040\055' )
-$(OBJECTS) bfi.dasm.c: $(BUILDFLG)
+$(OBJECTS) tmp.dasm.c: $(BUILDFLG)
 $(BUILDFLG):
 	-@rm -f .build-opts.*
 	-@echo '$(BUILDOPT)' > $(BUILDFLG)
