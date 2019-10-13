@@ -884,11 +884,9 @@ static int dld, inp, rle = 0, num = -1, ov_flg, loopid, zstate;
 		continue;
 	    }
 
-	    /* Matching [-], [+] and [] is annoyingly verbose */
+	    /* Matching [-] and [+] is annoyingly verbose, especially as
+	     * I want to allow the pending_mov to stay pending past a T_SET. */
 	    switch(zstate) {
-	    case 0:
-		if (ch == T_WHL) { zstate++ ; continue; }
-		break;
 	    case 1:
 		if (ch == T_ADD && c == -1) { zstate++ ; continue; }
 		if (ch == T_ADD && c == 1) { zstate+=2 ; continue; }
@@ -907,16 +905,6 @@ static int dld, inp, rle = 0, num = -1, ov_flg, loopid, zstate;
 		    pending_mov = 0;
 		}
 
-		if (zstate == 1 && ch == T_END && !opt_no_endif) {
-		    p = n = new_node(p, T_IF, curr_line, curr_col);
-		    n->jmp=jst; jst = n; n->count = ++loopid;
-		    p = n = new_node(p, T_STOP, curr_line, curr_col);
-		    p = n = new_node(p, T_ENDIF, curr_line, curr_col);
-		    n->jmp = jst; jst = jst->jmp; n->jmp->jmp = n;
-		    zstate = 0;
-		    continue;
-		}
-
 		p = n = new_node(p, T_WHL, curr_line, curr_col);
 		{ n->jmp=jst; jst = n; n->count = ++loopid; }
 
@@ -926,8 +914,6 @@ static int dld, inp, rle = 0, num = -1, ov_flg, loopid, zstate;
 		} else if (zstate == 3) {
 		    p = n = new_node(p, T_ADD, curr_line, curr_col);
 		    n->count = 1;
-		} else if (ch == T_END) {
-		    p = n = new_node(p, T_STOP, curr_line, curr_col);
 		}
 		zstate = 0;
 	    }
@@ -960,6 +946,18 @@ static int dld, inp, rle = 0, num = -1, ov_flg, loopid, zstate;
 		    }
 		    continue;
 		}
+	    }
+
+	    /* Spot the trivial infinite loop '[]' */
+	    if (ch == T_END && p && p->type == T_WHL) {
+		if (!opt_no_endif) p->type = T_IF;
+		p = n = new_node(p, T_STOP, curr_line, curr_col);
+		p = n = new_node(p, T_END, curr_line, curr_col);
+		if (!opt_no_endif) n->type = T_ENDIF;
+		n->jmp = jst; jst = jst->jmp; n->jmp->jmp = n;
+		if (!opt_no_endif)
+		    p = n = new_node(p, T_SET, curr_line, curr_col);
+		continue;
 	    }
 	}
 #endif
