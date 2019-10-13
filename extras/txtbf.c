@@ -41,6 +41,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <limits.h>
 #if _POSIX_VERSION >= 199506L || defined(LLONG_MAX)
 #include <inttypes.h>

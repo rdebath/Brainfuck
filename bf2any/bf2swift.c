@@ -9,9 +9,8 @@
  */
 
 static int ind = 0;
-static FILE * ofd;
-#define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
-#define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
+#define pr(s)           printf("%*s" s "\n", ind*4, "")
+#define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 
 static gen_code_t gen_code;
 struct be_interface_s be_interface = {.gen_code=gen_code};
@@ -23,8 +22,6 @@ gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
-	ofd = stdout;
-
 	pr(	"// WTF! Seriously!"
 	"\n"	"// The standard fucking library isn't standard!!!"
 	"\n"

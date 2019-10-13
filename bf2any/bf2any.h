@@ -36,10 +36,12 @@ extern struct fe_interface_s {
     && (__GNUC__ > 2) || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
 #define UNUSED __attribute__ ((__unused__))
 
+#ifdef _POSIX_VERSION
 #if (_XOPEN_VERSION+0) < 500 && _POSIX_VERSION < 200809L
-#if !defined(strdup) && !defined(_WIN32)
+#if !defined(strdup)
 #define strdup(str) \
     ({char*_s=(str);int _l=strlen(_s)+1;void*_t=malloc(_l);if(_t)memcpy(_t,_s,_l);_t;})
+#endif
 #endif
 #endif
 

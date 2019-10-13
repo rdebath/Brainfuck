@@ -9,10 +9,9 @@
  */
 
 static int ind = 0;
-static FILE * ofd;
-#define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
-#define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
-#define prv2(s,v,v2)    fprintf(ofd, "%*s" s "\n", ind*4, "", (v), (v2))
+#define pr(s)           printf("%*s" s "\n", ind*4, "")
+#define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
+#define prv2(s,v,v2)    printf("%*s" s "\n", ind*4, "", (v), (v2))
 
 static void print_dstring(char * str);
 static char * dumbcast = "";
@@ -26,8 +25,6 @@ gen_code(int ch, int count, char * strn)
 {
     switch(ch) {
     case '!':
-	ofd = stdout;
-
 	pr("module fuck;");	/* Required to prevent really stupid error messages. */
 
 	pr("import std.stdio;");

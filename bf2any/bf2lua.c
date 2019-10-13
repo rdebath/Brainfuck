@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
+#include <string.h>
 
 #if !defined(DISABLE_LIBLUA) && (_POSIX_VERSION < 200809L)
 #include "usemktemp.c"

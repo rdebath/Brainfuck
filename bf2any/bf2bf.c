@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 
 #if _POSIX_VERSION < 200112L && _XOPEN_VERSION < 500
 #define NO_SNPRINTF
+#warning Using sprintf not snprintf
 #endif
 
 #include "bf2any.h"
@@ -1545,7 +1547,7 @@ static trivbf trip[1] = {{
 }};
 
 /* Language "Descriptive BF" */
-static trivbf nice[1] = {{
+static trivbf nicebf[1] = {{
     .name = "nice", .name2 = "n",
     .class = L_CDWORDS,
     .bf = { "right", "left", "up", "down", "out", "in", "begin", "end" },
@@ -2377,7 +2379,7 @@ static trivbf bcdbyte[1] = {{
 
 static trivbf * trivlist[] = {
 
-    rhoprime, cbyte, ook, blub, f__k, f__krle, pogaack, trip, nice,
+    rhoprime, cbyte, ook, blub, f__k, f__krle, pogaack, trip, nicebf,
     bc, bc_rle, fish, dotty, lisp0, bewbs, moo, chinese, zero, yolang,
     k_on_fuck, petooh, arabic, dc1, dc2, dc3, dc4, nyan, atpling, cupid,
     ternary, pikalang, spoon, troll, roadrunner, brainbool, clojure,
