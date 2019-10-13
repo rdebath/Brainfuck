@@ -1100,7 +1100,7 @@ link_and_run(dasm_State ** state)
     code(map_hugeram());
     finish_runclock(&run_time, &io_time);
 
-    if (verbose>1)
+    if (verbose>3)
 	fprintf(stderr, "Run complete\n");
 
 #if !defined(LEGACYOS) && !defined(_WIN32)

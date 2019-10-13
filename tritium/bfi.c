@@ -1264,11 +1264,9 @@ process_file(void)
     } else
 	if (opt_runner) try_opt_runner();
 
-    if (verbose) {
+    if (verbose)
 	print_tree_stats();
-	if (verbose>1)
-	    printtree();
-    } else
+    else
 	calculate_stats(); /* is in print_tree_stats() */
 
     /* limit to proven memory range. */
@@ -1279,10 +1277,7 @@ process_file(void)
     if (do_run) {
 	setbuf(stdout, 0);
 	run_tree();
-	if (verbose>2) {
-	    print_tree_stats();
-	    printtree();
-	}
+	if (verbose>2) print_tree_stats();
 	unmap_hugeram();
     } else
 	fprintf(stderr, "Only tree runner linked\n");
@@ -1318,10 +1313,7 @@ process_file(void)
 		    fprintf(stderr, "Starting profiling interpreter\n");
 		run_tree();
 
-		if (verbose>2) {
-		    print_tree_stats();
-		    printtree();
-		}
+		if (verbose>2) print_tree_stats();
 	    } else if (cell_size <= 0) {
 		if (verbose>1)
 		    fprintf(stderr, "Starting maxtree interpreter\n");
@@ -1375,7 +1367,7 @@ process_file(void)
 	fprintf(stderr, "\n");
     }
 
-    if (do_run && verbose && verbose < 3 && run_time>0) {
+    if (do_run && verbose && verbose < 3 && run_time>0.0001) {
 	fflush(stdout);
 	if (io_time == 0.0)
 	    fprintf(stderr, "Run time %.6fs\n", run_time);
@@ -1480,6 +1472,9 @@ print_tree_stats(void)
 	if (profile_min_cell != 0 || profile_max_cell != 0)
 	    fprintf(stderr, "Tape cells used %d..%d\n",
 		profile_min_cell, profile_max_cell);
+
+	if (verbose>1 && node_type_counts[T_CHR] != total_nodes)
+	    printtree();
     }
 }
 
