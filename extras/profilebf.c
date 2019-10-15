@@ -66,6 +66,7 @@ int final_tape_pos = 0;	/* Where the tape pointer finished. */
 intmax_t overflows =0;	/* Number of detected overflows. */
 intmax_t underflows =0;	/* Number of detected underflows. */
 intmax_t neg_clear =0;	/* Number of detected underflows from [-]. */
+int phy_limit = 0;	/* Did we hit an interpreter limit */
 int hard_wrap = 0;	/* Have cell values gone outside 0..255 ? */
 int hard_max = 0, hard_min = 0;
 int do_optimise = 1;
@@ -357,6 +358,7 @@ void run(void)
 		if (mem[m] > SAFE_CELL_MAX) {
 		    /* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
 		    overflows++;
+		    phy_limit = 1;
 		    mem[m] -= (SAFE_CELL_MAX+1);
 		    profile[pgm[n].cmd*4 + 3]++;
 		}
@@ -377,6 +379,7 @@ void run(void)
 		if (mem[m] < -SAFE_CELL_MAX) {
 		    /* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
 		    underflows++;
+		    phy_limit = 1;
 		    mem[m] += (SAFE_CELL_MAX+1);
 		    profile[pgm[n].cmd*4 + 3]++;
 		}
@@ -527,6 +530,7 @@ void run(void)
 		if (mem[m] > SAFE_CELL_MAX) {
 		    /* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
 		    overflows++;
+		    phy_limit = 1;
 		    mem[m] -= (SAFE_CELL_MAX+1);
 		    profile[pgm[n].cmd*4 + 3]++;
 		}
@@ -547,6 +551,7 @@ void run(void)
 		if (mem[m] < -SAFE_CELL_MAX) {
 		    /* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
 		    underflows++;
+		    phy_limit = 1;
 		    mem[m] += (SAFE_CELL_MAX+1);
 		    profile[pgm[n].cmd*4 + 3]++;
 		}
@@ -807,6 +812,8 @@ print_summary()
 	    fprintf(stderr, "Range error: ");
 	    if (physical_overflow)
 		fprintf(stderr, "range %d..%d", physical_min, physical_max);
+	    else if(phy_limit)
+		fprintf(stderr, "+/- %d", SAFE_CELL_MAX);
 	    else
 		fprintf(stderr, "value check");
 	    if (overflows)
