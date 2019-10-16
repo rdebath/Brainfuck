@@ -148,11 +148,11 @@ FNAME(int * p, void * mem)
 	case T_PRTI:
 	    {
 		char buf[4+3*sizeof(icell)], *sp=buf;
-		icell ch = *m;
-		do {;
+		icell ch = M(*m);
+		do {
 		    *sp++ = '0' + ch % 10;
 		} while((ch /= 10) != 0);
-		do {;
+		do {
 		    putch(*--sp);
 		} while(sp>buf);
 	    }

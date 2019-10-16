@@ -21,6 +21,7 @@ X(dd,DD,
             fprintf(stderr, "The -d option does not support -fintio\n");
             exit(255);
         }
+	opt_no_fullprt = 1;
     }
 #endif
 #endif

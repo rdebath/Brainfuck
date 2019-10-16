@@ -34,9 +34,7 @@ static int fixed_mask = 0;
 static int mask_defined = 1;
 static int indent = 0, disable_indent = 0;
 
-#define okay_for_cstr(xc) (((xc) >= ' ' && (xc) <= '~') || \
-	    (xc == '\n') || (xc == '\r') || (xc == '\a') || \
-	    (xc == '\b') || (xc == '\t'))
+#define okay_for_cstr(xc) ((xc) != 0 && (xc) <= '~')
 
 static int use_direct_getchar = 0;
 static int use_dynmem = 0;
@@ -244,8 +242,7 @@ print_c_header(FILE * ofd)
 	struct bfi * n = bfprog;
 	/* Check the string; be careful. */
 	while(n && okay) {
-	    if (n->type != T_CHR ||
-		(!okay_for_cstr(n->count) && n->count != '\033'))
+	    if (n->type != T_CHR || !okay_for_cstr(n->count))
 		okay = 0;
 
 	    if (n->type == T_CHR && (n->count <= 0 || n->count > 127))
@@ -448,7 +445,8 @@ print_c_header(FILE * ofd)
     }
     else
     {
-	if (node_type_counts[T_INP] != 0 || node_type_counts[T_PRT] != 0) {
+	if (node_type_counts[T_INP] != 0 ||
+	    node_type_counts[T_PRT] != 0 || node_type_counts[T_CHR] != 0) {
 	    if (l_iostyle == 1) {
 		if (knr_c_ok) fprintf(ofd, "#if defined(__STDC__) && defined(__STDC_ISO_10646__)\n");
 		fprintf(ofd, "#include <locale.h>\n");
@@ -683,7 +681,8 @@ print_c_header(FILE * ofd)
 		"\n"	"  register CELL * m = move_ptr(alloc_ptr(mem),0);" );
 	}
 
-	if (node_type_counts[T_INP] != 0 || node_type_counts[T_PRT] != 0)
+	if (node_type_counts[T_INP] != 0 ||
+	    node_type_counts[T_PRT] != 0 || node_type_counts[T_CHR] != 0) {
 	    if (l_iostyle == 1) {
 		if (knr_c_ok)
 		    fprintf(ofd, "#if defined(__STDC__) && defined(__STDC_ISO_10646__)\n");
@@ -691,6 +690,7 @@ print_c_header(FILE * ofd)
 		if (knr_c_ok)
 		    fprintf(ofd, "#endif\n");
 	    }
+	}
 
 	fprintf(ofd, "  setbuf(stdout, 0);\n");
     }
@@ -964,7 +964,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		    v = v->next;
 		    if (v->count == '%') got_perc = 1;
 		    if (v->count < ' ' || v->count > '~' || v->count == '\\' || v->count == '"')
-			slen++;
+			slen+=3;
 		    i++;
 		    slen++;
 		    if (v->next && v->next->count == '\n')
@@ -983,6 +983,13 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		    if (n->count == '\t') { *p++ = '\\'; *p++ = 't'; } else
 		    if (n->count == '\\') { *p++ = '\\'; *p++ = '\\'; } else
 		    if (n->count == '"') { *p++ = '\\'; *p++ = '"'; } else
+		    if (n->count < ' ') {
+			int c = n->count & 0xFF;
+			*p++ = '\\';
+			*p++ = '0' + ((c>>6) & 0x3);
+			*p++ = '0' + ((c>>3) & 0x7);
+			*p++ = '0' + ((c   ) & 0x7);
+		    } else
 			*p++ = (char) /*GCC -Wconversion*/ n->count;
 		    if (j!=i)
 			n = n->next;

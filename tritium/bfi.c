@@ -117,6 +117,7 @@ int opt_runner = 0;
 int opt_no_calc = 0;
 int opt_no_lessthan = 0;
 int opt_no_litprt = 0;
+int opt_no_fullprt = 0;
 int opt_no_endif = 0;
 int opt_no_kv_recursion = 0;
 int opt_no_loop_classify = 0;
@@ -223,7 +224,7 @@ void run_tree(void);
 int getch(int oldch);
 int getint(int oldch);
 void putch(int oldch);
-void putint(int oldch);
+void putint(unsigned int oldch);
 void set_cell_size(int cell_bits);
 
 /* Trial run. */
@@ -363,6 +364,8 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("        Disable the T_IF and T_ENDIF tokens.\n");
     printf("   -fno-litprt\n");
     printf("        Disable the T_CHR token and printf() strings.\n");
+    printf("   -fno-fullprt\n");
+    printf("        The T_CHR can only cope with simple ASCII.\n");
     printf("   -fno-kv-recursion\n");
     printf("        Disable recursive known value optimisations.\n");
     printf("   -fno-loop-classify\n");
@@ -588,6 +591,7 @@ checkarg(char * opt, char * arg)
     } else if (!strcmp(opt, "-fno-lttok")) { opt_no_lessthan = 1; return 1;
     } else if (!strcmp(opt, "-fno-endif")) { opt_no_endif = 1; return 1;
     } else if (!strcmp(opt, "-fno-litprt")) { opt_no_litprt = 1; return 1;
+    } else if (!strcmp(opt, "-fno-fullprt")) { opt_no_fullprt = 1; return 1;
     } else if (!strcmp(opt, "-fno-kv-recursion")) { opt_no_kv_recursion = 1; return 1;
     } else if (!strcmp(opt, "-fno-loop-classify")) { opt_no_loop_classify = 1; return 1;
     } else if (!strcmp(opt, "-fno-kv-mov")) { opt_no_kvmov = 1; return 1;
@@ -635,10 +639,6 @@ main(int argc, char ** argv)
     if (!opt_bytedefault)
 	if (!strcmp("UTF-8", nl_langinfo(CODESET))) libc_allows_utf8 = 1;
 #endif
-
-    if (opt_bytedefault) iostyle = 2;
-    else if (libc_allows_utf8) iostyle = 1;
-    else iostyle = 0;
 #endif
 #ifdef _WIN32
     SetupVT100Console(0);
@@ -1121,10 +1121,12 @@ printtreecell(FILE * efd, int indent, struct bfi * n)
 	break;
 
     case T_CHR:
-	if (n->count >= ' ' && n->count <= '~' && n->count != '"')
+	if (n->count >= ' ' && n->count <= '~' && n->count != '\'')
 	    fprintf(efd, " '%c', ", n->count);
+	else if (n->count < 0x80)
+	    fprintf(efd, " 0x%02x, ", n->count & 0xFF);
 	else
-	    fprintf(efd, " 0x%02x, ", n->count);
+	    fprintf(efd, " U+%04x, ", n->count);
 	break;
 
     case T_STOP: case T_PRT: case T_PRTI: case T_INP: case T_INPI:
@@ -1621,16 +1623,19 @@ run_tree(void)
 		    v->type = T_CHR;
 		    v->line = n->line;
 		    v->col = n->col;
-		    v->count = UM(n->type == T_PRT?p[n->offset]:n->count);
+		    v->count = (n->type == T_PRT?UM(p[n->offset]):n->count);
 		    opt_run_end = v;
-		    if (opt_no_litprt) {
+		    if (opt_no_litprt || (opt_no_fullprt && v->count != '\n'
+			&& (v->count < ' ' || v->count > '~'))) {
 			v->type = T_SET;
 			v = add_node_after(opt_run_end);
 			v->type = T_PRT;
 			v->line = n->line;
 			v->col = n->col;
 			opt_run_end = v;
-		    }
+		    } else
+			if (v->count < 128 || v->count > UCSMAX || iostyle != 1)
+			    v->count = (signed char) v->count;
 		}
 		break;
 	    } else {
@@ -2650,8 +2655,11 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 	case T_PRT: /* Print literal character. */
 	    if (opt_no_litprt) break; /* BE can't cope */
 	    known_value = UM(known_value);
-	    if (known_value < 0 && (known_value&0xFF) < 0x80)
-		known_value &= 0xFF;
+	    if (opt_no_fullprt && known_value != '\n' &&
+		(known_value < ' ' || known_value > '~'))
+		break;
+	    if (known_value < 128 || known_value > UCSMAX || iostyle != 1)
+		known_value = (signed char) known_value;
 	    v->type = T_CHR;
 	    v->count = known_value;
 	    if (verbose>5) fprintf(stderr, "  Make literal putchar.\n");
@@ -3937,14 +3945,6 @@ getch(int oldch)
 #ifdef _WIN32
 	fflush(stdout);
 #endif
-	if (iostyle == 3) {
-	    int rv;
-	    rv = scanf("%d", &c);
-	    if (rv == EOF || rv == 0)
-		goteof = 1;
-	    else
-		c = UM(c);
-	} else
 #ifdef __STDC_ISO_10646__
 	if (iostyle == 1) {
 	    int rv;
@@ -4007,31 +4007,20 @@ void
 putch(int ch)
 {
     pause_runclock();
-#ifndef _WIN32
-#ifdef __STDC_ISO_10646__
-    if (iostyle == 1 && cell_mask>0 &&
-       (cell_size > 21 || (cell_size == 21 && SM(ch) >= -128)))
-	ch = SM(ch);
-    else
-#endif
-	if (iostyle != 3)
-	    ch = UM(ch);
-#ifdef __STDC_ISO_10646__
+    ch = UM(ch);
+    if (ch < 128 || ch > UCSMAX || iostyle != 1)
+	ch = (signed char) ch;
+
+#if defined(_WIN32) || defined(__STDC_ISO_10646__)
     if (ch > 127 && iostyle == 1)
+#if !defined(_WIN32) && defined(__STDC_ISO_10646__)
 	printf("%lc", ch);
+#else
+	oututf8(ch);
+#endif
     else
 #endif
 	putchar(ch);
-#else
-    if (iostyle != 1) {
-	putchar(ch & 0xFF);
-    } else {
-	if (cell_mask>0 && cell_size > 21)
-	    oututf8(SM(ch));
-	else
-	    oututf8(UM(ch));
-    }
-#endif
 
     if (only_uses_putch) only_uses_putch = 2-(ch == '\n' || iostyle == 3);
 
@@ -4039,11 +4028,11 @@ putch(int ch)
 }
 
 void
-putint(int ch)
+putint(unsigned int ch)
 {
     pause_runclock();
-    ch = XM(ch);
-    printf("%d", ch);
+    ch = UM(ch);
+    printf("%u", ch);
     unpause_runclock();
 }
 
