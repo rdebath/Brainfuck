@@ -20,6 +20,7 @@
 
 static int do_input = 0;
 static int do_output = 0;
+static int done_func = 0;
 static int ind = 0;
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
@@ -28,6 +29,8 @@ static gen_code_t gen_code;
 struct be_interface_s be_interface = {.gen_code=gen_code};
 
 static void print_string(char * str);
+static void print_outputlib();
+static void print_inputlib();
 
 static void
 gen_code(int ch, int count, char * strn)
@@ -44,13 +47,15 @@ gen_code(int ch, int count, char * strn)
 	pr("fi");
 	pr("");
 
-	pr("set -f");
-	pr("");
+	if (!count) {
+	    pr("set -f");
+	    pr("");
 
-	pr("brainfuck() {");
-	ind++;
-	if (!count)
+	    pr("brainfuck() {");
+	    done_func = 1;
+	    ind++;
 	    prv("P=%d", tapeinit);
+	}
 	break;
 
     case 'X': pr("echo Infinite Loop 2>&1 ; exit 1"); break;
@@ -94,66 +99,79 @@ gen_code(int ch, int count, char * strn)
     case 'E': ind--; pr("fi"); break;
 
     case '~':
+	if (!done_func)
+	    break;
+
 	ind--;
 	pr("}");
 
-	if (do_output) {
-	    pr("");
-	    pr("# shellcheck disable=SC2039,SC1117");
-	    pr("if [ \".$(echo -n)\" = .-n ]");
-	    pr("then");
-	    pr("    echon() { echo \"$1\\c\"; }");
-	    pr("    echoe() { echo \"$1\\c\"; }");
-	    pr("else");
-	    pr("    echon() { echo -n \"$1\"; }");
-	    pr("    if [ \".$(echo -e)\" = .-e ]");
-	    pr("    then echoe() { echo -n \"$1\"; }");
-	    pr("    else # shellcheck disable=SC1075");
-	    pr("         if [ \".$(echo -e '\\070\\c')\" = .8 ]");
-	    pr("         then echoe() { echo -e \"$1\\c\"; }");
-	    pr("         else echoe() { echo -n -e \"$1\"; }");
-	    pr("         fi");
-	    pr("    fi");
-	    pr("fi");
-	    pr("if [ \".$(echoe '\\070')\" != .8 ]");
-	    pr("then echoe(){ printf \"%%b\" \"$*\" 2>/dev/null ; }");
-	    pr("fi");
-	    pr("if [ \".$(echoe '\\171')\" = .y ]");
-	    pr("then o(){ echoe \"$(printf '\\\\%%03o' \"$1\")\" ; }");
-	    pr("else o(){ echoe \"$(printf '\\\\%%04o' \"$1\")\" ; }");
-	    pr("fi");
-	}
+	if (do_output)
+	    print_outputlib();
 
-	if (do_input) {
-	    pr("");
-	    pr("getch() {");
-	    pr("    [ \"$goteof\" = \"y\" ] && return;");
-	    pr("    [ \"$gotline\" != \"y\" ] && {");
-	    pr("        if read -r line");
-	    pr("        then");
-	    pr("            gotline=y");
-	    pr("        else");
-	    pr("            goteof=y");
-	    pr("            return");
-	    pr("        fi");
-	    pr("    }");
-	    pr("    [ \"$line\" = \"\" ] && {");
-	    pr("        gotline=n");
-	    pr("        : $((M$P=10))");
-	    pr("        return");
-	    pr("    }");
-	    pr("    A=\"$line\"");
-	    pr("    while [ ${#A} -gt 1 ] ; do A=\"${A%%?}\"; done");
-	    pr("    line=\"${line#?}\"");
-	    pr("    A=$(printf %%d \\'\"$A\")");
-	    pr("    : $((M$P=A))");
-	    pr("}");
-	}
+	if (do_input)
+	    print_inputlib();
 
 	pr("");
 	pr("brainfuck");
 	break;
     }
+}
+
+static void
+print_outputlib()
+{
+    pr("");
+    pr("# shellcheck disable=SC2039,SC1117");
+    pr("if [ \".$(echo -n)\" = .-n ]");
+    pr("then");
+    pr("    echon() { echo \"$1\\c\"; }");
+    pr("    echoe() { echo \"$1\\c\"; }");
+    pr("else");
+    pr("    echon() { echo -n \"$1\"; }");
+    pr("    if [ \".$(echo -e)\" = .-e ]");
+    pr("    then echoe() { echo -n \"$1\"; }");
+    pr("    else # shellcheck disable=SC1075");
+    pr("         if [ \".$(echo -e '\\070\\c')\" = .8 ]");
+    pr("         then echoe() { echo -e \"$1\\c\"; }");
+    pr("         else echoe() { echo -n -e \"$1\"; }");
+    pr("         fi");
+    pr("    fi");
+    pr("fi");
+    pr("if [ \".$(echoe '\\070')\" != .8 ]");
+    pr("then echoe(){ printf \"%%b\" \"$*\" 2>/dev/null ; }");
+    pr("fi");
+    pr("if [ \".$(echoe '\\171')\" = .y ]");
+    pr("then o(){ echoe \"$(printf '\\\\%%03o' \"$1\")\" ; }");
+    pr("else o(){ echoe \"$(printf '\\\\%%04o' \"$1\")\" ; }");
+    pr("fi");
+}
+
+static void
+print_inputlib()
+{
+    pr("");
+    pr("getch() {");
+    pr("    [ \"$goteof\" = \"y\" ] && return;");
+    pr("    [ \"$gotline\" != \"y\" ] && {");
+    pr("        if read -r line");
+    pr("        then");
+    pr("            gotline=y");
+    pr("        else");
+    pr("            goteof=y");
+    pr("            return");
+    pr("        fi");
+    pr("    }");
+    pr("    [ \"$line\" = \"\" ] && {");
+    pr("        gotline=n");
+    pr("        : $((M$P=10))");
+    pr("        return");
+    pr("    }");
+    pr("    A=\"$line\"");
+    pr("    while [ ${#A} -gt 1 ] ; do A=\"${A%%?}\"; done");
+    pr("    line=\"${line#?}\"");
+    pr("    A=$(printf %%d \\'\"$A\")");
+    pr("    : $((M$P=A))");
+    pr("}");
 }
 
 static void
@@ -173,6 +191,8 @@ print_string(char * str)
 		prv("echo '%s'", buf);
 		badchar = 0;
 	    } else {
+		if (!done_func && !do_output)
+		    print_outputlib();
 		do_output++;
 		prv("echon '%s'", buf);
 	    }
@@ -182,8 +202,10 @@ print_string(char * str)
 	    if (badchar == 10)
 		pr("echo");
 	    else {
-		prv("o %d", badchar);
+		if (!done_func && !do_output)
+		    print_outputlib();
 		do_output++;
+		prv("o %d", badchar);
 	    }
 	    badchar = 0;
 	}
