@@ -15,6 +15,7 @@
 #include "bfi.run.h"
 #include "clock.h"
 #include "bfi.ccode.h"
+#include "big_int.h"
 
 #ifndef DISABLE_TCCLIB
 #include <libtcc.h>
@@ -31,7 +32,7 @@
 typedef void (*void_func)(void);
 static const char * putname = "putch";
 static int fixed_mask = 0;
-static int mask_defined = 1;
+static int mask_defined = 0;
 static int indent = 0, disable_indent = 0;
 
 #define okay_for_cstr(xc) ((xc) != 0 && (xc) <= '~')
@@ -43,6 +44,7 @@ static int use_functions = -1;
 static int libtcc_specials = 0;
 static int knr_c_ok = 1;
 static int tiny_tape = 0;
+static int gen_getch = 0, gen_putch = 0;
 
 #if defined(DISABLE_DLOPEN)
 static const int use_dlopen = 0;
@@ -67,6 +69,7 @@ static char * rvalmsk(int offset);
 static char * rval(int offset);
 static char * lval(int offset);
 static void print_c_header(FILE * ofd);
+static void print_lib_funcs(FILE * ofd);
 
 int
 checkarg_ccode(char * opt, char * arg UNUSED)
@@ -291,7 +294,10 @@ print_c_header(FILE * ofd)
     }
 
     if (cell_size == 0) {
-	if (cell_length == 0 || cell_length == INT_MAX) {
+	if (cell_type_iso)
+	    fprintf(ofd, "#include <stdint.h>\n\n");
+	else if (cell_length == 0 || cell_length == INT_MAX || 
+		(cell_length > 0 && cell_size == 0)) {
 	    if (knr_c_ok)
 		fprintf(ofd, "#ifdef __STDC__\n");
 
@@ -319,28 +325,27 @@ print_c_header(FILE * ofd)
 	    fprintf(ofd, "#endif\n\n");
 
 	    if (cell_length != INT_MAX) {
+		mask_defined = 1;
 		fprintf(ofd, "#ifndef M\n");
-		fprintf(ofd, "#define M(V) V\n");
+		if (cell_length > 0 && cell_length < sizeof(C)*CHAR_BIT)
+		    fprintf(ofd, "#define M(V) ((V)&(((C)1<<%d)-1))\n", cell_length);
+		else
+		    fprintf(ofd, "#define M(V) V\n");
 		fprintf(ofd, "#endif\n\n");
 		if (knr_c_ok) fprintf(ofd, "#ifdef __STDC__\n");
 		fprintf(ofd, "enum { MaskTooSmall=1/(M(0x80)) };\n");
 		if (knr_c_ok) fprintf(ofd, "#endif\n\n");
 	    } else {
-		mask_defined = 0;
 		if (knr_c_ok) fprintf(ofd, "#ifdef __STDC__\n");
 		fprintf(ofd, "enum { CellTooSmall=1/(sizeof(C)>=sizeof(int)) };\n");
 		if (knr_c_ok) fprintf(ofd, "#endif\n\n");
 	    }
-	} else {
-	    if (cell_type_iso)
-		fprintf(ofd, "#include <stdint.h>\n\n");
-	    mask_defined = 0;
 	}
 
-    } else if(fixed_mask>0)
+    } else if(fixed_mask>0) {
 	fprintf(ofd, "#define M(V) ((V) & 0x%x)\n\n", fixed_mask);
-    else
-	mask_defined = 0;
+	mask_defined = 1;
+    }
 
     /* Add the debugging lib routines */
     if (enable_trace || node_type_counts[T_DUMP] != 0) {
@@ -414,9 +419,6 @@ print_c_header(FILE * ofd)
 	fputs("\n", ofd);
     }
 
-    /* Anything special needed for putch? */
-    if(l_iostyle != 1) putname = "putchar";
-
     /* Interface/headers for T_PRT and T_INP */
     if (do_run) {
 	if (use_dlopen) {
@@ -438,9 +440,11 @@ print_c_header(FILE * ofd)
 		"#define getch (*bf_init.bf_getch)\n"
 		);
 	} else {
-	    fprintf(ofd, "extern void putch(int ch);\n");
-	    fprintf(ofd, "extern int getch(int ch);\n");
-	    fprintf(ofd, "extern %s mem[];\n", cell_type);
+	    fprintf(ofd, "%s%s%s\n",
+		"extern void putch(int ch);\n"
+		"extern int getch(int ch);\n"
+		"extern ", cell_type, " mem[];\n"
+		"#define brainfuck main");
 	}
     }
     else
@@ -459,88 +463,44 @@ print_c_header(FILE * ofd)
 
     /* Standalone routines for Input and Print */
     if (!do_run) {
-	if (node_type_counts[T_INP] != 0)
+	if (node_type_counts[T_INP] != 0 || node_type_counts[T_INPI] != 0)
 	{
-	    if (l_iostyle == 2 && (eofcell == 4 || (eofcell == 2 && EOF == -1))) {
+	    if (l_iostyle == 2 && node_type_counts[T_INPI] == 0 &&
+		(eofcell == 4 || (eofcell == 2 && EOF == -1))) {
 		use_direct_getchar = 1;
 	    } else {
-		fprintf(ofd, "#ifdef __STDC__\n");
-		fprintf(ofd, "static int\n");
-		fprintf(ofd, "getch(int oldch)\n");
-		fprintf(ofd, "#else\n");
-		fprintf(ofd, "static int getch(oldch) int oldch;\n");
-		fprintf(ofd, "#endif\n");
-		fprintf(ofd, "{\n");
-		fprintf(ofd, "  int ch;\n");
-		if (l_iostyle == 2) {
-		    fprintf(ofd, "  ch = getchar();\n");
-		} else {
-		    fprintf(ofd, "  do {\n");
-		    if (l_iostyle == 1) {
-			if (knr_c_ok)
-			    fprintf(ofd, "#if defined(__STDC__) && defined(__STDC_ISO_10646__)\n");
-			fprintf(ofd, "\tch = getwchar();\n");
-			if (knr_c_ok) {
-			    fprintf(ofd, "#else\n");
-			    fprintf(ofd, "\tch = getchar();\n");
-			    fprintf(ofd, "#endif\n");
-			}
-		    } else
-			fprintf(ofd, "\tch = getchar();\n");
-		    fprintf(ofd, "  } while (ch == '\\r');\n");
-		}
-		switch(eofcell) {
-		default:
-		    fprintf(ofd, "#ifndef EOFCELL\n");
-		    fprintf(ofd, "  if (ch != EOF) return ch;\n");
-		    fprintf(ofd, "  return oldch;\n");
-		    fprintf(ofd, "#else\n");
-		    fprintf(ofd, "#if EOFCELL == EOF\n");
-		    fprintf(ofd, "  return ch;\n");
-		    fprintf(ofd, "#else\n");
-		    fprintf(ofd, "  if (ch != EOF) return ch;\n");
-		    fprintf(ofd, "  return EOFCELL;\n");
-		    fprintf(ofd, "#endif\n");
-		    fprintf(ofd, "#endif\n");
-		    break;
-		case 1:
-		    fprintf(ofd, "  if (ch != EOF) return ch;\n");
-		    fprintf(ofd, "  return oldch;\n");
-		    break;
-		case 3:
-		    fprintf(ofd, "  if (ch != EOF) return ch;\n");
-		    fprintf(ofd, "  return 0;\n");
-		    break;
-		case 2:
-		#if EOF != -1
-		    fprintf(ofd, "  if (ch != EOF) return ch;\n");
-		    fprintf(ofd, "  return -1;\n");
-		    break;
-		#endif
-		case 4:
-		    fprintf(ofd, "  return ch;\n");
-		    break;
-		}
-		fprintf(ofd, "}\n\n");
+		if (knr_c_ok)
+		    fprintf(ofd, "%s%s%s%s%s%s%s",
+			"#ifdef __STDC__\n"
+			 "static ",cell_type," getch(",cell_type," oldch);\n"
+			 "#else\n"
+			 "static ",cell_type," getch();\n"
+			 "#endif\n\n");
+		else
+		    fprintf(ofd, "%s%s%s%s%s",
+			"static ",cell_type," getch(",cell_type," oldch);\n");
+		gen_getch = 1;
 	    }
 	}
 
+	/* Anything special needed for putch? */
 	if ((node_type_counts[T_CHR] != 0 || node_type_counts[T_PRT] != 0) &&
 	    l_iostyle == 1) {
-	    fputs(
-		"#if defined(__STDC__) && defined(__STDC_ISO_10646__)\n"
-		"static void putch(int ch)\n"
-		"{\n"
-		"  if(ch>127)\n"
-		"\tprintf(\"%lc\",ch);\n"
-		"  else\n"
-		"\tputchar(ch);\n"
-		"}\n"
-		"#else\n"
-		"#define putch(ch) putchar(ch)\n"
-		"#endif\n"
-		"\n", ofd);
-	}
+	    gen_putch = 1;
+
+	    if (knr_c_ok)
+		fputs(
+		    "#if defined(__STDC__) && defined(__STDC_ISO_10646__)\n"
+		    "static void putch(int ch);\n"
+		    "#else\n"
+		    "static void putch();\n"
+		    "#endif\n"
+		    "\n", ofd);
+	    else
+		fputs("static void putch(int ch);\n", ofd);
+
+	} else
+	    putname = "putchar";
     }
 
     /* Are we using T_PRTI ? */
@@ -561,17 +521,21 @@ print_c_header(FILE * ofd)
 
     if (node_type_counts[T_INPI] != 0)
     {
-	fprintf(ofd, "#ifdef __STDC__\n");
-	fprintf(ofd, "static int\n");
-	fprintf(ofd, "getint(int oldch)\n");
-	fprintf(ofd, "#else\n");
-	fprintf(ofd, "static int getint(oldch) int oldch;\n");
-	fprintf(ofd, "#endif\n");
-	fprintf(ofd, "{\n");
-	fprintf(ofd, "  int ch;\n");
-	fprintf(ofd, "  if (scanf(\"%%d\", &ch)) return ch;\n");
-	fprintf(ofd, "  return oldch;\n");
-	fprintf(ofd, "}\n\n");
+	fprintf(ofd, "%s%s%s%s%s",
+			"static ",cell_type," getint()"
+		"\n"	"{"
+		"\n"	"    int f = 1, c;"
+		"\n"	"    ",cell_type," v;"
+		"\n"	"    while(f) {"
+		"\n"	"        f = 0;"
+		"\n"	"        c = getch(0);"
+		"\n"	"        if(c >= '0' && c <= '9') {"
+		"\n"	"            v = v*10 + c - 48;"
+		"\n"	"            f = 1;"
+		"\n"	"        }"
+		"\n"	"    }"
+		"\n"	"    return v;"
+		"\n"	"}\n\n");
     }
 
     /* Are we using T_STOP ? */
@@ -697,14 +661,9 @@ print_c_header(FILE * ofd)
 
     /* Start main() for runing now. */
     if (do_run) {
-	if (use_dlopen) {
-	    fprintf(ofd, "%s%s%s",
-		"static int brainfuck(void){\n"
-		"  register ", cell_type, " * m = mem;\n");
-	} else {
-	    fprintf(ofd, "int main(){\n");
-	    fprintf(ofd, "  register %s * m = mem;\n", cell_type);
-	}
+	fprintf(ofd, "%s%s%s",
+	    "int brainfuck(void){\n"
+	    "  register ", cell_type, " * m = mem;\n");
     }
 
     if (enable_trace || node_type_counts[T_DUMP] != 0) {
@@ -713,6 +672,115 @@ print_c_header(FILE * ofd)
 
     if (!use_functions)
 	fprintf(ofd, "\n");
+}
+
+void
+print_lib_funcs(FILE * ofd)
+{
+    if (gen_putch)
+    {
+	if (knr_c_ok)
+	    fputs(
+		"\n"	"#ifdef __STDC__"
+		"\n"	"static void putch(int ch)"
+		"\n"	"#else"
+		"\n"	"static void putch(ch) int ch;"
+		"\n"	"#endif"
+		"\n"	"#if defined(__STDC__) && defined(__STDC_ISO_10646__)"
+		"\n"	"{"
+		"\n"	"    if(ch>127)"
+		"\n"	"\tprintf(\"%lc\",ch);"
+		"\n"	"    else"
+		"\n"	"\tputchar(ch);"
+		"\n"	"}"
+		"\n"	"#else"
+		"\n"	"{"
+		"\n"	"    putchar(ch);"
+		"\n"	"}"
+		"\n"	"#endif"
+		"\n", ofd);
+	else
+	    fputs(
+		"\n"	"static void putch(int ch)"
+		"\n"	"{"
+		"\n"	"#ifdef __STDC_ISO_10646__"
+		"\n"	"    if(ch>127)"
+		"\n"	"\tprintf(\"%lc\",ch);"
+		"\n"	"    else"
+		"\n"	"#endif"
+		"\n"	"\tputchar(ch);"
+		"\n"	"}"
+		"\n", ofd);
+    }
+
+    if (gen_getch)
+    {
+	fprintf(ofd, "\n");
+	if (knr_c_ok)
+	{
+	    fprintf(ofd, "#ifdef __STDC__\n");
+	    fprintf(ofd, "static %s\n", cell_type);
+	    fprintf(ofd, "getch(%s oldch)\n", cell_type);
+	    fprintf(ofd, "#else\n");
+	    fprintf(ofd, "static int getch(oldch) %s oldch;\n", cell_type);
+	    fprintf(ofd, "#endif\n");
+	} else
+	    fprintf(ofd, "static %s\ngetch(%s oldch)\n", cell_type, cell_type);
+
+	fprintf(ofd, "{\n");
+	fprintf(ofd, "  int ch;\n");
+	if (iostyle == 2) {
+	    fprintf(ofd, "  ch = getchar();\n");
+	} else {
+	    fprintf(ofd, "  do {\n");
+	    if (iostyle == 1) {
+		if (knr_c_ok)
+		    fprintf(ofd, "#if defined(__STDC__) && defined(__STDC_ISO_10646__)\n");
+		else
+		    fprintf(ofd, "#ifdef __STDC_ISO_10646__\n");
+
+		fprintf(ofd, "\tch = getwchar();\n");
+		fprintf(ofd, "#else\n");
+		fprintf(ofd, "\tch = getchar();\n");
+		fprintf(ofd, "#endif\n");
+	    } else
+		fprintf(ofd, "\tch = getchar();\n");
+	    fprintf(ofd, "  } while (ch == '\\r');\n");
+	}
+	switch(eofcell) {
+	default:
+	    fprintf(ofd, "#ifndef EOFCELL\n");
+	    fprintf(ofd, "  if (ch != EOF) return ch;\n");
+	    fprintf(ofd, "  return oldch;\n");
+	    fprintf(ofd, "#else\n");
+	    fprintf(ofd, "#if EOFCELL == EOF\n");
+	    fprintf(ofd, "  return ch;\n");
+	    fprintf(ofd, "#else\n");
+	    fprintf(ofd, "  if (ch != EOF) return ch;\n");
+	    fprintf(ofd, "  return EOFCELL;\n");
+	    fprintf(ofd, "#endif\n");
+	    fprintf(ofd, "#endif\n");
+	    break;
+	case 1:
+	    fprintf(ofd, "  if (ch != EOF) return ch;\n");
+	    fprintf(ofd, "  return oldch;\n");
+	    break;
+	case 3:
+	    fprintf(ofd, "  if (ch != EOF) return ch;\n");
+	    fprintf(ofd, "  return 0;\n");
+	    break;
+	case 2:
+	#if EOF != -1
+	    fprintf(ofd, "  if (ch != EOF) return ch;\n");
+	    fprintf(ofd, "  return -1;\n");
+	    break;
+	#endif
+	case 4:
+	    fprintf(ofd, "  return ch;\n");
+	    break;
+	}
+	fprintf(ofd, "}\n");
+    }
 }
 
 static void
@@ -1024,7 +1092,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 
 	case T_INPI:
 	    if (!disable_indent) pt(ofd, indent,n);
-	    fprintf(ofd, "%s = getint(%s);\n", lval(n->offset), rval(n->offset));
+	    fprintf(ofd, "%s = getint();\n", lval(n->offset));
 
 	    if (enable_trace) {
 		pt(ofd, indent,0);
@@ -1288,18 +1356,25 @@ print_ccode(FILE * ofd)
     indent = 0;
     disable_indent = 0;
 
-    if (!noheader) print_c_header(ofd);
-
     if (!use_functions)
     {
+	if (!noheader)
+	    print_c_header(ofd);
+	else
+	    fprintf(ofd, "int bf(register %s * m)\n{\n", cell_type);
+
 	print_c_body(ofd, bfprog, (struct bfi *)0);
 
+	fprintf(ofd, "  return 0;\n}\n");
+
 	if (!noheader)
-	    fprintf(ofd, "  return 0;\n}\n");
+	    print_lib_funcs(ofd);
 	return;
     }
 
     if (!noheader) {
+	print_c_header(ofd);
+
 	fprintf(ofd, "  {\n");
 	if (!knr_c_ok)
 	    fprintf(ofd, "    extern void bf(register %s*);\n", cell_type);
@@ -1344,6 +1419,8 @@ print_ccode(FILE * ofd)
 	fprintf(ofd, "void bf FD((register %s * m),(m) register %s * m;)\n{\n", cell_type, cell_type);
     print_c_body(ofd, bfprog, (struct bfi *)0);
     fprintf(ofd, "}\n");
+    if (!noheader)
+	print_lib_funcs(ofd);
     return;
 }
 
@@ -1363,8 +1440,7 @@ run_ccode(void)
 #ifdef __TINYC__
 	use_dlopen = 0;
 #else
-	use_dlopen = ((total_nodes < 4000 && cell_length!=64) ||
-		      opt_level>=3 || cell_length>64);
+	use_dlopen = ((total_nodes < 4000) || (opt_level > 3));
 #endif
     if (use_dlopen)
 	run_gccode();

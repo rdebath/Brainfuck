@@ -66,6 +66,7 @@ characters after your favorite comment marker in a very visible form.
 #endif
 
 #include "bfi.tree.h"
+#include "big_int.h"
 #include "ov_int.h"
 
 #ifndef NO_EXT_BE
