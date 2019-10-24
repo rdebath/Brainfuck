@@ -511,12 +511,8 @@ checkarg(char * opt, char * arg)
 	case 'm': opt_level= -1; break;
 	case 'T': enable_trace=1; break;
 
-	case '8':
-	    iostyle=2;
-	    default_io=0;
-	    set_cell_size(8);
-	    eofcell = 4;
-	    break;
+	case '8': set_cell_size(8); break;
+	case 'w': set_cell_size(32); break;
 
 	case 'a': iostyle=0; default_io=0; break;
 	case 'B': iostyle=2; default_io=0; break;
