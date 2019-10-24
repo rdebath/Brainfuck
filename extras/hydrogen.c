@@ -933,7 +933,19 @@ fprintf(stderr, "%d: %s,%d m[%d]=%d"
 
 	case T_PRT:
 #ifdef MODMASK
+#if MASK >= 384
+	    /* If negative is distinct from >128 map the first 128 negative
+	     * values like an 8-bit cell */
+	    {
+		int c = M(*m + MASK + 1);
+		if (c > MASK/2 && c > 255) {
+		    putchar(c-(MASK+1));
+		} else
+		    putchar(c);
+	    }
+#else
 	    putchar(M(*m + MASK + 1));
+#endif
 #else
 	    putchar(*m);
 #endif
