@@ -30,6 +30,7 @@ static int ind = 0;
 
 static void print_cstring(char * str);
 static int use_macro = 0;
+static int utf8_conv = 0;
 static int bpc = 0;
 
 static check_arg_t fn_check_arg;
@@ -49,6 +50,10 @@ fn_check_arg(const char * arg)
 	    fprintf(stderr, "Cell size must be a minimum of 32 bits\n");
 	    exit(1);
 	}
+        return 1;
+    }
+    if (strcmp("-u", arg) ==0) {
+        utf8_conv = 1;
         return 1;
     }
     if (strcmp("-h", arg) ==0) {
@@ -123,37 +128,52 @@ gen_code(int ch, int count, char * strn)
 	);
 	puts("");
 
-	/* BN is a bit weird about getting ints from a bignum, so while I'm
-	 * messing about here I'll stick in a UTF-8 encoder too.
-	 */
-	printf("%s\n",
-		"void"
-	"\n"	"putchar8(BIGNUM * chr)"
-	"\n"	"{"
-	"\n"	"    int input_chr;"
-	"\n"	"    BIGNUM * t2 = BN_new();"
-	"\n"	"    input_chr = BN_get_word(chr);"
-	"\n"	"    BN_zero(t2);"
-	"\n"	"    if(BN_cmp(chr,t2) < 0) input_chr = -(input_chr&255);"
-	"\n"	"    BN_free(t2);"
-	"\n"
-	"\n"	"    if (input_chr < 0x80) {            /* one-byte char */"
-	"\n"	"        putchar(input_chr);"
-	"\n"	"    } else if (input_chr < 0x800) {    /* two-byte char */"
-	"\n"	"        putchar(0xC0 | (0x1F & (input_chr >>  6)));"
-	"\n"	"        putchar(0x80 | (0x3F & (input_chr      )));"
-	"\n"	"    } else if (input_chr < 0x10000) {  /* three-byte char */"
-	"\n"	"        putchar(0xE0 | (0x0F & (input_chr >> 12)));"
-	"\n"	"        putchar(0x80 | (0x3F & (input_chr >>  6)));"
-	"\n"	"        putchar(0x80 | (0x3F & (input_chr      )));"
-	"\n"	"    } else if (input_chr < 0x200000) { /* four-byte char */"
-	"\n"	"        putchar(0xF0 | (0x07 & (input_chr >> 18)));"
-	"\n"	"        putchar(0x80 | (0x3F & (input_chr >> 12)));"
-	"\n"	"        putchar(0x80 | (0x3F & (input_chr >>  6)));"
-	"\n"	"        putchar(0x80 | (0x3F & (input_chr      )));"
-	"\n"	"    }"
-	"\n"	"}"
-	);
+	if (utf8_conv)
+	    /* BN is a bit weird about getting ints from a bignum, so while I'm
+	     * messing about here I'll stick in a UTF-8 encoder too.
+	     */
+	    printf("%s\n",
+		    "void"
+	    "\n"	"putchar8(BIGNUM * chr)"
+	    "\n"	"{"
+	    "\n"	"    int input_chr;"
+	    "\n"	"    BIGNUM * t2 = BN_new();"
+	    "\n"	"    input_chr = BN_get_word(chr);"
+	    "\n"	"    BN_zero(t2);"
+	    "\n"	"    if(BN_cmp(chr,t2) < 0) input_chr = -(input_chr&255);"
+	    "\n"	"    BN_free(t2);"
+	    "\n"
+	    "\n"	"    if (input_chr < 0x80) {            /* one-byte char */"
+	    "\n"	"        putchar(input_chr);"
+	    "\n"	"    } else if (input_chr < 0x800) {    /* two-byte char */"
+	    "\n"	"        putchar(0xC0 | (0x1F & (input_chr >>  6)));"
+	    "\n"	"        putchar(0x80 | (0x3F & (input_chr      )));"
+	    "\n"	"    } else if (input_chr < 0x10000) {  /* three-byte char */"
+	    "\n"	"        putchar(0xE0 | (0x0F & (input_chr >> 12)));"
+	    "\n"	"        putchar(0x80 | (0x3F & (input_chr >>  6)));"
+	    "\n"	"        putchar(0x80 | (0x3F & (input_chr      )));"
+	    "\n"	"    } else if (input_chr < 0x200000) { /* four-byte char */"
+	    "\n"	"        putchar(0xF0 | (0x07 & (input_chr >> 18)));"
+	    "\n"	"        putchar(0x80 | (0x3F & (input_chr >> 12)));"
+	    "\n"	"        putchar(0x80 | (0x3F & (input_chr >>  6)));"
+	    "\n"	"        putchar(0x80 | (0x3F & (input_chr      )));"
+	    "\n"	"    }"
+	    "\n"	"}"
+	    );
+	else
+	    printf("%s\n",
+		    "void"
+	    "\n"	"putchar8(BIGNUM * chr)"
+	    "\n"	"{"
+	    "\n"	"    int input_chr;"
+	    "\n"	"    BIGNUM * t2 = BN_new();"
+	    "\n"	"    input_chr = BN_get_word(chr);"
+	    "\n"	"    BN_zero(t2);"
+	    "\n"	"    if(BN_cmp(chr,t2) < 0) input_chr = -(input_chr&255);"
+	    "\n"	"    BN_free(t2);"
+	    "\n"	"    putchar(input_chr);"
+	    "\n"	"}"
+	    );
 
 	puts("");
 

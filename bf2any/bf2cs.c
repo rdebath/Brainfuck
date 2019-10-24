@@ -57,7 +57,10 @@ gen_code(int ch, int count, char * strn)
 	prv("Console.Write(Char.ConvertFromUtf32(%s));",
 	    bytecell?"(byte)M[P]":"(ulong)M[P]>0x10FFFF?0xFFFD:(int)M[P]");
 	break;
-    case ',': pr("M[P]=Console.Read();"); break;
+    case ',':
+	pr("V=Console.Read();");
+	pr("if(V != -1) { M[P] = V; }");
+	break;
     case '"': print_cstring(strn); break;
 
     case '[': prv("while(%sM[P]!=0) {", bytecell?"(byte)":""); ind++; break;

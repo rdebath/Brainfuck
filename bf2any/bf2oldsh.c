@@ -256,7 +256,7 @@ gen_code(int ch, int count, char * strn)
 		"# Use other tools here, input is not needed for TC",
 		"i1() {",
 		"A=`dd bs=1 count=1 2>/dev/null | od -t d1 | awk '{print $2;}'`",
-	        "eval \"M$P=$A\"",
+	        "[ \"$A\" != '' ] && eval \"M$P=$A\"",
 		"}");
 	}
 
@@ -296,6 +296,7 @@ print_string(char * str)
 	    } else {
 		buf[outlen] = 0;
 		printf("echon '%s'\n", buf);
+		do_output = 1;
 	    }
 	    gotnl = 0; outlen = 0;
 	}

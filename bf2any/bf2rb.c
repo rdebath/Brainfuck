@@ -12,6 +12,7 @@
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
 static int safetapeoff = 0, curtapeoff = 0;
+static int utf8_conv = 0;
 
 static void print_cstring(char * str);
 
@@ -24,6 +25,10 @@ fn_check_arg(const char * arg)
 {
     if (strcmp(arg, "-M") == 0) {
 	tapelen = 0;
+	return 1;
+    }
+    if (strcmp(arg, "-u") == 0) {
+	utf8_conv = 1;
 	return 1;
     }
     return 0;
@@ -135,13 +140,18 @@ gen_code(int ch, int count, char * strn)
     case '"': print_cstring(strn); break;
     case '.':
 	I;
-	if(bytecell) printf("print (%s & 255).chr\n", cm);
-	else printf("begin print '' << %s rescue print (%s & 255).chr end\n", cm, cm);
+	if(!utf8_conv) printf("print (%s & 255).chr\n", cm);
+	else {
+	    if(bytecell) { I; printf("%s &= 255\n", cm); }
+	    printf("begin print '' << %s rescue print (%s & 255).chr end\n", cm, cm);
+	}
 	break;
     case ',':
 	I;
-	if (bytecell) printf("%s = $stdin.getbyte if !$stdin.eof\n", cm);
-	else          printf("%s = $stdin.getc.ord if !$stdin.eof\n", cm);
+	if (!utf8_conv)
+	    printf("%s = $stdin.getbyte if !$stdin.eof\n", cm);
+	else
+	    printf("%s = $stdin.getc.ord if !$stdin.eof\n", cm);
 	break;
     }
 }

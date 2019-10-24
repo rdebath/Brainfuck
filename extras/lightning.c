@@ -282,11 +282,16 @@ outrun(int ch, int count)
 	jit_finishi(getchar);
 	jit_retval(REG_ACC);
 
-	if (tape_step>1)
-	    jit_str_i(REG_P, REG_ACC);
-	else
-	    jit_str_c(REG_P, REG_ACC);
+	{
+	    jit_node_t *lbl = jit_beqi(REG_ACC, EOF);
 
+	    if (tape_step>1)
+		jit_str_i(REG_P, REG_ACC);
+	    else
+		jit_str_c(REG_P, REG_ACC);
+
+	    jit_patch(lbl);
+	}
 	break;
     }
 }

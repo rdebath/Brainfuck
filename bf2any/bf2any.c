@@ -55,6 +55,7 @@ static void pipe_to_be(char ** filelist, int filecount);
  */
 static int enable_rle = 0;
 static int backend_only = 0;
+static int eofcell = 0;
 
 static int
 check_arg(const char * arg) {
@@ -93,6 +94,14 @@ check_argv(const char * arg)
 	backend_only = 1;
 	enable_rle++;
 	enable_debug = 1;
+
+    } else if (strcmp(arg, "-n") == 0) {
+	eofcell = 0;
+    } else if (strcmp(arg, "-z") == 0) {
+	eofcell = 1;
+    } else if (strcmp(arg, "-e") == 0) {
+	eofcell = 2;
+
     } else if (check_arg(arg)) {
 	;
     }
@@ -285,7 +294,11 @@ load_and_run(char ** filelist, int filecount)
 		    continue;
 		}
 		if (ch == '"') { qstring++; continue; }
-		if (ch == ',') inp = 1;
+		if (ch == ',') {
+		    inp = 1;
+		    if (eofcell == 1) outrun('=', 0);
+		    if (eofcell == 2) outrun('=', -1);
+		}
 		if (!b && ch == ']') {
 		    fprintf(stderr, "Warning: skipping unbalanced ']' command.\n");
 		    continue; /* Ignore too many ']' */

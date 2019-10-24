@@ -207,7 +207,8 @@ gen_code(int ch, int count, char * strn)
 	printf("fn i {\n");
 	printf("    f\n");
 	printf("    v=`{dd 'bs=1' 'count=1' >[2]/dev/null | od -t d1 | cut -d ' ' -s -f 2- }\n");
-	printf("    w\n");
+	printf("    if (! ~ $v ())\n");
+	printf("      w\n");
 	printf("}\n" "\n");
 
 	if (max_prle>1) {
