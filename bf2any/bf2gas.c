@@ -152,25 +152,33 @@ gen_code(int ch, int count, char * strn)
 	}
 	break;
     case ',':
-	if (use_64bit)
-	    puts("call getchar@PLT");
-	else
-	    puts("call getchar");
-	printf("cmp %s, -1\n", AX);
-	printf("je 1f\n");
-	printf("mov byte ptr [%s], al\n", BX);
-	printf("1:\n");
+	if (use_64bit) {
+	    printf("mov edx, 1\n");
+	    printf("mov rsi, %s\n",BX);
+	    printf("mov edi, 0\n");
+	    printf("call read@PLT\n");
+	} else {
+	    printf("sub %s, 4\n", SP);
+	    printf("push 1\n");
+	    printf("push %s\n", BX);
+	    printf("push 0\n");
+	    printf("call read\n");
+	    printf("add %s, 16\n", SP);
+	}
 	break;
     case '.':
-	printf("movzx %s, byte ptr [%s]\n", AX, BX);
-	if (!use_64bit)
-	{
-	    printf("push %s\n", AX);
-	    puts("call putchar");
-	    printf("pop %s\n", AX);
+	if (use_64bit) {
+	    printf("mov edx, 1\n");
+	    printf("mov rsi, %s\n", BX);
+	    printf("mov edi, 1\n");
+	    printf("call write@PLT\n");
 	} else {
-	    printf("mov %s, %s\n", DI, AX);
-	    puts("call putchar@PLT");
+	    printf("sub %s, 4\n", SP);
+	    printf("push 1\n");
+	    printf("push %s\n", BX);
+	    printf("push 1\n");
+	    printf("call write\n");
+	    printf("add %s, 16\n", SP);
 	}
 	break;
     case '~':
