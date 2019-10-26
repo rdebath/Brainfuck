@@ -645,6 +645,9 @@ char ** argv;
 	if (sizeof(unsigned short) == bytes_needed) { printf("unsigned short\n"); return 0; }
 	if (sizeof(unsigned) == bytes_needed) { printf("unsigned\n"); return 0; }
 	if (sizeof(unsigned long) == bytes_needed) { printf("unsigned long\n"); return 0; }
+#if defined(ULLONG_MAX)
+	if (sizeof(unsigned long long) == bytes_needed) { printf("unsigned long long\n"); return 0; }
+#endif
 	return 1;
     } else {
 #if defined(SCHAR_MAX) && defined(__STDC__)
@@ -654,6 +657,9 @@ char ** argv;
 	if (sizeof(short) == bytes_needed) { printf("short\n"); return 0; }
 	if (sizeof(int) == bytes_needed) { printf("int\n"); return 0; }
 	if (sizeof(long) == bytes_needed) { printf("long\n"); return 0; }
+#if defined(LONG_LONG_MAX) || defined(GOT_LLONG)
+	if (sizeof(long long) == bytes_needed) { printf("long long\n"); return 0; }
+#endif
 	return 1;
     }
 }
