@@ -525,11 +525,16 @@ char ** argv;
 {
     int bytes_needed = 0;
     int is_unsigned = 1;
+    int no_iso = 0;
     if (argc < 2) { print_info(); return 0;}
+
+    if (strcmp(argv[1], "-c") == 0) {
+	argv++; argc--; no_iso++;
+    }
 
     if (strcmp(argv[1], "-u8") == 0) {
 #ifdef UINT8_MAX
-	printf("uint8_t\n"); return 0;
+	if (!no_iso) { printf("uint8_t\n"); return 0; }
 #endif
 	bytes_needed = 1;
 	is_unsigned = 1;
@@ -537,7 +542,7 @@ char ** argv;
 
     if (strcmp(argv[1], "-i8") == 0) {
 #ifdef INT8_MAX
-	printf("int8_t\n"); return 0;
+	if (!no_iso) { printf("int8_t\n"); return 0; }
 #endif
 	bytes_needed = 1;
 	is_unsigned = 0;
@@ -545,7 +550,7 @@ char ** argv;
 
     if (strcmp(argv[1], "-u16") == 0) {
 #ifdef UINT16_MAX
-	printf("uint16_t\n"); return 0;
+	if (!no_iso) { printf("uint16_t\n"); return 0; }
 #endif
 	bytes_needed = 2;
 	is_unsigned = 1;
@@ -553,7 +558,7 @@ char ** argv;
 
     if (strcmp(argv[1], "-i16") == 0) {
 #ifdef INT16_MAX
-	printf("int16_t\n"); return 0;
+	if (!no_iso) { printf("int16_t\n"); return 0; }
 #endif
 	bytes_needed = 2;
 	is_unsigned = 0;
@@ -561,7 +566,7 @@ char ** argv;
 
     if (strcmp(argv[1], "-u32") == 0) {
 #ifdef UINT32_MAX
-	printf("uint32_t\n"); return 0;
+	if (!no_iso) { printf("uint32_t\n"); return 0; }
 #endif
 	bytes_needed = 4;
 	is_unsigned = 1;
@@ -569,7 +574,7 @@ char ** argv;
 
     if (strcmp(argv[1], "-i32") == 0) {
 #ifdef INT32_MAX
-	printf("int32_t\n"); return 0;
+	if (!no_iso) { printf("int32_t\n"); return 0; }
 #endif
 	bytes_needed = 4;
 	is_unsigned = 0;
@@ -577,7 +582,7 @@ char ** argv;
 
     if (strcmp(argv[1], "-u64") == 0) {
 #ifdef UINT64_MAX
-	printf("uint64_t\n"); return 0;
+	if (!no_iso) { printf("uint64_t\n"); return 0; }
 #endif
 	bytes_needed = 8;
 	is_unsigned = 1;
@@ -585,7 +590,7 @@ char ** argv;
 
     if (strcmp(argv[1], "-i64") == 0) {
 #ifdef INT64_MAX
-	printf("int64_t\n"); return 0;
+	if (!no_iso) { printf("int64_t\n"); return 0; }
 #endif
 	bytes_needed = 8;
 	is_unsigned = 0;
@@ -593,7 +598,7 @@ char ** argv;
 
     if (strcmp(argv[1], "-u128") == 0) {
 #ifdef UINT128_MAX
-	printf("uint128_t\n"); return 0;
+	if (!no_iso) { printf("uint128_t\n"); return 0; }
 #endif
 #if defined(__SIZEOF_INT128__)
 	printf("unsigned __int128\n"); return 0;
@@ -607,7 +612,7 @@ char ** argv;
 
     if (strcmp(argv[1], "-i128") == 0) {
 #ifdef INT128_MAX
-	printf("int128_t\n"); return 0;
+	if (!no_iso) { printf("int128_t\n"); return 0; }
 #endif
 #if defined(__SIZEOF_INT128__)
 	printf("__int128\n"); return 0;
