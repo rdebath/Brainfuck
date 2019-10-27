@@ -1770,6 +1770,15 @@ static trivbf roadrunner[1] = {{
     .help = "Roadrunner -- https://esolangs.org/wiki/Roadrunner",
 }};
 
+/* Language "XiFuck" */
+static trivbf xifucklang[1] = {{
+    .name = "xifuck",
+    .class = L_CDWORDS,
+    .bf = { "修宪", "连任", "习近平", "大撒币", "登基", "包皇", "萨格尔王", "宽衣"},
+
+    .help = "XiFuck -- https://github.com/backup53/XiFuck",
+}};
+
 /* Language "CGALang" */
 static trivbf cgalang[1] = {{
     .name = "cga",
@@ -2384,7 +2393,7 @@ static trivbf * trivlist[] = {
     k_on_fuck, petooh, arabic, dc1, dc2, dc3, dc4, nyan, atpling, cupid,
     ternary, pikalang, spoon, troll, roadrunner, brainbool, clojure,
     nasm, nasmmagic, cgalang, brainfuq, emojifuck, trigram, cbyte_rle,
-    babylang, matlab, tmcc, heart, iuab, bcdfuck, bcdbyte,
+    babylang, matlab, tmcc, heart, iuab, bcdfuck, bcdbyte, xifucklang,
 
     bfout, doubler_12, doubler_copy_LXXH, doubler_12nz, doubler_12r,
     doubler_17a, doubler_17b, doubler_copy, doubler_copynz,
