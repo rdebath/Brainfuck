@@ -1,4 +1,8 @@
 : '['
+# This regression test triggers bugs in the esotope-bfc, libbf
+# and bfdb compilers.
+#
+# Robert de Bath 2019
 
 for b in 8 16 32
 do echo "Esotope $b:" "$( tcc -w -run <( esotope-bfc -s$b $0 ) )"

@@ -1,7 +1,8 @@
-[ This is a binary counter benchmark program, it runs
-671105767 instructions and is mostly unoptimisable.
-As it runs it prints the letters of the alphabet with
-a delay that doubles between each letter.           ]
+[ This is a binary counter benchmark program, it runs   ]
+[ 671105767 instructions and is mostly unoptimisable.   ]
+[ As it runs it prints the letters of the alphabet with ]
+[ a delay that doubles between each letter.             ]
+[ Robert de Bath  2015                                  ]
 
 >++++++++[>+++>>>++++++++<<<<-]>++<<
 #

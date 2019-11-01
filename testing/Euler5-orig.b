@@ -1,4 +1,5 @@
 [ http://git.veekun.com/project-euler.git/tree/HEAD:/heteroglot ]
+[ https://github.com/eevee/project-euler ]
 
 PROBLEM 5: What is the smallest number divisible by each of the numbers 1 to 20?
 

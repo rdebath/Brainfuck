@@ -1,3 +1,7 @@
+Brainfuck test program written by Robert de Bath in 2014
+This program needs 6 cells
+When given a newline and EOF it describes the characters it received
+
 >>,----------[[-]>>[-]>[-]+++++++++++++[<++++++>-]<.--.-------------.>++
 ++++[<----->-]<-.[-]<<]>>[-]>[-]++++++++++[<++++++>-]<.>++++++[<+++>-]<.
 --.--------------.[-]++++++++++.[-]<<+,+[>+>]<[<<]>>-[>[-]>[-]++++[<++++

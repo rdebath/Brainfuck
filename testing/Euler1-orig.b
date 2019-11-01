@@ -1,4 +1,9 @@
-[ Project Euler Problem 1: Solution by: James Stanley
+[///////////////////////////////////////////////////////////////////////////////
+
+Project Euler Problem 1: Solution by: James Stanley
+https://github.com/jes/bnbf
+zLib license
+
 $ bcci-wrap Euler1.b
 Project Euler .net Problem 1
 
@@ -11,9 +16,8 @@ Find the sum of all the multiples of 3 or 5 below 1000.
 
 233168
 $
-]
 
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////]
 Project Euler Problem 1 by James Stanley
 
 Generate 1000

@@ -1,5 +1,13 @@
 
 : '['
+# Several heavily optimising interpreters make mistakes when calculating
+# optimisation of operations that exceed the cell size by doing those
+# calculation with incorrectly wrapped variables.
+#
+# This does a basic check for this sort of issue.
+#
+# Robert de Bath 2016
+
 for b in 8 16 32
 do  echo "Esotope $b:" "$( tcc -run <( esotope-bfc -s$b $0 ) | cat -vt )"
 done
