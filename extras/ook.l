@@ -19,6 +19,7 @@ static void wordlist();
 
 static int uncomment_mode = 0;
 static int bfcomment = 0;
+static int maxcol = 72;
 
 #define YY_INPUT(buf,result,max_size) result = bf_prefilter(buf,max_size)
 size_t bf_prefilter(char * buf, size_t maxsize);
@@ -341,6 +342,7 @@ ook	B?[Oo]ok
 .		commentch(yytext[0]);
 %%
 
+void options_from_name(char*);
 void Usage(void);
 void addcmd(int, int);
 void run(void);
@@ -382,6 +384,7 @@ int main(int argc, char ** argv)
     int ar, filecount = 0;
 
     progname = argv[0];
+    options_from_name(progname);
     filelist = calloc(argc, sizeof *filelist);
 
     while(argc>1)
@@ -390,13 +393,22 @@ int main(int argc, char ** argv)
 	    if (!strcmp(argv[1], "--")) enable_opts = 1;
 	    else if (!strcmp(argv[1], "-r")) runit = 1;
 	    else if (!strcmp(argv[1], "-run")) runit = 1;
+	    else if (!strcmp(argv[1], "-bf")) runit = 0;
 
 	    else if (!strcmp(argv[1], "-e")) on_eof = -1;
 	    else if (!strcmp(argv[1], "-z")) on_eof = 0;
 	    else if (!strcmp(argv[1], "-n")) on_eof = 1;
+	    else if (!strcmp(argv[1], "-x")) on_eof = 2;
 	    else if (!strcmp(argv[1], "-d")) debug = 1;
 	    else if (!strcmp(argv[1], "-q")) quiet = 1;
 	    else if (!strcmp(argv[1], "-v")) quiet = 0;
+
+	    else if (!strncmp(argv[1], "-width=", 7) && argv[1][7]) {
+		maxcol = atoi(argv[1]+7);
+	    }
+	    else if (!strncmp(argv[1], "-w", 2)) {
+		maxcol = atoi(argv[1]+2);
+	    }
 
 	    else if (!strcmp(argv[1], "-chash")) line_cc = '#';
 	    else if (!strcmp(argv[1], "-cslash")) line_cc = '/';
@@ -590,8 +602,25 @@ int main(int argc, char ** argv)
 	{ pp=jmp; jmp=pgm[jmp].arg; pgm[pp].arg=0; pgm[pp].cmd = '+'; }
 	setbuf(stdout, NULL);
 	run();
+	if (col) {
+	    fflush(stdout);
+	    fprintf(stderr, "\n");
+	    col = 0;
+	}
     }
     return 0;
+}
+
+void
+options_from_name(char * name)
+{
+    char *p, *s;
+    for(s=p=name; *s; s++)
+	if (*s == '/')
+	    p = s+1;
+
+    if (!strcmp(p, "deadbeef") || !strcmp(p, "beef") || !strcmp(p, "bf"))
+	runit = 1;
 }
 
 void
@@ -613,6 +642,7 @@ Usage(void)
     fprintf(stderr, "   -e       Use -1 for EOF.\n");
     fprintf(stderr, "   -z       Use 0 for EOF.\n");
     fprintf(stderr, "   -n       Leave the cell unchanged on EOF.\n");
+    fprintf(stderr, "   -x       When given an EOF the interpreter will terminate.\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "   -chash   A comment starts at a '#' til the end of line.\n");
     fprintf(stderr, "   -cslash  A comment starts at a '/' til the end of line.\n");
@@ -685,7 +715,7 @@ pc(int ch)
     if (ch == '#' && !debug) return;
     if (ccol) putchar('\n'), ccol = col = 0;
     putchar(ch);
-    if (++col >= MAXCOL) putchar('\n'), col = 0;
+    if (++col >= maxcol && maxcol>0) putchar('\n'), col = 0;
 }
 
 static void commentch(int ch)
@@ -1146,7 +1176,7 @@ void addcmd(int ch, int cnt)
 		  pgm[cp-2].cmd == '[') {
 		cp -= 2; pgm[pp=cp].cmd = '='; pgm[cp].arg = 0;
 	    } else if (pgm[cp-1].cmd == '[') {
-		cp--; pgm[pp=cp].cmd = '?'; pgm[cp].arg = pgm[cp+1].mov;
+		cp--; pgm[pp=cp].cmd = (pgm[cp].arg = pgm[cp+1].mov)?'?':'!';
 	    }
 	}
     }
@@ -1168,11 +1198,11 @@ void run(void)
 	case ']':  if (t[m] != 0) n=pgm[n].arg; break;
 	case '?':  while(t[m]) m += pgm[n].arg; break;
 	case '>':  m += pgm[n].arg; break;
-	case '.':  putchar(t[m]); break;
-	case ',':
-	    if((ch=getchar())!=EOF) t[m]=ch;
-	    else if (on_eof != 1) t[m]=on_eof;
-	    break;
+	case '.':  putchar(t[m]); col = (t[m] != '\n'); break;
+	case ',':  t[m] = ((ch=getchar())!=EOF)?ch:on_eof<1?on_eof:t[m];
+		   if (ch == EOF && on_eof == 2) exit(-1);
+		   break;
+	case '!':  if(t[m]) exit(2); break;
 	case '#':
 	    fprintf(stderr, "\n%3d %3d %3d %3d %3d %3d %3d %3d %3d %3d\n%*s\n",
 		    t[0], t[1], t[2], t[3], t[4], t[5], t[6], t[7], t[8], t[9],
