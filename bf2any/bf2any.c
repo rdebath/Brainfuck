@@ -402,7 +402,7 @@ pipe_to_be(char ** filelist, int filecount)
 		    continue;
 		}
 		if (ch == '>' && tapeinit <= 0) {
-		    tapeinit = number;
+		    tapeinit = number + (digits==0);
 		    number = 0; digits = 0;
 		    continue;
 		}

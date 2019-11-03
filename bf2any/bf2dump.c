@@ -171,7 +171,12 @@ static int ind = 0;
 	}
 	break;
 
-    case '!': puts("{"); ind++; break;
+    case '!':
+	puts("{");
+	ind++;
+	if (tapeinit > 0)
+	    printf("m += %d; /* Tape init */\n", tapeinit); break;
+	break;
     case '~': puts("}"); break;
 
     case '#': puts("/*DEBUG*/"); break;
