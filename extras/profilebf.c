@@ -160,7 +160,7 @@ int main(int argc, char **argv)
 {
     FILE * ifd;
     int ch, ar;
-    int p = -1, n = -1, j = -1, lc = 0;
+    int p = -1, n = -1, j = -1, lc = 0, inp = 0;
     char * datafile = 0;
     progname = argv[0];
 
@@ -222,7 +222,7 @@ int main(int argc, char **argv)
      *  If the debug flag is set the '#' command is also included.
      */
 
-    while((ch = getc(ifd)) != EOF && (ifd != stdin || ch != '!' || j >= 0 || !pgm)) {
+    while((ch = getc(ifd)) != EOF && (ifd != stdin || ch != '!' || !inp || j >= 0)) {
 	int r = (ch == '<' || ch == '>' || ch == '+' || ch == '-');
 	if (r || (debug && ch == '#') || (ch == ']' && (j >= 0 || lc)) ||
 	    ch == '[' || ch == ',' || ch == '.') {
@@ -246,7 +246,7 @@ int main(int argc, char **argv)
 		    pgm[n-2].cmd == '[') {
 		    n -= 2; pgm[p=n].cmd = '='; pgm[n].arg = 0;
 		}
-	    }
+	    } else if (pgm[n].cmd == ',') inp = 1;
 	}
     }
     if (ifd != stdin) fclose(ifd);
