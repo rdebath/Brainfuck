@@ -264,22 +264,15 @@ run_dynasm(void)
     /* Create Stack frame. */
     | ->start:
     |.if I386
-#ifndef APPLE_i386_stackalign
     | push ebp
+    | mov  ebp, esp
     | push edi
     | push esi
     | push ebx
-    | mov  ebp, esp
     |
-    | mov  REG_P, dword [ebp+20]
-#else
-    | push ebp
-    | mov  ebp, esp
-    | sub  esp, 24	// Align 16 bytes
-    | mov  dword [ebp-4], edi
-    | mov  dword [ebp-8], esi
-    | mov  dword [ebp-12], ebx
     | mov  REG_P, dword [ebp+8]
+#ifdef APPLE_i386_stackalign
+    | sub  esp, 12	// Align 16 bytes
 #endif
     |.else
     | push rbp
@@ -679,34 +672,17 @@ run_dynasm(void)
 	    | =>(n->count):
 	    break;
 
-
+#ifndef APPLE_i386_stackalign
 	case T_PRT:
 	    clean_acc();
 	    load_acc_offset(offset);
 	    acc_loaded = 0;
 
-	    |.if I386
-#ifndef APPLE_i386_stackalign
-	    | push REG_A
-	    | call &putch
-	    | pop eax
-#else
-	    | mov dword [esp], REG_A
-	    | call &putch
-#endif
-	    |.else
-#ifndef _WIN32
-	    | mov PRM_D, REG_A
-#else
-	    | mov REG_C, REG_A
-#endif
-#if (defined(__code_model_small__) && !defined(__PIC__)) || defined(__ILP32__)
-	    | mov   eax, (uintptr_t) putch
-#else
-	    | mov64 rax, (uintptr_t) putch
-#endif
-	    | call  rax
-	    |.endif
+            used_prtchr = 1;
+	    if (tape_step == 1)
+		| call ->prtchr
+	    else
+		| call ->prtchrw
 	    break;
 
 	case T_PRTI:
@@ -715,14 +691,9 @@ run_dynasm(void)
 	    acc_loaded = 0;
 
 	    |.if I386
-#ifndef APPLE_i386_stackalign
 	    | push REG_A
 	    | call &putint
 	    | pop eax
-#else
-	    | mov dword [esp], REG_A
-	    | call &putint
-#endif
 	    |.else
 #ifndef _WIN32
 	    | mov PRM_D, REG_A
@@ -738,7 +709,6 @@ run_dynasm(void)
 	    |.endif
 	    break;
 
-#ifndef APPLE_i386_stackalign
 	case T_CHR:
 	    clean_acc();
 	    acc_const = acc_loaded = 0;
@@ -809,28 +779,15 @@ run_dynasm(void)
 
 	    }
 	    break;
-#else
-	case T_CHR:
-	    clean_acc();
-	    acc_const = acc_loaded = 0;
-	    | mov dword [esp], (count)
-	    | call &putch
-	    break;
-#endif
 
 	case T_INP:
 	    load_acc_offset(offset);
 	    set_acc_offset(offset);
 
 	    |.if I386
-#ifndef APPLE_i386_stackalign
 	    | push REG_A
 	    | call &getch
 	    | pop REG_D
-#else
-	    | mov dword [esp], REG_A
-	    | call &getch
-#endif
 	    |.else
 #ifndef _WIN32
 	    | mov PRM_D, REG_A
@@ -852,14 +809,9 @@ run_dynasm(void)
 	    set_acc_offset(offset);
 
 	    |.if I386
-#ifndef APPLE_i386_stackalign
 	    | push REG_A
 	    | call &getint
 	    | pop REG_D
-#else
-	    | mov dword [esp], REG_A
-	    | call &getint
-#endif
 	    |.else
 #ifndef _WIN32
 	    | mov PRM_D, REG_A
@@ -875,6 +827,47 @@ run_dynasm(void)
 	    |.endif
 	    /* Note: REG_A must be eax/rax */
 	    break;
+#endif
+
+#ifdef APPLE_i386_stackalign
+	case T_PRT:
+	    clean_acc();
+	    load_acc_offset(offset);
+	    acc_loaded = 0;
+
+	    | mov dword [esp], REG_A
+	    | call &putch
+	    break;
+
+	case T_PRTI:
+	    clean_acc();
+	    load_acc_offset(offset);
+	    acc_loaded = 0;
+	    | mov dword [esp], REG_A
+	    | call &putint
+	    break;
+
+	case T_CHR:
+	    clean_acc();
+	    acc_const = acc_loaded = 0;
+	    | mov dword [esp], (count)
+	    | call &putch
+	    break;
+
+	case T_INP:
+	    load_acc_offset(offset);
+	    set_acc_offset(offset);
+	    | mov dword [esp], REG_A
+	    | call &getch
+	    break;
+
+	case T_INPI:
+	    load_acc_offset(offset);
+	    set_acc_offset(offset);
+	    | mov dword [esp], REG_A
+	    | call &getint
+	    break;
+#endif
 
 	case T_STOP:
 	    |.if I386
@@ -912,21 +905,13 @@ run_dynasm(void)
 
     |->endcode:
     |.if I386
-#ifndef APPLE_i386_stackalign
     | xor eax, eax
-    | mov esp, ebp
+    | lea esp,[ebp-12]
     | pop ebx
     | pop esi
     | pop edi
     | pop ebp
-#else
-    | mov edi, dword [ebp-4]
-    | mov esi, dword [ebp-8]
-    | mov ebx, dword [ebp-12]
-    | add esp, 24
-    | pop ebp
     | ret
-#endif
     |.else
     | xor rax, rax
     | mov  r15, [rbp-8]
@@ -935,8 +920,8 @@ run_dynasm(void)
     | mov  rbx, [rbp-32]
     | mov rsp, rbp
     | pop rbp
-    |.endif
     | ret
+    |.endif
 
     /*
      *	This is a simple print character library routine.
