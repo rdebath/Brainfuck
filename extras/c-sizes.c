@@ -136,8 +136,10 @@ print_info()
     printf("Macro __STDC_VERSION__     %ldL C99 ISO/IEC 9899:1999\n", (long) __STDC_VERSION__);
 # elif __STDC_VERSION__ == 201112L
     printf("Macro __STDC_VERSION__     %ldL C11 ISO/IEC 9899:2011\n", (long) __STDC_VERSION__);
-# elif __STDC_VERSION__ > 201112L
-    printf("Macro __STDC_VERSION__     %ldL recent version\n", (long) __STDC_VERSION__);
+# elif __STDC_VERSION__ == 201710L
+    printf("Macro __STDC_VERSION__     %ldL C18 ISO/IEC 9899:2018\n", (long) __STDC_VERSION__);
+# elif __STDC_VERSION__ > 200000L
+    printf("Macro __STDC_VERSION__     %ldL unknown version\n", (long) __STDC_VERSION__);
 # else
     printf("Macro __STDC_VERSION__     %ldL C89/C90 ISO/IEC 9899:1990\n", (long) __STDC_VERSION__);
 # endif
@@ -223,17 +225,17 @@ print_info()
 #ifdef CHAR_BIT
 	sprintf(txtbuf+strlen(txtbuf), " %d", CHAR_BIT);
 #else
-	strcat(txtbuf, " N/A");
+	strcat(txtbuf, " undef");
 #endif
 #ifdef WORD_BIT
-	sprintf(txtbuf+strlen(txtbuf), " %d", WORD_BIT);
+	sprintf(txtbuf+strlen(txtbuf), "/%d", WORD_BIT);
 #else
-	strcat(txtbuf, " N/A");
+	strcat(txtbuf, "/undef");
 #endif
 #ifdef LONG_BIT
-	sprintf(txtbuf+strlen(txtbuf), " %d", LONG_BIT);
+	sprintf(txtbuf+strlen(txtbuf), "/%d", LONG_BIT);
 #else
-	strcat(txtbuf, " N/A");
+	strcat(txtbuf, "/undef");
 #endif
 	printf("Bits for CHAR/WORD/LONG   %s\n", txtbuf);
 
