@@ -86,6 +86,7 @@ static trivbf * trivlist[];
 static trivbf bfout[], doubler_copy[], doubler_12[], bfquadz[];
 static trivbf cbyte[], cint[], cbyte_rle[], cint_rle[];
 static trivbf bcdbyte[];
+static trivbf new_triv[1];
 
 struct instruction { int ch; int count; struct instruction * next, *loop; };
 
@@ -109,6 +110,7 @@ static struct instruction *pgm = 0, *last = 0;
 static trivbf * doubler = doubler_copy;
 static trivbf * bfquad = bfquadz;
 
+static void set_triv_out(trivbf *, int, const char *);
 static void generic_output(int ch, int count);
 static void risbf(int ch, int count);
 static void tinybf(int ch, int count);
@@ -282,6 +284,14 @@ fn_check_arg(const char * arg)
 	    }
 	}
 	if (j) fprintf(stderr, "\n");
+	return 1;
+    } else
+    if (strncmp(arg, "-triv=", 6) == 0) {
+	set_triv_out(new_triv, 0, arg+6);
+	return 1;
+    } else
+    if (strncmp(arg, "-trivj=", 7) == 0) {
+	set_triv_out(new_triv, 1, arg+7);
 	return 1;
     } else if (arg[0] == '-') {
 	int i;
@@ -530,6 +540,52 @@ generic_output(int ch, int count)
 	else if (langclass & C_HEADERS)
 	    col += printf("%s%s", col?" ":"", "return 0;}");
     }
+}
+
+static void
+set_triv_out(trivbf * l, int opt_flg, const char * arg)
+{
+    int i;
+    char *mut, *s, sep;
+    const char *ap;
+    if (l->name == 0) {
+	l->name = "built";
+	l->class = L_WORDS;
+	for (i=0; i<8; i++)
+	    l->bf[i] = bfout->bf[i];
+    }
+
+    switch(opt_flg) {
+    case 0: l->class = L_WORDS; break;
+    case 1: l->class = L_JNWORD; break;
+    }
+
+    sep = '\001';
+    s = mut = malloc(strlen(arg)+2);
+    *s = 0;
+    for(ap = arg;*ap;ap++) {
+	if (*ap == ',') *s++ = sep;
+	else if (*ap == sep) ;
+	else if (*ap != '\\') *s++ = *ap;
+	else if (ap[1]) {
+	    ap++; *s++ = *ap;
+	}
+	*s = 0;
+    }
+
+    s = mut;
+    for(i=0; i<8; i++) {
+	char * p = strchr(s, sep);
+	if (p) *p = 0;
+	if (*s)
+	    l->bf[i] = strdup(s);
+	if (p) s = p+1; else break;
+    }
+    free(mut);
+
+    lang = l;
+    langclass = l->class;
+    bf_multi = l->multi;
 }
 
 /******************************************************************************
