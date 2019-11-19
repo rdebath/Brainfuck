@@ -285,6 +285,8 @@ char * hello_world_byte[] = {
     /* Too many steps and too many cells */
     ">-[[-------->]-[--<]>-]",
     ">+[[++++++++>]+[++<]>+]",
+
+    ">-[[<]>-[-->]+>-]",
 #endif
 
     0 };
@@ -2589,7 +2591,7 @@ gen_twincell(char * buf)
     patterns_searched++;
 
     /* Clear the working cells */
-    if (flg_init) add_str(">[-]<[-]");
+    if (flg_init) { add_str("[-]>[-]"); currcell = !currcell; }
 
     str_cells_used = maxcell+1;
 

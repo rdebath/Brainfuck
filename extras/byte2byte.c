@@ -43,14 +43,17 @@
 #endif
 
 int cell_wrap = 0;
-int cell_unsigned = 0;
-int textmode = 0;
+int cell_unsigned = 1;
+int xmode = 0;		/* Alternate (faster) generation */
+int flippy = 1;		/* Both cells used for printing */
+int disable_mult = 0;
+int testmode = 0;
 int dump_table = 0;
 
 struct s_bftab {
     int len;
     char * code;
-} bytebftab[256][256];
+} bytebftab[256][256], bytebftab2[256][256];
 
 int flip = 0;
 int col = 0;
@@ -79,11 +82,14 @@ main(int argc, char ** argv)
 		switch(*p)
 		{
 		case '-': opton = 0; break;
-		case 'b': cell_wrap ^= 1; break;
-		case 'u': cell_unsigned ^= 1; break;
-		case 't': textmode ^= 1; break;
-		case 'd': dump_table ^= 1; break;
-
+		case 'b': cell_wrap = 1; break;
+		case 'u': cell_unsigned = 1; break;
+		case 's': cell_unsigned = 0; break;
+		case 'x': xmode = 1; break;
+		case 'f': flippy = 0; break;
+		case 't': testmode = 1; break;
+		case 'd': dump_table = 1; break;
+		case 'm': disable_mult = 1; break;
 		default:
 		    Usage();
 		}
@@ -95,6 +101,8 @@ main(int argc, char ** argv)
     initbytebftab();
 
     if (filecount>0) {
+	flip = (flippy && !disable_mult);
+	printf("%s\n", flip?"[-]>[-]":">[-]<[-]");
 	for(ar=0; ar<filecount; ar++) {
 	    const char * s;
 	    int ch;
@@ -102,7 +110,29 @@ main(int argc, char ** argv)
 
 	    s = filelist[ar];
 	    for(;;) {
-		write_byte(*s?*s:ch);
+		int c = *s?*s:ch;
+		write_byte(c);
+
+		{
+		    while(col<40) {putchar(' '); col++;}
+		    if (c > ' ' && c <= '~'
+			    && c != '-' && c != '+' && c != '<' && c != '>'
+			    && c != '[' && c != ']' && c != ',' && c != '.') {
+			printf("%c\n", c);
+		    } else if (c == '\n') { printf("NL\n");
+		    } else if (c == '\r') { printf("CR\n");
+		    } else if (c == ' ') { printf("SP\n");
+		    } else if (c == '.') { printf("dot\n");
+		    } else if (c == ',') { printf("comma\n");
+		    } else if (c == '-') { printf("dash\n");
+		    } else if (c == '+') { printf("plus\n");
+		    } else if (c == '>') { printf("GT\n");
+		    } else if (c == '<') { printf("LT\n");
+		    } else {
+			printf("\\%03o\n", c&0xFF);
+		    }
+		    col = 0;
+		}
 
 		if (!*s) break;
 		s++;
@@ -128,7 +158,10 @@ Usage()
 {
     fprintf(stderr, "byte2byte {opts} text\n");
     fprintf(stderr, "  -b\tAssume wrapping bytes\n");
-    fprintf(stderr, "  -u\tAssume '.' needs unsigned\n");
+    fprintf(stderr, "  -u\tAssume '.' needs unsigned values\n");
+    fprintf(stderr, "  -s\tAssume '.' needs signed values\n");
+    fprintf(stderr, "  -x\tUse alternate sequences.\n");
+    fprintf(stderr, "  -f\tOnly print from first cell.\n");
     fprintf(stderr, "  -d\tDump table and exit\n");
     exit(1);
 }
@@ -164,12 +197,46 @@ write_byte(int ch)
     if ((col=((col+1)%72)) == 0) putchar('\n');
 }
 
+static inline int
+test_merge(
+    struct s_bftab * from,
+    struct s_bftab * via,
+    struct s_bftab * res)
+{
+    int nlen, dflip = 0;
+    char bfbuf[260];
+
+    nlen = from->len + via->len;
+
+#if MERGECHECK
+    if (from->len > 1 && via->len > 1)
+	if ((from->code[from->len-1] == '>' || from->code[from->len-1] == '<') &&
+		(via->code[0] == '>' || via->code[0] == '<')) {
+	    nlen -= 2;
+	    dflip = 1;
+	}
+#endif
+
+    if (res->len > nlen) {
+	strcpy(bfbuf, from->code);
+	if (dflip) {
+	    bfbuf[from->len-1] = 0;
+	    strcat(bfbuf, via->code+1);
+	} else
+	    strcat(bfbuf, via->code);
+	free(res->code);
+	res->code = strdup(bfbuf);
+	res->len = nlen;
+	return 1;
+    }
+    return 0;
+}
+
 void
 mergecodes()
 {
     int from,via,to;
     int gotone;
-    char bfbuf[260];
 
     do
     {
@@ -182,23 +249,40 @@ mergecodes()
 		    if (from == to) continue;
 		    if (via == to) continue;
 
-		    if ((bytebftab[from][to].len >
-			 bytebftab[from][via].len + bytebftab[via][to].len)
-#if 0
-			 || (bytebftab[from][to].len ==
-			bytebftab[from][via].len + bytebftab[via][to].len &&
-			bytebftab[from][via].code[0] < bytebftab[from][to].code[0]
-			)
-#endif
-			) {
+		    gotone |= test_merge(
+			&bytebftab[from][via],
+			&bytebftab[via][to],
+			&bytebftab[from][to]);
+		}
+	    }
+	}
 
-			strcpy(bfbuf, bytebftab[from][via].code);
-			strcat(bfbuf, bytebftab[via][to].code);
-			free(bytebftab[from][to].code);
-			bytebftab[from][to].code = strdup(bfbuf);
-			bytebftab[from][to].len =
-			    bytebftab[from][via].len + bytebftab[via][to].len;
-			gotone = 1;
+	if (!flippy) {
+	    for(from=0; from<256; from++) {
+		for(via=0; via<256; via++) {
+		    for(to=0; to<256; to++) {
+			if (from == to) continue;
+
+			if (bytebftab2[from][via].code) {
+			    gotone |= test_merge(
+				&bytebftab2[from][via],
+				&bytebftab[via][to],
+				&bytebftab2[from][to]);
+			}
+
+			if (bytebftab2[via][to].code) {
+			    gotone |= test_merge(
+				&bytebftab[from][via],
+				&bytebftab2[via][to],
+				&bytebftab2[from][to]);
+
+			    if (bytebftab2[from][via].code)
+				gotone |= test_merge(
+				    &bytebftab2[from][via],
+				    &bytebftab2[via][to],
+				    &bytebftab[from][to]);
+
+			}
 		    }
 		}
 	    }
@@ -212,6 +296,7 @@ initbytebftab()
 {
     int from,to,i,j,k;
     int ini, dec, inc;
+    int oflg;
     int R=0, E=0;
     char bfbuf[260];
 
@@ -220,6 +305,8 @@ initbytebftab()
 	for(to=0; to<256; to++)
 	{
 	    int f;
+	    bytebftab2[from][to].len = 30000;
+	    bytebftab2[from][to].code = 0;
 
 	    if (cell_wrap) {
 		j = ((to-from) & 0xFF);
@@ -246,32 +333,56 @@ initbytebftab()
 		bytebftab[from][to].len = k;
 		bytebftab[from][to].code = strdup(bfbuf);
 	    }
-	    /* To zero is dumb too */
-	    if (to == 0 && bytebftab[from][to].len > 3) {
-		free(bytebftab[from][to].code);
-		bytebftab[from][to].len = 3;
-		if (cell_unsigned || cell_wrap)
+	}
+    }
+
+    for(from=0; from<256; from++) {
+	/* To zero is dumb too */
+	to = 0;
+	if (bytebftab[from][to].len > 3) {
+	    free(bytebftab[from][to].code);
+	    bytebftab[from][to].len = 3;
+	    if (cell_unsigned || cell_wrap)
+		bytebftab[from][to].code = strdup("[-]");
+	    else {
+		if (from>127)
+		    bytebftab[from][to].code = strdup("[+]");
+		else
 		    bytebftab[from][to].code = strdup("[-]");
-		else {
-		    if (from>127)
-			bytebftab[from][to].code = strdup("[+]");
-		    else
-			bytebftab[from][to].code = strdup("[-]");
-		}
 	    }
 	}
     }
 
-    mergecodes(); /* Prefer simple stuff. */
 
-    if (cell_wrap) E=7;
-    else if (cell_unsigned) E=8;
-    else E=6;
+    if (!xmode) mergecodes(); /* Prefer simple stuff. */
+
+    if (testmode) E=32;
+    else if (cell_wrap) E=11;
+    else if (cell_unsigned) E=14;
+    else E=14;
 
     if(E>0) {
 	/* Some additive strings ">++++[<++++>-]<" */
 	for(ini= E; ini> -E; ini--) {
+	  for(oflg = 0; oflg<4; oflg++) {
 	    for(dec = -E; dec < E; dec++) {
+		/* Prefer +/- 1 on desc loop */
+		if (xmode) {
+		    if (oflg == 0) {
+			if (dec <= 1) continue;
+		    } else if (oflg == 1) {
+			if (dec >= -1) continue;
+		    } else if (oflg == 2) {
+			if (dec != 1) continue;
+		    }
+		} else {
+		    if (oflg == 0) {
+			if (dec != -1) continue;	/* += ini * inc */
+		    } else if (oflg == 1) {
+			if (dec != 1) continue;
+		    } else if (oflg > 2)
+			break;
+		}
 		for(inc = E; inc > -E; inc--) {
 		    int cnt = 0;
 		    int sum = ini;
@@ -326,19 +437,67 @@ initbytebftab()
 		    }
 		}
 	    }
+	  }
 	}
     }
 
-    mergecodes(); /* Prefer simple stuff. */
+    if (!xmode) mergecodes(); /* Prefer simple stuff. */
 
-    if (cell_wrap) R=9;
-    else if (cell_unsigned) R=14;
-    else R=12;
+    if (testmode) R=32;
+    else if (cell_wrap) R=11;
+    else if (cell_unsigned) R=17;
+    else R=15;
 
-    if (R>0) {
-	/* Then a multiplication set */
+    if (R>0 && !disable_mult) {
+
+	/* Add the flippy nul codes */
+	if (!flippy) {
+	    for(from=0; from<256; from++) {
+		/* To zero with a flip. */
+		to = 0;
+		if (from == 0) {
+		    bytebftab2[from][to].len = 1;
+		    bytebftab2[from][to].code = strdup(">");
+		} else if (cell_unsigned || cell_wrap || from < 128) {
+		    bytebftab2[from][to].len = 4;
+		    bytebftab2[from][to].code = strdup("[-]>");
+		}
+
+		/* Move a value to the other cell */
+		if (from != 0) {
+		    if (cell_unsigned || cell_wrap || from < 128) {
+			bytebftab2[from][from].len = 7;
+			bytebftab2[from][from].code = strdup("[->+<]>");
+		    } else {
+			bytebftab2[from][from].len = 7;
+			bytebftab2[from][from].code = strdup("[+>-<]>");
+		    }
+		}
+	    }
+	}
+
+	/* Then a multiplication set "[-->+++++<]>" */
 	for(from=0; from<256; from++) {
-	    for(dec = R; dec > -R; dec--) {
+	  for(oflg = 0; oflg<4; oflg++) {
+	    for(dec = -R; dec < R; dec++) {
+		/* Prefer +/- 1 on desc loop */
+		if (xmode) {
+		    if (oflg == 0) {
+			if (dec <= 1) continue;
+		    } else if (oflg == 1) {
+			if (dec >= -1) continue;
+		    } else if (oflg == 2) {
+			if (dec != 1) continue;
+		    }
+		} else {
+		    if (oflg == 0) {
+			if (dec != -1) continue;	/* Times inc */
+		    } else if (oflg == 1) {
+			if (dec > 0) continue;		/* Div -dec times inc */
+		    } else if (oflg != 2) {
+			break;
+		    }
+		}
 		for(inc = R; inc > -R; inc--) {
 		    int cnt = 0;
 		    int sum = from;
@@ -365,7 +524,13 @@ initbytebftab()
 		    if (cnt < 256 && to >= 0 && to < 256) {
 			int len = abs(inc) + abs(dec) + 5;
 			char * p = bfbuf;
-			if (bytebftab[from][to].len > len) {
+			int f = 0;
+			if (flippy)
+			    f = (bytebftab[from][to].len > len);
+			else
+			    f = (bytebftab2[from][to].len > len);
+
+			if (f) {
 			    *p++ = '[';
 			    i = dec;
 			    while(i>0) { i--; *p++ = '+'; }
@@ -378,16 +543,55 @@ initbytebftab()
 			    *p++ = ']';
 			    *p++ = '>';
 			    *p++ = 0;
-			    bytebftab[from][to].len = len;
-			    bytebftab[from][to].code = strdup(bfbuf);
+			    if (flippy) {
+				if (bytebftab[from][to].code)
+				    free(bytebftab[from][to].code);
+				bytebftab[from][to].len = len;
+				bytebftab[from][to].code = strdup(bfbuf);
+			    } else {
+				if (from == to) {
+				    fprintf(stderr, "%d: %d %s -> %d %s\n",
+					from,
+					bytebftab2[from][to].len,
+					bytebftab2[from][to].code,
+					len,
+					bfbuf);
+				}
+				if (bytebftab2[from][to].code)
+				    free(bytebftab2[from][to].code);
+				bytebftab2[from][to].len = len;
+				bytebftab2[from][to].code = strdup(bfbuf);
+			    }
 			}
 		    }
 		}
 	    }
+	  }
 	}
     }
 
     mergecodes();
+}
+
+void
+clearbytebftab()
+{
+    int from,to;
+
+    for(from=0; from<256; from++) {
+	for(to=0; to<256; to++)
+	{
+	    if (bytebftab[from][to].code)
+		free(bytebftab[from][to].code);
+	    bytebftab[from][to].code = 0;
+	    bytebftab[from][to].len = 0;
+
+	    if (bytebftab2[from][to].code)
+		free(bytebftab2[from][to].code);
+	    bytebftab2[from][to].code = 0;
+	    bytebftab2[from][to].len = 0;
+	}
+    }
 }
 
 void do_dump()
@@ -401,9 +605,24 @@ void do_dump()
     for(from=0; from<256; from++) {
 	printf("{\n");
 	for(to=0; to<256; to++) {
-	    printf("/* bf_%c[%3d][%3d] */ \"%s\"%s\n", mtype,
-		    from, to, bytebftab[from][to].code,
-		    to==255?"":",");
+	    char *s = bytebftab[from][to].code;
+	    int f = 0;
+
+	    printf("/* bf_%c[%3d][%3d] (%2d) */ \"",
+		    mtype, from, to,
+		    bytebftab[from][to].len);
+
+	    while(*s) {
+		if (*s == '>' || *s == '<') {
+		    if (f) putchar('<');
+		    else putchar('>');
+		    f = !f;
+		} else
+		    putchar(*s);
+		s++;
+	    }
+
+	    printf("\"%s\n", to==255?"":",");
 	}
 	printf("}%s\n", from==255?"":",");
     }
@@ -412,54 +631,57 @@ void do_dump()
 
 void dump_tables()
 {
-    int from, to;
+    int from, to, tmp_xmode = xmode;
     struct s_bftab u_bftab[256][256];
 
-
-    cell_wrap = cell_unsigned = 0;
+    xmode = cell_wrap = cell_unsigned = 0;
     initbytebftab();
     do_dump();
 
-    for(from=0; from<256; from++)
-        for(to=0; to<256; to++)
-	{
-	    if (bytebftab[from][to].code)
-		free(bytebftab[from][to].code);
-	    bytebftab[from][to].code = 0;
-	    bytebftab[from][to].len = 0;
-	}
+    clearbytebftab();
 
     cell_unsigned = 1;
     initbytebftab();
     do_dump();
 
-    for(from=0; from<256; from++)
-        for(to=0; to<256; to++)
-	{
-	    u_bftab[from][to].code = bytebftab[from][to].code;
-	    u_bftab[from][to].len = bytebftab[from][to].len;
-	    bytebftab[from][to].code = 0;
-	    bytebftab[from][to].len = 0;
-	}
+    xmode = tmp_xmode;
+
+    if (!xmode)
+	for(from=0; from<256; from++)
+	    for(to=0; to<256; to++)
+	    {
+		u_bftab[from][to].code = bytebftab[from][to].code;
+		u_bftab[from][to].len = bytebftab[from][to].len;
+		bytebftab[from][to].code = 0;
+		bytebftab[from][to].len = 0;
+	    }
+
+    clearbytebftab();
 
     cell_unsigned = 0;
     cell_wrap = 1;
     initbytebftab();
 
-    for(from=0; from<256; from++)
-        for(to=0; to<256; to++)
-	{
-	    if (u_bftab[from][to].len <= bytebftab[from][to].len) {
-		if (bytebftab[from][to].code)
-		    free(bytebftab[from][to].code);
-		bytebftab[from][to].code = u_bftab[from][to].code;
-		bytebftab[from][to].len = u_bftab[from][to].len;
+    /* Prefer to minimise wrapping; use the 'u' style if it's the same len */
+    if (!xmode)
+	for(from=0; from<256; from++)
+	    for(to=0; to<256; to++)
+	    {
+		if (u_bftab[from][to].len <= bytebftab[from][to].len) {
+		    if (bytebftab[from][to].code)
+			free(bytebftab[from][to].code);
+		    bytebftab[from][to].code = u_bftab[from][to].code;
+		    bytebftab[from][to].len = u_bftab[from][to].len;
+		} else
+		    free(u_bftab[from][to].code);
+
 		u_bftab[from][to].len = 0;
 		u_bftab[from][to].code = 0;
 	    }
-	}
 
     do_dump();
+
+    clearbytebftab();
 
     exit(0);
 }
