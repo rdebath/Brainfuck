@@ -8,7 +8,7 @@
  * C Sharp translation from BF, runs at about 1,400,000,000 instructions per second.
  */
 
-static int ind = 0;
+static int ind = 0, utf_32 = 0;
 #define prv(s,v)        printf("%*s" s "\n", ind*4, "", (v))
 #define pr(s)           printf("%*s" s "\n", ind*4, "")
 
@@ -54,8 +54,13 @@ gen_code(int ch, int count, char * strn)
     case '>': prv("P += %d;", count); break;
     case '<': prv("P -= %d;", count); break;
     case '.':
-	prv("Console.Write(Char.ConvertFromUtf32(%s));",
-	    bytecell?"(byte)M[P]":"(ulong)M[P]>0x10FFFF?0xFFFD:(int)M[P]");
+	if (bytecell)
+	    pr("Console.Write((Char)(byte)M[P]);\n");
+	else if (utf_32)
+	    prv("Console.Write(Char.ConvertFromUtf32(%s));",
+		"(ulong)M[P]>0x10FFFF?0xFFFD:(int)M[P]");
+	else
+	    pr("Console.Write((Char)((ulong)M[P]>0xFFFF?0xFFFD:M[P]));\n");
 	break;
     case ',':
 	pr("V=Console.Read();");
@@ -87,16 +92,11 @@ print_cstring(char * str)
 	if (outlen && (*str == 0 || badchar || gotnl || outlen > sizeof(buf)-8))
 	{
 	    buf[outlen] = 0;
-	    if (gotnl) {
-		buf[outlen-2] = 0;
-		prv("Console.Write(\"%s\\n\");", buf);
-	    } else {
-		prv("Console.Write(\"%s\");", buf);
-	    }
+	    prv("Console.Write(\"%s\");", buf);
 	    gotnl = 0; outlen = 0;
 	}
 	if (badchar) {
-	    prv("Console.Write((char)%d);", badchar);
+	    prv("Console.Write((Char)%d);", badchar);
 	    badchar = 0;
 	}
 	if (!*str) break;
