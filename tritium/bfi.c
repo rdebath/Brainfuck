@@ -1359,10 +1359,8 @@ process_file(void)
     }
 #endif
 
-    if (do_run && only_uses_putch == 2 && isatty(STDOUT_FILENO)) {
-	fflush(stdout);
-	fprintf(stderr, "\n");
-    }
+    if (do_run && only_uses_putch == 2 && isatty(STDOUT_FILENO))
+	putch('\n');
 
     if (do_run && verbose && verbose < 3 && run_time>0.0001) {
 	fflush(stdout);
