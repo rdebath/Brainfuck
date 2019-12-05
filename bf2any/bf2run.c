@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 
 #include "bf2any.h"
@@ -140,7 +141,7 @@ gen_code(int ch, int count, char * strn)
 	    dumpprog(mem, mptr);
 	    return;
 	}
-	setbuf(stdout, 0);
+	if (isatty(fileno(stdout))) setbuf(stdout, 0);
 
 	tapealloc = tapesz;
 	if(!checklimits) {
