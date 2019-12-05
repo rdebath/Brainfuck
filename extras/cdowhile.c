@@ -240,7 +240,7 @@ outcmd(int ch, int count)
     pr("return 0;\n}");
 
     fclose(ofd);
-    setbuf(stdout,0);
+    if (isatty(fileno(stdout))) setbuf(stdout,0);
 
     compile_and_run();
 }

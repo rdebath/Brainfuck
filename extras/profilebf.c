@@ -250,7 +250,7 @@ int main(int argc, char **argv)
 	}
     }
     if (ifd != stdin) fclose(ifd);
-    setbuf(stdout, NULL);
+    if (isatty(fileno(stdout))) setbuf(stdout, NULL);
     if (!pgm) {
 	fprintf(stderr, "Empty program, everything is zero.\n");
 	return 1;

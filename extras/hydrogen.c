@@ -7,6 +7,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 
 /* Choose a cell size: 0, 1, 2, 4, 127, 255, 65535, others.
@@ -157,7 +158,7 @@ int main(int argc, char **argv)
     FILE * ifd;
     int ch, dld = 0, lid = 0;
     struct bfi *p=0, *n=0, *j=0;
-    setbuf(stdout, NULL);
+    if (isatty(fileno(stdout))) setbuf(stdout, NULL);
     for(;;) {
 	if (argc>1 && strcmp(argv[1], "-d") == 0) {
 	    dump_prog++; argc--; argv++;

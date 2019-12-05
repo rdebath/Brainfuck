@@ -7,6 +7,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 
 #ifndef TAPELEN
@@ -133,7 +134,7 @@ main(int argc, char ** argv)
     }
     if(c) outrun(lastch, c);
     while(b>0){ outrun(']', 1); b--;} /* Not enough ']', add some. */
-    setbuf(stdout, 0);
+    if (isatty(fileno(stdout))) setbuf(stdout, 0);
     outrun('~', 0);
     return 0;
 }
