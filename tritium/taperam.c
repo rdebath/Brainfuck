@@ -15,7 +15,7 @@
 #include "bfi.tree.h"
 #include "bfi.run.h"
 
-#if defined(MAP_NORESERVE) && defined(SA_SIGINFO) && defined(SA_RESETHAND) && !defined(__asmjs__)
+#if defined(MAP_PRIVATE) && defined(SA_SIGINFO) && defined(SA_RESETHAND) && !defined(__asmjs__)
 #ifndef DISABLE_HUGERAM
 #define USEHUGERAM
 #endif
