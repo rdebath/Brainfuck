@@ -175,7 +175,7 @@ static int ind = 0;
 	puts("{");
 	ind++;
 	if (tapeinit > 0)
-	    printf("m += %d; /* Tape init */\n", tapeinit); break;
+	    printf("m += %d; /* Tape init */\n", tapeinit);
 	break;
     case '~': puts("}"); break;
 
