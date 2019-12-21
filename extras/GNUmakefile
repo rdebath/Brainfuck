@@ -11,11 +11,10 @@ EXTRAS=bf1k bf0k bfas ook hydrogen16 hydrogen32 hydrogen64
 ALLEXE = $(EXELIST) $(MOREEXE) $(EXTRAS) $(LIBDL_EXE) $(LIGHTNINGEXE)
 
 all: build
-	-@[ ! -d .git ] || { \
-	git add -A ||: ; \
-	git commit -m "`date +'%F' ; \
-	git diff --stat HEAD `" ; \
-	:;}
+
+clean:
+	-rm -f $(OBJECTS) $(LIBOBJ) $(ILIST)
+	-rm -f ook-tmp.c $(ALLEXE) $(patsubst %,%.o,$(MOREEXE))
 
 # Install all we can make, but don't fail if some can't be built.
 install:
@@ -29,10 +28,6 @@ install:
 	    $(INSTALL) $$i $(INSTALLDIR)/$$i$(INSTALLEXT) ; \
 	fi ; \
 	done
-
-clean:
-	-rm -f $(OBJECTS) $(LIBOBJ) $(ILIST)
-	-rm -f ook-tmp.c $(ALLEXE) $(patsubst %,%.o,$(MOREEXE))
 
 # Delete the direct to exe rule to make sure %.o files are used for ccache.
 % : %.c
@@ -65,9 +60,6 @@ ook: ook.l
 
 lightning: lightning.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ $(LIBS_LIGHTNING) -o $@
-
-bbf2bfrle: bbf2bfrle.c
-	$(CC) $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
 
 qtable.h: byte2byte.tmp
 	./byte2byte.tmp -d > qtable.tmp

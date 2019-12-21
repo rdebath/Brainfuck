@@ -1,0 +1,24 @@
+This is the Neutron brainfuck interpreter.
+It's rather small and dense, but still readable.
+
+It's a wrapping 8 bit interpreter, the type of the 'val' field controls
+this and you can change it simply by changing that type.
+
+The size of the program, tape and number of nested loops are limited only
+by available memory.  In practice this means about 250,000,000 cells if
+compiled as a 32bit application. Compiling as 64bit will use twice the
+RAM per cell so you need at least 6Gb of FREE ram before this is likely
+to allow more cells.
+
+The program does not optimise the BF in any way. (It's a bit slow!)
+
+Newline processing is inherited from the C stdio library.
+Input leaves the current cell unchanged on EOF.
+The "stdout" stream is unbuffered.
+
+If the program specified on the command line there are no special controls.
+If the program is read from "stdin" a "!" character marks the end of the
+program and the start of the data.
+
+Robert de Bath
+
