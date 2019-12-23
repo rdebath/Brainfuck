@@ -126,3 +126,6 @@ broken-bfM.c
     The '<' command does not allow a return to cell zero.
     Message: Hello Zombie! 255.
 
+broken-bfN.c
+    The '-' command does nothing when signed byte cell is negative.
+    Message: Hello 
