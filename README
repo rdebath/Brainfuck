@@ -52,7 +52,7 @@ broken-bf3.c
 broken-bf4.c
     Loop nesting does not work at all, however, loops can be skipped.
     Message: Hello... RUN! ZOMBIES!!
-    
+
 broken-bf5.c
     Loops cannot be skipped over.
     Message: Hello... RUN! ZOMBIES!!
@@ -64,7 +64,7 @@ broken-bf6.c
 broken-bf7.c
     Loops cannot be skipped over and nesting joins to last.
     Message: Hello... RUN! ZOMBIES!!
-    
+
 broken-bf8.c
     Skipping over nested loops is faulty.
     Message: Hello... RUN! ZOMBIES!!
@@ -128,4 +128,4 @@ broken-bfM.c
 
 broken-bfN.c
     The '-' command does nothing when signed byte cell is negative.
-    Message: Hello 
+    Message: Hello

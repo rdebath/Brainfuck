@@ -7,13 +7,15 @@ echo Proper 1=8bit, 2=16bit, 3=32bit, 4=7bit, 5=Hard-byte, 6=Error-byte
 
 P="$(dirname "$0")"
 W=$(( ($(tput cols)-2)/3-8))
+TMP=/tmp/_tf$$
 
 [ "$W" -ge 18 ] || W=18
 
 for i in "$P"/proper-bf*.c "$P"/repeat-bf*.c "$P"/broken-bf?.c
 do  echo "$(basename "$i")" :"$(
-    ( ulimit -t 2 ; tcc -w -run "$i" "$1" </dev/null |
-    tr -d '\0' | xxd -g0 -l$W -c$W ) 2>&1 )"
+    ( ulimit -t 2 ; gcc -w -O2 -o "$TMP" "$i" && {
+	:| "$TMP" "$1" | tr -d '\0' | xxd -g0 -l$W -c$W
+    } ) 2>&1
+    rm -f "$TMP" )"
 done
-
 
