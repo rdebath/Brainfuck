@@ -1,8 +1,7 @@
 #include <stdio.h>
 int main (int argc, char *argv[]) {
     char *b=0, *p, t[65536]={0};
-    unsigned short m=0;
-    int i=0;
+    int m=0, i=0;
     FILE *fp=argc>1?fopen(argv[1], "r"):stdin;
     size_t r=0;
     setbuf(stdout, 0);
