@@ -9,8 +9,8 @@ int main (int argc, char *argv[]) {
     if(!fp || getdelim(&b,&r,argc>1?'\0':'!',fp)<0)
 	perror(argv[1]);
     else if(b&&r>0)for(p=b;*p;p++)switch(*p) {
-	case '>': m++;break;
-	case '<': m--;break;
+	case '>': m++; if(!m) return fprintf(stderr, "Tape overflow\n"); break;
+	case '<': if(!m) return fprintf(stderr, "Tape underflow\n"); m--; break;
 	case '+': t[m]++;break;
 	case '-': t[m]--;break;
 	case '.': putchar(t[m]);break;
