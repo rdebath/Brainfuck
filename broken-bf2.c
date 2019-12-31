@@ -22,7 +22,7 @@ main(int argc, char **argv){
 	case '.': putchar(mem[m]); break;
 	case ',': {int a=getchar(); if(a!=EOF) mem[m]=a;} break;
 	case ']':
-	    if (loopat == -1) exit(1);
+	    if (loopat == -1) return 1;
 	    if (mem[m]) p = loopat; else loopat = -1;
 	    break;
 	case '[':

@@ -25,7 +25,7 @@ main(int argc, char **argv){
 	    loopat = p;
 	    break;
 	case ']':
-	    if (loopat == -1) exit(1);
+	    if (loopat == -1) return 1;
 	    if (mem[m]) p = loopat;
 	    break;
 	}

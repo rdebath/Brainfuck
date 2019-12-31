@@ -1,11 +1,17 @@
+Test code
+---------
+
 HelloWorld.b
     Version that works with every interpreter below.
 
 HelloWorld2.b
-    Version that kills all the non-standard interpreters below.
+    Version that breaks all the non-standard interpreters below.
 
 bitwidth.b
     Gives all the messages below.
+
+Reasonable interpreters
+-----------------------
 
 proper-bf1.c
     Eight bit wrapping cells.
@@ -23,12 +29,23 @@ proper-bf4.c
     Seven bit wrapping cells
     Message: Hello World! 127.
 
-proper-bf5.c
+Sometimes reasonable interpreters
+---------------------------------
+
+weirds-bf1.c
+    Eight bit wrapping cells with double ended tape.
+    Message: Hello World! 255.
+
+weirds-bf2.c
     Eight bit, saturating cells, inc to 255 and dec to 0.
     Message: Hello, world! Ltd.
 
-proper-bf6.c
-    Eight bit, inc out of range aborts interpreter.
+weirds-bf3.c
+    Eight bit, cell outside of 0..255 aborts interpreter.
+    Message: Hello
+
+weirds-bf4.c
+    Eight bit, cell outside of -128..255 aborts interpreter.
     Message: Hello
 
 repeat-bf1.c
@@ -36,6 +53,9 @@ repeat-bf1.c
     This interpreter is turing complete, but not brainfuck.
     See: https://esolangs.org/wiki/Newbiefuck
     Message: Hello... RUN! ZOMBIES!!
+
+Interpreters with broken looping
+--------------------------------
 
 broken-bf1.c
     The [ command does not correctly skip of nested loops.
@@ -73,6 +93,14 @@ broken-bf9.c
     Loops cannot be skipped over and more weirdness with nesting.
     Message: Hello... RUN! ZOMBIES!!
 
+broken-bfA.c
+    Nested loops cannot be skipped, other loops are weird.
+    Message: ?
+
+broken-bfD.c
+    The ']' command is incorrectly run when the '[' command skips.
+    Message: Hello (then lots of spaces)
+
 broken-bfE.c
     Loops do not skip nor do unbalanced loops work correctly.
     Message: Hello... RUN! ZOMBIES!!
@@ -81,42 +109,44 @@ broken-bfG.c
     Incorrect skipping over nested loops.
     Message: Hello... RUN! ZOMBIES!!
 
-broken-bfA.c
-    Nested loops cannot be skipped, other loops are weird.
-    Message: ?
+broken-bfF.c
+    Simplistic single loop and incorrect loop condition.
+    Message: >V]]`(((.LOH..TIG<C?M
+
+broken-bfH.c
+    If skipping over loops the stack is used when it shouldn't be.
+    Message: Hello Evil Vnqkc! WTF!
+
+broken-bfK.c
+    Looping is just broken.
+    Message: >Y``c....BE>..J?=295C
+
+Interpreters with broken cells
+------------------------------
 
 broken-bfB.c
     Seven bit cell with saturation to zero.
     Actually okay, but really unlikely to be intentional.
     Message: Hello World! Ltd WTF!.
 
-broken-bfJ.c
-    Overflow on inc wraps to -127, dec of 0 stays as zero.
-    Message: Hello World! Ltd WTF!.
-
 broken-bfC.c
     Loop condition does not take account of negative cell contents.
     Message: Hello  # WTF!.
-
-broken-bfD.c
-    The ']' command is incorrectly run when the '[' command completes.
-    Message: Hello (then lots of spaces)
-
-broken-bfF.c
-    Simplistic single loop and incorrect loop condition.
-    Message: >V]]`(((.LOH..TIG<C?M
-
-broken-bfH.c
-    Something's wrong with the skipping over loops.
-    Message: Hello Evil Vnqkc! WTF!
 
 broken-bfI.c
     Crazy cell overflow breakage.
     Message: Hello Zombie World! 31.
 
-broken-bfK.c
-    Looping is just broken.
-    Message: >Y``c....BE>..J?=295C
+broken-bfJ.c
+    Overflow on inc wraps to -127, dec of 0 stays as zero.
+    Message: Hello World! Ltd WTF!.
+
+broken-bfN.c
+    The '-' command does nothing when signed byte cell is negative.
+    Message: Hello
+
+Special breakage
+----------------
 
 broken-bfL.c
     Mismatched (and incorrect) conditions on loops.
@@ -125,7 +155,3 @@ broken-bfL.c
 broken-bfM.c
     The '<' command does not allow a return to cell zero.
     Message: Hello Zombie! 255.
-
-broken-bfN.c
-    The '-' command does nothing when signed byte cell is negative.
-    Message: Hello

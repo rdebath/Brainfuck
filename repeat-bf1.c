@@ -5,6 +5,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <limits.h>
 
@@ -62,7 +63,7 @@ int main(int argc, char **argv)
 	 }
       }
       if (ifd!=stdin) fclose(ifd);
-      setbuf(stdout, NULL);
+      if (isatty(fileno(stdout))) setbuf(stdout, NULL);
       if (pgm) { pgm[n+1].cmd = 0; run(); }
    }
    return !ifd;
