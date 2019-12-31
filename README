@@ -121,6 +121,10 @@ broken-bfK.c
     Looping is just broken.
     Message: >Y``c....BE>..J?=295C
 
+broken-bfO.c
+    Off by one error in loop jumping. (Double spacing cmds is workaround)
+    Message:
+
 Interpreters with broken cells
 ------------------------------
 
