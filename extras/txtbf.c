@@ -68,6 +68,7 @@ void gen_twoflower(char * buf);
 void gen_twincell(char * buf);
 void gen_trislipnest(char * buf);
 void gen_countslide(char * linebuf);
+void gen_nastyslide(char * linebuf);
 
 int runbf(char * prog, int longrun);
 
@@ -315,12 +316,12 @@ int subrange_count = 0;
 int enable_twocell = 1;
 int enable_twincell = 1;
 int enable_countslide = 0;
+int enable_nastyslide = 0;
 int enable_nestloop = 0;
 int enable_trislipnest = 0;
 int enable_special = 1;
 int enable_rerun = 1;
 
-int flg_fliptwocell = 0;
 int flg_lookahead = 0;
 int flg_zoned = 0;
 int flg_optimisable = 0;
@@ -378,6 +379,7 @@ wipe_config()
     enable_trislipnest = 0;
     enable_sliploop = 0;
     enable_countslide = 0;
+    enable_nastyslide = 0;
     enable_twocell = 0;
     enable_twincell = 0;
     enable_subrange = 0;
@@ -388,319 +390,307 @@ wipe_config()
 }
 
 int
+process_arg(char * arg)
+{
+    if (strncmp(arg, "-v", 2) == 0) {
+	if (arg[2])
+	    verbose = strtol(arg+2, 0, 10);
+	else
+	    verbose++;
+    } else if (strncmp(arg, "-w", 2) == 0 && arg[2] >= '0' && arg[2] <= '9') {
+	maxcol = atol(arg+2);
+    } else if (strcmp(arg, "-w") == 0) {
+	maxcol = 0;
+    } else if (strncmp(arg, "-B", 2) == 0 && arg[2] >= '0' && arg[2] <= '9') {
+	blocksize = atol(arg+2);
+    } else if (strcmp(arg, "-B") == 0) {
+	blocksize = 8192;
+    } else if (strncmp(arg, "-L", 2) == 0 && arg[2] >= '0' && arg[2] <= '9') {
+	cell_limit = atol(arg+2);
+
+    } else if (strcmp(arg, "-binary") == 0) {
+	flg_binary = 1;
+    } else if (strcmp(arg, "-init") == 0) {
+	flg_init = 1;
+    } else if (strcmp(arg, "-noinit") == 0) {
+	flg_init = 0;
+    } else if (strcmp(arg, "-clear") == 0) {
+	flg_clear = 1;
+    } else if (strcmp(arg, "-noclear") == 0) {
+	flg_clear = 0;
+    } else if (strcmp(arg, "-lookahead") == 0) {
+	flg_lookahead = 1;
+    } else if (strcmp(arg, "-rerun") == 0) {
+	enable_rerun = 1;
+    } else if (strcmp(arg, "-F") == 0) {
+	flg_morefound = flg_morefound*2+1;
+    } else if (strcmp(arg, "-zoned") == 0) {
+	flg_zoned = 1;
+
+    } else if (strcmp(arg, "-max") == 0) {
+	wipe_config();
+	enable_sliploop = 1;
+	sliploop_maxcell = 8;
+	sliploop_maxind = 8;
+	enable_multloop = 1;
+	multloop_maxcell = 7;
+	multloop_maxloop = 40;
+	multloop_maxinc = 12;
+	enable_twocell = 1;
+	enable_twincell = 1;
+	enable_countslide = 1;
+	enable_nastyslide = 0;
+	enable_subrange = 1;
+	enable_nestloop = 1;
+	enable_trislipnest = 1;
+	enable_special = 1;
+	enable_rerun = 1;
+
+    } else if (strcmp(arg, "-std") == 0) {
+	if (done_config_wipe) {
+	    fprintf(stderr, "The option -std must be first\n");
+	    exit(1);
+	}
+	done_config_wipe = 1;
+
+    } else if (strncmp(arg, "-I", 2) == 0) {
+	wipe_config();
+	special_init = arg+2;
+
+    } else if (strcmp(arg, "-0") == 0) {
+	flg_optimisable = !flg_optimisable;
+
+    } else if (strcmp(arg, "-O0") == 0) {
+	wipe_config();
+	enable_subrange = 1;
+	enable_twocell = 1;
+	enable_twincell = 1;
+	enable_special = 1;
+	flg_optimisable = 1;
+
+    } else if (strcmp(arg, "-O") == 0) {
+	wipe_config();
+	enable_multloop = 1;
+	enable_subrange = 1;
+	enable_twocell = 1;
+	enable_twincell = 1;
+	enable_special = 1;
+	flg_optimisable = 1;
+
+    } else if (strcmp(arg, "-O2") == 0) {
+	wipe_config();
+	enable_multloop = 1;
+	multloop_maxcell = 7;
+	multloop_maxloop = 40;
+	multloop_maxinc = 12;
+	enable_subrange = 1;
+	enable_twocell = 1;
+	enable_twincell = 1;
+	enable_special = 1;
+	flg_optimisable = 1;
+
+    } else if (strcmp(arg, "-i") == 0) {
+	flg_init = !flg_init;
+    } else if (strcmp(arg, "-c") == 0) {
+	flg_clear = !flg_clear;
+    } else if (strcmp(arg, "-sc") == 0) {
+	flg_signed = 1; bytewrap = 0;
+    } else if (strcmp(arg, "-uc") == 0) {
+	flg_signed = 0; bytewrap = 0;
+    } else if (strcmp(arg, "-b") == 0) {
+	bytewrap = !bytewrap;
+    } else if (strcmp(arg, "-rtz") == 0) {
+	flg_rtz = !flg_rtz;
+
+    } else if (strcmp(arg, "-slide") == 0) {
+	wipe_config();
+	enable_countslide = !enable_countslide;
+
+    } else if (strcmp(arg, "-evil") == 0) {
+	wipe_config();
+	enable_nastyslide = !enable_nastyslide;
+
+    } else if (strcmp(arg, "-slip") == 0) {
+	wipe_config();
+	enable_sliploop = !enable_sliploop;
+	sliploop_maxcell = 7;
+	sliploop_maxind = 6;
+
+    } else if (strcmp(arg, "-slip2") == 0) {
+	wipe_config();
+	enable_sliploop = 1;
+	sliploop_maxcell = 8;
+	sliploop_maxind = 7;
+
+    } else if (strcmp(arg, "-slip3") == 0) {
+	wipe_config();
+	enable_sliploop = 1;
+	sliploop_maxcell = 10;
+	sliploop_maxind = 9;
+
+    } else if (strcmp(arg, "-mult") == 0) {
+	wipe_config();
+	enable_multloop = !enable_multloop;
+
+    } else if (strcmp(arg, "-mult2") == 0) {
+	wipe_config();
+	enable_multloop = 1;
+	multloop_maxcell = 7;
+	multloop_maxloop = 40;
+	multloop_maxinc = 12;
+
+    } else if (strcmp(arg, "-mult3") == 0) {
+	wipe_config();
+	enable_multloop = 1;
+	multloop_maxcell = 10;
+	multloop_maxloop = 40;
+	multloop_maxinc = 7;
+
+    } else if (strcmp(arg, "-mult-bare") == 0) {
+	multloop_no_prefix = 1;
+
+    } else if (strcmp(arg, "-Q") == 0) {
+	wipe_config();
+	enable_twocell = !enable_twocell;
+
+    } else if (strcmp(arg, "-q") == 0) {
+	wipe_config();
+	enable_twincell = !enable_twincell;
+	if (enable_twincell)
+	    enable_twocell = 1;
+
+    } else if (strcmp(arg, "-X") == 0) {
+	wipe_config();
+	enable_special = !enable_special;
+
+    } else if (strcmp(arg, "-S") == 0) {
+	wipe_config();
+	enable_subrange = !enable_subrange;
+
+    } else if (strncmp(arg, "-s", 2) == 0 && arg[2] >= '0' && arg[2] <= '9') {
+	wipe_config();
+	subrange_count = atol(arg+2);
+	enable_subrange = 1;
+
+    } else if (strncmp(arg, "-multcell=", 10) == 0) {
+	wipe_config();
+	enable_multloop = 1;
+	multloop_maxcell = atol(arg+10);
+    } else if (strncmp(arg, "-multloop=", 10) == 0) {
+	wipe_config();
+	enable_multloop = 1;
+	multloop_maxloop = atol(arg+10);
+    } else if (strncmp(arg, "-multincr=", 10) == 0) {
+	wipe_config();
+	enable_multloop = 1;
+	multloop_maxinc = atol(arg+10);
+
+    } else if (strcmp(arg, "-N") == 0) {
+	wipe_config();
+	enable_nestloop ++;
+
+    } else if (strcmp(arg, "-NN") == 0) {
+	wipe_config();
+	enable_nestloop +=2;
+
+    } else if (strcmp(arg, "-tri") == 0) {
+	wipe_config();
+	enable_trislipnest = 1;
+
+    } else if (strcmp(arg, "-help") == 0) {
+	fprintf(stderr, "txtbf [options] [file]\n");
+	fprintf(stderr, "-v      Verbose\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "-std    Enable the stuff that's enabled by default.\n");
+	fprintf(stderr, "-max    Enable everything -- very slow\n");
+	fprintf(stderr, "-I><    Enable one special string.\n");
+	fprintf(stderr, "-O      Enable easy to optimise codes.\n");
+	fprintf(stderr, "-S      Toggle subrange multiply method\n");
+	fprintf(stderr, "-X      Toggle builtin special strings\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "-i      Add/remove cell init strings and return to cell zero\n");
+	fprintf(stderr, "-c      Add/remove cell clear strings and return to cell zero\n");
+	fprintf(stderr, "-rtz    Set/clear Return to cell zero\n");
+	fprintf(stderr, "-sc/-uc Assume input chars are signed/unsigned\n");
+	fprintf(stderr, "-b      Assume cells are bytes\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "-q      Toggle two cells method\n");
+	fprintf(stderr, "-Q      Toggle simple two cells method\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "-slip   Toggle short slip loops\n");
+	fprintf(stderr, "-slip2  Search long slip loops (slow)\n");
+	fprintf(stderr, "-N      Toggle nested loops (very slow)\n");
+	fprintf(stderr, "-tri    Search nested and tri-slip/nest loops\n");
+	fprintf(stderr, "-s10    Try just one subrange multiply size\n");
+	fprintf(stderr, "-mult   Toggle multiply loops\n");
+	fprintf(stderr, "-mult2  Search long multiply loops (slow)\n");
+	fprintf(stderr, "-mult3  Search long multiply loops (slow)\n");
+	fprintf(stderr, " -multincr=99 Specify multiply loop max increment\n");
+	fprintf(stderr, " -multloop=99 Specify multiply loop max loops\n");
+	fprintf(stderr, " -multcell=99 Specify multiply loop max cells\n");
+	fprintf(stderr, "-zoned  Use zones to pick cell to use.\n");
+	fprintf(stderr, "-lookahead Use lookahead when picking cells.\n");
+	exit(0);
+    } else {
+	return 0;
+    }
+
+    return 1;
+}
+
+int
 main(int argc, char ** argv)
 {
     FILE * ifd;
-    for(;;) {
-	if (argc < 2 || argv[1][0] != '-' || argv[1][1] == '\0') {
-	    break;
-	} else if (strcmp(argv[1], "--") == 0) {
-	    argc--; argv++;
-	    break;
-	} else if (strncmp(argv[1], "-v", 2) == 0) {
-	    if (argv[1][2])
-		verbose = strtol(argv[1]+2, 0, 10);
-	    else
-		verbose++;
-	    argc--; argv++;
-	} else if (strncmp(argv[1], "-w", 2) == 0 && argv[1][2] >= '0' && argv[1][2] <= '9') {
-	    maxcol = atol(argv[1]+2);
-	    argc--; argv++;
-	} else if (strcmp(argv[1], "-w") == 0) {
-	    maxcol = 0;
-	    argc--; argv++;
-	} else if (strncmp(argv[1], "-B", 2) == 0 && argv[1][2] >= '0' && argv[1][2] <= '9') {
-	    blocksize = atol(argv[1]+2);
-	    argc--; argv++;
-	} else if (strcmp(argv[1], "-B") == 0) {
-	    blocksize = 8192;
-	    argc--; argv++;
-	} else if (strncmp(argv[1], "-L", 2) == 0 && argv[1][2] >= '0' && argv[1][2] <= '9') {
-	    cell_limit = atol(argv[1]+2);
-	    argc--; argv++;
+    int ar;
+    char * filename = 0;
 
-	} else if (strcmp(argv[1], "-binary") == 0) {
-	    flg_binary = 1;
-	    argc--; argv++;
-	} else if (strcmp(argv[1], "-init") == 0) {
-	    flg_init = 1;
-	    argc--; argv++;
-	} else if (strcmp(argv[1], "-noinit") == 0) {
-	    flg_init = 0;
-	    argc--; argv++;
-	} else if (strcmp(argv[1], "-clear") == 0) {
-	    flg_clear = 1;
-	    argc--; argv++;
-	} else if (strcmp(argv[1], "-noclear") == 0) {
-	    flg_clear = 0;
-	    argc--; argv++;
-	} else if (strcmp(argv[1], "-lookahead") == 0) {
-	    flg_lookahead = 1;
-	    argc--; argv++;
-	} else if (strcmp(argv[1], "-rerun") == 0) {
-	    enable_rerun = 1;
-	    argc--; argv++;
-	} else if (strcmp(argv[1], "-F") == 0) {
-	    flg_morefound = flg_morefound*2+1;
-	    argc--; argv++;
-	} else if (strcmp(argv[1], "-zoned") == 0) {
-	    flg_zoned = 1;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-max") == 0) {
-	    wipe_config();
-	    enable_sliploop = 1;
-	    sliploop_maxcell = 8;
-	    sliploop_maxind = 8;
-	    enable_multloop = 1;
-	    multloop_maxcell = 7;
-	    multloop_maxloop = 40;
-	    multloop_maxinc = 12;
-	    enable_twocell = 1;
-	    enable_twincell = 1;
-	    enable_countslide = 1;
-	    enable_subrange = 1;
-	    enable_nestloop = 1;
-	    enable_trislipnest = 1;
-	    enable_special = 1;
-	    enable_rerun = 1;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-std") == 0) {
-	    if (done_config_wipe) {
-		fprintf(stderr, "The option -std must be first\n");
+    for(ar =1; ar<argc; ar++) {
+	if (filename == 0 && (argv[ar][0] != '-' || argv[ar][1] == '\0')) {
+	    filename = argv[ar];
+	    if (*filename == '-') filename++;
+	} else if (filename == 0 && ar+1 < argc && !strcmp(argv[ar], "--")) {
+	    filename = argv[ar+1];
+	    ar++;
+	} else if (!strcmp(argv[ar], "-h")) {
+	    process_arg("-help");
+	} else if (argv[ar][0] == '-' && argv[ar][1] == '-'
+		    && argv[ar][2] != 0 && argv[ar][3] != 0) {
+	    if (!process_arg(argv[ar]+1)) {
+		fprintf(stderr, "Unknown option '%s'\n", argv[ar]);
 		exit(1);
 	    }
-	    done_config_wipe = 1;
-	    argc--; argv++;
-
-	} else if (strncmp(argv[1], "-I", 2) == 0) {
-	    wipe_config();
-	    special_init = argv[1]+2;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-0") == 0) {
-	    flg_optimisable = !flg_optimisable;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-O0") == 0) {
-	    wipe_config();
-	    enable_subrange = 1;
-	    enable_twocell = 1;
-	    enable_twincell = 1;
-	    enable_special = 1;
-	    flg_optimisable = 1;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-O") == 0) {
-	    wipe_config();
-	    enable_multloop = 1;
-	    enable_subrange = 1;
-	    enable_twocell = 1;
-	    enable_twincell = 1;
-	    enable_special = 1;
-	    flg_optimisable = 1;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-O2") == 0) {
-	    wipe_config();
-	    enable_multloop = 1;
-	    multloop_maxcell = 7;
-	    multloop_maxloop = 40;
-	    multloop_maxinc = 12;
-	    enable_subrange = 1;
-	    enable_twocell = 1;
-	    enable_twincell = 1;
-	    enable_special = 1;
-	    flg_optimisable = 1;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-i") == 0) {
-	    flg_init = !flg_init;
-	    argc--; argv++;
-	} else if (strcmp(argv[1], "-c") == 0) {
-	    flg_clear = !flg_clear;
-	    argc--; argv++;
-	} else if (strcmp(argv[1], "-sc") == 0) {
-	    flg_signed = 1; bytewrap = 0;
-	    argc--; argv++;
-	} else if (strcmp(argv[1], "-uc") == 0) {
-	    flg_signed = 0; bytewrap = 0;
-	    argc--; argv++;
-	} else if (strcmp(argv[1], "-b") == 0) {
-	    bytewrap = !bytewrap;
-	    argc--; argv++;
-	} else if (strcmp(argv[1], "-rtz") == 0) {
-	    flg_rtz = !flg_rtz;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-slide") == 0) {
-	    wipe_config();
-	    enable_countslide = !enable_countslide;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-slip") == 0) {
-	    wipe_config();
-	    enable_sliploop = !enable_sliploop;
-	    sliploop_maxcell = 7;
-	    sliploop_maxind = 6;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-slip2") == 0) {
-	    wipe_config();
-	    enable_sliploop = 1;
-	    sliploop_maxcell = 8;
-	    sliploop_maxind = 7;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-slip3") == 0) {
-	    wipe_config();
-	    enable_sliploop = 1;
-	    sliploop_maxcell = 10;
-	    sliploop_maxind = 9;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-mult") == 0) {
-	    wipe_config();
-	    enable_multloop = !enable_multloop;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-mult2") == 0) {
-	    wipe_config();
-	    enable_multloop = 1;
-	    multloop_maxcell = 7;
-	    multloop_maxloop = 40;
-	    multloop_maxinc = 12;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-mult3") == 0) {
-	    wipe_config();
-	    enable_multloop = 1;
-	    multloop_maxcell = 10;
-	    multloop_maxloop = 40;
-	    multloop_maxinc = 7;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-mult-bare") == 0) {
-            multloop_no_prefix = 1;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-Q") == 0) {
-	    wipe_config();
-	    enable_twocell = !enable_twocell;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-Q+") == 0) {
-	    wipe_config();
-	    flg_fliptwocell = !flg_fliptwocell;
-	    if (flg_fliptwocell) enable_twocell = 1;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-q") == 0) {
-	    wipe_config();
-	    enable_twincell = !enable_twincell;
-	    if (enable_twincell && !enable_twocell)
-		flg_fliptwocell = enable_twocell = 1;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-X") == 0) {
-	    wipe_config();
-	    enable_special = !enable_special;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-S") == 0) {
-	    wipe_config();
-	    enable_subrange = !enable_subrange;
-	    argc--; argv++;
-
-	} else if (strncmp(argv[1], "-s", 2) == 0 && argv[1][2] >= '0' && argv[1][2] <= '9') {
-	    wipe_config();
-	    subrange_count = atol(argv[1]+2);
-	    enable_subrange = 1;
-	    argc--; argv++;
-
-	} else if (strncmp(argv[1], "-multcell=", 10) == 0) {
-	    wipe_config();
-	    enable_multloop = 1;
-	    multloop_maxcell = atol(argv[1]+10);
-	    argc--; argv++;
-	} else if (strncmp(argv[1], "-multloop=", 10) == 0) {
-	    wipe_config();
-	    enable_multloop = 1;
-	    multloop_maxloop = atol(argv[1]+10);
-	    argc--; argv++;
-	} else if (strncmp(argv[1], "-multincr=", 10) == 0) {
-	    wipe_config();
-	    enable_multloop = 1;
-	    multloop_maxinc = atol(argv[1]+10);
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-N") == 0) {
-	    wipe_config();
-	    enable_nestloop ++;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-NN") == 0) {
-	    wipe_config();
-	    enable_nestloop +=2;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-tri") == 0) {
-	    wipe_config();
-	    enable_trislipnest = 1;
-	    argc--; argv++;
-
-	} else if (strcmp(argv[1], "-h") == 0) {
-	    fprintf(stderr, "txtbf [options] [file]\n");
-	    fprintf(stderr, "-v      Verbose\n");
-	    fprintf(stderr, "\n");
-	    fprintf(stderr, "-std    Enable the stuff that's enabled by default.\n");
-	    fprintf(stderr, "-max    Enable everything -- very slow\n");
-	    fprintf(stderr, "-I><    Enable one special string.\n");
-	    fprintf(stderr, "-O      Enable easy to optimise codes.\n");
-	    fprintf(stderr, "-S      Toggle subrange multiply method\n");
-	    fprintf(stderr, "-X      Toggle builtin special strings\n");
-	    fprintf(stderr, "\n");
-	    fprintf(stderr, "-i      Add/remove cell init strings and return to cell zero\n");
-	    fprintf(stderr, "-c      Add/remove cell clear strings and return to cell zero\n");
-	    fprintf(stderr, "-rtz    Set/clear Return to cell zero\n");
-	    fprintf(stderr, "-sc/-uc Assume input chars are signed/unsigned\n");
-	    fprintf(stderr, "-b      Assume cells are bytes\n");
-	    fprintf(stderr, "\n");
-	    fprintf(stderr, "-q      Toggle two cells method\n");
-	    fprintf(stderr, "-Q      Toggle simple two cells method\n");
-	    fprintf(stderr, "\n");
-	    fprintf(stderr, "-slip   Toggle short slip loops\n");
-	    fprintf(stderr, "-slip2  Search long slip loops (slow)\n");
-	    fprintf(stderr, "-N      Toggle nested loops (very slow)\n");
-	    fprintf(stderr, "-tri    Search nested and tri-slip/nest loops\n");
-	    fprintf(stderr, "-s10    Try just one subrange multiply size\n");
-	    fprintf(stderr, "-mult   Toggle multiply loops\n");
-	    fprintf(stderr, "-mult2  Search long multiply loops (slow)\n");
-	    fprintf(stderr, "-mult3  Search long multiply loops (slow)\n");
-	    fprintf(stderr, " -multincr=99 Specify multiply loop max increment\n");
-	    fprintf(stderr, " -multloop=99 Specify multiply loop max loops\n");
-	    fprintf(stderr, " -multcell=99 Specify multiply loop max cells\n");
-	    fprintf(stderr, "-zoned  Use zones to pick cell to use.\n");
-	    fprintf(stderr, "-lookahead Use lookahead when picking cells.\n");
-	    exit(0);
+	} else if (process_arg(argv[ar])) {
+	    /* Done */
+	} else if (argv[ar][0] == '-') {
+	    char * p;
+	    char obuf[4] = "-*";
+	    for(p=argv[ar]+1; *p; p++) {
+		obuf[1] = *p;
+		if (!process_arg(obuf)) {
+		    fprintf(stderr, "Unknown option '%s'\n", argv[ar]);
+		    exit(1);
+		}
+	    }
 	} else {
-	    fprintf(stderr, "Unknown option '%s'\n", argv[1]);
-	    exit(1);
+	    fprintf(stderr, "Unknown argument '%s'\n", argv[ar]);
+	    exit(2);
 	}
     }
+
+    if (filename == 0 || *filename == 0)
+	ifd = stdin;
+    else {
+	ifd = fopen(filename, "r");
+	if (ifd == 0) { perror(filename); exit(1); }
+    }
+
     flg_rtz = (flg_rtz || flg_init || flg_clear);
     if (bytewrap) flg_signed = 0;
 
     if (multloop_maxcell > cell_limit) multloop_maxcell = cell_limit;
     if (sliploop_maxcell > cell_limit) sliploop_maxcell = cell_limit;
 
-    if (argc < 2 || strcmp(argv[1], "-") == 0)
-	ifd = stdin;
-    else
-	ifd = fopen(argv[1], "r");
-    if (ifd == 0) perror(argv[1]);
-    else
     {
 	char * linebuf, * p;
 	int linebuf_size = 0;
@@ -849,6 +839,11 @@ find_best_conversion(char * linebuf)
     if (enable_countslide) {
 	if (verbose>2) fprintf(stderr, "Trying 'Counted Slide' routine @%"PRIdMAX".\n", patterns_searched);
 	gen_countslide(linebuf);
+    }
+
+    if (enable_nastyslide) {
+	if (verbose>2) fprintf(stderr, "Trying 'Evil/Nasty Slide' routine @%"PRIdMAX".\n", patterns_searched);
+	gen_nastyslide(linebuf);
     }
 
     if (enable_sliploop) {
@@ -1268,6 +1263,12 @@ gen_subrange(char * buf, int subrange, int flg_subzone)
 	    if ((counts[i] || i == 0) && i>str_cells_used)
 		str_cells_used = i;
     maxcell = str_cells_used++;
+
+    /* Limit the number of cells used */
+    if (maxcell >= cell_limit) {
+	maxcell = cell_limit-1;
+	str_cells_used = maxcell+1;
+    }
 
     if (flg_init) {
 	/* Clear the working cells */
@@ -2469,28 +2470,28 @@ gen_print(char * buf, int init_offset)
  */
 static char bestfactor[] = {
 	 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	 4, 4, 3, 3, 4, 3, 3,20, 4, 5, 5, 3, 4, 4, 5, 5,
-	 4, 4,21, 5, 6, 6, 6,21, 5, 5, 6, 6, 4, 5, 5,22,
-	 6, 7, 5, 5, 4,22, 6, 5, 7, 7, 7,22, 6, 6,23, 7,
-	 8, 8, 6, 6, 6,23, 7, 7, 8, 8, 8, 5,23, 7, 6,24,
-	 8, 9, 9,23, 7, 7, 7,24, 8, 8, 9, 7, 7, 7,24,24,
-	 8, 8, 7, 9,10,10,10,24, 8, 7, 7,25, 9, 9,10,10,
-	 8, 8, 8,25,25, 9, 9,26,10,11,11,11,25,25, 9, 9,
-	 8,26,10,10,11,11,25, 9, 8, 8,26,26,10,10,27,11,
-	12,12,12,12,26,26,10,10, 8, 9,11,11,12,12,12,26,
-	10,10, 9, 9,27,11,11,28,12,13,10, 9, 9, 9,27,27,
-	11,11,11,28,12,12,13,13,13,27,27,11,11, 9,10,28,
-	12,12,29,13,14,14,11,11,10,10,28,28,12,12,12,29,
-	13,11,14,14,14,14,28,28,12,12,12,27,11,13,13,30,
-	14,15,15,28,12,12,10,11,11,29,13,13,13,30,14,14,
-	15,15,11,11,11,29,29,13,13,13,30,30,14,14,31,15};
+	 4, 4, 6, 6, 5, 7, 7,22, 6, 5, 5, 9, 7, 7, 6, 6,
+	 8, 8,23, 7, 6, 6, 6,24, 8, 8, 7, 7,11, 9, 9,24,
+	 8, 7,10,10,13,25, 9,11, 8, 8, 8,26,10,10,25, 9,
+	 8, 8,11,11,11,26,10,10, 9, 9, 9,15,27,11,13,26,
+	10, 9, 9,28,12,12,12,27,11,11,10,13,13,13,28,28,
+	12,12,14,11,10,10,10,29,13,15,15,28,12,12,11,11,
+	14,14,14,29,29,13,13,28,12,11,11,11,30,30,14,14,
+	 8,29,13,13,12,12,31,15,15,15,30,30,14,14,29,13,
+	12,12,12,12,31,31,15,15,15,30,14,14,13,13,13,26,
+	10,10, 9,31,31,15,15,30,14,13,13,13,13,13,27,27,
+	11,11,31,31,15,15,14,14,14,14,27,11,11,11,10,28,
+	12,12,31,15,14,14,11,11,10,10,28,28,12,12,29,29,
+	13,31,15,15,15,15,28,28,12,12,12,29,29,13,13,30,
+	14,15,15,15,12,12,12,11,29,29,13,13,30,30,14,31,
+	15,15,15,15,15,29,29,13,13,13,30,30,14,14,31,15
+};
 
 void
 gen_twoflower(char * buf)
 {
 
     const int maxcell = 1;
-    int currcell=0;
     int i;
     char * p;
 
@@ -2498,13 +2499,7 @@ gen_twoflower(char * buf)
     patterns_searched++;
 
     /* Clear the working cells */
-    if (flg_init) {
-	add_str("[-]>[-]");
-	if (flg_fliptwocell)
-	    currcell=!currcell;
-	else
-	    add_chr('<');
-    }
+    if (flg_init) add_str("[-]>[-]<");
 
     str_cells_used = maxcell+1;
 
@@ -2514,7 +2509,7 @@ gen_twoflower(char * buf)
 	int a,b,c = *p++;
 	if (flg_signed) c = (signed char)c; else c = (unsigned char)c;
 
-	cdiff = c - cells[currcell];
+	cdiff = c - cells[0];
 	t = bestfactor[abs(cdiff)]; a =(t&0xF); t = !!(t&0x10);
 	b = abs(cdiff)/a+t;
 
@@ -2534,38 +2529,41 @@ gen_twoflower(char * buf)
 		a = da;
 		b = db;
 		cdiff = ddiff;
-		if(cells[currcell]>0) add_str("[-]");
-		if(cells[currcell]<0) add_str("[+]");
-		cells[currcell] = 0;
+		if(cells[0]>0) add_str("[-]");
+		if(cells[0]<0) add_str("[+]");
+		cells[0] = 0;
 	    }
 	}
 
-	if (a>1) {
-	    if (cdiff<0) a= -a;
+	if (a<=1) a = 0;
+	if (cdiff<0) a= -a;
+	cells[0] += a*b;
 
-	    if (flg_fliptwocell && cells[currcell] == cells[!currcell])
-		currcell = !currcell;
-	    else if (currcell)
-		add_chr('<');
-	    else
-		add_chr('>');
+	/* If target is close to the limit adjust first */
+	if (c > 253 || c < -126 ) {
+	    while(cells[0] < c) { add_chr('+'); cells[0]++; }
+	    while(cells[0] > c) { add_chr('-'); cells[0]--; }
+	}
+
+	if (a) {
+	    add_chr('>');
 
 	    for(i=0; i<b; i++) add_chr('+');
 
-	    if (currcell) add_str("[>"); else add_str("[<");
-	    while(a > 0) { add_chr('+'); a--; cells[currcell] += b; }
-	    while(a < 0) { add_chr('-'); a++; cells[currcell] -= b; }
-	    if (currcell) add_str("<-]>"); else add_str(">-]<");
+	    add_str("[<");
+	    while(a > 0) { add_chr('+'); a--; }
+	    while(a < 0) { add_chr('-'); a++; }
+	    add_str(">-]<");
 	}
 
-	while(cells[currcell] < c) { add_chr('+'); cells[currcell]++; }
-	while(cells[currcell] > c) { add_chr('-'); cells[currcell]--; }
+	while(cells[0] < c) { add_chr('+'); cells[0]++; }
+	while(cells[0] > c) { add_chr('-'); cells[0]--; }
 
 	add_chr('.');
 	if (best_len>0 && str_next > best_len) return;	/* Too big already */
     }
 
-    currcell = clear_tape(currcell);
+    clear_tape(0);
 
     check_if_best(buf, "twocell");
 }
@@ -2712,7 +2710,7 @@ gen_countslide(char * linebuf)
 {
 static char codebuf[128], *s;
 static char namebuf[128];
-    int p1,p2,p3,p4;
+    int p1,p2,p3,p4,a1;
 
 static char * extra_cell[] = {
     "[>[",
@@ -2730,53 +2728,139 @@ static char * extra_cell[] = {
     0};
 
     for(p2=0; extra_cell[p2]; p2++)
-	for(p4=-10; p4<10; p4++)
-	    if (p4 != 0 && (flg_signed || p4>0))
-		for(p3=3; p3<20; p3++)
-		    for(p1=7; p1<64; p1++)
+	for(a1=0; a1<2; a1++)
+	{
+	    for(p4=-10; p4<10; p4++)
+	    {
+		if (a1 == 0 &&  (p4 < -1 || p4 > 1)) continue;
+		if (a1 == 1 && !(p4 < -1 || p4 > 1)) continue;
+
+		if (p4 != 0 && (flg_signed || p4>0))
+		    for(p3=2; p3<20; p3++)
 		    {
-			int i,t,a,b,c=0;
-			if ( (p1-1)*p3+p4 > 255) continue;
-			if ( p4<0 && p3 <= -p4) continue;
+			if (a1 == 0 && p3 < 5) continue;
+			if (a1 == 1 && p3 >= 5) continue;
 
-			s = codebuf;
+			for(p1=7; p1<64; p1++)
+			{
+			    int i,t,a,b,c=0;
+			    if ( (p1-1)*p3+p4 > 255) continue;
+			    if ( p4<0 && p3 <= -p4) continue;
 
-			t = bestfactor[p1]; a =(t&0xF); t = !!(t&0x10);
-			b = p1/a+t;
+			    s = codebuf;
 
-			if (a>1) {
-			    for(i=0; i<b; i++) *s++ = '+';
+			    t = bestfactor[p1]; a =(t&0xF); t = !!(t&0x10);
+			    b = p1/a+t;
 
-			    *s++ = '['; *s++ = '>';
-			    while(a > 0) { *s++ = '+'; a--; c += b; }
-			    *s++ = '<'; *s++ = '-'; *s++ = ']';
+			    if (a>1) {
+				for(i=0; i<b; i++) *s++ = '+';
+
+				*s++ = '['; *s++ = '>';
+				while(a > 0) { *s++ = '+'; a--; c += b; }
+				*s++ = '<'; *s++ = '-'; *s++ = ']';
+			    }
+			    *s++ = '>';
+
+			    while(c < p1) { *s++ = '+'; c++; }
+			    while(c > p1) { *s++ = '-'; c--; }
+
+			    strcpy(s, extra_cell[p2]);
+			    s = codebuf + strlen(codebuf);
+
+			    for(i=0; i<p3; i++) *s++ = '+';
+			    *s++ = '>'; *s++ = ']';
+			    if (p4>0)
+			    for(i=0; i<p4; i++) *s++ = '+';
+			    if (p4<0)
+			    for(i=0; i>p4; i--) *s++ = '-';
+			    *s = 0;
+
+			    if (flg_init)
+				strcat(codebuf, ">[-]<");
+
+			    strcat(codebuf, "[<]>-]");
+
+			    sprintf(namebuf, "Counted Slope %d,%d,%d,%d%s",
+				    p1,p2,p3,p4,flg_init?" (i)":"");
+			    gen_special(linebuf, codebuf, namebuf, 0);
+
 			}
-			*s++ = '>';
-
-			while(c < p1) { *s++ = '+'; c++; }
-			while(c > p1) { *s++ = '-'; c--; }
-
-			strcpy(s, extra_cell[p2]);
-			s = codebuf + strlen(codebuf);
-
-			for(i=0; i<p3; i++) *s++ = '+';
-			*s++ = '>'; *s++ = ']';
-			if (p4>0)
-			for(i=0; i<p4; i++) *s++ = '+';
-			if (p4<0)
-			for(i=0; i>p4; i--) *s++ = '-';
-			*s = 0;
-
-			if (flg_init)
-			    strcat(codebuf, ">[-]<");
-
-			strcat(codebuf, "[<]>-]");
-
-			sprintf(namebuf, "Counted Slope %d,%d,%d,%d%s",
-				p1,p2,p3,p4,flg_init?" (i)":"");
-			gen_special(linebuf, codebuf, namebuf, 0);
-
 		    }
+	    }
+	}
+}
+
+/* This generates some sequences that create a ramp of values from large
+ * to small. The collection of values is usually scattered nicely over
+ * the ASCII range (or the full unsigned byte range).
+ *
+ * This variation includes several extra pieces to trap broken interpreters.
+ */
+void
+gen_nastyslide(char * linebuf)
+{
+static char codebuf[256], *s;
+static char namebuf[128];
+    int p1,p2,p3,p4, a1;
+
+static char * extra_cell[] = {
+    "[>[",
+    "[>+>[",
+    "[>++>[",
+    "[>+++>[",
+    "[>+>++>[",
+    "[>++>+>[",
+
+    "[>++++>[",
+    "[>+>+>[", "[>+>+++>[", "[>+>++++>[",
+    "[>++>++>[", "[>++>+++>[", "[>++>++++>[",
+    "[>+++>+>[", "[>+++>++>[", "[>+++>+++>[", "[>+++>++++>[",
+    "[>++++>+>[", "[>++++>++>[", "[>++++>+++>[", "[>++++>++++>[",
+    0};
+
+    for(p2=0; extra_cell[p2]; p2++)
+	for(a1=0; a1<2; a1++) {
+	    for(p4=-10; p4<= 10; p4++) {
+		if (a1 == 0 &&  (p4 < -1 || p4 > 1)) continue;
+		if (a1 == 1 && !(p4 < -1 || p4 > 1)) continue;
+
+		if (p4 != 0 && (flg_signed || bytewrap || p4>0))
+		    for(p3=1; p3<15; p3++)
+			for(p1=1; p1<15; p1++)
+			{
+			    int i;
+			    if ( (p1-1)*p3+p4 > 255) continue;
+			    if ( p4<0 && p3 <= -p4) continue;
+
+			    s = codebuf;
+			    strcpy(s, "+[>[<->+");
+			    s = s + strlen(s);
+
+			    strcpy(s, extra_cell[p2]);
+			    s = s + strlen(s);
+
+			    for(i=0; i<p3; i++) *s++ = '+';
+
+			    *s++ = '>'; *s++ = ']'; *s++ = '['; *s++ = ']';
+			    if (p4>0)
+			    for(i=0; i<p4; i++) *s++ = '+';
+			    if (p4<0)
+			    for(i=0; i>p4; i--) *s++ = '-';
+			    *s = 0;
+
+			    strcpy(s, "[<]>-]]");
+			    s = s + strlen(s);
+
+			    for(i=0; i<p1; i++) *s++ = '+';
+			    strcpy(s, "<]");
+
+			    sprintf(namebuf, "Evil Slope %d,%d,%d,%d",
+				    p1,p2,p3,p4);
+			    gen_special(linebuf, codebuf, namebuf, 0);
+
+			}
+	    }
+	}
 }
 
 /******************************************************************************/
@@ -2835,7 +2919,10 @@ runbf(char * prog, int longrun)
         }
 
 	if (bytewrap) cells[m] &= 255;
-	else {
+	else if (longrun) {
+	    if (cells[m] > 255 || cells[m] < -128)
+		return -3;
+	} else {
 	    if (cells[m] > 255 ||
 		(!flg_signed && cells[m] < 0) ||
 		(flg_signed && cells[m] < -128))
