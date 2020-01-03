@@ -74,15 +74,15 @@ broken-bf4.c
     Message: Hello... RUN! ZOMBIES!!
 
 broken-bf5.c
-    Loops cannot be skipped over.
+    Loops cannot be skipped over. Stack handling is wrong.
     Message: Hello... RUN! ZOMBIES!!
 
 broken-bf6.c
-    Loops cannot be skipped over and nesting is faulty.
+    Loops cannot be skipped over, nesting is faulty and pointer is saved.
     Message: Hello... RUN! ZOMBIES!!
 
 broken-bf7.c
-    Loops cannot be skipped over and nesting joins to last.
+    Loops cannot be skipped over and nesting is ignored.
     Message: Hello... RUN! ZOMBIES!!
 
 broken-bf8.c
