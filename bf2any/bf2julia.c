@@ -15,11 +15,10 @@
  * This is because Julia only properly compiles functions, however,
  * it takes a very long time to compile large functions and programs.
  *
- * LostKng.bf is unrunnable.
+ * LostKng.bf can be run if optimisation or compilation is disabled completely.
  */
 
-#define MAXWHILE 256
-/* #define OLDBYTEMODE */
+#define MAXWHILE 50
 
 struct instruction {
     int ch;
@@ -40,7 +39,7 @@ static int lblcount = 0;
 static int icount = 0;
 
 static void print_cstring(char * str);
-static int no_function = 0;
+static int use_function = -1;
 
 static check_arg_t fn_check_arg;
 static gen_code_t gen_code;
@@ -50,7 +49,11 @@ static int
 fn_check_arg(const char * arg)
 {
     if (strcmp(arg, "-nofunc") == 0) {
-	no_function = 1;
+	use_function = 0;
+	return 1;
+    }
+    if (strcmp(arg, "-func") == 0) {
+	use_function = 1;
 	return 1;
     }
     if (strcmp("-h", arg) ==0) {
@@ -91,14 +94,15 @@ gen_code(int ch, int count, char * strn)
 
     if (ch != '~') return;
 
-    if (icount == 3 && pgm->ch == '!' && pgm->next->ch == '"' &&
-	    pgm->next->next->ch == '~') {
+    if (icount == 3 && use_function != 1 && pgm->ch == '!' &&
+	    pgm->next->ch == '"' && pgm->next->next->ch == '~') {
 	loutcmd('"', 0, pgm->next);
     } else {
 
-	loutcmd(999, 1, n);
+	if (icount < MAXWHILE/4 && use_function < 0)
+	    use_function = 0;
 
-	if (icount < MAXWHILE || no_function) {
+	if (!use_function) {
 	    for(n=pgm; n; n=n->next)
 		loutcmd(n->ch, n->count, n);
 	} else {
@@ -147,42 +151,45 @@ loutcmd(int ch, int count, struct instruction *n)
 {
     switch(ch) {
     case 999:
-#ifdef OLDBYTEMODE
-	if (bytecell) {
-	    printf( "%s%d%s%d%s",
-		    "m = zeros(UInt8, ",tapesz,")\n"
-		    "p = ", tapeinit, "\n");
-	    break;
-	}
-#endif
-	printf( "%s%d%s%d%s",
-		"m = zeros(Int, ",tapesz,")\n"
-		"p = ", tapeinit, "\n");
 	break;
     case 1000:
-	printf("function bf%d(m,p)\n", n->ino);
+	I; printf("function bf%d(m,p)\n", n->ino);
 	ind++;
 	break;
     case 1001:
+	I; printf("p\n");
 	ind--;
-	printf("end\n\n");
+	I; printf("end\n\n");
 	break;
     case 1002:
-	I; printf("bf%d(m,p)\n", count);
+	I; printf("p = bf%d(m,p)\n", count);
 	break;
 
     case '!':
-	if (!no_function) puts("function brainfuck(m,p)");
+	if (use_function)
+	    puts("function brainfuck(m,p)");
+	else
+	    printf( "%s%d%s%d%s",
+		    "let m = zeros(Int, ",tapesz,"), "
+		    "p = ", tapeinit, "\n");
+	ind++;
 	break;
     case '~':
-	if (!no_function) puts("end\nbrainfuck(m,p)");
+	if (use_function)
+	{
+	    I; puts("p");
+	    ind--;
+	    I; puts("end\n");
+	    I; printf("brainfuck(zeros(Int,%d), %d)\n", tapesz, tapeinit);
+	} else {
+	    ind--;
+	    I; puts("end");
+	}
 	break;
 
     case '=': I; printf("m[p] = %d\n", count); break;
     case 'B':
-#ifndef OLDBYTEMODE
 	if(bytecell) { I; printf("m[p] %%= 256;\n"); }
-#endif
 	I; printf("v = m[p]\n");
 	break;
     case 'M': I; printf("m[p] = m[p]+v*%d\n", count); break;
@@ -203,22 +210,16 @@ loutcmd(int ch, int count, struct instruction *n)
     case '<': I; printf("p -= %d\n", count); break;
     case '>': I; printf("p += %d\n", count); break;
     case '[':
-#ifndef OLDBYTEMODE
 	if(bytecell) { I; printf("m[p] %%= 256;\n"); }
-#endif
 	I; printf("while m[p] != 0\n");
 	ind++;
 	break;
     case ']':
-#ifndef OLDBYTEMODE
 	if(bytecell) { I; printf("m[p] %%= 256;\n"); }
-#endif
 	ind--; I; printf("end\n");
 	break;
     case 'I':
-#ifndef OLDBYTEMODE
 	if(bytecell) { I; printf("m[p] %%= 256;\n"); }
-#endif
 	I; printf("if m[p] != 0\n");
 	ind++;
 	break;
@@ -226,7 +227,6 @@ loutcmd(int ch, int count, struct instruction *n)
 	ind--; I; printf("end\n");
 	break;
     case '.':
-#ifndef OLDBYTEMODE
 	if (bytecell) {
 	    I; printf("m[p] = ( m[p] + 256 ) %% 256;\n");
 	    I; printf("print(Char(m[p]))\n");
@@ -237,9 +237,6 @@ loutcmd(int ch, int count, struct instruction *n)
 	    I; printf("    print(Char(0xFFFD))\n");
 	    I; printf("end\n");
 	}
-#else
-	I; printf("print(Char(m[p]))\n");
-#endif
 	break;
     case '"': print_cstring(n->cstr); break;
     case ',': I; printf("if !eof(stdin) ; m[p] = read(stdin, Char) ; end\n"); break;
