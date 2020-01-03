@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-int jmpstk[200], sp = 0;
+int jmpstk[200] = {-1,0}, sp = 0;
 
 int
 main(int argc, char **argv){
@@ -22,7 +22,7 @@ main(int argc, char **argv){
 	case '.': putchar(mem[m]); break;
 	case ',': {int a=getchar(); if(a!=EOF) mem[m]=a;} break;
 	case '[': jmpstk[++sp] = p; break;
-	case ']': if(mem[m]==0) {if(sp>0)sp--;} else p=jmpstk[sp]; break;
+	case ']': if(mem[m]) p=jmpstk[sp]; else if(sp>0) sp--; break;
 	}
     }
 }

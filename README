@@ -90,7 +90,7 @@ broken-bf8.c
     Message: Hello... RUN! ZOMBIES!!
 
 broken-bf9.c
-    Loops cannot be skipped over and more weirdness with nesting.
+    Loops aren't skipped; this is the do..while variant.
     Message: Hello... RUN! ZOMBIES!!
 
 broken-bfA.c

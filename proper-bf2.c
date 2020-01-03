@@ -17,7 +17,7 @@ int main (int argc, char *argv[]) {
 	case '.': putchar(t[m]);break;
 	case ',': {int c=getchar();if(c!=EOF)t[m]=c;}break;
 	case '[': if(t[m]==0)while((i+=(*p=='[')-(*p==']'))&&p[1])p++;break;
-	case ']': if(t[m]!=0)while((i+=(*p==']')-(*p=='['))&&p>b)p--;break;
+	case ']': if(t[m]!=0)while((i+=(*p==']')-(*p=='['))&&p>=b)p--;break;
     }
     return 0;
 }

@@ -10,10 +10,10 @@ int main (int argc, char *argv[]) {
 	perror(argv[1]);
     else if(b&&r>0) for(p=b;*p;p++) {
 	t[m += (*p == '>') - (*p == '<')] += (*p == '+') - (*p == '-');
-	if (*p == '[' && t[m]==0) while((i+=(*p=='[')-(*p==']'))&&p[1]) p++;
-	if (*p == ']' && t[m]>0) while((i+=(*p==']')-(*p=='['))&&p>b) p--;
 	if (*p == '.') putchar(t[m]);
 	if (*p == ',') {int c=getchar();if(c!=EOF)t[m]=c;}
+	if (*p == '[' && t[m]==0) while((i+=(*p=='[')-(*p==']'))&&p[1]) p++;
+	if (*p == ']' && t[m]> 0) while((i+=(*p==']')-(*p=='['))&&p>=b) p--;
     }
     return 0;
 }

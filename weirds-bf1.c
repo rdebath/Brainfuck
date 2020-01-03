@@ -15,10 +15,10 @@ int main (int argc, char *argv[]) {
     if (isatty(fileno(stdout))) setbuf(stdout, 0);
     for(p=b;*p;p++) {
 	t[m += (*p == '>') - (*p == '<')] += (*p == '+') - (*p == '-');
-        if (*p == '[' && t[m]==0) while((i+=(*p=='[')-(*p==']'))&&p[1]) p++;
-        if (*p == ']' && t[m]!=0) while((i+=(*p==']')-(*p=='['))&&p>b) p--;
         if (*p == '.') putchar(t[m]);
         if (*p == ',' && ((c=getchar()) != EOF)) t[m]=c;
+        if (*p == '[' && t[m]==0) while((i+=(*p=='[')-(*p==']'))&&p[1]) p++;
+        if (*p == ']' && t[m]!=0) while((i+=(*p==']')-(*p=='['))&&p>=b) p--;
     }
     return 0;
 }
