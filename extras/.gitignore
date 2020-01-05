@@ -1,10 +1,8 @@
 *.tmp.*
 bbf2bfrle
-bf-trace
 bf0k
 bf1k
 bfas
-bfdowhile
 bfopt
 byte2byte
 cdowhile
