@@ -374,6 +374,7 @@ size_t string_conversion(char * buf, size_t max_size);
 size_t tiny_bf_to_bf(char * buf, size_t max_size);
 size_t qqq_to_bf(char * buf, size_t max_size);
 size_t headsecks_to_bf(char * buf, size_t max_size);
+char * set_prefilter(char * arg);
 
 int main(int argc, char ** argv)
 {
@@ -489,7 +490,7 @@ int main(int argc, char ** argv)
 	    }
 	    else if (!strncmp(argv[1], "-match=", 7) && argv[1][7]) {
 		mode = INITIAL;
-		character_prefilter = argv[1]+7;
+		character_prefilter = set_prefilter(argv[1]+7);
 		character_conversion = bf;
 		custom_prefilter = string_conversion;
 	    }
@@ -499,7 +500,7 @@ int main(int argc, char ** argv)
 		mode = WORDLIST;
 		bflist = strdup(argv[1]+4);
 		for(s=bflist; *s; s++) {
-		    if(*s==',') continue;
+		    if (*s==',') continue;
 		    if ((*s>='0' && *s<='9') || ((*s & 0x80) != 0)) continue;
 		    if (*s>='a' && *s<='z') { has_lower = 1; continue; }
 		    if (*s>='A' && *s<='Z') { has_upper = 1; continue; }
@@ -635,7 +636,7 @@ Usage(void)
     fprintf(stderr, "\n");
     fprintf(stderr, "Options:\n");
 
-    fprintf(stderr, "   -run -r  Run the converted brainfuck\n");
+    fprintf(stderr, "   -run -r  Run the converted brainfuck using an embedded deadbeef interpreter\n");
     fprintf(stderr, "   -v       Verbose, try to include original source in output.\n");
     fprintf(stderr, "   -d       Debug, use '#' for a debug character.\n");
     fprintf(stderr, "\n");
@@ -663,13 +664,14 @@ Usage(void)
     fprintf(stderr, "            alphanumeric separating by any non-alphanumeric character works.\n");
     fprintf(stderr, "            Note: Uses order: '><+-.,[]#'\n");
     fprintf(stderr, "\n");
-    fprintf(stderr, "   -match=,right,left,up,down,out,in,begin,end\n");
+    fprintf(stderr, "   -match=right,left,up,down,out,in,begin,end\n");
     fprintf(stderr, "            Match exact strings without any separation.\n");
-    fprintf(stderr, "            The first character after the '=' separates the commands in\n");
-    fprintf(stderr, "            the command line option. The commands do not have to have unique\n");
-    fprintf(stderr, "            prefixes. Extra words can be added after the standard to block\n");
-    fprintf(stderr, "            conversions that might break alignment. The first of those is\n");
-    fprintf(stderr, "            translated as a '#' command, the rest are ignored.\n");
+    fprintf(stderr, "            A comma separates the commands in the command line option,\n");
+    fprintf(stderr, "            to include a comma prefix it with a '\\', do this also for\n");
+    fprintf(stderr, "            the '\\' character. The commands do not have to have unique\n");
+    fprintf(stderr, "            prefixes. Extra words can be added after the standard to\n");
+    fprintf(stderr, "            block conversions that might break alignment. The first of\n");
+    fprintf(stderr, "            those is translated as a '#' command, the rest are ignored.\n");
     fprintf(stderr, "            Note: Uses order: '><+-.,[]'\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "   -blub    Input using blub.\n");
@@ -930,6 +932,25 @@ utf8_conversion(char * buf, size_t max_size)
  * For a large input building a regex would be faster; but large inputs
  * are very uncommon!
  */
+char *
+set_prefilter(char * arg)
+{
+    char *mut, *s, sep = '\001';
+    const char * ap;
+    s = mut = malloc(strlen(arg)+2);
+    *s++ = sep; *s = 0;
+    for(ap = arg;*ap;ap++) {
+	if (*ap == ',') *s++ = sep;
+	else if (*ap == sep) ;
+	else if (*ap != '\\') *s++ = *ap;
+	else if (ap[1]) {
+	    ap++; *s++ = *ap;
+	}
+	*s = 0;
+    }
+    return mut;
+}
+
 size_t
 string_conversion(char * buf, size_t max_size)
 {
