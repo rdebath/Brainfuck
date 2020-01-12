@@ -924,10 +924,10 @@ hex_output(FILE * ofd, int ch, int eof)
     } else {
 	if(!pos)
 	    memset(linebuf, ' ', sizeof(linebuf));
-	if (ch<0)
+	if (ch < 0 && ch >= -9)
 	    sprintf(buf, "%2d", ch);
 	else
-	    sprintf(buf, "%02x", ch);
+	    sprintf(buf, "%02x", ch & 0xFF);
 	memcpy(linebuf+pos*3+(pos > 7)+1, buf, 2);
 	if (addr+pos == hex_bracket) {
 	    linebuf[pos*3+(pos > 7)] = '(';
