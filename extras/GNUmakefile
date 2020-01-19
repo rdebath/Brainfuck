@@ -5,7 +5,7 @@ INSTALLEXT=
 CLIST=$(filter-out cdowhile.c lightning.c,$(wildcard *.c))
 EXELIST := $(patsubst %.c,%,$(CLIST))
 OBJECTS := $(patsubst %.c,%.o,$(CLIST)) ook.o
-ILIST=qtable.h qtable.tmp byte2byte.tmp
+ILIST=qtable.h qtable.tmp.h byte2byte.tmp.out
 EXTRAS=bf1k bf0k bfas ook hydrogen16 hydrogen32 hydrogen64
 
 ALLEXE = $(EXELIST) $(MOREEXE) $(EXTRAS) $(LIBDL_EXE) $(LIGHTNINGEXE)
@@ -14,7 +14,7 @@ all: build
 
 clean:
 	-rm -f $(OBJECTS) $(LIBOBJ) $(ILIST)
-	-rm -f ook-tmp.c $(ALLEXE) $(patsubst %,%.o,$(MOREEXE))
+	-rm -f ook.tmp.c $(ALLEXE) $(patsubst %,%.o,$(MOREEXE))
 
 # Install all we can make, but don't fail if some can't be built.
 install:
@@ -54,18 +54,18 @@ cdowhile: cdowhile.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@ $(LIBS_LIBDL)
 
 ook: ook.l
-	$(LEX) $(LFLAGS) -t $^ > ook-tmp.c || rm ook-tmp.c
-	$(CC) $(CFLAGS) $(NOSGN) $(LDFLAGS) $(TARGET_ARCH) ook-tmp.c -o $@
-	-@rm -f ook-tmp.c
+	$(FLEX) $(LFLAGS) -o ook.tmp.c $^
+	$(CC) $(CFLAGS) $(NOSGN) $(LDFLAGS) $(TARGET_ARCH) ook.tmp.c -o $@
+	-@rm -f ook.tmp.c
 
 lightning: lightning.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ $(LIBS_LIGHTNING) -o $@
 
-qtable.h: byte2byte.tmp
-	./byte2byte.tmp -d > qtable.tmp
-	mv qtable.tmp qtable.h
+qtable.h: byte2byte.tmp.out
+	./byte2byte.tmp.out -d > qtable.tmp.h
+	mv qtable.tmp.h qtable.h
 
-byte2byte.tmp: byte2byte.c
+byte2byte.tmp.out: byte2byte.c
 	$(HOSTCC) -O -o $@ $^
 
 txtbf: txtbf.c
@@ -79,9 +79,7 @@ MARK := $(shell echo Configuration start >$(LOGDEV))
 
 HOSTCC := $(shell ( which 2>/dev/null clang gcc pcc ; echo /cc ) | sed -n '/^\// s:.*/::p' | head -1)
 CC := $(HOSTCC)
-
-# LEX := $(shell ( which 2>/dev/null flex ; echo lex ) | head -1 | sed 's:.*/::')
-LEX := flex
+FLEX := flex
 
 ifneq ($(CC),cc)
 CFLAGS=-O2 $(FUNSAFE) -Wall -Wshadow $(DEFS)
