@@ -1,9 +1,7 @@
 /* This is a "jit" interpreter for a "Do While" variant of Brainfuck.
  * Unexpectedly, it appears to be Turing complete.
  *
-#ifndef BRAINFUCK
- * THIS IS NOT AN INTERPRETER FOR THE brainfuck LANGUAGE!
-#endif
+ * The DO-WHILE variant is NOT the brainfuck language!
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,6 +16,7 @@
 
 int ind = 0;
 int use_unistd = 0;
+int generate_bf = 0;
 const char * current_file;
 int enable_debug = 0;
 int tapelen = 30000;
@@ -67,6 +66,7 @@ main(int argc, char ** argv)
 	    fprintf(stderr, "%s\n",
 	    "\t"    "-h      This message"
 	    "\n\t"  "-w      Use words not bytes"
+	    "\n\t"  "-bf     Run BF not do-while"
 	    "\n\t"  "-M30000 Set length of tape."
 	    "\n\t"  "-unix   Use \"unistd.h\" for read/write."
 	    "\n\t"  "-Cclang Choose a different C compiler"
@@ -120,7 +120,7 @@ main(int argc, char ** argv)
 	    if(!m && ch != '[' && ch != ']' && ch != '.' && ch != ',' &&
 		(ch != '#' || !enable_debug) ) continue;
 	    /* Check for loop comments; ie: ][ comment ] */
-	    if (lc || (ch=='[' && lastch==']' )) {
+	    if (lc || (ch=='[' && lastch==']' && generate_bf )) {
 		lc += (ch=='[') - (ch==']'); continue;
 	    }
 	    if (lc) continue;
@@ -169,6 +169,9 @@ check_argv(const char * arg)
     } else
     if (strcmp(arg, "-v") == 0) {
 	verbose++; return 1;
+    } else
+    if (strcmp(arg, "-bf") == 0) {
+	generate_bf = 1; return 1;
     } else
     if (strcmp(arg, "-unix") == 0) {
 	use_unistd = 1; return 1;
@@ -227,13 +230,9 @@ outcmd(int ch, int count)
     case '<': prv("m -= %d;", count); break;
     case '.': pr("PUTC(*m);"); break;
     case ',': pr("GETC(*m);"); break;
-#ifdef BRAINFUCK
-    case '[': pr("while(*m) {"); ind++; break;
-    case ']': ind--; pr("}"); break;
-#else
-    case '[': pr("do {"); ind++; break;
+    case '[': if (generate_bf) pr("if(*m)");
+	      pr("do {"); ind++; break;
     case ']': ind--; pr("} while(*m);"); break;
-#endif
     }
 
     if (ch != '~') return;
