@@ -1,1 +1,25 @@
+# Attributes for github's "Linguist" stats
 *.awk linguist-language=awk
+tools/** linguist-vendored
+testing/*.b linguist-vendored
+testing/*.out linguist-generated
+
+testing/Cellsize.b -linguist-vendored
+testing/Cellsize2.b -linguist-vendored
+testing/Cellsize3.b -linguist-vendored
+testing/Cellsize4.b -linguist-vendored
+testing/Cellsize5.b -linguist-vendored
+testing/Counter.b -linguist-vendored
+testing/EasyOpt.b -linguist-vendored
+testing/Endtest.b -linguist-vendored
+testing/Hello.b -linguist-vendored
+testing/Hello2.b -linguist-vendored
+testing/Precalc.b -linguist-vendored
+testing/PrecalcBreak.b -linguist-vendored
+testing/Prttab.b -linguist-vendored
+testing/Skiploop.b -linguist-vendored
+testing/Tribit.b -linguist-vendored
+testing/al-count-1.b -linguist-vendored
+testing/al-count-2.b -linguist-vendored
+testing/cells100k.b -linguist-vendored
+testing/cells30k.b -linguist-vendored
