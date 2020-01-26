@@ -16,7 +16,6 @@
 static int opt_optim = 0;
 int disable_init_optim = 0;
 static const char * current_file;
-struct fe_interface_s fe_interface = {.tape_len = TAPELEN};
 
 /* Brainfuck loader.
  *
@@ -56,6 +55,7 @@ static void pipe_to_be(char ** filelist, int filecount);
 static int enable_rle = 0;
 static int backend_only = 0;
 static int eofcell = 0;
+static int tapelen = TAPELEN;
 
 static int
 check_arg(const char * arg) {
@@ -130,6 +130,7 @@ main(int argc, char ** argv)
     char ** filelist = 0;
     int filecount = 0;
 
+    tapesz = tapeinit + tapelen;
     filelist = calloc(argc, sizeof*filelist);
 
     if (be_interface.gen_code == 0) {
@@ -195,13 +196,14 @@ main(int argc, char ** argv)
     check_arg("+init");	/* Callout to BE for soft init. */
 
     /* Defaults if not told */
-    if (!opt_optim && fe_interface.disable_fe_optim)
+    if (!opt_optim && be_interface.disable_fe_optim)
 	opt_optim = disable_init_optim = 1;
 
     if (!opt_optim)
 	opt_optim = enable_optim = 1;
 
     tapeinit = (!be_interface.disable_be_optim && !backend_only)?BOFF:0;
+    tapesz = tapeinit + tapelen;
 
     if (be_interface.bytesonly) bytecell = 1;
 
@@ -403,6 +405,7 @@ pipe_to_be(char ** filelist, int filecount)
 		}
 		if (ch == '>' && tapeinit <= 0) {
 		    tapeinit = number + (digits==0);
+		    tapesz = tapeinit + tapelen;
 		    number = 0; digits = 0;
 		    continue;
 		}

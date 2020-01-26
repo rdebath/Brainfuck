@@ -94,7 +94,7 @@ static int
 fn_check_arg(const char * arg)
 {
     if (strcmp(arg, "-M") == 0) {
-	tapelen = 0;
+	init_type = no_init;
 	return 1;
     }
     if (strcmp(arg, "-tokens") == 0) {
@@ -179,42 +179,41 @@ gen_code(int ch, int count, char * strn)
     switch(ch) {
     case '!':
 	if (count) break;
-	if (tapelen) {
-	    switch(init_type)
-	    {
-	    case no_init: break;
-	    case quick_init:
-		/* The Haskell interpreter needs us to poke the highest cell we
-		 * want to use before we read any before that cell.
-		 */
-		PRTTOK(PUSH);
-		putsnum(tapesz+2);
-		PRTTOK(PUSH);
-		putsnum(0);
-		PRTTOK(STORE);
-		break;
 
-	    case full_init:
-		/* Some WS interpreters need EVERY cell cleared manually before we
-		 * use them.
-		 */
-		PRTTOK(PUSH); putsnum(0);
-		PRTTOK(LABEL); putlabel(loopid);
-		PRTTOK(DUP);
-		PRTTOK(PUSH); putsnum(tapesz+4);
-		PRTTOK(SUB);
-		PRTTOK(JZ); putlabel(loopid+1);
-		PRTTOK(DUP);
-		PRTTOK(PUSH); putsnum(0);
-		PRTTOK(STORE);
-		PRTTOK(PUSH); putsnum(1);
-		PRTTOK(ADD);
-		PRTTOK(JMP); putlabel(loopid);
-		PRTTOK(LABEL); putlabel(loopid+1);
-		PRTTOK(DROP);
-		loopid += 2;
-		break;
-	    }
+	switch(init_type)
+	{
+	case no_init: break;
+	case quick_init:
+	    /* The Haskell interpreter needs us to poke the highest cell we
+	     * want to use before we read any before that cell.
+	     */
+	    PRTTOK(PUSH);
+	    putsnum(tapesz+2);
+	    PRTTOK(PUSH);
+	    putsnum(0);
+	    PRTTOK(STORE);
+	    break;
+
+	case full_init:
+	    /* Some WS interpreters need EVERY cell cleared manually before we
+	     * use them.
+	     */
+	    PRTTOK(PUSH); putsnum(0);
+	    PRTTOK(LABEL); putlabel(loopid);
+	    PRTTOK(DUP);
+	    PRTTOK(PUSH); putsnum(tapesz+4);
+	    PRTTOK(SUB);
+	    PRTTOK(JZ); putlabel(loopid+1);
+	    PRTTOK(DUP);
+	    PRTTOK(PUSH); putsnum(0);
+	    PRTTOK(STORE);
+	    PRTTOK(PUSH); putsnum(1);
+	    PRTTOK(ADD);
+	    PRTTOK(JMP); putlabel(loopid);
+	    PRTTOK(LABEL); putlabel(loopid+1);
+	    PRTTOK(DROP);
+	    loopid += 2;
+	    break;
 	}
 
 	if(bytecell && call_works) {

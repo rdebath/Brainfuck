@@ -13,6 +13,7 @@ static int ind = 0;
 #define I printf("%*s", ind*4, "")
 static int safetapeoff = 0, curtapeoff = 0;
 static int utf8_conv = 0;
+static int unbounded_tape = 0;
 
 static void print_cstring(char * str);
 
@@ -24,7 +25,7 @@ static int
 fn_check_arg(const char * arg)
 {
     if (strcmp(arg, "-M") == 0) {
-	tapelen = 0;
+	unbounded_tape = 1;
 	return 1;
     }
     if (strcmp(arg, "-u") == 0) {
@@ -52,7 +53,7 @@ gen_code(int ch, int count, char * strn)
     int mov = 0;
     char * cm;
 
-    if (tapelen>0) move_opt(&ch, &count, &mov);
+    if (!unbounded_tape) move_opt(&ch, &count, &mov);
     if (ch == 0) return;
 
     cm = cell(mov);
@@ -62,13 +63,13 @@ gen_code(int ch, int count, char * strn)
 	if (!count)
 	{
 	    /* Using push is about 20% slower, using a Hash is a LOT slower! */
-	    if (tapelen > 0)
+	    if (!unbounded_tape)
 		printf("m = Array.new(%d, 0)\n",tapesz);
 	    else {
 		puts("m = Array.new");
 	    }
 	    printf("%s%d%s", "p = ", tapeinit, "\n");
-	    if (tapelen <= 0)
+	    if (unbounded_tape)
 		puts("m.push(0) while p>=m.length");
 	}
 	break;
@@ -100,7 +101,7 @@ gen_code(int ch, int count, char * strn)
     case '>':
 	I; printf("p += %d\n", count);
 	curtapeoff += count;
-	if (tapelen <= 0 && curtapeoff > safetapeoff) {
+	if (unbounded_tape && curtapeoff > safetapeoff) {
 	    safetapeoff = curtapeoff;
 	    I; puts("m.push(0) while p>=m.length");
 	}

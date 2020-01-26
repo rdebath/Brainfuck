@@ -30,6 +30,7 @@ static int use_oslib = 0;
 static int use_putcell = 0;
 static int use_putstr = 0;
 static int use_getcell = 0;
+static int unbounded_tape = 0;
 
 static FILE * ofd;
 #ifndef DISABLE_LIBPY
@@ -47,7 +48,7 @@ static int
 fn_check_arg(const char * arg)
 {
     if (strcmp(arg, "-M") == 0) {
-	tapelen = 0;
+	unbounded_tape = 1;
 	return 1;
     }
     if (strcmp(arg, "-d") == 0) {
@@ -109,13 +110,13 @@ gen_code(int ch, int count, char * strn)
 	if (use_oslib)
 	    fprintf(ofd, "import os,platform\n");
 
-	if (tapelen <= 0)
+	if (unbounded_tape)
 	    fprintf(ofd, "from collections import defaultdict\n");
 
 	fprintf(ofd, "\ndef brainfuck(argv):\n");
 	ind++;
 
-	if (tapelen > 0) {
+	if (!unbounded_tape) {
 	    I; fprintf(ofd, "m = [0] * %d\n", tapesz);
 	} else {
 	    /* Dynamic arrays are 20% slower! */
@@ -234,7 +235,7 @@ gen_code(int ch, int count, char * strn)
 	I; fprintf(ofd, "brainfuck(sys.argv)\n");
 	ind--;
 
-	if (use_oslib && tapelen>0) {
+	if (use_oslib && !unbounded_tape) {
 	    fprintf(ofd, "\n");
 	    I; fprintf(ofd, "if __name__ == \"__rpython__\":\n"); ind++;
 	    ind++;

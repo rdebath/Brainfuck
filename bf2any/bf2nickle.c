@@ -8,13 +8,24 @@
  * Nickle translation from BF, runs at about 12,000,000 instructions per second.
  */
 
-static int ind = 0, use_utf8, hello_world = 0;
+static int ind = 0, use_utf8, hello_world, unbounded_tape;
 #define I printf("%*s", ind*2, "")
 
+static check_arg_t fn_check_arg;
 static gen_code_t gen_code;
-struct be_interface_s be_interface = {.gen_code=gen_code};
+struct be_interface_s be_interface = {fn_check_arg, gen_code};
 
 static void print_cstring(char * str);
+
+static int
+fn_check_arg(const char * arg)
+{
+    if (strcmp(arg, "-M") == 0) {
+        unbounded_tape = 1;
+        return 1;
+    }
+    return 0;
+}
 
 static void
 gen_code(int ch, int count, char * strn)
@@ -24,7 +35,7 @@ gen_code(int ch, int count, char * strn)
 	hello_world = !!count;
 	if (!hello_world) {
 	    ind ++;
-	    if (tapelen <= 1)
+	    if (unbounded_tape)
 		printf("%s%d%s",
 		    "(func(){\n"
 		    "  int[...] m;\n"
@@ -72,7 +83,7 @@ gen_code(int ch, int count, char * strn)
     case '<': I; printf("p = p - %d;\n", count); break;
     case '>':
 	I; printf("p = p + %d;\n", count);
-	if (tapelen <= 1) {
+	if (unbounded_tape) {
 	    I; printf("while(n<p) { n=n+1; m[n] = 0; }\n");
 	}
 	break;

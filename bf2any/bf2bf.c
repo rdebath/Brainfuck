@@ -155,7 +155,7 @@ fn_check_arg(const char * arg)
 		L_BASE == L_TOKENS || L_BASE == L_BCD ||
 		(langclass & C_ADDRLE) == C_ADDRLE))
 	{
-	    fe_interface.disable_fe_optim = 1;
+	    be_interface.disable_fe_optim = 1;
 	}
 
 	if (langclass == L_TOKENS || langclass == L_BCD)
@@ -1027,14 +1027,9 @@ static const char * bfxml_1[] =
 	    puts("<?xml version=\"1.0\"?>");
 	    printf("<fuck bits='%d' wrap='Y'>",
 		    (int)(bytecell?8:sizeof(int)*8));
-	    if (tapelen > 0)
-		printf("<tapes><tape length='%d'/></tapes>\n", tapelen);
-	    else
-		printf("<tapes><tape/></tapes>\n");
-	}
-	else if (ch == '~') {
+	    printf("<tapes><tape/></tapes>\n");
+	} else if (ch == '~')
 	    printf("</fuck>\n");
-	}
 	return;
     }
 

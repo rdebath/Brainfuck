@@ -83,7 +83,8 @@ $(ALLEXE): $(COREOBJ)
 $(COREOBJ): bf2any_ex.h bf2any.h ov_int.h
 $(patsubst %.c,%.o,$(wildcard *.c)): bf2any.h
 
-bf2crun.o bf2dump.o bf2py.o bf2php.o bf2perl.o bf2perl6.o bf2rb.o: move_opt.h
+bf2awk.o bf2bc.o bf2crun.o bf2dump.o bf2py.o: move_opt.h
+bf2php.o bf2perl.o bf2perl6.o bf2rb.o: move_opt.h
 
 #-------------------------------------------------------------------------------
 # Special cases and configuration

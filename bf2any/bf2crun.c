@@ -177,8 +177,11 @@ gen_code(int ch, int count, char * strn)
 	    pr("#define PUTC(x) putchar(x)");
 	}
 
-	pr("#ifndef TAPELEN");
-	prv("#define TAPELEN %d", tapelen);
+	pr("#ifdef TAPELEN");
+	prv("#define TAPESIZE (TAPELEN+%d)", tapeinit);
+	pr("#endif");
+	pr("#ifndef TAPESIZE");
+	prv("#define TAPESIZE %d", tapesz);
 	pr("#endif");
 	prv("#define TAPEOFF %d", tapeinit);
 
@@ -221,14 +224,14 @@ gen_code(int ch, int count, char * strn)
 	    ind++;
 	}
 	if (bytecell) {
-	    pr("static unsigned char mem[TAPELEN+TAPEOFF];");
+	    pr("static unsigned char mem[TAPESIZE];");
 	    pr("register unsigned char *m = mem + TAPEOFF;");
 	    pr("register int v;");
 	} else if (be_interface.cells_are_ints) {
-	    pr("static unsigned int mem[TAPELEN+TAPEOFF];");
+	    pr("static unsigned int mem[TAPESIZE];");
 	    pr("register unsigned int v, *m = mem + TAPEOFF;");
 	} else {
-	    pr("static C mem[TAPELEN+TAPEOFF];");
+	    pr("static C mem[TAPESIZE];");
 	    pr("register C v, *m = mem + TAPEOFF;");
 	}
 	if (runmode == no_run && !use_unistd)
