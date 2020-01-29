@@ -3,11 +3,11 @@
 #include <unistd.h>
 #include <string.h>
 
-#if !defined(DISABLE_LIBLUA) && (_POSIX_VERSION < 200809L)
+#if defined(ENABLE_LIBLUA) && (_POSIX_VERSION < 200809L)
 #include "usemktemp.c"
 #endif
 
-#ifndef DISABLE_LIBLUA
+#ifdef ENABLE_LIBLUA
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
@@ -54,7 +54,7 @@ static void print_cstring(char * str);
 
 static int do_dump;
 static FILE * ofd;
-#ifndef DISABLE_LIBLUA
+#ifdef ENABLE_LIBLUA
 static char * luacode = 0;
 static size_t luacodesize = 0;
 #endif
@@ -70,7 +70,7 @@ fn_check_arg(const char * arg)
         do_dump = 1;
         return 1;
     } else
-#ifndef DISABLE_LIBLUA
+#ifdef ENABLE_LIBLUA
     if (strcmp(arg, "-r") == 0) {
         do_dump = 0;
         return 1;
@@ -112,7 +112,7 @@ gen_code(int ch, int count, char * strn)
     }
 
     if (ch != '~') return;
-#ifndef DISABLE_LIBLUA
+#ifdef ENABLE_LIBLUA
     if (!do_dump) {
 #ifndef DISABLE_OPENMEMSTREAM
 	ofd = open_memstream(&luacode, &luacodesize);
@@ -179,7 +179,7 @@ gen_code(int ch, int count, char * strn)
 	free(n);
     }
 
-#ifndef DISABLE_LIBLUA
+#ifdef ENABLE_LIBLUA
     if (!do_dump && ch == '~') {
 	int status, result;
 	lua_State *L;

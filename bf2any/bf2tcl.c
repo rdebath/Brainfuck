@@ -3,11 +3,11 @@
 #include <unistd.h>
 #include <string.h>
 
-#if !defined(DISABLE_LIBTCL) && (_POSIX_VERSION < 200809L)
+#if defined(ENABLE_LIBTCL) && (_POSIX_VERSION < 200809L)
 #include "usemktemp.c"
 #endif
 
-#ifndef DISABLE_LIBTCL
+#ifdef ENABLE_LIBTCL
 #include <tcl.h>
 #endif
 
@@ -25,7 +25,7 @@ static int hello_world = 0;
 
 static FILE * ofd;
 static int use_utf8 = 0;
-#ifndef DISABLE_LIBTCL
+#ifdef ENABLE_LIBTCL
 static char * tclcode = 0;
 static size_t tclcodesize = 0;
 #endif
@@ -43,7 +43,7 @@ fn_check_arg(const char * arg)
 	do_dump = 1;
 	return 1;
     } else
-#ifndef DISABLE_LIBTCL
+#ifdef ENABLE_LIBTCL
     if (strcmp(arg, "-r") == 0) {
 	do_dump = 0;
 	return 1;
@@ -62,7 +62,7 @@ gen_code(int ch, int count, char * strn)
     switch(ch) {
     case '!':
 	hello_world = (count!=0);
-#ifndef DISABLE_LIBTCL
+#ifdef ENABLE_LIBTCL
 	if (!do_dump) {
 #ifndef DISABLE_OPENMEMSTREAM
 	    ofd = open_memstream(&tclcode, &tclcodesize);
@@ -152,7 +152,7 @@ gen_code(int ch, int count, char * strn)
 	break;
     }
 
-#ifndef DISABLE_LIBTCL
+#ifdef ENABLE_LIBTCL
     if (!do_dump && ch == '~') {
 #ifndef DISABLE_OPENMEMSTREAM
 	fclose(ofd);

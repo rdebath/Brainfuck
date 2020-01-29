@@ -120,17 +120,17 @@ endif
 # change as pkgconf (the svelte version) is available.
 HAVE_TCL=$(shell ($(PKGCONF) --cflags --libs tcl ) >/dev/null 2>&1 && echo tcl)
 ifneq ($(HAVE_TCL),)
-TCLFLAG=$(shell $(PKGCONF) --cflags $(HAVE_TCL))
+TCLFLAG=-DENABLE_LIBTCL $(shell $(PKGCONF) --cflags $(HAVE_TCL))
 TCLLIBS=$(shell $(PKGCONF) --libs $(HAVE_TCL))
 TCLDEP=libtcl.lib-on
 else
 HAVE_TCL_H=$(wildcard /usr/include/tcl/tcl.h)
 ifeq ($(HAVE_TCL_H),)
-TCLFLAG=-DDISABLE_LIBTCL
+TCLFLAG=
 TCLLIBS=
 TCLDEP=libtcl.lib-off
 else
-TCLFLAG=-I/usr/include/tcl
+TCLFLAG=-DENABLE_LIBTCL -I/usr/include/tcl
 TCLLIBS=-ltcl
 TCLDEP=libtcl.lib-on
 endif
@@ -158,11 +158,11 @@ HAVE_PYLIB=$(shell ($(PKGCONF) --list-all ) 2>/dev/null | \
 	sed -n 's/^\(python-[^ ]*\).*/\1/p' | \
 	sort -r | head -1)
 ifeq ($(HAVE_PYLIB),)
-PYLIBFLAG=-DDISABLE_LIBPY
+PYLIBFLAG=
 PYLIBLIBS=
 PYLIBDEP=libpy.lib-off
 else
-PYLIBFLAG=$(shell $(PKGCONF) --cflags $(HAVE_PYLIB))
+PYLIBFLAG=-DENABLE_LIBPY $(shell $(PKGCONF) --cflags $(HAVE_PYLIB))
 PYLIBLIBS=$(shell $(PKGCONF) --libs $(HAVE_PYLIB))
 PYLIBDEP=libpy.lib-on
 endif
@@ -189,11 +189,11 @@ HAVE_LUALIB=$(shell ($(PKGCONF) --list-all ) 2>/dev/null | \
 	sed -n -e 's/^\(luajit\) .*/\1/p' -e 's/^\(lua5\..\) .*/\1/p' | \
 	sort -r | head -1)
 ifeq ($(HAVE_LUALIB),)
-LUALIBFLAG=-DDISABLE_LIBLUA
+LUALIBFLAG=
 LUALIBLIBS=
 LUALIBDEP=liblua.lib-off
 else
-LUALIBFLAG=$(shell $(PKGCONF) --cflags $(HAVE_LUALIB))
+LUALIBFLAG=-DENABLE_LIBLUA $(shell $(PKGCONF) --cflags $(HAVE_LUALIB))
 LUALIBLIBS=$(shell $(PKGCONF) --libs $(HAVE_LUALIB))
 LUALIBDEP=liblua.lib-on
 endif
@@ -226,7 +226,7 @@ endif
 
 HAVE_TCC=$(wildcard /usr/include/libtcc.h)
 ifeq ($(HAVE_TCC),)
-TCCFLAG=-DDISABLE_LIBTCC
+TCCFLAG=
 TCCLIBS=
 TCCDEP=libtcc.lib-off
 else
@@ -252,11 +252,11 @@ DO_TCC := $(call try-run,\
           } | $(TRYCC2) -o "$$TMP" -ltcc $(LIBDL),1)
 
 ifeq ($(DO_TCC),)
-TCCFLAG=-DDISABLE_LIBTCC
+TCCFLAG=
 TCCLIBS=
 TCCDEP=libtcc.lib-off
 else
-TCCFLAG=
+TCCFLAG=-DENABLE_LIBTCC
 TCCLIBS=-ltcc
 TCCDEP=libtcc.lib-on
 endif

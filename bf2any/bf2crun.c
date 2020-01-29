@@ -11,7 +11,7 @@
 #include <signal.h>
 #endif
 
-#ifndef DISABLE_LIBTCC
+#ifdef ENABLE_LIBTCC
 #include <libtcc.h>
 #endif
 
@@ -35,7 +35,7 @@ static FILE * ofd;
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
 #define prv2(s,v,v2)    fprintf(ofd, "%*s" s "\n", ind*4, "", (v), (v2))
 
-#ifndef DISABLE_LIBTCC
+#ifdef ENABLE_LIBTCC
 static void compile_and_run_libtcc(void);
 #endif
 #ifndef DISABLE_DLOPEN
@@ -58,7 +58,7 @@ static int in_one = 0;
 static char pic_opt[8] = " -fpic";
 #endif
 
-#ifndef DISABLE_LIBTCC
+#ifdef ENABLE_LIBTCC
 static char * ccode = 0;
 static size_t ccodesize = 0;
 #endif
@@ -77,7 +77,7 @@ fn_check_arg(const char * arg)
 	"\t"    "-d      Dump code"
 	"\n\t"  "-mmove  Use move merging translation."
 	"\n\t"  "-unix   Use \"unistd.h\" for read/write."
-#ifndef DISABLE_LIBTCC
+#ifdef ENABLE_LIBTCC
 	"\n\t"  "-ltcc   Use libtcc to run code."
 #endif
 #ifndef DISABLE_DLOPEN
@@ -115,7 +115,7 @@ fn_check_arg(const char * arg)
 	runmode = run_dll; return 1;
     } else
 #endif
-#ifndef DISABLE_LIBTCC
+#ifdef ENABLE_LIBTCC
     if (strcmp(arg, "-ltcc") == 0) {
 	runmode = run_libtcc; return 1;
     } else
@@ -346,7 +346,7 @@ gen_code(int ch, int count, char * strn)
     fclose(ofd);
     setbuf(stdout,0);
 
-#ifndef DISABLE_LIBTCC
+#ifdef ENABLE_LIBTCC
     if (runmode == run_libtcc)
 	compile_and_run_libtcc();
     else
@@ -408,7 +408,7 @@ print_cstring(char * str)
 static void
 open_ofd(void)
 {
-#ifndef DISABLE_LIBTCC
+#ifdef ENABLE_LIBTCC
     if (runmode == run_libtcc) {
 	ofd = open_memstream(&ccode, &ccodesize);
     } else
@@ -580,7 +580,7 @@ loaddll(const char * dlname)
 }
 #endif
 
-#ifndef DISABLE_LIBTCC
+#ifdef ENABLE_LIBTCC
 static void
 compile_and_run_libtcc(void)
 {

@@ -1,4 +1,4 @@
-#ifndef DISABLE_LIBPY
+#ifdef ENABLE_LIBPY
 /* This must be first; hopefully nothing else "must be first" too */
 #include <Python.h>
 #endif
@@ -12,7 +12,7 @@
 #include "move_opt.h"
 
 /* Ah, yes, this should be first too ... idiots. */
-#if !defined(DISABLE_LIBPY) && (_POSIX_VERSION < 200809L)
+#if defined(ENABLE_LIBPY) && (_POSIX_VERSION < 200809L)
 #include "usemktemp.c"
 #endif
 
@@ -33,7 +33,7 @@ static int use_getcell = 0;
 static int unbounded_tape = 0;
 
 static FILE * ofd;
-#ifndef DISABLE_LIBPY
+#ifdef ENABLE_LIBPY
 static char * pycode = 0;
 static size_t pycodesize = 0;
 #endif
@@ -55,7 +55,7 @@ fn_check_arg(const char * arg)
 	do_dump = 1;
 	return 1;
     } else
-#ifndef DISABLE_LIBPY
+#ifdef ENABLE_LIBPY
     if (strcmp(arg, "-r") == 0) {
 	do_dump = 0;
 	return 1;
@@ -93,7 +93,7 @@ gen_code(int ch, int count, char * strn)
 
     switch(ch) {
     case '!':
-#ifndef DISABLE_LIBPY
+#ifdef ENABLE_LIBPY
         if (!do_dump) {
 #ifndef DISABLE_OPENMEMSTREAM
 	    ofd = open_memstream(&pycode, &pycodesize);
@@ -327,7 +327,7 @@ gen_code(int ch, int count, char * strn)
 	break;
     }
 
-#ifndef DISABLE_LIBPY
+#ifdef ENABLE_LIBPY
     if (!do_dump && ch == '~') {
 #ifndef DISABLE_OPENMEMSTREAM
 	fclose(ofd);
