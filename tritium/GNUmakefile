@@ -200,8 +200,8 @@ GNULGT += $(call cc-option,-fno-strict-aliasing,-fno-strict-aliasing)
 GNULGT += $(call cc-option,-Wno-sign-compare,-Wno-sign-compare,-w)
 
 # Later GCCs are annoying.
-DASMFLAGS += $(call cc-option,-Wno-implicit-fallthrough,-Wno-implicit-fallthrough)
-DASMFLAGS += $(call cc-option,-Wno-array-bounds,-Wno-array-bounds)
+DASMFLAGS += $(call cc-option,-Wno-unused-value -Wimplicit-fallthrough -Warray-bounds, \
+    -Wno-implicit-fallthrough -Wno-array-bounds,-w)
 
 ################################################################################
 
