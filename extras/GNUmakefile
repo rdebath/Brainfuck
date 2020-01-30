@@ -182,23 +182,9 @@ endif
 
 endif
 
-HAVE_GDLM := $(call try-run,\
-	{ echo '\#define _GNU_SOURCE'; \
-	  echo '\#include <stdio.h>'; \
-	  echo 'int main (int argc, char *argv[]) {'; \
-	  echo 'char *b=0; size_t r=0;'; \
-	  echo 'FILE *fp=argc>1?fopen(argv[1], "r"):0;'; \
-	  echo 'if(!fp || getdelim(&b,&r,33,fp)<0) perror(argv[1]);'; \
-	  echo 'return 0;}'; \
-	  } > $(TMP).c ; $(TRYCC2) -o $(TMP),1)
-
-ifeq ($(HAVE_GDLM),)
-CFLAGS += -include lib/getdelim.c
-endif
-
 LOW_MEM := $(call try-run,\
-            [ "`ulimit -v 2>$(LOGDEV)`" = unlimited ] || \
-            [ "`ulimit -v 2>$(LOGDEV)`" -lt 40960 ] ,1)
+            [ "`(ulimit -v )2>$(LOGDEV)`" = unlimited ] || \
+            [ "`(ulimit -v )2>$(LOGDEV)`" -lt 40960 ] ,1)
 
 ifeq ($(LOW_MEM),)
 QTABLEDEF = -DNOQTABLE
