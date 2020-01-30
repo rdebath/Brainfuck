@@ -23,6 +23,11 @@ void longbeef(void);
 
 void dowhile(void);
 
+#ifdef ENABLE_BF2ANY
+extern int be_option(const char * arg);
+extern void be_outcmd(int mov, int ch, int count);
+#endif
+
 void putch(int);
 void minibf(char * bfprg);
 void microbf(char * bfprg);
@@ -50,6 +55,9 @@ static enum outtype {
 
 static enum intype {
     L_DEFAULTIN,
+#ifdef ENABLE_BF2ANY
+    L_BF2,
+#endif
     L_DEADBEEF, L_DUMPBEEF, L_ZEROBEEF, L_LONGBEEF, L_DOWHILE,
     L_INP_ASCII,
     L_MINIBF, L_MICROBF, L_PRETTYBF, L_TRACEBF
@@ -65,6 +73,23 @@ int main(int argc, char **argv)
     char * fn = 0;
     int ch, ar;
     if (isatty(fileno(stdout))) setbuf(stdout, NULL);
+
+#ifdef ENABLE_BF2ANY
+    for (ar=1; ar<argc; ar++) {
+	if (strncmp(argv[ar], "-bf2", 4) == 0) {
+	    if (in_format == L_DEFAULTIN && be_option(argv[ar])) {
+		in_format = L_BF2;
+		out_format = L_ASCII;
+		db_disable = 1;
+	    } else {
+		fprintf(stderr,
+		    "%s: Unexpected argument: '%s'\n", argv[0], argv[ar]);
+		exit(1);
+	    }
+	}
+    }
+#endif
+
     for (ar=1; ar<argc; ar++) {
 	switch(0) { default:
 	    if (!strcmp(argv[ar], "-e")) on_eof = -1;
@@ -121,10 +146,38 @@ int main(int argc, char **argv)
 	    else if (!strcmp(argv[ar], "-trace")) in_format = L_TRACEBF;
 	    else break;
 	    continue;
+#ifdef ENABLE_BF2ANY
+	case L_BF2:
+	    if (strncmp(argv[ar], "-bf2", 4) == 0)
+		continue;
+#endif
 	default:;
 	}
 
-	if (!strcmp(argv[ar], "-compact")) compact_bf = 1;
+	if (strncmp(argv[ar], "-w", 2) == 0 &&
+		(argv[ar][2] == 0 ||
+		(argv[ar][2] >= '0' && argv[ar][2] <= '9') )) {
+	    maxcol = atol(argv[ar]+2);
+
+#ifdef ENABLE_BF2ANY
+	    be_option(argv[ar]);
+#endif
+
+	}
+
+#ifdef ENABLE_BF2ANY
+	else if (in_format == L_BF2 && be_option(argv[ar])) /*OK*/ ;
+	else if (in_format == L_DEFAULTIN && out_format == L_DEFAULTOUT &&
+		(argv[ar][0] == '-' && argv[ar][1] != '\0') &&
+		be_option("-bf2bf") && be_option(argv[ar]) ) {
+	    in_format = L_BF2;
+	    out_format = L_ASCII;
+	    db_disable = 1;
+	    continue;
+	}
+#endif
+
+	else if (!strcmp(argv[ar], "-compact")) compact_bf = 1;
 	else if (!strcmp(argv[ar], "-no-rail")) db_disable |= 1;
 	else if (!strcmp(argv[ar], "-no-mov")) db_disable |= 2 | 1;
 	else if (!strcmp(argv[ar], "-no-set")) db_disable |= 4;
@@ -167,6 +220,24 @@ int main(int argc, char **argv)
 	    case L_LONGBEEF: longbeef(); break;
 	    case L_ZEROBEEF: zc_deadbeef(); break;
 	    case L_DOWHILE: dowhile(); break;
+
+#ifdef ENABLE_BF2ANY
+	    case L_BF2:
+		{
+		    int n;
+		    be_outcmd(0, 0, 0);
+		    for(n = 0; pgm[n].cmd; n++) {
+			if (pgm[n].cmd == ',' && on_eof <= 0) {
+			    be_outcmd(pgm[n].mov, '=', on_eof);
+			    be_outcmd(0, pgm[n].cmd, pgm[n].arg);
+			} else
+			    be_outcmd(pgm[n].mov, pgm[n].cmd, pgm[n].arg);
+		    }
+		    be_outcmd(0, '~', 0);
+		}
+		break;
+#endif
+
 	    default:
 		fprintf(stderr, "Incorrect format selection\n");
 		exit(6);
@@ -242,6 +313,11 @@ Usage(char * arg0)
     fprintf(stderr, "        -msf       Output in MiniStringFuck.\n");
     fprintf(stderr, "        -$         Output in $.\n");
     fprintf(stderr, "        -bcd       Output in BCDFuck.\n");
+
+#ifdef ENABLE_BF2ANY
+    be_option("-h");
+#endif
+
     exit(1);
 }
 
@@ -479,6 +555,7 @@ void dowhile(void)
 	}
     }
 }
+
 
 /*****************************************************************************
  * Special purpose output, all the various "languages".

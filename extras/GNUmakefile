@@ -2,7 +2,7 @@
 INSTALL=install -p -s
 INSTALLDIR=/usr/local/bin
 INSTALLEXT=
-CLIST=$(filter-out cdowhile.c lightning.c,$(wildcard *.c))
+CLIST=$(filter-out cdowhile.c lightning.c trixy_if.c %.tmp.c,$(wildcard *.c))
 EXELIST := $(patsubst %.c,%,$(CLIST))
 OBJECTS := $(patsubst %.c,%.o,$(CLIST)) ook.o
 ILIST=qtable.h qtable.tmp.h byte2byte.tmp.out
@@ -13,7 +13,7 @@ ALLEXE = $(EXELIST) $(MOREEXE) $(EXTRAS) $(LIBDL_EXE) $(LIGHTNINGEXE)
 all: build
 
 clean:
-	-rm -f $(OBJECTS) $(LIBOBJ) $(ILIST)
+	-rm -f $(OBJECTS) $(LIBOBJ) $(ILIST) $(TRIXYOBJ)
 	-rm -f ook.tmp.c $(ALLEXE) $(patsubst %,%.o,$(MOREEXE))
 
 # Install all we can make, but don't fail if some can't be built.
@@ -70,6 +70,35 @@ byte2byte.tmp.out: byte2byte.c
 
 txtbf: txtbf.c
 	$(CC) $(CFLAGS) $(QTABLEDEF) $(LDFLAGS) $(TARGET_ARCH) txtbf.c -o $@
+
+################################################################################
+
+BA=../bf2any
+TRIXYOBJ=trixy.o trixy_if.o bf2bf.o bf2elf.o bf2gas.o bf2oldsh.o bf2rc.o
+
+trixy: $(TRIXYOBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) -o $@ $(TRIXYOBJ)
+
+trixy.o: trixy.c
+	$(CC) $(CFLAGS) -DENABLE_BF2ANY $(TARGET_ARCH) -c -o $@ trixy.c
+
+trixy_if.o: trixy_if.c $(BA)/bf2any.h
+	$(CC) $(CFLAGS) -I$(BA) $(TARGET_ARCH) -c -o $@ trixy_if.c
+
+bf2bf.o: $(BA)/bf2bf.c $(BA)/bf2any.h
+	$(CC) $(CFLAGS) $(TARGET_ARCH) -Dbe_interface=int_bf2bf -c -o $@ $(BA)/bf2bf.c
+
+bf2elf.o: $(BA)/bf2elf.c $(BA)/bf2any.h
+	$(CC) $(CFLAGS) $(TARGET_ARCH) -Dbe_interface=int_bf2elf -c -o $@ $(BA)/bf2elf.c
+
+bf2gas.o: $(BA)/bf2gas.c $(BA)/bf2any.h
+	$(CC) $(CFLAGS) $(TARGET_ARCH) -Dbe_interface=int_bf2gas -c -o $@ $(BA)/bf2gas.c
+
+bf2oldsh.o: $(BA)/bf2oldsh.c $(BA)/bf2any.h
+	$(CC) $(CFLAGS) $(TARGET_ARCH) -Dbe_interface=int_bf2oldsh -c -o $@ $(BA)/bf2oldsh.c
+
+bf2rc.o: $(BA)/bf2rc.c $(BA)/bf2any.h
+	$(CC) $(CFLAGS) $(TARGET_ARCH) -Dbe_interface=int_bf2rc -c -o $@ $(BA)/bf2rc.c
 
 ################################################################################
 ifneq ($(MAKECMDGOALS),clean)
