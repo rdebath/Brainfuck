@@ -97,7 +97,7 @@ int nexttok(FILE * ifd);
 
 struct subst {
     int t[7];
-    char * s;
+    const char * s;
 } substrlist[] = {
 #ifndef NO_XTRA
     { {T_SET,0},
@@ -145,7 +145,7 @@ struct subst {
     {{0},0}
 };
 
-char * program = "C";
+const char * program = "C";
 struct bfi { int type; struct bfi *next, *prev, *jmp; int count; } *pgm;
 
 void run(void);

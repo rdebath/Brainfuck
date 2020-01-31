@@ -24,7 +24,7 @@ static void
 pc(int ch) { if (col>=72) { putchar('\n'); col=0; } col++; putchar(ch); }
 
 static void
-ps(char * p) {
+ps(const char * p) {
     if (!p || col+strlen(p) >= 72) {putchar('\n'); col = 0;}
     while(p&&*p) pc(*p++);
 }

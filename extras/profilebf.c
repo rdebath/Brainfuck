@@ -27,7 +27,7 @@
 #define UM(vx) ((vx) & cell_mask)
 #define SM(vx) ((UM(vx) ^ cell_smask) - cell_smask)
 
-char * progname = "";
+const char * progname = "";
 CELL * mem = 0;
 int memsize = 0;
 int memshift = 0;

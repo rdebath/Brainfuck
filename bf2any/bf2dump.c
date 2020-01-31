@@ -7,7 +7,7 @@
 
 static check_arg_t fn_check_arg;
 static gen_code_t gen_code;
-struct be_interface_s be_interface = { fn_check_arg, gen_code};
+struct be_interface_s be_interface = { .check_arg=fn_check_arg, .gen_code=gen_code};
 
 static int c_header = 0;
 static int no_mov = 0;
@@ -50,7 +50,7 @@ fn_check_arg(const char * arg)
     return 0;
 }
 
-static char *
+static const char *
 cell(int mov)
 {
     static char buf[3+3+sizeof(mov)*3];

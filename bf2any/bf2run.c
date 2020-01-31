@@ -74,7 +74,7 @@ fn_check_arg(const char * arg)
 }
 
 static void testmem() {
-    if (memlen < mptr-mem + 8) {
+    if (mem+memlen < mptr + 8) {
 	size_t s = memlen + 1024;
 	int * p;
 	p = realloc(mem, s * sizeof(int));

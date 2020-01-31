@@ -8,13 +8,16 @@
 /* Brainfuck loop optimiser
  *
  */
+
+#define asize(ar) ((int)(sizeof(ar)/sizeof(*(ar))))
+
 static int qcmd[128];
 static int qrep[128];
 static int qcnt = 0;
 
 static void process_loop(void);
 static int try_constant_loop(int loopz, int inc, int mov, int has_zmode);
-static int try_constant_slider(int loopz, int inc, int mov, int has_zmode);
+static int try_constant_slider(int mov);
 
 static int madd_offset[32];
 static int madd_inc[32];
@@ -31,7 +34,7 @@ outtxn(int ch, int repcnt)
     if ((ch != '>' && ch != '<' && ch != '+' && ch != '-' &&
 	 ch != '=' && ch != '[' && ch != ']') ||
 	(qcnt == 0 && ch != '[') ||
-	(qcnt >= sizeof(qcmd)/sizeof(*qcmd)-16)) {
+	(qcnt >= asize(qcmd)-16)) {
 
 	/* If it's not a new loop add the current one too */
 	if(ch != '[' && ch != 0) {
@@ -110,7 +113,7 @@ static void process_loop()
 	    if (mov == madd_offset[j]) break;
 	}
 	if (j == madd_count) {
-	    if (j >= sizeof(madd_offset)/sizeof(*madd_offset)) {
+	    if (j >= asize(madd_offset)) {
 		/* Loop too big */
 		outtxn(0,0);
 		return;
@@ -136,7 +139,7 @@ static void process_loop()
 
     if (mov) {
 	if (qcnt == 3 && (qcmd[1] == '<' || qcmd[1] == '>'))
-	    if (try_constant_slider(loopz, inc, mov, has_zmode))
+	    if (try_constant_slider(mov))
 		return;
 	outtxn(0, 0);  /* Unbalanced loop -- Nope. */
 	return;
@@ -381,7 +384,7 @@ try_constant_loop(int loopz, int inc, int mov, int has_zmode)
 }
 
 static int
-try_constant_slider(int loopz, int inc, int mov, int has_zmode)
+try_constant_slider(int mov)
 {
     struct mem *ctape = tape;
     int i, steps = 0;

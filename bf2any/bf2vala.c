@@ -10,7 +10,7 @@
  */
 
 static int ind = 0;
-static char * cell_t = 0;
+static const char * cell_t = 0;
 #define I printf("%*s", ind*2, "")
 
 static gen_code_t gen_code;

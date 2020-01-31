@@ -46,7 +46,7 @@ fn_check_arg(const char * arg)
     return 0;
 }
 
-static char *
+static const char *
 cell(int mov)
 {
     static char buf[6+3+sizeof(mov)*3];
@@ -62,7 +62,7 @@ static void
 gen_code(int ch, int count, char * strn)
 {
     int mov = 0;
-    char * cm;
+    const char * cm;
 
     move_opt(&ch, &count, &mov);
     if (ch == 0) return;

@@ -14,7 +14,7 @@ static int ind = 0;
 #define prv2(s,v,v2)    printf("%*s" s "\n", ind*4, "", (v), (v2))
 
 static void print_dstring(char * str);
-static char * dumbcast = "";
+static const char * dumbcast = "";
 
 static gen_code_t gen_code;
 /* Assume same machine, same int */

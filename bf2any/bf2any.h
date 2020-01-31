@@ -18,7 +18,7 @@ struct be_interface_s {
     int fe_bytecell;
     int disable_fe_optim;	/* Only for bf2bf */
     int fe_enable_debug;        /* Only for C generator */
-    char * fe_extra_commands;   /* Only for C generator */
+    const char * fe_extra_commands;   /* Only for C generator */
 } be_interface;
 
 #define tapeinit (be_interface.tape_init)

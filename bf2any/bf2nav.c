@@ -28,7 +28,7 @@ static int ind = 2;
 static int lblcount = 0;
 static int icount = 0;
 static int noheader = 0;
-static char * boilerplate;
+static const char * boilerplate;
 
 #define pr(s)           printf("%*s" s "\n", ind*2, "")
 #define prv(s,v)        printf("%*s" s "\n", ind*2, "", (v))
@@ -230,7 +230,7 @@ loutcmd(int ch, int count, struct instruction *n)
     }
 }
 
-static char * boilerplate =
+static const char * boilerplate =
 	"OBJECT Form 73000 BF"
 "\n"	"{"
 "\n"	"  OBJECT-PROPERTIES"

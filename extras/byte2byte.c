@@ -168,7 +168,7 @@ void
 write_tail()
 {
     if (cell_clear && curr) {
-	char * s = "[-]";
+	const char * s = "[-]";
 	while(*s) write_char(*s++);
     }
     if (flip) {
@@ -596,7 +596,7 @@ void do_dump()
     if (cell_unsigned) mtype = 'u';
     if (cell_wrap) mtype = 'b';
 
-    printf("char * bftable_%c[256][256] =\n", mtype);
+    printf("const char * bftable_%c[256][256] =\n", mtype);
     printf("{\n");
     for(from=0; from<256; from++) {
 	printf("{\n");

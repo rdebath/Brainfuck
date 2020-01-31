@@ -69,16 +69,16 @@ struct be_interface_s be_interface = {
 static const char bf[] = "><+-.,[]";
 
 typedef struct {
-    char * name;
-    char * bf[8];
-    char * gen_hdr, * gen_foot;
-    char * wrap_eight_bit;
-    char * clean_tmps;
-    char * set_cell;
-    char * zero_cell;
-    char * repeat_prev;
-    char * name2;
-    char * help;
+    const char * name;
+    const char * bf[8];
+    const char * gen_hdr, * gen_foot;
+    const char * wrap_eight_bit;
+    const char * clean_tmps;
+    const char * set_cell;
+    const char * zero_cell;
+    const char * repeat_prev;
+    const char * name2;
+    const char * help;
     int class, multi, bytesonly;
 } trivbf;
 
@@ -1377,7 +1377,7 @@ bcdbf(int ch, int count, char * strn)
 {
     char * p;
     if ((p = strchr(bf,ch))) {
-	char * bcmd = bcdbyte->bf[p-bf];
+	const char * bcmd = bcdbyte->bf[p-bf];
 
 	if ((ch == '+' || ch =='-') && count >= 16) {
 	    count &= 0xFF;

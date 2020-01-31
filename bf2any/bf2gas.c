@@ -187,5 +187,8 @@ gen_code(int ch, int count, char * strn)
 	puts("ret");
 	printf(".comm buffer,%d,32\n", tapesz);
 	break;
+    case '"':
+	fprintf(stderr, "Fail cmd '\"' '%s'\n", strn);
+	break;
     }
 }

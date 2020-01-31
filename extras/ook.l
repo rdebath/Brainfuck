@@ -342,7 +342,7 @@ ook	B?[Oo]ok
 .		commentch(yytext[0]);
 %%
 
-void options_from_name(char*);
+void options_from_name(const char *);
 void Usage(void);
 void addcmd(int, int);
 void run(void);
@@ -355,17 +355,17 @@ int sof = 1, cln = 0, col = 0, ccol = 0;
 
 int quiet = 1;
 
-char * progname = "C";
+const char * progname = "C";
 
-char * character_prefilter = 0;
-char * character_conversion = 0;
+const char * character_prefilter = 0;
+const char * character_conversion = 0;
 int line_cc = EOF;
 
 int sc_pending_off = 0;
 char * sc_pending_buf = 0;
 
-char bf[] = "><+-.,[]#";
-char *bflist = 0;
+const char bf[] = "><+-.,[]#";
+const char *bflist = 0;
 int bflist_ic = 1;
 
 size_t (*custom_prefilter)(char *, size_t) = 0;
@@ -495,11 +495,11 @@ int main(int argc, char ** argv)
 		custom_prefilter = string_conversion;
 	    }
 	    else if (!strncmp(argv[1], "-al=", 4)) {
-		char * s;
+		char * s, * xs;
 		int has_upper = 0, has_lower = 0;
 		mode = WORDLIST;
-		bflist = strdup(argv[1]+4);
-		for(s=bflist; *s; s++) {
+		bflist = xs = strdup(argv[1]+4);
+		for(s=xs; *s; s++) {
 		    if (*s==',') continue;
 		    if ((*s>='0' && *s<='9') || ((*s & 0x80) != 0)) continue;
 		    if (*s>='a' && *s<='z') { has_lower = 1; continue; }
@@ -510,7 +510,7 @@ int main(int argc, char ** argv)
 
 		if (!has_upper || !has_lower) {
 		    bflist_ic = 1;
-		    for(s=bflist; *s; s++)
+		    for(s=xs; *s; s++)
 			if (isupper(*s))
 			    *s = tolower(*s);
 		} else
@@ -613,9 +613,9 @@ int main(int argc, char ** argv)
 }
 
 void
-options_from_name(char * name)
+options_from_name(const char * name)
 {
-    char *p, *s;
+    const char *p, *s;
     for(s=p=name; *s; s++)
 	if (*s == '/')
 	    p = s+1;
@@ -768,7 +768,7 @@ static int countch(char * s, int ch)
 
 static void wordlist()
 {
-    char *s = bflist, *e;
+    const char *s = bflist, *e;
     int c = 0;
     if (bflist_ic)
     {
@@ -871,7 +871,7 @@ utf8_conversion(char * buf, size_t max_size)
 
 	c = (unsigned char)c;
 	if (c <= 0x7f) {
-	    char *m, *r;
+	    const char *m, *r;
 	    m = character_prefilter;
 	    r = character_conversion;
 
@@ -891,10 +891,10 @@ utf8_conversion(char * buf, size_t max_size)
 	} else if (utf-chrbuf < 8) {
 	    *utf++ = c;
 	    if (utf-chrbuf == UTFlen[chrbuf[0]&0x3F]) {
-		unsigned char *m;
-		char *r;
+		const unsigned char *m;
+		const char *r;
 
-		m = (unsigned char*) character_prefilter;
+		m = (const unsigned char*) character_prefilter;
 		r = character_conversion;
 		while(*m && *r) {
 		    if (*m == chrbuf[0]) {
@@ -958,7 +958,7 @@ string_conversion(char * buf, size_t max_size)
     int c = 0xDEADBEEF;
     int match_flg, match_id, match_len;
     int cnt;
-    char *s, *e;
+    const char *s, *e;
 
     if (sc_pending_buf == 0) sc_pending_buf = strdup(character_prefilter);
 

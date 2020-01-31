@@ -54,7 +54,7 @@
 void find_best_conversion(char * linebuf);
 
 int gen_print(char * buf, int init_offset);
-void check_if_best(char * buf, char * name);
+void check_if_best(const char * buf, const char * name);
 
 void gen_subrange(char * buf, int subrange, int flg_zoned);
 void gen_ascii(char * buf);
@@ -63,14 +63,14 @@ void gen_multbyte(char * buf);
 void gen_nestloop(char * buf);
 void gen_nestloop8(char * buf);
 void gen_slipnest(char * buf);
-void gen_special(char * buf, char * initcode, char * name, int usercode);
+void gen_special(char * buf, const char * initcode, const char * name, int usercode);
 void gen_twoflower(char * buf);
 void gen_twincell(char * buf);
 void gen_trislipnest(char * buf);
 void gen_countslide(char * linebuf);
 void gen_nastyslide(char * linebuf);
 
-int runbf(char * prog, int longrun);
+int runbf(const char * prog, int longrun);
 
 #define MAX_CELLS 512
 #define MAX_STEPS 1000000
@@ -89,7 +89,7 @@ int runbf(char * prog, int longrun);
 #define RUNNERCODE5 ">+++++[<+++++++>-]<[>+>++>+++<<<-]"
 
 /* Some previously found "Hello World" prefixes, so you don't have to do big runs. */
-char * hello_world[] = {
+const char * hello_world[] = {
     "+++++++++++++++[>++++++++>+++++++>++>+++<<<<-]",
     "+++++++++++++++[>+++++++>++++++++>++>+++<<<<-]",
     "+++++++++++++++[>+++++>+++++>++++++>+++>++<<<<<-]",
@@ -118,7 +118,7 @@ char * hello_world[] = {
 
     0 };
 
-char * hello_world2[] = {
+const char * hello_world2[] = {
     "++++[>+++++<-]>[>[++++++>]+[<]>-]",
     "++++[>+++++<-]>[>[++++++>]++[<]>-]",
     "+++[>++++++<-]>[>[+++++++>]++[<]>-]",
@@ -195,7 +195,7 @@ char * hello_world2[] = {
 
     0 };
 
-char * hello_world3[] = {
+const char * hello_world3[] = {
 
     "->+>+>>+>---[++++++++++++[>+++++>++>+<<<-]+<+]", /* https://esolangs.org/wiki/Talk:Brainfuck#Shortest_known_.22hello_world.22_program. */
     "--->->->>+>+>>+[++++[>+++[>++++>-->+++<<<-]<-]<+++]",  /* https://esolangs.org/wiki/Talk:Brainfuck#Shortest_known_.22hello_world.22_program. */
@@ -208,7 +208,7 @@ char * hello_world3[] = {
  * are generated from brute force searches and give "interesting" looking
  * patterns in memory.
  */
-char * hello_world_byte[] = {
+const char * hello_world_byte[] = {
     "+[[->]-[<]>-]",
     "-[[+>]+[<]>+]",
 
@@ -334,9 +334,9 @@ int blocksize = 0;
 int cell_limit = MAX_CELLS;
 
 void reinit_state(void);
-void output_str(char * s);
+void output_str(const char * s);
 void add_chr(int ch);
-void add_str(char * p);
+void add_str(const char * p);
 
 char * str_start = 0;
 int str_max = 0, str_next = 0, str_mark = 0;
@@ -355,7 +355,7 @@ char * found_init[PREV_FOUND];
 char * found_nmid[PREV_FOUND];
 int found_len[PREV_FOUND];
 
-char * special_init = 0;
+const char * special_init = 0;
 
 static int cells[MAX_CELLS];
 
@@ -390,7 +390,7 @@ wipe_config()
 }
 
 int
-process_arg(char * arg)
+process_arg(const char * arg)
 {
     if (strncmp(arg, "-v", 2) == 0) {
 	if (arg[2])
@@ -774,7 +774,7 @@ find_best_conversion(char * linebuf)
 #endif
 
     if (enable_special) {
-	char ** hellos;
+	const char ** hellos;
 	char namebuf[64];
 	if (verbose>2) fprintf(stderr, "Trying non-wrap hello-worlds\n");
 
@@ -785,7 +785,7 @@ find_best_conversion(char * linebuf)
     }
 
     if (enable_special && !flg_optimisable) {
-	char ** hellos;
+	const char ** hellos;
 	char namebuf[64];
 	if (verbose>2) fprintf(stderr, "Trying complex hello-worlds\n");
 
@@ -916,7 +916,7 @@ find_best_conversion(char * linebuf)
 }
 
 void
-output_str(char * s)
+output_str(const char * s)
 {
 static int col = 0;
     int ch;
@@ -934,7 +934,7 @@ static int col = 0;
 }
 
 void
-check_if_best(char * buf, char * name)
+check_if_best(const char * buf, const char * name)
 {
     if (str_cells_used > cell_limit && cell_limit > 0) return;
 
@@ -1106,7 +1106,7 @@ add_chr(int ch)
 }
 
 inline void
-add_str(char * p)
+add_str(const char * p)
 {
     while(p && *p) add_chr(*p++);
 }
@@ -2024,7 +2024,7 @@ return_to_top:
  */
 
 void
-gen_special(char * buf, char * initcode, char * name, int usercode)
+gen_special(char * buf, const char * initcode, const char * name, int usercode)
 {
     int maxcell = 0;
     int currcell=0;
@@ -2053,7 +2053,7 @@ gen_special(char * buf, char * initcode, char * name, int usercode)
 	}
 	maxcell = str_cells_used-1;
     } else {
-	char *p, *b;
+	const char *p, *b;
 	int m=0, nestlvl=0;
 	int countdown = MAX_STEPS;
 
@@ -2595,7 +2595,7 @@ gen_twincell(char * buf)
 
     /* Print each character */
     for(p=buf; *p; p++) {
-	char *s;
+	const char *s;
 	int nextc = (unsigned char) *p;
 	if (bytewrap) s = bftable_b[curr][nextc];
 	else if (flg_signed) s = bftable_s[curr][nextc];
@@ -2712,7 +2712,7 @@ static char codebuf[128], *s;
 static char namebuf[128];
     int p1,p2,p3,p4,a1;
 
-static char * extra_cell[] = {
+static const char * extra_cell[] = {
     "[>[",
     "[>+>[",
     "[>++>[",
@@ -2803,7 +2803,7 @@ static char codebuf[256], *s;
 static char namebuf[128];
     int p1,p2,p3,p4, a1;
 
-static char * extra_cell[] = {
+static const char * extra_cell[] = {
     "[>[",
     "[>+>[",
     "[>++>[",
@@ -2869,7 +2869,7 @@ struct bfi { int mov; int cmd; int arg; } *pgm = 0;
 int pgmlen = 0;
 
 int
-runbf(char * prog, int longrun)
+runbf(const char * prog, int longrun)
 {
     int m= 0, p= -1, n= -1, j= -1, ch;
     int maxcell = 0, countdown = (longrun?MAX_STEPS:10000);

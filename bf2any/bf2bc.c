@@ -16,9 +16,9 @@ static int used_o = 0;
 static gen_code_t gen_code;
 struct be_interface_s be_interface = {.gen_code=gen_code};
 
-static void print_cstring(char * str);
+static void print_cstring(const char * str);
 
-static char *
+static const char *
 cell(int mov)
 {
     static char buf[9+3+sizeof(mov)*3];
@@ -34,7 +34,7 @@ static void
 gen_code(int ch, int count, char * strn)
 {
     int mov = 0, i;
-    char * mc;
+    const char * mc;
 
     move_opt(&ch, &count, &mov);
     if (ch == 0) return;
@@ -143,7 +143,7 @@ gen_code(int ch, int count, char * strn)
 }
 
 static void
-print_cstring(char * str)
+print_cstring(const char * str)
 {
     char buf[256];
     int badchar = 0;

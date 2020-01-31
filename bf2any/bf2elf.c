@@ -232,7 +232,7 @@ gen_code(int ch, int count, char * strn)
 	    umask(umsk);
 #endif
 	} else {
-	    int i, j;
+	    size_t i, j;
 	    for(i=0; i<pos; i+=30) {
 		for(j=0; j<30; j++) {
 		    if (i+j<pos)
@@ -242,5 +242,8 @@ gen_code(int ch, int count, char * strn)
 	    }
 	}
 	break;
+    case '"':
+        fprintf(stderr, "Fail cmd '\"' '%s'\n", strn);
+        break;
     }
 }

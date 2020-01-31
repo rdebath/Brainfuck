@@ -61,7 +61,7 @@ static size_t luacodesize = 0;
 
 static check_arg_t fn_check_arg;
 static gen_code_t gen_code;
-struct be_interface_s be_interface = {fn_check_arg, gen_code};
+struct be_interface_s be_interface = {.check_arg=fn_check_arg, .gen_code=gen_code};
 
 static int
 fn_check_arg(const char * arg)
