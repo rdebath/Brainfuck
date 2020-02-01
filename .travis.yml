@@ -1,0 +1,11 @@
+# https://travis-ci.org/rdebath/Brainfuck/builds
+language: c
+
+os:
+  - linux
+
+# Only run the tests if the exe was built.
+script:
+    - bash try.sh HelloWorld.b
+    - bash try.sh HelloWorld2.b
+    - bash try.sh bitwidth.b
