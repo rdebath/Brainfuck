@@ -969,15 +969,14 @@ run_dynasm(void)
 #endif
 
 typedef int (*fnptr)(char* memory);
-static fnptr code = 0;
-static size_t codelen;
 
 static void
 link_and_run(dasm_State ** state)
 {
+    fnptr  code = 0;
     char   *codeptr;
-    size_t  size;
-    int     dasm_status = dasm_link(state, &size);
+    size_t  codelen;
+    int     dasm_status = dasm_link(state, &codelen);
     if (dasm_status != DASM_S_OK) {
 	fprintf(stderr, "Process dasm_link() failed\n");
 	exit(1);
@@ -988,7 +987,7 @@ link_and_run(dasm_State ** state)
     /* I allocate this with a 'PROT_EXEC' flag set so the kernel can choose
      * to put it in the 'code area' if there is such a thing (i386) */
     codeptr =
-	(char *) mmap(NULL, size,
+	(char *) mmap(NULL, codelen,
 #ifdef NO_MPROTECT
 		      PROT_WRITE |
 #endif
@@ -1000,7 +999,7 @@ link_and_run(dasm_State ** state)
 	int fd = open("/dev/zero", O_RDWR);
 	if (fd >= 0) {
 	    codeptr =
-		(char *) mmap(NULL, size,
+		(char *) mmap(NULL, codelen,
 #ifdef NO_MPROTECT
 			      PROT_WRITE |
 #endif
@@ -1016,20 +1015,19 @@ link_and_run(dasm_State ** state)
     }
 
 #ifndef NO_MPROTECT
-    if (mprotect(codeptr, size, PROT_WRITE | PROT_READ) != 0) {
+    if (mprotect(codeptr, codelen, PROT_WRITE | PROT_READ) != 0) {
 	perror("mprotect to enable code writing");
     };
 #endif
 #elif defined(_WIN32)
-    codeptr = (char*) VirtualAlloc(0, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    codeptr = (char*) VirtualAlloc(0, codelen, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
     if (!codeptr) {
 	perror("Unable to allocate executable memory");
 	exit(1);
     }
 #else
-    codeptr = malloc(size);
+    codeptr = malloc(codelen);
 #endif
-    codelen = size;
 
     (void)dasm_getpclabel;      /* Unused */
 
@@ -1038,13 +1036,13 @@ link_and_run(dasm_State ** state)
     delete_tree();
 
 #if !defined(LEGACYOS) && !defined(_WIN32) && !defined(NO_MPROTECT)
-    if (mprotect(codeptr, size, PROT_EXEC | PROT_READ) != 0) {
+    if (mprotect(codeptr, codelen, PROT_EXEC | PROT_READ) != 0) {
 	if (verbose)
 	    perror("mprotect read only");
     };
 #elif defined(_WIN32)
     DWORD oldProt = 0;
-    if (!VirtualProtect(codeptr, size, PAGE_EXECUTE_READ, &oldProt)) {
+    if (!VirtualProtect(codeptr, codelen, PAGE_EXECUTE_READ, &oldProt)) {
 	if (verbose)
 	    perror("VirtualProtect read only failed");
     }
@@ -1062,11 +1060,11 @@ link_and_run(dasm_State ** state)
     {
 	const char *fname = "/tmp/code-dasm.bin";
 	FILE   *f = fopen(fname, "w");
-	fwrite(codeptr, size, 1, f);
+	fwrite(codeptr, codelen, 1, f);
 	fclose(f);
 	fprintf(stderr, "Dynasm "CPUID" code dumped to file '%s'\n", fname);
 	fprintf(stderr, "codeptr = 0x%lx\n", (unsigned long) codeptr);
-	fprintf(stderr, "size    = %lu\n", (unsigned long) size);
+	fprintf(stderr, "codelen = %lu\n", (unsigned long) codelen);
 	fprintf(stderr, "putch   = 0x%lx\n", (unsigned long) &putch);
 	fprintf(stderr, "getch   = 0x%lx\n", (unsigned long) &getch);
 	fprintf(stderr, "failout = 0x%lx\n", (unsigned long) &failout);
@@ -1080,7 +1078,7 @@ link_and_run(dasm_State ** state)
        (Technical Corrigendum 1) workaround; see the Rationale for the
        POSIX specification of dlsym(). */
 					     /* -- Linux man page dlsym() */
-    *(void **) (&code) = codeptr;
+    *(void **) (&code) = (void*) codeptr;
     start_runclock();
     code(map_hugeram());
     finish_runclock(&run_time, &io_time);

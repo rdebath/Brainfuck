@@ -132,8 +132,6 @@ static int maxpc = 0;
 static void link_and_run(dasm_State **state);
 static size_t tape_step = sizeof(int);
 typedef int (*fnptr)(char * memory);
-static fnptr code = 0;
-static size_t codelen;
 static char * tapemem;
 
 static int acc_loaded = 0;
@@ -613,9 +611,10 @@ link_and_run(dasm_State ** state)
      * the segments together onto one unit of code. The size of this code
      * is returned in the 'size' argument.
      */
+    fnptr  code = 0;
     char   *codeptr;
-    size_t  size;
-    int     dasm_status = dasm_link(state, &size);
+    size_t codelen;
+    int     dasm_status = dasm_link(state, &codelen);
     if (dasm_status != DASM_S_OK) {
 	fprintf(stderr, "Process dasm_link() failed\n");
 	exit(1);
@@ -628,7 +627,7 @@ link_and_run(dasm_State ** state)
     /* I allocate this with a 'PROT_EXEC' flag set so the kernel can choose
      * to put it in the 'code area' if there is such a thing (i386) */
     codeptr =
-	(char *) mmap(NULL, size,
+	(char *) mmap(NULL, codelen,
 #ifdef NO_MPROTECT
                       PROT_WRITE |
 #endif
@@ -640,7 +639,7 @@ link_and_run(dasm_State ** state)
 	int fd = open("/dev/zero", O_RDWR);
 	if (fd >= 0) {
 	    codeptr =
-		(char *) mmap(NULL, size,
+		(char *) mmap(NULL, codelen,
 #ifdef NO_MPROTECT
 			      PROT_WRITE |
 #endif
@@ -656,19 +655,17 @@ link_and_run(dasm_State ** state)
     }
 
 #ifndef NO_MPROTECT
-    if (mprotect(codeptr, size, PROT_WRITE | PROT_READ) != 0) {
+    if (mprotect(codeptr, codelen, PROT_WRITE | PROT_READ) != 0) {
 	perror("mprotect to enable code writing");
     };
 #endif
 #else /*_WIN32*/
-    codeptr = (char*) VirtualAlloc(0, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    codeptr = (char*) VirtualAlloc(0, codelen, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
     if (!codeptr) {
 	perror("Unable to allocate executable memory");
 	exit(1);
     }
 #endif
-
-    codelen = size;
 
     /* Last phase: Stream out the code fragments into proper machine
      * code doing the final absolute relocations.
@@ -687,13 +684,13 @@ link_and_run(dasm_State ** state)
      * happens so there won't be any 'bad cache' effects */
 #ifndef __WIN32
 #ifndef NO_MPROTECT
-    if (mprotect(codeptr, size, PROT_EXEC | PROT_READ) != 0) {
+    if (mprotect(codeptr, codelen, PROT_EXEC | PROT_READ) != 0) {
 	perror("mprotect read only");
     };
 #endif
 #else
     DWORD oldProt = 0;
-    if (!VirtualProtect(codeptr, size, PAGE_EXECUTE_READ, &oldProt)) {
+    if (!VirtualProtect(codeptr, codelen, PAGE_EXECUTE_READ, &oldProt)) {
 	perror("VirtualProtect read only failed");
     }
 #endif
@@ -706,9 +703,10 @@ link_and_run(dasm_State ** state)
      *  ndisasm -b32 code.bin
      */
     FILE   *f = fopen("/tmp/code.bin", "w");
-    fwrite(codeptr, size, 1, f);
+    fwrite(codeptr, codelen, 1, f);
     fclose(f);
     fprintf(stderr, "codeptr = 0x%lx\n", (unsigned long) codeptr);
+    fprintf(stderr, "codelen = 0x%lx\n", (unsigned long) codelen);
     fprintf(stderr, "putchar = 0x%lx\n", (unsigned long) &putchar);
     fprintf(stderr, "getchar = 0x%lx\n", (unsigned long) &getchar);
 #endif
@@ -724,13 +722,13 @@ link_and_run(dasm_State ** state)
        (Technical Corrigendum 1) workaround; see the Rationale for the
        POSIX specification of dlsym(). */
 					     /* -- Linux man page dlsym() */
-    *(void **) (&code) = codeptr;
+    *(void **) (&code) = (void *) codeptr;
     code(tapemem + tape_step * tapeinit);
 
     /* Discard code and data */
 #ifndef _WIN32
     if (munmap(codeptr, codelen) != 0)
-	perror("munmap(code..)");
+	perror("munmap(codeptr, codelen)");
 #else
     (void)VirtualFree(codeptr, 0, MEM_RELEASE);
 #endif
