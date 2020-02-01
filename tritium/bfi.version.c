@@ -74,11 +74,15 @@
 #if defined(_WIN32)
 #define BFI_FOUND_CPU_X86_32_WINDOWS
 #endif
-#elif defined(__powerpc__) || defined(__PPC__)
+#elif defined(__PPC64__)
+#define PROCESSOR	"PPC64"
+#elif (defined(__powerpc__) || defined(__PPC__)) && defined(__BIG_ENDIAN__)
 #define PROCESSOR	"PPC"
 #ifdef __ELF__
 #define BFI_FOUND_CPU_PPC
 #endif
+#elif defined(__powerpc__) || defined(__PPC__)
+#define PROCESSOR	"PPC"
 #elif defined(__sparc__)
 #define PROCESSOR	"Sparc"
 #ifdef __ELF__
@@ -92,6 +96,8 @@
 #else
 #define PROCESSOR	"ARM"
 #endif
+#elif defined(__AARCH64EL__)
+#define PROCESSOR	"ARM64"
 #elif defined(__MIPSEL__) || defined(__MIPSEB__)
 #define PROCESSOR	"MIPS"
 #elif defined(__SH4__)
@@ -102,10 +108,12 @@
 #define PROCESSOR	"DEC Alpha"
 #elif defined(__vax__)
 #define PROCESSOR	"VAX"
+#elif defined(__s390x__)
+#define PROCESSOR	"s390x"
 #elif defined(__asmjs__)
 #define PROCESSOR	"using asm.js"
 #else
-#define PROCESSOR	"using an unknown processor"
+#define PROCESSOR	"?"
 #endif
 
 /* This is what I've spotted this time. */

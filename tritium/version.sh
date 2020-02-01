@@ -48,6 +48,8 @@ git_describe() {
 
     # Find the most recent tag.
     TAG=`git describe --tags --match='v[0-9]*.[0-9]*' --abbrev=0 $ORIGIN`
+    [ "$TAG" = "" ] && return
+
     MAJOR=`echo $TAG | sed "s/^v\([0-9]*\).*/\1/"`
     MINOR=`echo $TAG | sed "s/^v[0-9]*\.\([0-9]*\)/\1/"`
 

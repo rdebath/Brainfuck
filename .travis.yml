@@ -1,37 +1,78 @@
-# https://travis-ci.org/rdebath/Brainfuck/builds
+ # https://travis-ci.org/rdebath/Brainfuck/builds
 language: c
 
 # Select Trusty
-dist: trusty
-sudo: false
+# dist: trusty
+# sudo: false
 group: beta
 
-addons:
-  apt:
-    packages:
-    - lua5.1
-    - liblua5.1-bitop0
-    - g++-multilib
+arch:
+  - amd64
+  - s390x
+  - ppc64le
+  - arm64
+
+# addons:
+#  apt:
+#    packages:
+#    - lua5.1
+#    - liblua5.1-bitop0
+#    - g++-multilib
+
+install:
+  - "if [ $TRAVIS_OS_NAME = linux ]; then sudo apt-get install -y g++-multilib ||: ; fi"
+  - "if [ $TRAVIS_OS_NAME = linux ]; then sudo apt-get install -y liblua5.3-bitop0 lua5.3 ||: ; fi"
+  - "if [ $TRAVIS_OS_NAME = linux ]; then sudo apt-get install -y liblua5.2-bitop0 lua5.2 ||: ; fi"
+  - "if [ $TRAVIS_OS_NAME = linux ]; then sudo apt-get install -y liblua5.1-bitop0 lua5.1 ||: ; fi"
 
 os:
   - linux
   - osx
 
 compiler:
-  - clang
   - gcc
+  - clang
 
 env:
-  - TARGET_ARCH=-m64
+  -
   - TARGET_ARCH=-m32
-# Ubunty Precise doesn't know about mx32
   - TARGET_ARCH=-mx32
 
-matrix:
+jobs:
     exclude:
         -
             os: linux
             compiler: clang
+            env: TARGET_ARCH=-mx32
+        -
+            os: osx
+            env: TARGET_ARCH=-mx32
+        -
+            arch: s390x
+            os: osx
+        -
+            arch: s390x
+            env: TARGET_ARCH=-m32
+        -
+            arch: s390x
+            env: TARGET_ARCH=-mx32
+        -
+            arch: ppc64le
+            os: osx
+        -
+            arch: ppc64le
+            env: TARGET_ARCH=-m32
+        -
+            arch: ppc64le
+            env: TARGET_ARCH=-mx32
+        -
+            arch: arm64
+            os: osx
+        -
+            arch: arm64
+            env: TARGET_ARCH=-m32
+        -
+            arch: arm64
             env: TARGET_ARCH=-mx32
 
 # Only run the tests if the exe was built.
@@ -47,3 +88,6 @@ script:
   - test ! -x tritium/bfi.out || tritium/bfi.out testing/Mandelbrot.b
   - test ! -x tritium/bfi.out || tritium/bfi.out testing/Prime.b < testing/Prime.in
   - test ! -x tritium/bfi.out || tritium/bfi.out -h || true
+
+#  - "\"$CC\" -dM -E -x c -</dev/null"
+

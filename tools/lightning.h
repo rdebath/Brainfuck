@@ -51,7 +51,7 @@ extern "C" {
 #include <lightning/fp-common.h>
 #endif
 
-#if defined(__powerpc__) || defined(__PPC__)
+#if (defined(__powerpc__) || defined(__PPC__)) && defined(__BIG_ENDIAN__) && !defined(__PPC64__)
 #include <lightning/asm-common.h>
 
 #ifndef LIGHTNING_DEBUG
