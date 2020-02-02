@@ -63,7 +63,6 @@ struct be_interface_s be_interface = {
 #define L_HANOILOVE     0x18    /* hanoilove(token, count); */
 #define L_DOWHILE       0x19    /* bfdowhile(token, count); */
 #define L_BINRLE        0x1A    /* bfbinrle(token, count); */
-#define L_BCD           0x1B    /* bcdbf(token, count, strn); */
 #define L_QQQ           0x1E    /* qqq(token, count); */
 
 static const char bf[] = "><+-.,[]";
@@ -85,7 +84,6 @@ typedef struct {
 static trivbf * trivlist[];
 static trivbf bfout[], doubler_copy[], doubler_12[], bfquadz[];
 static trivbf cbyte[], cint[], cbyte_rle[], cint_rle[];
-static trivbf bcdbyte[];
 static trivbf new_triv[1];
 
 struct instruction { int ch; int count; struct instruction * next, *loop; };
@@ -120,7 +118,6 @@ static void bfxml(int ch, int count);
 static void bfugly(int ch, int count);
 static void malbrain(int ch, int count);
 static void hanoilove(int ch, int count);
-static void bcdbf(int ch, int count, char * strn);
 static void qqq(int ch, int count);
 static void bfdowhile(int ch, int count);
 static void bfbinrle(int ch, int count);
@@ -154,14 +151,10 @@ fn_check_arg(const char * arg)
 
 	if (! ( L_BASE == L_BFRLE || L_BASE == L_HANOILOVE ||
 		L_BASE == L_BINRLE || L_BASE == L_BFXML ||
-		L_BASE == L_TOKENS || L_BASE == L_BCD ||
-		(langclass & C_ADDRLE) == C_ADDRLE))
+		L_BASE == L_TOKENS || (langclass & C_ADDRLE) == C_ADDRLE))
 	{
 	    be_interface.disable_fe_optim = 1;
 	}
-
-	if (langclass == L_TOKENS || langclass == L_BCD)
-	    be_interface.enable_chrtok = 1;
 
 	return 1;
     }
@@ -230,9 +223,6 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-dump") == 0) {
 	lang = 0; langclass = L_TOKENS; return 1;
     } else
-    if (strcmp(arg, "-bcd") == 0) {
-	lang = 0; langclass = L_BCD; return 1;
-    } else
     if (strcmp(arg, "-qqq") == 0 || strcmp(arg, "-???") == 0) {
 	lang = 0; langclass = L_QQQ; return 1;
     } else
@@ -261,7 +251,6 @@ fn_check_arg(const char * arg)
 	"\n\t"  "-hanoilove Hanoi Love translation"
 	"\n\t"  "-dowhile   Do ... while translataion."
 	"\n\t"  "-binrle    Base 2 RLE BF"
-	"\n\t"  "-bcd       BCDFuck byte wide with optimisation"
 	"\n\t"  "-???       https://esolangs.org/wiki/%3F%3F%3F"
 	"\n\t"  "-dbr       Like -dbl12nz with RLE of '+' and '-'."
 	"\n\t"  "-multi     Combined single, double and quad with cell size."
@@ -388,7 +377,7 @@ pmc(const char * s)
 static void
 gen_code(int ch, int count, char * strn)
 {
-    if (L_BASE != L_TOKENS && L_BASE != L_BFRLE && L_BASE != L_BCD &&
+    if (L_BASE != L_TOKENS && L_BASE != L_BFRLE &&
 	L_BASE != L_HANOILOVE && L_BASE != L_BINRLE)
     {
 	if (ch == '=') {
@@ -441,7 +430,6 @@ gen_code(int ch, int count, char * strn)
     case L_HANOILOVE:	hanoilove(ch, count); break;
     case L_DOWHILE:	bfdowhile(ch, count); break;
     case L_BINRLE:	bfbinrle(ch, count); break;
-    case L_BCD:		bcdbf(ch, count, strn); break;
     case L_QQQ:		qqq(ch, count); break;
     }
 
@@ -1333,131 +1321,6 @@ bfdowhile(int ch, int count)
 	    }
 	}
     }
-}
-
-static void
-pc_bcd2(int ch)
-{
-
-    if ((col>=((maxcol-2)/3)*3+2 && maxcol) || ch == '\n') {
-	putchar('\n');
-	col = 0;
-	if (ch == ' ' || ch == '\n') ch = 0;
-    }
-    if (ch) {
-	if (col != 0 && col%3 == 2) {
-	    putchar(' ');
-	    col++;
-	}
-	putchar(ch);
-	col++;
-    }
-}
-
-static void
-pc_bcd(int ch)
-{
-    if (disable_optim) { pc_bcd2(ch); return; }
-
-    if (ch == '0') bf_mov++;
-    else if (ch == 'A') bf_mov--;
-    else {
-	while (bf_mov>0) {bf_mov--; pc_bcd2('0'); }
-	while (bf_mov<0) {bf_mov++; pc_bcd2('A'); }
-	pc_bcd2(ch);
-    }
-}
-
-static void
-pmc_bcd(const char * s)
-{
-    while (*s) pc_bcd(*s++);
-}
-
-void
-bcdbf(int ch, int count, char * strn)
-{
-    char * p;
-    if ((p = strchr(bf,ch))) {
-	const char * bcmd = bcdbyte->bf[p-bf];
-
-	if ((ch == '+' || ch =='-') && count >= 16) {
-	    count &= 0xFF;
-	    if (ch == '-') count = 256 - count;
-	    ch = '+';
-
-	    while (count >= 16) {
-		int hi = count / 16;
-		if (hi>9) hi = 9;
-		count -= hi*16;
-		pmc_bcd("000");
-		pc_bcd('0' + hi);
-		pmc_bcd("AAAA");
-		if (count == 0) return;
-	    }
-	}
-
-	do {
-	    pmc_bcd(bcmd);
-	} while(--count>0);
-
-	return;
-    }
-
-    if (ch == '=') {
-	int nibble;
-	for(nibble = 4; nibble>=0; nibble-=4) {
-	    int d = (count>>nibble) & 0xF;
-	    if (nibble == 4)
-		pmc_bcd("000B1AC");
-	    else
-		pmc_bcd("B1AC");
-
-	    if (d>=9) { pc_bcd('0'+d/2); pc_bcd('A'); d-= d/2; }
-	    if (d>0) { pc_bcd('0'+d); pc_bcd('A'); }
-
-	    if (nibble == 4)
-		pmc_bcd("AAA");
-	}
-    }
-
-    if (ch == '"' && strn && *strn) {
-	int outch = 0, i, l = strlen(strn)+1;
-
-	if (!state) pc_bcd('0');
-	if (state) l--;
-	for(i=0; i<l; i++)
-        {
-            int nibble;
-	    int v = strn[i];
-
-            for(nibble = 4; nibble>=0; nibble-=4) {
-                int d, n = (v>>nibble) & 0xF;
-                d = n - outch;
-		if (n == 0 && v != 0 && d != 0) {
-		    pmc_bcd("0EA");
-		} else {
-		    if (d<0) d += 0x10;
-		    if (d>=9) { pc_bcd('0'+d/2); pc_bcd('A'); d-= d/2; }
-		    if (d>0) { pc_bcd('0'+d); pc_bcd('A'); }
-		    outch = n;
-		    if(v) pc_bcd('E');
-		}
-            }
-        }
-	if (!state) pc_bcd('A');
-    }
-
-    if (ch == '~') {
-	pc_bcd(0);
-	if (col%3 == 1)
-	    pc_bcd2('0');
-    }
-
-    if (ch == '!') state = count;
-
-    if (ch == 'X')
-	pmc_bcd("01ABCA");
 }
 
 void
