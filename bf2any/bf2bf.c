@@ -49,7 +49,7 @@ struct be_interface_s be_interface = {
 #define L_JNWORD        1       /* Words NO spaces */
 #define L_CHARS         2       /* Add strings char by char. */
 #define L_BF            3       /* Generated code is BF. */
-#define L_BFCHARS       4       /* Generated code is sort of like BF. */
+#define L_BFCHARS       4       /* BF like code that needs mov_opt */
 #define L_LINES         5       /* Code is not wordwrapped. */
 
 #define L_TOKENS        0x10    /* token(token, count); */
@@ -144,9 +144,11 @@ fn_check_arg(const char * arg)
 	}
 	if (lang == cbyte) lang = c;
 
-	if (!disable_optim && (langclass != L_BF || bf_multi != 0)) {
+	if (!disable_optim) {
 	    /* This enables BF style optimisation of '<' and '>' on OUTPUT */
-	    if (L_BASE == L_BF || L_BASE == L_BFCHARS || L_BASE == L_DOWHILE)
+	    if (L_BASE == L_BFCHARS || L_BASE == L_DOWHILE)
+		enable_bf_mov = 1;
+	    else if (L_BASE == L_BF && bf_multi > 1)
 		enable_bf_mov = 1;
 	}
 
@@ -2097,7 +2099,7 @@ static trivbf bfquadnz[1] = {{
 
 static trivbf bitbf8[1] = {{
     .name = "bit8",
-    .class = L_BF,
+    .class = L_BFCHARS,
     .help = "BF to BF translation, set cell size to 8 bits.",
 
     .bf = {
@@ -2117,7 +2119,7 @@ static trivbf bitbf8[1] = {{
 
 static trivbf bitbf[1] = {{
     .name = "bit",
-    .class = L_BF,
+    .class = L_BFCHARS,
     .help = "BF to BF translation, set cell size to 1 bit.",
 
     .bf = {
