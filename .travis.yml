@@ -1,4 +1,4 @@
- # https://travis-ci.org/rdebath/Brainfuck/builds
+# https://travis-ci.org/rdebath/Brainfuck/builds
 language: c
 
 # Select Trusty
@@ -88,6 +88,7 @@ script:
   - test ! -x tritium/bfi.out || tritium/bfi.out testing/Mandelbrot.b
   - test ! -x tritium/bfi.out || tritium/bfi.out testing/Prime.b < testing/Prime.in
   - test ! -x tritium/bfi.out || tritium/bfi.out -h || true
+  - test ! -x extras/c-sizes || extras/c-sizes
 
 #  - "\"$CC\" -dM -E -x c -</dev/null"
 
