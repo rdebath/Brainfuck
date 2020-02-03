@@ -266,7 +266,7 @@ gen_code(int ch, int count, char * strn)
 	| push r15
 	| push r14
 	| push r13
-	| push r12
+	| push rbx
 	|
 	| mov  rbp, rsp
 	| sub  rsp, 64 // Some shadow space for Windows.
@@ -577,7 +577,7 @@ gen_code(int ch, int count, char * strn)
 	|.else
 	| xor rax, rax
 	| mov rsp, rbp
-	| pop r12
+	| pop rbx
 	| pop r13
 	| pop r14
 	| pop r15
