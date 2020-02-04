@@ -124,7 +124,7 @@ TCLFLAG=-DENABLE_LIBTCL $(shell $(PKGCONF) --cflags $(HAVE_TCL))
 TCLLIBS=$(shell $(PKGCONF) --libs $(HAVE_TCL))
 TCLDEP=libtcl.lib-on
 else
-HAVE_TCL_H=$(wildcard /usr/include/tcl/tcl.h)
+HAVE_TCL_H=$(wildcard /usr/include/tcl/tcl$(TARGET_ARCH).h)
 ifeq ($(HAVE_TCL_H),)
 TCLFLAG=
 TCLLIBS=
