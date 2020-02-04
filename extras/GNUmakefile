@@ -128,7 +128,9 @@ else
 UNSAFE += $(call cc-option,$(WERROR) -fno-strict-overflow,-fno-strict-overflow)
 endif
 
-ifeq ($(findstring -march,$(TARGET_ARCH))$(findstring -mcpu,$(TARGET_ARCH)),)
+GCCTRIPLE=$(shell $(CC) $(TARGET_ARCH) -dumpmachine 2>/dev/null)
+
+ifeq ($(findstring arm-linux,$(GCCTRIPLE)),)
 MARCH =$(call cc-option,$(WERROR) -march=native,-march=native)
 UNSAFE += $(MARCH)
 endif
