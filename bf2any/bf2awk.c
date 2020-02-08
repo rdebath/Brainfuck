@@ -154,12 +154,12 @@ gen_code(int ch, int count, char * strn)
 	    printf("    }\n");
 	    printf("    if (!genord) {\n");
 	    printf("        for(i=1; i<256; i++)\n");
-	    printf("            ord[sprintf(\"%%c\",i)] = i\n");
+	    printf("            ord_ch[sprintf(\"%%c\",i)] = i\n");
 	    printf("        genord = 1\n");
 	    printf("    }\n");
 	    printf("    c = substr(line, 1, 1)\n");
 	    printf("    line = substr(line, 2)\n");
-	    printf("    m[p+mov] = ord[c]\n");
+	    printf("    m[p+mov] = ord_ch[c]\n");
 	    printf("}\n");
 	}
 	break;
@@ -193,12 +193,12 @@ gen_code(int ch, int count, char * strn)
 	I; printf("    }\n");
 	I; printf("    if (!genord) {\n");
 	I; printf("        for(i=1; i<256; i++)\n");
-	I; printf("            ord[sprintf(\"%%c\",i)] = i\n");
+	I; printf("            ord_ch[sprintf(\"%%c\",i)] = i\n");
 	I; printf("        genord=1\n");
 	I; printf("    }\n");
 	I; printf("    c = substr(line, 1, 1)\n");
 	I; printf("    line=substr(line, 2)\n");
-	I; printf("    %s = ord[c]\n", cm);
+	I; printf("    %s = ord_ch[c]\n", cm);
 	I; printf("    break\n");
 	I; printf("}\n");
 	break;
