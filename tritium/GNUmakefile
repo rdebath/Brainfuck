@@ -308,7 +308,7 @@ DO_SSL := $(call try-run,\
 # Open GMP big numbers ?
 DO_GMP := $(call try-run,\
 	{ echo '\#include <gmp.h>'; 				\
-	  echo 'int main(){mpz_t t1;mpz_init(t1);return(0);}'; \
+	  echo 'int main(){mpz_t t1;mpz_init(t1);mpz_fits_slong_p(t1);return(0);}'; \
 	  } > $(TMP).c ; $(TRYCC2) $(WERROR) -o $(TMP) -lgmp,1)
 
 endif	# CC
