@@ -75,6 +75,7 @@ char bf[] = "+-><[].,";
 intmax_t profile[256*4];
 int program_len;	/* Number of BF command characters */
 int found_comment = 0;
+int found_comment_loop = 0;
 int eof_count = 0;
 
 static struct timeval run_start, paused, run_pause;
@@ -232,6 +233,7 @@ int main(int argc, char **argv)
 	    }
 	    if (lc || (ch == '[' && n == -1)) {
 		found_comment++;
+		if (ch == '[' && !lc) found_comment_loop++;
 		lc += (ch=='[') - (ch==']');
 		continue;
 	    }
@@ -278,6 +280,8 @@ int main(int argc, char **argv)
     run();
 
     finish_runclock(&run_time, &wait_time);
+
+    fflush(stdout);
 
     print_summary();
     return 0;
@@ -452,7 +456,12 @@ void run(void)
 		    if (use_utf8) oututf8(a);
 		    else putchar(a);
 		}
-		if (a != 13) nonl = (a != '\n');
+		if (a != 13) {
+		    if (use_utf8)
+			nonl = (a != '\n');
+		    else
+			nonl = ((a&0xFF) != '\n');
+		}
 	    }
 	    break;
 	case ',':
@@ -742,9 +751,12 @@ print_summary()
 	    fprintf(stderr, "Program size %d : ", program_len);
 	    print_pgm();
 	    fprintf(stderr, "\n");
-	} else if (found_comment)
+	} else if (found_comment_loop == 1)
 	    fprintf(stderr, "Program size %d (+%d initial comment)\n",
 			    program_len, found_comment);
+	else if (found_comment)
+	    fprintf(stderr, "Program size %d (+%d/%d initial comment)\n",
+			    program_len, found_comment, found_comment_loop);
 	else
 	    fprintf(stderr, "Program size %d\n", program_len);
 	fprintf(stderr, "Final tape contents:\n");
