@@ -63,7 +63,7 @@ int main(int argc, char **argv)
 	 }
       }
       if (ifd!=stdin) fclose(ifd);
-      if (isatty(fileno(stdout))) setbuf(stdout, NULL);
+      setbuf(stdout, NULL);
       if (pgm) { pgm[n+1].cmd = 0; run(); }
    }
    return !ifd;

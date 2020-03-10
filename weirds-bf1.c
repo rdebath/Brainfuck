@@ -12,7 +12,7 @@ int main (int argc, char *argv[]) {
 	g |= ((b[n++] = c) == ','); b[n] = 0;
     }
     if(!fp || !b) { perror(argv[1]); return 1;}
-    if (isatty(fileno(stdout))) setbuf(stdout, 0);
+    setbuf(stdout, 0);
     for(p=b;*p;p++) {
 	t[m += (*p == '>') - (*p == '<')] += (*p == '+') - (*p == '-');
         if (*p == '.') putchar(t[m]);
