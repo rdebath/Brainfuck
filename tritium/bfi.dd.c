@@ -206,8 +206,10 @@ print_dd(void)
 	    outcmd('>', n->offset);
 	    if (eofcell == 3)
 		outcmd('=', 0);
-	    else if (eofcell == 2 || eofcell == 4)
+	    else if (eofcell == 2)
 		outcmd('=', -1);
+	    else if (eofcell == 4)
+		outcmd('=', EOF);
 	    outcmd(',', 0);
 	    outcmd('<', n->offset);
 	    break;

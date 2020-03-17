@@ -382,7 +382,8 @@ void deadbeef(void)
 	case '.': putch(t[m]); break;
 	case ',':
 	    t[m] = ((ch = getchar()) != EOF) ? ch : on_eof < 1 ? on_eof : t[m];
-	    if (ch == EOF && on_eof == 2) exit(-1);
+	    if (ch == EOF && on_eof == 2)
+		exit((fprintf(stderr, "^D\n"),0));
 	    break;
 	case '!': if(t[m]) exit(2); break;
 	case '#':
@@ -443,7 +444,8 @@ void zc_deadbeef(void)
 	case '.': putch(t[m]); break;
 	case ',':
 	    t[m] = ((ch = getchar()) != EOF) ? ch : on_eof < 1 ? on_eof : t[m];
-	    if (ch == EOF && on_eof == 2) exit(-1);
+	    if (ch == EOF && on_eof == 2)
+		exit((fprintf(stderr, "^D\n"),0));
 	    break;
 	case '!':
 	    if(!t[m]) break;
