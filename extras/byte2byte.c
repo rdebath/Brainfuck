@@ -680,9 +680,9 @@ void dump_tables()
 	    } else
 		free(b_bftab[from][to].code);
 
-		b_bftab[from][to].len = 0;
-		b_bftab[from][to].code = 0;
-	    }
+	    b_bftab[from][to].len = 0;
+	    b_bftab[from][to].code = 0;
+	}
 
     do_dump();
 
