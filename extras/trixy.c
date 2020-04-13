@@ -64,7 +64,7 @@ static enum intype {
     } in_format = L_DEFAULTIN;
 
 static
-int compact_bf = 0, /* Strip non-bf chars for  non-deabeef interpreters. */
+int compact_bf = -1, /* Strip non-bf chars for non-deadbeef interpreters. */
     db_disable = 0; /* Disable "optimisations" of the deadbeef variants */
 
 int main(int argc, char **argv)
@@ -140,10 +140,13 @@ int main(int argc, char **argv)
 
 	    else if (!strcmp(argv[ar], "-iascii")) in_format = L_INP_ASCII;
 
-	    else if (!strcmp(argv[ar], "-minibf")) in_format = L_MINIBF;
 	    else if (!strcmp(argv[ar], "-microbf")) in_format = L_MICROBF;
 	    else if (!strcmp(argv[ar], "-pretty")) in_format = L_PRETTYBF;
 	    else if (!strcmp(argv[ar], "-trace")) in_format = L_TRACEBF;
+	    else if (!strcmp(argv[ar], "-minibf")) {
+		in_format = L_MINIBF;
+		if (compact_bf < 0) compact_bf = 1;
+	    }
 	    else break;
 	    continue;
 #ifdef ENABLE_BF2ANY
@@ -178,6 +181,7 @@ int main(int argc, char **argv)
 #endif
 
 	else if (!strcmp(argv[ar], "-compact")) compact_bf = 1;
+	else if (!strcmp(argv[ar], "-no-compact")) compact_bf = 0;
 	else if (!strcmp(argv[ar], "-no-rail")) db_disable |= 1;
 	else if (!strcmp(argv[ar], "-no-mov")) db_disable |= 2 | 1;
 	else if (!strcmp(argv[ar], "-no-set")) db_disable |= 4;
@@ -251,7 +255,7 @@ int main(int argc, char **argv)
 		(ifd != stdin || ch != '!' || jmp >= 0 || !inp)) {
 	    inp |= (ch == ',');
 	    if (ch == 0) continue;
-	    if (compact_bf && strchr("><+-.,[]#", ch) == 0) continue;
+	    if (compact_bf == 1 && strchr("><+-.,[]#", ch) == 0) continue;
 	    if (n+2>s && !(b = realloc(b, s += 1024))) { perror(fn); return 1;}
             b[n++] = ch; b[n] = 0;
 	}
