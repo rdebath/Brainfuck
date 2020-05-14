@@ -292,7 +292,7 @@ gen_code(int ch, int count, char * strn)
     case 'B':
 	load_acc_offset(imov);
 	if (bytecell && acc_hi_dirty) {
-	    | and REG_A, 0xFF
+	    | and REG_A, 255
 	    acc_hi_dirty = 0;
 	}
 	| mov REG_B,REG_A

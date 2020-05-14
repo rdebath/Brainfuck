@@ -136,6 +136,10 @@ struct be_interface_s be_interface = {fn_check_arg, gen_code,
 static int
 fn_check_arg(const char * arg)
 {
+    if (strcmp(arg, "-h") == 0) {
+	fprintf(stderr, "\t-oFILE     Output in binary to FILE\n");
+	return 1;
+    } else
     if (strncmp(arg, "-o", 2) == 0 && arg[2]) {
 	filename = arg+2;
 	return 1;
