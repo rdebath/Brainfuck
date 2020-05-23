@@ -1,3 +1,5 @@
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Frdebath%2FBrainfuck.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Frdebath%2FBrainfuck?ref=badge_shield)
+
 Brainfuck
 =========
 
@@ -140,3 +142,7 @@ The programs bf2bash.sh, bf2c.awk and all brainfuck source code, including any
 embedded in the C code are explicitly granted public domain status.
 
 The code in the tools and the testing directories have their own licensing.
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Frdebath%2FBrainfuck.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Frdebath%2FBrainfuck?ref=badge_large)
