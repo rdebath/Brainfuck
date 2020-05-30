@@ -312,10 +312,12 @@ print_c_header(FILE * ofd)
 
 	    fprintf(ofd, "#if 0 /*1978 K&R*/\n");
 	    fprintf(ofd, "#elif defined(C) /*Okay*/\n");
-	    fprintf(ofd, "#elif defined(__SIZEOF_INT128__)\n");
-	    fprintf(ofd, "#define C unsigned __int128\n");
-	    fprintf(ofd, "#elif defined(_UINT128_T)\n");
-	    fprintf(ofd, "#define C __uint128_t\n");
+	    if (cell_length==0 || cell_length>64) {
+		fprintf(ofd, "#elif defined(__SIZEOF_INT128__)\n");
+		fprintf(ofd, "#define C unsigned __int128\n");
+		fprintf(ofd, "#elif defined(_UINT128_T)\n");
+		fprintf(ofd, "#define C __uint128_t\n");
+	    }
 	    fprintf(ofd, "#elif defined(ULLONG_MAX) || defined(__LONG_LONG_MAX__)\n");
 	    fprintf(ofd, "#define C unsigned long long\n");
 	    fprintf(ofd, "#elif defined(UINTMAX_MAX)\n");
@@ -327,9 +329,15 @@ print_c_header(FILE * ofd)
 	    if (cell_length != INT_MAX) {
 		mask_defined = 1;
 		fprintf(ofd, "#ifndef M\n");
-		if (cell_length > 0 && cell_length < sizeof(C)*CHAR_BIT)
+		if (cell_length > 0 && cell_length < sizeof(C)*CHAR_BIT) {
 		    fprintf(ofd, "#define M(V) ((V)&(((C)1<<%d)-1))\n", cell_length);
-		else
+
+		    if (knr_c_ok) fprintf(ofd, "#ifdef __STDC__\n");
+		    if (cell_length > sizeof(int)*CHAR_BIT && cell_length < sizeof(C)*CHAR_BIT)
+			fprintf(ofd, "enum { CellTooSmall=1/(sizeof(C)>=%d) };\n",
+			    (cell_length+CHAR_BIT-1)/CHAR_BIT);
+		    if (knr_c_ok) fprintf(ofd, "#endif\n");
+		} else
 		    fprintf(ofd, "#define M(V) V\n");
 		fprintf(ofd, "#endif\n\n");
 		if (knr_c_ok) fprintf(ofd, "#ifdef __STDC__\n");
