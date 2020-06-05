@@ -175,6 +175,8 @@ FUNSAFE := $(UNSAFE)
 
 endif
 
+FHASH=\#
+
 ################################################################################
 try-run = $(shell set -e;               \
 	echo Trying "$(1)" > $(LOGDEV); \
@@ -190,7 +192,7 @@ TRYCC2=$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) $(TARGET_ARCH) $(TMP).c
 ################################################################################
 # Test for lightning.h V2 ?
 DO_LIGHT2 := $(call try-run,\
-	{ echo '\#include <lightning.h>';                               \
+	{ echo '$(FHASH)include <lightning.h>';                         \
 	  echo 'int main(){jit_state_t*_jit=0;jit_emit();return 0;}';   \
 	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -llightning,1)
 
@@ -200,7 +202,7 @@ LIGHTNINGEXE := lightning
 else
 # As a static library it needs -lm
 DO_LIGHT2 := $(call try-run,\
-        { echo '\#include <lightning.h>';                               \
+        { echo '$(FHASH)include <lightning.h>';                         \
           echo 'int main(){jit_state_t*_jit=0;jit_emit();return 0;}';   \
           } > $(TMP).c ; $(TRYCC2) -o $(TMP) -llightning -lm,1)
 
@@ -222,7 +224,7 @@ txtbf: qtable.h
 endif
 
 GNUC99 := $(call try-run,\
-        { echo '\#include <stdio.h>'; \
+        { echo '$(FHASH)include <stdio.h>'; \
           echo 'int main (int argc, char **argv)'; \
           echo '{for(int i=1; i<10;i++) printf("Hello World!");}'; \
           } > $(TMP).c ; $(TRYCC2) -std=gnu99 -o $(TMP),-std=gnu99)
@@ -231,14 +233,14 @@ GNUC99 := $(call try-run,\
 ifneq ($(wildcard /usr/include/dlfcn.h),)
 
 DO_LIBDL2 := $(call try-run,\
-        { echo '\#include <dlfcn.h>'; \
+        { echo '$(FHASH)include <dlfcn.h>'; \
           echo 'int main(){dlerror();return 0;}'; \
           } > $(TMP).c ; $(TRYCC2) -o $(TMP),1)
 
 ifeq ($(DO_LIBDL2),)
 # Maybe it needs -ldl
 DO_LIBDL1 := $(call try-run,\
-        { echo '\#include <dlfcn.h>'; \
+        { echo '$(FHASH)include <dlfcn.h>'; \
           echo 'int main(){dlerror();return 0;}'; \
           } > $(TMP).c ; $(TRYCC2) -o $(TMP) -ldl,1)
 endif

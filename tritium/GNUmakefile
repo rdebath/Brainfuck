@@ -233,6 +233,9 @@ endif
 # Only check the flags once.
 FUNSAFE := $(UNSAFE)
 
+# Version 4.3 F***s with parsing of hashs
+FHASH=\#
+
 ################################################################################
 
 TRYCC=$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c $(TMP).c
@@ -240,27 +243,27 @@ TRYCC2=$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) $(TARGET_ARCH) $(TMP).c
 
 # Do libtcc.h and -ltcc exist ?
 DO_TCC := $(call try-run,\
-	{ echo '\#include <libtcc.h>';			\
+	{ echo '$(FHASH)include <libtcc.h>';			\
 	  echo 'int main(){tcc_new();return 0;}';	\
 	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -ltcc -ldl,1)
 
 # How about lightning.h V2 ?
 DO_LIGHT2 := $(call try-run,\
-	{ echo '\#include <lightning.h>'; 				\
+	{ echo '$(FHASH)include <lightning.h>'; 			\
 	  echo 'int main(){jit_state_t*_jit=0;jit_emit();return 0;}';	\
 	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -llightning,1)
 
 ifeq ($(DO_LIGHT2),)
 # How about lightning.h V2 with a static library, needs -lm ?
 DO_LIGHT3 := $(call try-run,\
-	{ echo '\#include <lightning.h>'; 				\
+	{ echo '$(FHASH)include <lightning.h>'; 			\
 	  echo 'int main(){jit_state_t*_jit=0;jit_emit();return 0;}';	\
 	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -llightning -lm,1)
 
 ifeq ($(DO_LIGHT3),)
 # No? How about lightning.h V1 ?
 DO_LIGHT := $(call try-run,\
-	{ echo '\#include <lightning.h>';			\
+	{ echo '$(FHASH)include <lightning.h>';			\
 	  echo 'int main(){char * startptr[2048];';		\
 	  echo 'jit_flush_code(startptr, jit_get_ip().ptr);';	\
 	  echo 'return 0;}';					\
@@ -271,7 +274,7 @@ ifeq ($(findstring WINDOWS,$(CPUFOUND)),)
 # Alright, does my copy compile ?
 ifneq ($(TOOLDIR),)
 DO_MYLIGHT := $(call try-run,\
-	{ echo '\#include <lightning.h>';			\
+	{ echo '$(FHASH)include <lightning.h>';			\
 	  echo 'int main(){char * startptr[2048];';		\
 	  echo 'jit_flush_code(startptr, jit_get_ip().ptr);';	\
 	  echo 'return 0;}';					\
@@ -286,14 +289,14 @@ endif
 ifneq ($(wildcard /usr/include/dlfcn.h),)
 
 DO_LIBDL2 := $(call try-run,\
-	{ echo '\#include <dlfcn.h>'; \
+	{ echo '$(FHASH)include <dlfcn.h>'; \
 	  echo 'int main(){dlerror();return 0;}'; \
 	  } > $(TMP).c ; $(TRYCC2) -o $(TMP),1)
 
 ifeq ($(DO_LIBDL2),)
 # Maybe it needs -ldl
 DO_LIBDL1 := $(call try-run,\
-	{ echo '\#include <dlfcn.h>'; \
+	{ echo '$(FHASH)include <dlfcn.h>'; \
 	  echo 'int main(){dlerror();return 0;}'; \
 	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -ldl,1)
 endif
@@ -301,13 +304,13 @@ endif
 
 # Open SSL big numbers ?
 DO_SSL := $(call try-run,\
-	{ echo '\#include <openssl/bn.h>'; 				\
+	{ echo '$(FHASH)include <openssl/bn.h>'; 			\
 	  echo 'int main(){BIGNUM*t1=BN_new();BN_is_negative(t1);return(0);}'; \
 	  } > $(TMP).c ; $(TRYCC2) $(WERROR) -o $(TMP) -lcrypto,1)
 
 # Open GMP big numbers ?
 DO_GMP := $(call try-run,\
-	{ echo '\#include <gmp.h>'; 				\
+	{ echo '$(FHASH)include <gmp.h>'; 				\
 	  echo 'int main(){mpz_t t1;mpz_init(t1);mpz_fits_slong_p(t1);return(0);}'; \
 	  } > $(TMP).c ; $(TRYCC2) $(WERROR) -o $(TMP) -lgmp,1)
 

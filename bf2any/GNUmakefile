@@ -244,10 +244,11 @@ try-run = $(shell set -e;               \
 
 TRYCC=$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c -x c -
 TRYCC2=$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -x c -
+FHASH=\#
 
 # Do libtcc.h and -ltcc exist ?
 DO_TCC := $(call try-run,\
-        { echo '\#include <libtcc.h>';                  \
+        { echo '$(FHASH)include <libtcc.h>';            \
           echo 'int main(){tcc_new();return 0;}';       \
           } | $(TRYCC2) -o "$$TMP" -ltcc $(LIBDL),1)
 
