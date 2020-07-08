@@ -1239,24 +1239,24 @@ print_nasm_elf_hello_world(void)
 
     printf("msgend:\n");
     if (total_nodes > 0) {
-	printf("%%ifdef __YASM_MAJOR__\n");
-	printf("%%define msgsz\t%d\n", bytecount);
-	printf("%%else\n");
 	printf("%%define msgsz\tmsgend-msg\n");
+	printf("%%ifdef __YASM_MAJOR__\n");
+	printf("%%define smallmsg\t0\t; Yasm requires a literal integer\n");
+	printf("%%else\n");
+	printf("%%define smallmsg\t(msgsz < 128)\n");
 	printf("%%endif\n");
 
 	printf("\tsection .text\n");
 	printf("_start:\n");
 
-
-	/* printf("\txor\teax,eax\n");	Linux is zero */
-	/* printf("\txor\tebx,ebx\n");	Linux is zero */
-	/* printf("\txor\tedx,edx\n");	Linux is zero */
+	printf("\t; xor\teax,eax\t\t; Linux is already zero\n");
+	printf("\t; xor\tebx,ebx\n");
+	printf("\t; xor\tedx,edx\n\n");
 
 	printf("\tmov\tal,4\t\t; syscall 4, write\n");
 	printf("\tinc\tebx\n");
 	printf("\tmov\tecx,msg\n");
-	printf("%%if msgsz < 128\n");
+	printf("%%if smallmsg\n");
 	    printf("\tmov\tdl,msgsz\n");
 	    printf("\tint\t0x80\t\t; write(ebx, ecx, edx);\n");
 	    printf("\tmov\tal,1\n");
