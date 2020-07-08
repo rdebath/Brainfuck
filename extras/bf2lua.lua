@@ -20,7 +20,6 @@ local m = setmetatable({},{__index=function() return 0 end})
 
 function o() io.write(string.char(m[p]%256)) io.flush() end
 function i() local c=io.read(1) if c then m[p] = string.byte(c) end end
-function w() m[p] = m[p]%256 return (m[p] ~= 0) end
 ]]
 
 local wt = {}
@@ -42,10 +41,10 @@ while i < l do
     local m = 1
     while c == string.sub( code, i+m, i+m ) do m=m+1 end
     if ( c == "+" ) then
-	tt[#tt+1] = "m[p]=m[p]+"..m
+	tt[#tt+1] = "m[p]=(m[p]+"..m..")%256"
 	i = i + m-1
     elseif ( c == "-" ) then
-	tt[#tt+1] = "m[p]=m[p]-"..m
+	tt[#tt+1] = "m[p]=(m[p]-"..m..")%256"
 	i = i + m-1
     elseif ( c == ">" ) then
 	tt[#tt+1] = "p=p+"..m
@@ -70,12 +69,12 @@ while i < l do
 	    tt[#tt+1]= wt[sp]
 	    ttc = ttc + wtc[sp]
 	end
-	if body == "m[p]=m[p]-1" or body == "m[p]=m[p]+1" then
-	    -- Tiny optimisation; [-] is set to zero. ... Any more?
+	if body == "m[p]=(m[p]-1)%256" or body == "m[p]=(m[p]+1)%256" then
+	    -- Tiny optimisation; [-] is set to zero.
 	    tt[#tt+1]= "m[p]=0"
 	elseif bodyc < 5120 then
 	    -- Not too large loops are done directly.
-	    tt[#tt+1]= "while w()do"
+	    tt[#tt+1]= "while m[p]~=0 do"
 	    tt[#tt+1]= body
 	    ttc = ttc + bodyc
 	    tt[#tt+1]= "end"
@@ -84,7 +83,7 @@ while i < l do
 	    -- Specifically the body of a while loop has a maximum size,
 	    -- fortunatly the same limit does not apply to the body of a
 	    -- function.
-	    tt[#tt+1]= "while w()do"
+	    tt[#tt+1]= "while m[p]~=0 do"
 	    tt[#tt+1]= "f"..fno.."()"
 	    tt[#tt+1]= "end"
 
