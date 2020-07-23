@@ -19,7 +19,11 @@ struct be_interface_s {
     int disable_fe_optim;	/* Only for bf2bf */
     int fe_enable_debug;        /* Only for C generator */
     const char * fe_extra_commands;   /* Only for C generator */
-} be_interface;
+};
+
+#if !defined(NO_INTERFACE_EXT)
+extern struct be_interface_s be_interface;
+#endif
 
 #define tapeinit (be_interface.tape_init)
 #define tapesz   (be_interface.tape_len)

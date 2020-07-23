@@ -2,11 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define NO_INTERFACE_EXT
+#define be_interface (*(interfaces[be_id].be))
 #include "bf2any.h"
 
 #define TAPELEN 30000
 
-struct be_interface_s
+extern struct be_interface_s
     int_bf2bf,
     int_bf2gas,
     int_bf2elf,
@@ -66,10 +68,10 @@ be_option(const char * arg)
     if (be_id < 0) return 0;
 
     if (strncmp(arg, "-M", 2) == 0 && arg[2] != 0) {
-        int tapelen = strtoul(arg+2, 0, 10);
-        if (tapelen < 1) tapelen = TAPELEN;
+	int tapelen = strtoul(arg+2, 0, 10);
+	if (tapelen < 1) tapelen = TAPELEN;
 	tapesz = tapelen + tapeinit;
-        return 1;
+	return 1;
     }
 
     if (interfaces[be_id].be->check_arg == 0) return 0;

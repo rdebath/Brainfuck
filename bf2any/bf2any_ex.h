@@ -13,3 +13,4 @@ extern int disable_init_optim;
 extern int tape_is_all_blank;
 void outtxn(int ch, int count);
 
+extern struct be_interface_s be_interface;
