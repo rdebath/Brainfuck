@@ -68,7 +68,7 @@ void gen_twoflower(char * buf);
 void gen_twincell(char * buf);
 void gen_trislipnest(char * buf);
 void gen_countslide(char * linebuf);
-void gen_nastyslide(char * linebuf);
+void gen_nastyslide(char * linebuf, int lvl);
 
 int runbf(const char * prog, int longrun);
 
@@ -510,6 +510,18 @@ process_arg(const char * arg)
 	wipe_config();
 	enable_nastyslide = !enable_nastyslide;
 
+    } else if (strcmp(arg, "-evil2") == 0) {
+	wipe_config();
+	enable_nastyslide = 2;
+	enable_twocell = 1;
+	bytewrap = 1;
+
+    } else if (strcmp(arg, "-evil3") == 0) {
+	wipe_config();
+	enable_nastyslide = 3;
+	enable_twincell = 1;
+	bytewrap = 1;
+
     } else if (strcmp(arg, "-slip") == 0) {
 	wipe_config();
 	enable_sliploop = !enable_sliploop;
@@ -843,7 +855,7 @@ find_best_conversion(char * linebuf)
 
     if (enable_nastyslide) {
 	if (verbose>2) fprintf(stderr, "Trying 'Evil/Nasty Slide' routine @%"PRIdMAX".\n", patterns_searched);
-	gen_nastyslide(linebuf);
+	gen_nastyslide(linebuf, enable_nastyslide);
     }
 
     if (enable_sliploop) {
@@ -2730,12 +2742,12 @@ static const char * extra_cell[] = {
     for(p2=0; extra_cell[p2]; p2++)
 	for(a1=0; a1<2; a1++)
 	{
-	    for(p4=-10; p4<10; p4++)
+	    for(p4=-10; p4 <= 10; p4++)
 	    {
 		if (a1 == 0 &&  (p4 < -1 || p4 > 1)) continue;
 		if (a1 == 1 && !(p4 < -1 || p4 > 1)) continue;
 
-		if (p4 != 0 && (flg_signed || p4>0))
+		if (p4 != 0 && (flg_signed || bytewrap || p4>0))
 		    for(p3=2; p3<20; p3++)
 		    {
 			if (a1 == 0 && p3 < 5) continue;
@@ -2797,11 +2809,13 @@ static const char * extra_cell[] = {
  * This variation includes several extra pieces to trap broken interpreters.
  */
 void
-gen_nastyslide(char * linebuf)
+gen_nastyslide(char * linebuf, int lvl)
 {
 static char codebuf[256], *s;
 static char namebuf[128];
     int p1,p2,p3,p4, a1;
+    int max_p3 = 15;
+    int max_p1 = 15;
 
 static const char * extra_cell[] = {
     "[>[",
@@ -2818,18 +2832,27 @@ static const char * extra_cell[] = {
     "[>++++>+>[", "[>++++>++>[", "[>++++>+++>[", "[>++++>++++>[",
     0};
 
+    if (lvl>1) max_p1 = max_p3 = 63;
+
     for(p2=0; extra_cell[p2]; p2++)
-	for(a1=0; a1<2; a1++) {
-	    for(p4=-10; p4<= 10; p4++) {
+	for(a1=0; a1<2; a1++)
+	{
+	    for(p4=-10; p4 <= 10; p4++)
+	    {
 		if (a1 == 0 &&  (p4 < -1 || p4 > 1)) continue;
 		if (a1 == 1 && !(p4 < -1 || p4 > 1)) continue;
+		if (p4 != -1 && lvl == 2 && bytewrap) continue;
 
 		if (p4 != 0 && (flg_signed || bytewrap || p4>0))
-		    for(p3=1; p3<15; p3++)
-			for(p1=1; p1<15; p1++)
+		    for(p3=1; p3<max_p3; p3++)
+		    {
+			if (a1 == 0 && p3 < 5) continue;
+			if (a1 == 1 && p3 >= 5) continue;
+
+			for(p1=1; p1<max_p1; p1++)
 			{
 			    int i;
-			    if ( (p1-1)*p3+p4 > 255) continue;
+			    if ( p1*p3+p4 > 255) continue;
 			    if ( p4<0 && p3 <= -p4) continue;
 
 			    s = codebuf;
@@ -2859,6 +2882,7 @@ static const char * extra_cell[] = {
 			    gen_special(linebuf, codebuf, namebuf, 0);
 
 			}
+		    }
 	    }
 	}
 }
