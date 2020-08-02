@@ -140,8 +140,8 @@ option(char *arg)
 	"\n"    "    -a  Output all calls that have been used."
 	"\n"    "    -sc Use 'signed character' (8bit) cells."
 	"\n"    "    -s  Use signed cells."
-	"\n"    "    -w  Use 'WORD' (16bit) cells instead of 8 bit."
-	"\n"    "    -7..16 Use 7..16 bit cells instead of 8 bit."
+	"\n"    "    -w  Use signed 'WORD' (16bit) cells instead of 8 bit."
+	"\n"    "    -7..16 Use unsigned 7..16 bit cells instead of 8 bit."
 	);
 
 	exit(1);
@@ -1022,6 +1022,20 @@ unpause_runclock(void)
 void
 oututf8(int input_chr)
 {
+static int pending_hi = 0; /* UTF-16 conversion for 16-bit */
+    if ( (input_chr & ~0x3FF) == 0xD800) {
+	if (pending_hi) oututf8(0xFFFD);
+	pending_hi = input_chr;
+	return;
+    }
+    if ( (input_chr & ~0x3FF) == 0xDC00) {
+	if (pending_hi)
+	    input_chr = 0x10000 + ((pending_hi&0x3FF)<<10) + (input_chr&0x3FF);
+	pending_hi = 0;
+    }
+    if (input_chr >= 0xD800 && input_chr <= 0xDFFF)
+	input_chr = 0xFFFD;
+
     if (input_chr < 0x80) {            /* one-byte character */
         putchar(input_chr);
     } else if (input_chr < 0x800) {    /* two-byte character */
