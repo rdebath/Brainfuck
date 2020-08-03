@@ -1,6 +1,6 @@
 /* This is the Trixy brainfuck interpreter.
  *
- * It includes several trixy things you can do with BF.
+ * It includes several tricksy things you can do with BF.
  * Translations to various, non-tc, languages.
  * A few small interpreters, including the deadbeef embedded variant,
  * a pretty printer and a full trace.
@@ -945,11 +945,22 @@ void bfprinter(char * b)
         case '.':
 	{
 	    int mc = maxcol;
+	    int lc = 0, rc = 0;
 	    if (ss<=p) ss=p+1;
 	    maxcol = 47;
 	    while(s<ss && *s) {
-		if (strchr("><+-.,[]", *s))
+		if (strchr("><+-.,[]", *s)) {
+		    if (*s == lc) {
+			rc += 1;
+			if (rc == 5) {
+			    pc(' ');
+			    rc = 0;
+			}
+		    } else {
+			rc = 0; lc = *s;
+		    }
 		    pc(*s);
+		}
 		s++;
 	    }
 
