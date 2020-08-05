@@ -39,6 +39,7 @@ static void lastnl(void);
 
 /* Deadbeef interpreter state */
 static unsigned char t[(sizeof(int) > sizeof(short))+USHRT_MAX];
+static unsigned int tl[(sizeof(int) > sizeof(short))+USHRT_MAX];
 static struct bfi { int mov; int cmd; int arg; } *pgm = 0;
 static int jmp = -1, cp = -1, pp = -1;
 static int pgmlen = 0, on_eof = 1, debug = 0;
@@ -920,16 +921,17 @@ void microbf(char * b)
 void bfprinter(char * b)
 {
     char *p=b, *s=b, *ss=b;
-    int c, i=0;
+    int c, i=0, mask;
     unsigned short m=0;
+    if (out_format==L_UTF8) mask = 0x3FFFFF; else mask = 0xFF;
 
     for(;*p;p++)switch(*p) {
         case '>': m++;break;
         case '<': m--;break;
-        case '+': t[m]++;break;
-        case '-': t[m]--;break;
-        case ',': if((c=getchar())!=EOF)t[m]=c;break;
-        case '[': if(t[m]==0)while((i+=(*p=='[')-(*p==']'))&&p[1])p++;break;
+        case '+': tl[m]++;tl[m] &= mask; break;
+        case '-': tl[m]--;tl[m] &= mask; break;
+        case ',': if((c=getchar())!=EOF)tl[m]=c;break;
+        case '[': if(tl[m]==0)while((i+=(*p=='[')-(*p==']'))&&p[1])p++;break;
         case ']':
 	    if (ss<=p) {
 		char * p2;
@@ -939,7 +941,7 @@ void bfprinter(char * b)
 		if (*p2 == 0) {p = p2; break;}
 	    }
 
-	    if(t[m]!=0)while((i+=(*p==']')-(*p=='['))&&p>b)p--;
+	    if(tl[m]!=0)while((i+=(*p==']')-(*p=='['))&&p>b)p--;
 	    break;
 
         case '.':
@@ -969,14 +971,14 @@ void bfprinter(char * b)
 	    maxcol = mc;
 	    col = 0;
 
-	    c = t[m];
+	    c = tl[m];
 	    if (c > ' ' && c <= '~'
 		    && c != '-' && c != '+' && c != '<' && c != '>'
 		    && c != '[' && c != ']' && c != ',' && c != '.') {
 		printf("%c\n", c);
-	    } else if (c == '\n') { printf(" NL\n");
-	    } else if (c == '\r') { printf(" CR\n");
-	    } else if (c == ' ') { printf(" SP\n");
+	    } else if (c == '\n') { printf("\\n\n");
+	    } else if (c == '\r') { printf("\\r\n");
+	    } else if (c == ' ') { printf("\\s\n");
 	    } else if (c == '.') { printf("dot\n");
 	    } else if (c == ',') { printf("comma\n");
 	    } else if (c == '-') { printf("dash\n");
@@ -984,7 +986,10 @@ void bfprinter(char * b)
 	    } else if (c == '>') { printf("gt\n");
 	    } else if (c == '<') { printf("lt\n");
 	    } else {
-		printf("\\x%02X\n", c&0xFF);
+		if (out_format==L_UTF8 && c>0x7F && c <= 0x10FFFF) {
+		    printf("\\u%04X\n", c);
+		} else
+		    printf("\\x%02X\n", c&0xFF);
 	    }
 	}
     }
