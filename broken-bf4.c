@@ -17,18 +17,18 @@ int main (int argc, char *argv[]) {
 
 void interpret(char * pgm) {
     char * p;
-    int i;
     for(p=pgm;*p;p++) switch(*p) {
 	case '>': mp++;break;
 	case '<': mp--;break;
 	case '+': t[mp]++;break;
 	case '-': t[mp]--;break;
 	case '.': putchar(t[mp]);break;
-	case ',': i=getchar();if(i!=EOF)t[mp]=i;break;
+	case ',': t[mp]=getchar();break;
 	case '[':
 	    {
 		char * l = p+1;
-		while(*p!=']')p++;
+		while(*p!=']' && *p)p++;
+		if (!*p) return;
 		*p = 0;
 		while(t[mp])
 		    interpret(l);

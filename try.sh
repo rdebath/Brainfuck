@@ -15,7 +15,7 @@ TMP=/tmp/_tf$$
 for i in "$P"/proper-bf*.c "$P"/weirds-bf*.c "$P"/broken-bf?.c
 do  echo "$(basename "$i")" :"$(
     ( ulimit -t 2 ; gcc -w -O2 -o "$TMP" "$i" && {
-	:| "$TMP" "$1" | tr -d '\0' | xxd -g0 -l$W -c$W
+	:| "$TMP" "$1" | xxd -g0 -l$W -c$W
     } ) 2>&1 | head -1
     rm -f "$TMP" )"
 done
