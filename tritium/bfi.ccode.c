@@ -1050,7 +1050,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		    slen++;
 		    if (v->next && v->next->count == '\n')
 			;
-		    else if (slen > 132 || (slen>32 && v->count == '\n'))
+		    else if (slen > 132 || (slen>7 && v->count == '\n'))
 			break;
 		}
 		p = s = malloc(slen);
