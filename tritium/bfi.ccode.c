@@ -33,7 +33,7 @@ typedef void (*void_func)(void);
 static const char * putname = "putch";
 static int fixed_mask = 0;
 static int mask_defined = 0;
-static int indent = 0, disable_indent = 0;
+static int indent = 0, is_simple_statement = 0;
 
 #define okay_for_cstr(xc) ((xc) != 0 && (xc) <= '~')
 
@@ -533,7 +533,7 @@ print_c_header(FILE * ofd)
 			"static ",cell_type," getint()"
 		"\n"	"{"
 		"\n"	"    int f = 1, c;"
-		"\n"	"    ",cell_type," v;"
+		"\n"	"    ",cell_type," v = 0;"
 		"\n"	"    while(f) {"
 		"\n"	"        f = 0;"
 		"\n"	"        c = getch(0);"
@@ -805,7 +805,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	switch(n->type)
 	{
 	case T_MOV:
-	    if (!disable_indent) pt(ofd, indent,n);
+	    if (!is_simple_statement) pt(ofd, indent,n);
 	    if (!do_run && use_dynmem && n->count>0)
 		fprintf(ofd, "m = move_ptr(m,%d);\n", n->count);
 	    else if (n->count == 1)
@@ -823,7 +823,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    break;
 
 	case T_ADD:
-	    if (!disable_indent) pt(ofd, indent,n);
+	    if (!is_simple_statement) pt(ofd, indent,n);
 
 	    if (n->count == 1)
 		fprintf(ofd, "++%s;\n", lval(n->offset));
@@ -845,7 +845,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    break;
 
 	case T_SET:
-	    if (!disable_indent) pt(ofd, indent,n);
+	    if (!is_simple_statement) pt(ofd, indent,n);
 	    if (cell_size <= 0 && (n->count < -128 || n->count >= 256)) {
 		fprintf(ofd, "%s = (%s) %d;\n",
 		    lval(n->offset), cell_type, n->count);
@@ -861,7 +861,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    break;
 
 	case T_CALC:
-	    if (!disable_indent) pt(ofd, indent,n);
+	    pt(ofd, indent,n);
 	    do {
 		if (n->count == 0) {
 		    if (n->offset == n->offset2 && n->count2 == 1)
@@ -945,7 +945,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    break;
 
 	case T_CALCMULT:
-	    if (!disable_indent) pt(ofd, indent,n);
+	    pt(ofd, indent,n);
 
 	    if (n->count == 0 && n->count2 == 1 && n->count3 == 1)
 		fprintf(ofd, "%s = %s * %s;\n",
@@ -962,7 +962,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    break;
 
 	case T_LT:
-	    if (!disable_indent) pt(ofd, indent,n);
+	    pt(ofd, indent,n);
 
 	    if (n->count == 0 && n->count2 == 1 && n->count3 == 1)
 		fprintf(ofd, "%s += (%s < %s);\n",
@@ -984,10 +984,9 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    }
 	    break;
 
-
 	case T_PRT:
 	    if (!use_functions) {
-		if (!disable_indent) pt(ofd, indent,n);
+		pt(ofd, indent,n);
 		fprintf(ofd, "%s(%s);\n", putname, rvalmsk(n->offset));
 	    } else {
 		int pcount = 1;
@@ -996,7 +995,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		    pcount++;
 		}
 		if (pcount == 1) {
-		    if (!disable_indent) pt(ofd, indent,n);
+		    pt(ofd, indent,n);
 		    fprintf(ofd, "%s(%s);\n", putname, rvalmsk(n->offset));
 		} else if (pcount < 3) {
 		    int cn;
@@ -1020,12 +1019,12 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    break;
 
 	case T_PRTI:
-	    if (!disable_indent) pt(ofd, indent,n);
+	    pt(ofd, indent,n);
 	    fprintf(ofd, "putint(%s);\n", rvalmsk(n->offset));
 	    break;
 
 	case T_CHR:
-	    if (!disable_indent) pt(ofd, indent,n);
+	    pt(ofd, indent,n);
 	    if (!okay_for_cstr(n->count)) {
 		if (n->count == '\n')
 		    fprintf(ofd, "%s('\\n');\n", putname);
@@ -1091,7 +1090,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    break;
 
 	case T_INP:
-	    if (!disable_indent) pt(ofd, indent,n);
+	    pt(ofd, indent,n);
 	    if (use_direct_getchar)
 		fprintf(ofd, "%s = getchar();\n", lval(n->offset));
 	    else
@@ -1104,7 +1103,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    break;
 
 	case T_INPI:
-	    if (!disable_indent) pt(ofd, indent,n);
+	    pt(ofd, indent,n);
 	    fprintf(ofd, "%s = getint();\n", lval(n->offset));
 
 	    if (enable_trace) {
@@ -1138,9 +1137,10 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    }
 #endif
 
-	    if (n->next->next && n->next->next->jmp == n && !enable_trace) {
+	    if (n->next->next && n->next->next->jmp == n && !enable_trace &&
+		(n->next->type == T_SET || n->next->type == T_STOP)) {
 		fprintf(ofd, "if(%s) ", rvalmsk(n->offset));
-		disable_indent = 1;
+		is_simple_statement = 1;
 	    } else if (!use_goto) {
 		fprintf(ofd, "if(%s) ", rvalmsk(n->offset));
 		fprintf(ofd, "{\n");
@@ -1248,17 +1248,12 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    if (!use_goto) {
 		pt(ofd, indent,n);
 		fprintf(ofd, "while(%s) ", rvalmsk(n->offset));
-		if (n->next->next && n->next->next->jmp == n && !enable_trace)
-		    disable_indent = 1;
+		if (n->next->next && n->next->next->jmp == n &&
+		    n->next->type == T_MOV && !enable_trace)
+		    is_simple_statement = 1;
 		else
 		    fprintf(ofd, "{\n");
 	    } else {
-		if (n->next->next && n->next->next->jmp == n && !enable_trace) {
-		    disable_indent = 1;
-		    pt(ofd, indent,n);
-		    fprintf(ofd, "while(%s) ", rvalmsk(n->offset));
-		    break;
-		}
 		pt(ofd, indent,n);
 		fprintf(ofd, "if(%s == 0) ", rvalmsk(n->offset));
 		fprintf(ofd, "goto E%d;\n", n->count);
@@ -1269,8 +1264,8 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 
 	case T_END:
 	case T_ENDIF:
-	    if (disable_indent) {
-		disable_indent = 0;
+	    if (is_simple_statement) {
+		is_simple_statement = 0;
 		break;
 	    }
 	    if (!use_goto) {
@@ -1289,7 +1284,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    break;
 
 	case T_STOP:
-	    if (!disable_indent) pt(ofd, indent,n);
+	    if (!is_simple_statement) pt(ofd, indent,n);
 	    if (use_functions)
 		fprintf(ofd, "exit((fprintf(stderr, stopped),1));\n");
 	    else
@@ -1297,7 +1292,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    break;
 
 	case T_DUMP:
-	    if (!disable_indent) pt(ofd, indent,n);
+	    pt(ofd, indent,n);
 	    fprintf(ofd, "t_dump(m+%d,%d,%d);\n", n->offset, n->line, n->col);
 	    break;
 
@@ -1306,11 +1301,11 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		   "%s node: ptr+%d, cnt=%d, @(%d,%d).\n",
 		    tokennames[n->type],
 		    n->offset, n->count, n->line, n->col);
-	    if (disable_indent) fprintf(ofd, ";\n");
+	    fprintf(ofd, ";\n");
 	    break;
 
 	case T_CALL:
-	    if (!disable_indent) pt(ofd, indent,n);
+	    pt(ofd, indent,n);
 	    fprintf(ofd, "m = bf%d(m);\n", n->count);
 	    n=n->jmp;
 	    break;
@@ -1367,7 +1362,7 @@ print_ccode(FILE * ofd)
     }
 
     indent = 0;
-    disable_indent = 0;
+    is_simple_statement = 0;
 
     if (!use_functions)
     {
