@@ -13,6 +13,8 @@
 # include <inttypes.h>
 #endif
 
+#include "ov_int.h"
+
 #ifndef INTMAX_MAX
 # define intmax_t long
 # define PRIdMAX  "ld"
@@ -22,7 +24,6 @@
 #define MINOFF (0)
 #define MAXOFF (10)
 #define MINALLOC 1024
-#define SAFE_CELL_MAX	((1<<30) -1)
 
 #define UM(vx) ((vx) & cell_mask)
 #define SM(vx) ((UM(vx) ^ cell_smask) - cell_smask)
@@ -36,6 +37,7 @@ void run(void);
 void optimise(void);
 void print_summary(void);
 void hex_output(FILE * ofd, int ch, int eof);
+int ranged_mask(int);
 void start_runclock(void);
 void finish_runclock(double * prun_time, double *pwait_time);
 void pause_runclock(void);
@@ -47,7 +49,7 @@ int hex_bracket = -1;
 struct bfi { int cmd; int arg; } *pgm = 0;
 int pgmlen = 0, on_eof = 1, debug = 0;
 
-int physical_overflow = 0;
+int physical_overflow = 0;	/* Check overflows on +/- */
 int physical_min = 0;
 int physical_max = 255;
 int quick_summary = 0;
@@ -67,7 +69,6 @@ intmax_t overflows =0;	/* Number of detected overflows. */
 intmax_t underflows =0;	/* Number of detected underflows. */
 intmax_t neg_clear =0;	/* Number of detected underflows from [-]. */
 int phy_limit = 0;	/* Did we hit an interpreter limit */
-int hard_wrap = 0;	/* Have cell values gone outside 0..255 ? */
 int hard_max = 0, hard_min = 0;
 int do_optimise = 1;
 
@@ -77,6 +78,13 @@ int program_len;	/* Number of BF command characters */
 int found_comment = 0;
 int found_comment_loop = 0;
 int eof_count = 0;
+
+#ifdef SELFPROFILE
+intmax_t optprofile[256];
+#define inc_opt(_x) optprofile[_x]++;
+#else
+#define inc_opt(_x)
+#endif
 
 static struct timeval run_start, paused, run_pause;
 static double run_time, wait_time;
@@ -114,8 +122,12 @@ option(char *arg)
 	cell_mask = (1<<8)-1;
 	physical_min = -1;
 	return 1;
-    } else if (!strcmp(arg, "-w")) {
+    } else if (!strcmp(arg, "-W")) {
 	cell_mask = (1<<16)-1;
+	physical_min = -1;
+	return 1;
+    } else if (!strcmp(arg, "-w")) {
+	cell_mask = -1;
 	physical_min = -1;
 	return 1;
     } else if (!strcmp(arg, "-h") || !strcmp(arg, "--help")) {
@@ -140,7 +152,7 @@ option(char *arg)
 	"\n"    "    -a  Output all calls that have been used."
 	"\n"    "    -sc Use 'signed character' (8bit) cells."
 	"\n"    "    -s  Use signed cells."
-	"\n"    "    -w  Use signed 'WORD' (16bit) cells instead of 8 bit."
+	"\n"    "    -w  Use 32bit cells instead of 8 bit."
 	"\n"    "    -7..16 Use unsigned 7..16 bit cells instead of 8 bit."
 	);
 
@@ -189,7 +201,11 @@ int main(int argc, char **argv)
 	}
     }
 
-    if (physical_min == 0) {
+    if (cell_mask <= 0) {
+	physical_max = INT_MAX;
+	physical_min = INT_MIN;
+	cell_smask = INT_MIN;
+    } else if (physical_min == 0) {
 	physical_max = cell_mask;
 	physical_min = 0;
 	cell_smask = 0;
@@ -228,7 +244,9 @@ int main(int argc, char **argv)
 	if (r || (debug && ch == '#') || (ch == ']' && (j >= 0 || lc)) ||
 	    ch == '[' || ch == ',' || ch == '.') {
 	    if (r && p >= 0 && pgm[p].cmd == ch) {
-		if (pgm[p].arg < 128 || ch == '<' || ch == '>')
+		if (pgm[p].arg < 128 && (ch == '-' || ch == '+'))
+		    { pgm[p].arg += r; continue; }
+		if (pgm[p].arg < 65536 && (ch == '<' || ch == '>'))
 		    { pgm[p].arg += r; continue; }
 	    }
 	    if (lc || (ch == '[' && n == -1)) {
@@ -318,10 +336,11 @@ alloc_ptr(int memoff)
 
 void run(void)
 {
-    int m = 0, m0;
+    int m = 0;
     int n, v = 1;
     m = alloc_ptr(MAXOFF)-MAXOFF;
     for(n = 0;; n++) {
+	inc_opt(pgm[n].cmd);
 	switch(pgm[n].cmd)
 	{
 	case 0:
@@ -332,13 +351,34 @@ void run(void)
 	    profile[pgm[n].cmd*4] += pgm[n].arg;
 	    m += pgm[n].arg;
 	    if (m+MAXOFF >= memsize) m = alloc_ptr(m+MAXOFF)-MAXOFF;
-	    if(tape_max < m-memshift) tape_max = m-memshift;
+	    if (tape_max < m-memshift) tape_max = m-memshift;
 	    break;
+
+	case 'R':
+	    profile['>'*4] += pgm[n].arg*(intmax_t)(unsigned)v;
+	    m += pgm[n].arg;
+	    if (m+MAXOFF >= memsize) m = alloc_ptr(m+MAXOFF)-MAXOFF;
+	    if (tape_max < m-memshift) tape_max = m-memshift;
+	    break;
+
 	case '<':
 	    profile[pgm[n].cmd*4] += pgm[n].arg;
 	    m -= pgm[n].arg;
 	    if (m+MINOFF <= 0) m = alloc_ptr(m+MINOFF)-MINOFF;
-	    if(tape_min > m-memshift) {
+	    if (tape_min > m-memshift) {
+		tape_min = m-memshift;
+		if(tape_min < -1000) {
+		    fprintf(stderr, "Tape underflow at pointer %d\n", tape_min);
+		    exit(1);
+		}
+	    }
+	    break;
+
+	case 'L':
+	    profile['<'*4] += pgm[n].arg*(intmax_t)(unsigned)v;
+	    m -= pgm[n].arg;
+	    if (m+MINOFF <= 0) m = alloc_ptr(m+MINOFF)-MINOFF;
+	    if (tape_min > m-memshift) {
 		tape_min = m-memshift;
 		if(tape_min < -1000) {
 		    fprintf(stderr, "Tape underflow at pointer %d\n", tape_min);
@@ -348,44 +388,45 @@ void run(void)
 	    break;
 
 	case '+':
-	    profile[pgm[n].cmd*4] += pgm[n].arg;
-	    mem[m] += pgm[n].arg;
+	    {
+		int ov=0;
+		profile[pgm[n].cmd*4] += pgm[n].arg;
+		mem[m] = ov_iadd(mem[m], pgm[n].arg, &ov);
 
-	    if(physical_overflow) {
-		if (mem[m] > physical_max) {
-		    overflows++;
-		    mem[m] -= (physical_max-physical_min+1);
-		}
-	    } else {
-		if (mem[m] > physical_max) hard_wrap = 1;
-		if (mem[m] > hard_max) hard_max = mem[m];
-		if (mem[m] > SAFE_CELL_MAX) {
-		    /* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
+		if (ov) {
 		    overflows++;
 		    phy_limit = 1;
-		    mem[m] -= (SAFE_CELL_MAX+1);
 		    profile[pgm[n].cmd*4 + 3]++;
+		} else {
+		    if (mem[m] > hard_max) {
+			if(physical_overflow && mem[m] > physical_max) {
+			    overflows++;
+			    mem[m] -= (physical_max-physical_min+1);
+			}
+			hard_max = mem[m];
+		    }
 		}
 	    }
 	    break;
-	case '-':
-	    profile[pgm[n].cmd*4] += pgm[n].arg;
-	    mem[m] -= pgm[n].arg;
 
-	    if(physical_overflow) {
-		if (mem[m] < physical_min) {
-		    underflows++;
-		    mem[m] += (physical_max-physical_min+1);
-		}
-	    } else {
-		if (mem[m] < physical_min) hard_wrap = 1;
-		if (mem[m] < hard_min) hard_min = mem[m];
-		if (mem[m] < -SAFE_CELL_MAX) {
-		    /* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
+	case '-':
+	    {
+		int ov = 0;
+		profile[pgm[n].cmd*4] += pgm[n].arg;
+		mem[m] = ov_isub(mem[m], pgm[n].arg, &ov);
+
+		if (ov) {
 		    underflows++;
 		    phy_limit = 1;
-		    mem[m] += (SAFE_CELL_MAX+1);
 		    profile[pgm[n].cmd*4 + 3]++;
+		} else {
+		    if (mem[m] < hard_min) {
+			if(physical_overflow && mem[m] < physical_min) {
+			    underflows++;
+			    mem[m] += (physical_max-physical_min+1);
+			}
+			hard_min = mem[m];
+		    }
 		}
 	    }
 	    break;
@@ -416,7 +457,7 @@ void run(void)
 
 	case '[':
 	    if (!physical_overflow) {
-		if ((mem[m] & cell_mask) == 0 && mem[m]) {
+		if (mem[m] && (mem[m] & cell_mask) == 0) {
 		    /* This condition will be different. */
 		    if (mem[m] < 0) underflows++; else overflows++;
 		    profile[pgm[n].cmd*4 + 3]++;
@@ -430,9 +471,10 @@ void run(void)
 	    profile[pgm[n].cmd*4+1 + !!mem[m]]++;
 	    if (mem[m] == 0) n = pgm[n].arg;
 	    break;
+
 	case ']':
 	    if (!physical_overflow) {
-		if ((mem[m] & cell_mask) == 0 && mem[m]) {
+		if (mem[m] && (mem[m] & cell_mask) == 0) {
 		    /* This condition will be different. */
 		    if (mem[m] < 0) underflows++; else overflows++;
 		    profile[pgm[n].cmd*4 + 3]++;
@@ -450,11 +492,12 @@ void run(void)
 	case '.':
 	    profile[pgm[n].cmd*4]++;
 	    {
-		int a = (mem[m] & cell_mask);
-		if (a > physical_max) a -= (physical_max-physical_min+1);
+		int a = SM(mem[m]);
 		if (!suppress_io) {
-		    if (use_utf8) oututf8(a);
-		    else putchar(a);
+		    if (use_utf8) {
+			if (cell_mask == 0xFFFF) a = UM(a); /* Assume UTF16 */
+			oututf8(a);
+		    } else putchar(a);
 		}
 		if (a != 13) {
 		    if (use_utf8)
@@ -464,6 +507,7 @@ void run(void)
 		}
 	    }
 	    break;
+
 	case ',':
 	    profile[pgm[n].cmd*4+1 + !!mem[m]]++;
 
@@ -479,14 +523,14 @@ void run(void)
 
 	    unpause_runclock();
 	    break;
+
 	case '#':
 	    if (all_cells && cell_mask == 0xFF) {
 		int a;
 		fprintf(stderr, "Debug dump ->\n");
 		hex_bracket = m;
-		for(a = 0; a <= tape_max-tape_min; a++) {
-		    hex_output(stderr, mem[a] & cell_mask, 0);
-		}
+		for(a = 0; a <= tape_max-tape_min; a++)
+		    hex_output(stderr, ranged_mask(mem[a]), 0);
 		hex_output(stderr, 0, 1);
 		fprintf(stderr, "\n");
 	    } else {
@@ -499,7 +543,7 @@ void run(void)
 
 	case 'B':
 	    if (!physical_overflow) {
-		if ((mem[m] & cell_mask) == 0 && mem[m]) {
+		if (mem[m] && (mem[m] & cell_mask) == 0) {
 		    /* This condition will be different. */
 		    if (mem[m] < 0) underflows++; else overflows++;
 		    profile['['*4 + 3]++;
@@ -525,108 +569,56 @@ void run(void)
 	    break;
 
 	case 'M':
-	    profile['+'*4] += pgm[n].arg*v;
-	    mem[m] += pgm[n].arg*v;
-
-	    if(physical_overflow) {
-		while (mem[m] > physical_max) {
-		    overflows++;
-		    mem[m] -= (physical_max-physical_min+1);
-		}
-	    } else {
-		if (mem[m] > physical_max) hard_wrap = 1;
-		if (mem[m] > hard_max) hard_max = mem[m];
-		if (mem[m] > SAFE_CELL_MAX) {
-		    /* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
-		    overflows++;
-		    phy_limit = 1;
-		    mem[m] -= (SAFE_CELL_MAX+1);
-		    profile[pgm[n].cmd*4 + 3]++;
-		}
-	    }
-	    break;
-	case 'N':
-	    profile['-'*4] += pgm[n].arg*v;
-	    mem[m] -= pgm[n].arg*v;
-
-	    if(physical_overflow) {
-		while (mem[m] < physical_min) {
-		    underflows++;
-		    mem[m] += (physical_max-physical_min+1);
-		}
-	    } else {
-		if (mem[m] < physical_min) hard_wrap = 1;
-		if (mem[m] < hard_min) hard_min = mem[m];
-		if (mem[m] < -SAFE_CELL_MAX) {
-		    /* Even if we're checking on '[' it's possible for our "int" cell to overflow; trap that here. */
-		    underflows++;
-		    phy_limit = 1;
-		    mem[m] += (SAFE_CELL_MAX+1);
-		    profile[pgm[n].cmd*4 + 3]++;
-		}
-	    }
-	    break;
-
-	case 'R':
-	    profile['>'*4] += pgm[n].arg*v;
-	    m += pgm[n].arg;
-	    if (m+MAXOFF >= memsize) m = alloc_ptr(m+MAXOFF)-MAXOFF;
-	    if(tape_max < m-memshift) tape_max = m-memshift;
-	    break;
-	case 'L':
-	    profile['<'*4] += pgm[n].arg*v;
-	    m -= pgm[n].arg;
-	    if (m+MINOFF <= 0) m = alloc_ptr(m+MINOFF)-MINOFF;
-	    if(tape_min > m-memshift) {
-		tape_min = m-memshift;
-		if(tape_min < -1000) {
-		    fprintf(stderr, "Tape underflow at pointer %d\n", tape_min);
-		    exit(1);
-		}
-	    }
-	    break;
-	case '{':
-
-	    if (!physical_overflow) {
-		if ((mem[m] & cell_mask) == 0 && mem[m]) {
-		    /* This condition will be different. */
-		    if (mem[m] < 0) underflows++; else overflows++;
-		    profile['['*4 + 3]++;
-
-		    mem[m] &= cell_mask;
-		    if (mem[m] > physical_max)
-			mem[m] -= (physical_max-physical_min+1);
-		}
-	    }
-
-	    profile['['*4+1 + !!mem[m]]++;
-	    if (mem[m] == 0) { n = pgm[n].arg; break; }
-
-	    n++;
-	    m0 = m;
-	    do
 	    {
-		if (pgm[n].cmd == '>' ) {
-		    m += pgm[n].arg;
-		    if (m+MAXOFF >= memsize) m = alloc_ptr(m+MAXOFF)-MAXOFF;
-		    if(tape_max < m-memshift) tape_max = m-memshift;
-		} else {
-		    m -= pgm[n].arg;
-		    if (m+MINOFF <= 0) m = alloc_ptr(m+MINOFF)-MINOFF;
-		    if(tape_min > m-memshift) {
-			tape_min = m-memshift;
-			if(tape_min < -1000) {
-			    fprintf(stderr, "Tape underflow at pointer %d\n", tape_min);
-			    exit(1);
+		int ov = 0;
+		profile['+'*4] += pgm[n].arg*(intmax_t)(unsigned)v;
+		mem[m] = ov_iadd(mem[m], ov_imul(pgm[n].arg, v, &ov), &ov);
+
+		if (ov) {
+		    overflows++;
+		    phy_limit = 1;
+		    profile['+'*4 + 3]++;
+		} else
+		    if(physical_overflow) {
+			while(mem[m] > physical_max) {
+			    overflows++;
+			    mem[m] -= (physical_max-physical_min+1);
 			}
 		    }
-		}
+		if (mem[m] > hard_max) hard_max = mem[m];
+	    }
+	    break;
+
+	case 'N':
+	    {
+		int ov = 0;
+		profile['-'*4] += pgm[n].arg*(intmax_t)(unsigned)v;
+		mem[m] = ov_isub(mem[m], ov_imul(pgm[n].arg, v, &ov), &ov);
+
+		if (ov) {
+		    underflows++;
+		    phy_limit = 1;
+		    profile['-'*4 + 3]++;
+		} else
+		    if(physical_overflow) {
+			while (mem[m] < physical_min) {
+			    underflows++;
+			    mem[m] += (physical_max-physical_min+1);
+			}
+		    }
+		if (mem[m] > hard_max) hard_max = mem[m];
+	    }
+	    break;
+
+	case '{':
+	    {
+		int m0;
 
 		if (!physical_overflow) {
 		    if ((mem[m] & cell_mask) == 0 && mem[m]) {
 			/* This condition will be different. */
 			if (mem[m] < 0) underflows++; else overflows++;
-			profile[']'*4 + 3]++;
+			profile['['*4 + 3]++;
 
 			mem[m] &= cell_mask;
 			if (mem[m] > physical_max)
@@ -634,15 +626,52 @@ void run(void)
 		    }
 		}
 
-	    } while(mem[m] != 0);
+		profile['['*4+1 + !!mem[m]]++;
+		if (mem[m] == 0) { n = pgm[n].arg; break; }
 
-	    m0 = abs(m0-m);
-	    profile[pgm[n].cmd*4] += m0;
-	    profile[']'*4+1 ]++;
-	    profile[']'*4+1 + 1] += (m0/pgm[n].arg -1);
-	    n++;
+		n++;
+		m0 = m;
+		do
+		{
+		    if (pgm[n].cmd == '>' ) {
+			m += pgm[n].arg;
+			if (m+MAXOFF >= memsize) m = alloc_ptr(m+MAXOFF)-MAXOFF;
+			if(tape_max < m-memshift) tape_max = m-memshift;
+		    } else {
+			m -= pgm[n].arg;
+			if (m+MINOFF <= 0) m = alloc_ptr(m+MINOFF)-MINOFF;
+			if(tape_min > m-memshift) {
+			    tape_min = m-memshift;
+			    if(tape_min < -1000) {
+				fprintf(stderr, "Tape underflow at pointer %d\n", tape_min);
+				exit(1);
+			    }
+			}
+		    }
 
+		    if (!physical_overflow) {
+			if (mem[m] && (mem[m] & cell_mask) == 0) {
+			    /* This condition will be different. */
+			    if (mem[m] < 0) underflows++; else overflows++;
+			    profile[']'*4 + 3]++;
+
+			    mem[m] &= cell_mask;
+			    if (mem[m] > physical_max)
+				mem[m] -= (physical_max-physical_min+1);
+			}
+		    }
+
+		} while(mem[m] != 0);
+
+		m0 = abs(m0-m);
+		profile[pgm[n].cmd*4] += m0;
+		profile[']'*4+1 ]++;
+		profile[']'*4+1 + 1] += (m0/pgm[n].arg -1);
+		n++;
+
+	    }
 	    break;
+
 	}
     }
 }
@@ -762,20 +791,12 @@ print_summary()
 	fprintf(stderr, "Final tape contents:\n");
 
 	{
-	    int pw = 3, cc = 0, pc = 0, hex_ok = 0;
-	    {
-		char buf[64];
-		int i;
-		i = sprintf(buf, "%d", physical_min);
-		if (i > pw && i < (int)sizeof(buf)) pw = i;
-		i = sprintf(buf, "%d", physical_max);
-		if (i > pw && i < (int)sizeof(buf)) pw = i;
-	    }
+	    int cc = 0, pc = 0, hex_ok = 0;
 
 	    if (all_cells && cell_mask != 0xFF && tape_min == 0) {
 		hex_ok = 1;
 		for(ch = 0; ch <= tape_max-tape_min; ch++) {
-		    int v = SM(mem[ch+memshift]);
+		    int v = ranged_mask(mem[ch+memshift]);
 		    if (v < -9 || v > 255) {
 			hex_ok = 0;
 			break;
@@ -786,11 +807,18 @@ print_summary()
 	    if (all_cells && (cell_mask == 0xFF || hex_ok) && tape_min == 0) {
 		fprintf(stderr, "Pointer at: %d\n", final_tape_pos);
 		hex_bracket = final_tape_pos;
-		for(ch = 0; ch <= tape_max-tape_min; ch++) {
-		    hex_output(stderr, SM(mem[ch+memshift]), 0);
-		}
+		for(ch = 0; ch <= tape_max-tape_min; ch++)
+		    hex_output(stderr, ranged_mask(mem[ch+memshift]), 0);
 		hex_output(stderr, 0, 1);
 	    } else {
+		char buf[sizeof(int)*3+4];
+		int i, pw = 2;
+
+		for(ch = 0; (all_cells || ch < 16) && ch <= tape_max-tape_min; ch++) {
+		    i = sprintf(buf, "%d", ranged_mask(mem[ch+memshift+tape_min]));
+		    if (i > pw) pw = i;
+		}
+
 		if (tape_min < 0) cc += fprintf(stderr, " !");
 
 		for(ch = 0; (all_cells || ch < 16) && ch <= tape_max-tape_min; ch++) {
@@ -803,7 +831,7 @@ print_summary()
 			cc += fprintf(stderr, " :");
 		    }
 		    cc += fprintf(stderr, " %*d",
-				  pw, SM(mem[ch+memshift+tape_min]));
+				  pw, ranged_mask(mem[ch+memshift+tape_min]));
 		    if (final_tape_pos == ch+tape_min)
 			pc = cc;
 		}
@@ -816,7 +844,7 @@ print_summary()
 	if (tape_min < 0)
 	    fprintf(stderr, "WARNING: Tape pointer minimum %d, segfault.\n", tape_min);
 	fprintf(stderr, "Tape pointer maximum %d", tape_max);
-	if (!physical_overflow && !overflows && !underflows)
+	if (!physical_overflow && !overflows && !underflows && !neg_clear)
 	    fprintf(stderr, ", cell value range %d..%d", hard_min, hard_max);
 	fprintf(stderr, "\n");
 
@@ -825,7 +853,7 @@ print_summary()
 	    if (physical_overflow)
 		fprintf(stderr, "range %d..%d", physical_min, physical_max);
 	    else if(phy_limit)
-		fprintf(stderr, "+/- %d", SAFE_CELL_MAX);
+		fprintf(stderr, "physical overflow");
 	    else
 		fprintf(stderr, "value check");
 	    if (overflows)
@@ -907,14 +935,24 @@ print_summary()
 			program_len-tape_min, tape_max-tape_min+1,
 			total_count-tape_min,
 			nonwrap ? "non-" : "",
-			nonwrap && hard_wrap ? " (soft)" : "");
+			nonwrap && (overflows||underflows) ? " (soft)" : "");
 	    else
 		fprintf(stderr, " (%d, %d) %swrapping%s\n",
 			program_len-tape_min, tape_max-tape_min+1,
 			nonwrap ? "non-" : "",
-			nonwrap && hard_wrap ? " (soft)" : "");
+			nonwrap && (overflows||underflows) ? " (soft)" : "");
 	}
     }
+
+#ifdef SELFPROFILE
+    for(int i=0; i<256; i++) {
+	if(optprofile[i])
+	    if(i>' ' && i<='~')
+		printf("cmd('%c') = %"PRIdMAX"\n", i, optprofile[i]);
+	    else
+		printf("cmd('\\%03o') = %"PRIdMAX"\n", i, optprofile[i]);
+    }
+#endif
 }
 
 void
@@ -965,6 +1003,16 @@ hex_output(FILE * ofd, int ch, int eof)
 	    addr += 16;
 	}
     }
+}
+
+int
+ranged_mask(int v)
+{
+    if (physical_overflow) return SM(v);
+    if (cell_mask <= 0) return v;
+    if (v>= -cell_mask/2 && v<=cell_mask)
+	return v;
+    return SM(v);
 }
 
 void

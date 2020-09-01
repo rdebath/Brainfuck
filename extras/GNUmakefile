@@ -71,6 +71,8 @@ byte2byte.tmp.out: byte2byte.c
 txtbf: txtbf.c
 	$(CC) $(CFLAGS) $(QTABLEDEF) $(LDFLAGS) $(TARGET_ARCH) txtbf.c -o $@
 
+profilebf.o: profilebf.c ov_int.h
+
 ################################################################################
 
 BA=../bf2any
