@@ -101,7 +101,7 @@ static int disable_optim = 0;
 
 static int headsecksconv[] = {3, 2, 0, 1, 4, 5, 6, 7 };
 
-static int bf_multi = 0, tmp_clean = 1, bf_space = 0;
+static int bf_multi = 0, tmp_clean = 0, bf_space = 0;
 static struct instruction *pgm = 0, *last = 0;
 
 /* Default double and quad to the easiest to prove algorithms. */
@@ -605,8 +605,8 @@ bftranslate(int ch, int count)
 	    if (!last) pgm = n; else last->next = n;
 	    last = n;
 	} else if (p) {
-	    if (ch == '>' || ch == '<' || ch == ' ') tmp_clean = 0;
-	    else if (ch == '.') ;
+	    if (ch == '>' || ch == '<') tmp_clean = 0;
+	    else if (ch == '.' || ch == ',') ;
 	    else if (!tmp_clean && lang->clean_tmps) {
 		pmc(lang->clean_tmps); tmp_clean = 1;
 	    }
@@ -614,9 +614,10 @@ bftranslate(int ch, int count)
 	} else {
 	    if (ch == '#')
 		pmc("\n#\n");
-	    else if (ch == '=')
+	    else if (ch == '=') {
 		pmc(lang->zero_cell);
-	    else
+		tmp_clean = 1;
+	    } else
 		pc(ch);
 	}
 	return;
@@ -703,39 +704,59 @@ bftranslate(int ch, int count)
 
 	    pmc("\n\n");
 
-	    if(bf_multi&8) bfpackprint();
-	    else {
-		if(bf_multi&4) lang = bfquad;
-		else if (bf_multi&2) lang = doubler;
+	    lang = doubler;
+	    if(bf_multi&8)
+		bfpackprint();
+	    else
 		bfreprint();
-	    }
 
 	    pmc("\n\n");
 	    pmc("[-]]");
 	} else {
+	    int shortver = 0;
 	    /* Eight bit and thirty two bit. */
-	    /* This condition is a bit more difficult to optimise and a bit
-	     * smaller than the simple multiply lists above.
-	     * It checks for binary cells of 24bits or less. */
-	    pc(0); puts("// This generates 16777216 to check for larger than 24bit cells");
-	    pmc("+>>++++++++[-<<[->++++++++<]>[-<+>]>]<");
-	    pmc("+<[[-]>[-]<");
-	    pmc("\n\n");
-
-	    lang = bfout;
-	    bfreprint();
-
-	    /* This is an "else" condition, the code cannot be resequenced */
-	    pmc("\n\n");
-	    pc(0); puts("// This is an else condition linked to the start of the file");
-	    pmc(">[-]<[-]]>[[-]<");
-	    pmc("\n\n");
-
-	    lang = bfquad;
-	    bfreprint();
-
-	    pmc("\n\n");
-	    pmc(">[-]]<");
+	    pc(0);
+	    puts("// This generates 16777216 to check for larger than 24bit cells");
+	    if (shortver) {
+		/* This condition is a bit more difficult to optimise and a bit
+		 * smaller than the simple multiply lists above.
+		 * It checks for binary cells of 24bits or less. */
+		pmc("+>>++++++[-<<[->++++<]>[-<++++>]>]<");
+		pmc("+<[[-]>[-]<");
+		pmc("\n\n");
+		lang = bfout;
+		bfreprint();
+		/* This is an "else" condition, the code cannot be resequenced */
+		pmc("\n\n");
+		pc(0); puts("// This is an else condition linked to the start of the file");
+		pmc(">[-]<[-]]>[[-]<");
+		pmc("\n\n");
+		lang = bfquad;
+		bfreprint();
+		pmc("\n\n");
+		pmc(">[-]]<");
+	    } else {
+		pmc("[-]>[-]<");
+		pmc("+[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]\n");
+		pmc("<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]");
+		pmc("<[[-]");
+		pmc("\n\n");
+		lang = bfout;
+		bfreprint();
+		pmc("\n\n");
+		pmc("[-]]");
+		pmc("\n\n");
+		pmc("// This generates 16777216 to check for smaller than 24bit cells\n");
+		pmc("[-]>[-]<");
+		pmc("+[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]");
+		pmc("<[>++++++++<-]>[<++++++++>-]<[>++++++++<-]>[<++++++++>-]");
+		pmc("+<[>[-]<[-]]>[[-]<");
+		pmc("\n\n");
+		lang = bfquad;
+		bfreprint();
+		pmc("\n\n");
+		pmc(">[-]]<");
+	    }
 	}
     }
 }
@@ -750,8 +771,8 @@ bfreprint(void)
 	int count = n->count;
 	char * p;
 	if ((p = strchr(bf,ch))) {
-	    if (ch == '>' || ch == '<' || ch == ',') tmp_clean = 0;
-	    else if (ch == '.') ;
+	    if (ch == '>' || ch == '<') tmp_clean = 0;
+	    else if (ch == '.' || ch == ',') ;
 	    else if (!tmp_clean && lang->clean_tmps) {
 		pmc(lang->clean_tmps); tmp_clean = 1;
 	    }
@@ -759,9 +780,10 @@ bfreprint(void)
 	} else {
 	    if (ch == '#')
 		pmc("\n#\n");
-	    else if (ch == '=')
+	    else if (ch == '=') {
 		pmc(lang->zero_cell);
-	    else
+		tmp_clean = 1;
+	    } else
 		pc(ch);
 	}
     }
@@ -1615,6 +1637,7 @@ static trivbf dc4[1] = {{
     "%d+ lmx", "%d- lmx", "daP", "", "[lmxd0=q", "lbx]dSbxLbs."},
     .gen_hdr = "[256+]sM[256%d0>M]sm [q]sq 0dsldsr",
     .help = "DC using two unbounded variables to store the tape.",
+    .bytesonly = 1,
 }};
 
 /* Language "nyan" https://github.com/tommyschaefer/nyan-script */
@@ -1766,6 +1789,7 @@ static trivbf brainbool[1] = {{
      ">>>>>>>>>+<<<<<<<<+[>+]<[<]>>>>>>>>>]<[+<]",
      },
      .help = "Brainbool -- http://esolangs.org/wiki/Brainbool",
+    .bytesonly = 1,
 }};
 
 /* BF Doubler doubles the cell size. */
@@ -1775,10 +1799,10 @@ static trivbf doubler_12[1] = {{
     .class = L_BF,
     .multi = 2,
     .bf = {">>>>", "<<<<", ">+<+[>-]>[->>+<]<<", ">+<[>-]>[->>-<]<<-",
-    ".", ">>>[-]<<<[-],",
+    ".", "[-]>[-]>[-]>[-]<<<,",
     ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "[+<",
     ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-" "]<"},
-    .zero_cell = ">>>[-]<<<[-]",
+    .zero_cell = "[-]>[-]>[-]>[-]<<<",
     .clean_tmps = ">[-]>[-]<<",
 }};
 
@@ -1791,10 +1815,10 @@ static trivbf doubler_copy_LXXH[1] = {{
     ">>>>", "<<<<",
     ">>+<<+[>>-<<[->+<]]>[-<+>]>[->+<]<<",
     ">>+<<[>>-<<[->+<]]>[-<+>]>[->-<]<<-",
-    ".", ">>>[-]<<<[-],",
+    ".", "[-]>[-]>[-]>[-]<<<,",
     "[>+<[->>+<<]]>>[-<<+>>]>[<<+>>[-<+>]]<[->+<]<[[-]<",
     "[>+<[->>+<<]]>>[-<<+>>]>[<<+>>[-<+>]]<[->+<]<]<"},
-    .zero_cell = ">>>[-]<<<[-]",
+    .zero_cell = "[-]>[-]>[-]>[-]<<<",
     .clean_tmps = ">[-]>[-]<<"
 }};
 
@@ -1854,19 +1878,51 @@ static trivbf doubler_17b[1] = {{
     .zero_cell = ">>>[-]<[-]<<",
 }};
 
+/* 12 cost, cells in LXXMNXXH order, with tmpzero */
+static trivbf bfquad_12[1] = {{
+    .name = "quad12",
+    .class = L_BF,
+    .multi = 4,
+    .bf = {
+    ">>>>>>>>", "<<<<<<<<",
+    ">+<+[>-]>[->+>+[<-]<[->>>+<+[>-]>[->>+<]<<<<<]>]<<",
+    ">+<[>-]>[->+>[<-]<[->>>+<[>-]>[->>-<]<<-<<<]>>-<]<<-",
+    ".", "[-]>[-]>[-]>[-]>[-]>[-]>[-]>[-]<<<<<<<,",
+    ">+<[>-]>[->+>[<-]<[->>>+<[>-]>[->+>[<-]<[<]>[-<+>]]<<<<<]>]>>>-[+<<<<<",
+    ">+<[>-]>[->+>[<-]<[->>>+<[>-]>[->+>[<-]<[<]>[-<+>]]<<<<<]>]>>>-]<<<<<"
+    },
+    .zero_cell = "[-]>[-]>[-]>[-]>[-]>[-]>[-]>[-]<<<<<<<",
+    .clean_tmps = ">[-]>[-]>>>[-]>[-]<<<<<<"
+}};
+
+/* 12 cost, cells in LXXMNXXH order, no tmpzero */
+static trivbf bfquad_12nz[1] = {{
+    .name = "quad12nz",
+    .class = L_BF,
+    .multi = 4,
+    .bf = {
+    ">>>>>>>>", "<<<<<<<<",
+    ">+<+[>-]>[->+>+[<-]<[->>>+<+[>-]>[->>+<]<<<<<]>]<<",
+    ">+<[>-]>[->+>[<-]<[->>>+<[>-]>[->>-<]<<-<<<]>>-<]<<-",
+    ".", "[-]>[-]>[-]>[-]>[-]>[-]>[-]>[-]<<<<<<<,",
+    ">+<[>-]>[->+>[<-]<[->>>+<[>-]>[->+>[<-]<[<]>[-<+>]]<<<<<]>]>>>-[+<<<<<",
+    ">+<[>-]>[->+>[<-]<[->>>+<[>-]>[->+>[<-]<[<]>[-<+>]]<<<<<]>]>>>-]<<<<<"
+    }
+}};
+
 /* Copy cell cost, cells in XLHX order, with tmpzero */
 static trivbf doubler_copy[1] = {{
-    .name = "dblcopy",
+    .name = "dblcopy", .name2 = "dblcp",
     .class = L_BF,
     .multi = 2,
     .bf = {
     ">>>", "<<<",
     "+>+[<->[->>+<<]]>>[-<<+>>]<<<[->>+<<]",
     "+>[<->[->>+<<]]>>[-<<+>>]<<<[->>-<<]>-<",
-    ">.<", ">[-]>[-]<,<",
+    ">.<", "[-]>[-]>[-]>[-]<<,<",
     ">[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<" "[[-]",
     ">[<+>[->>+<<]]>>[-<<+>>]<[<<+>>[->+<]]>[-<+>]<<<" "]"},
-    .zero_cell = ">[-]>[-]<<",
+    .zero_cell = "[-]>[-]>[-]>[-]<<<",
     .clean_tmps = "[-]>>>[-]<<<"
 }};
 
@@ -1921,7 +1977,7 @@ static trivbf bfquadz[1] = {{
     "+>[<->[->>>>+<<<<]]>>>>[-<<<<+>>>>]<<<<<[>>[<<->>[->>>+<<<]]>>>[-<<<+>>>"
     "]<<<<<[>>>[<<<->>>[->>+<<]]>>[-<<+>>]<<<<<[->>>>-<<<<]>>>-<<<]>>-<<]>-<",
 
-    ">.<", ">[-]>[-]>[-]>[-]<<<,<",
+    ">.<", "[-]>[-]>[-]>[-]>[-]>[-]<<<<,<",
 
     ">[<+>[->>>>+<<<<]]>>>>[-<<<<+>>>>]" "<<<[<<+>>[->>>+<<<]]>>>[-<<<+>>>]"
     "<<[<<<+>>>[->>+<<]]>>[-<<+>>]" "<[<<<<+>>>>[->+<]]>[-<+>]" "<<<<<[[-]",
@@ -1929,7 +1985,7 @@ static trivbf bfquadz[1] = {{
     ">[<+>[->>>>+<<<<]]>>>>[-<<<<+>>>>]" "<<<[<<+>>[->>>+<<<]]>>>[-<<<+>>>]"
     "<<[<<<+>>>[->>+<<]]>>[-<<+>>]" "<[<<<<+>>>>[->+<]]>[-<+>]" "<<<<<]"},
 
-    .zero_cell = ">[-]>[-]>[-]>[-]<<<<",
+    .zero_cell = "[-]>[-]>[-]>[-]>[-]>[-]<<<<<",
     .clean_tmps = "[-]>>>>>[-]<<<<<",
     .help = "BF to BF translation, cell size double doubler."
 }};
@@ -1992,6 +2048,53 @@ static trivbf bitbf[1] = {{
 	"[->+>>+<<<]>>>[-<<<+>>>]++++++[-<<++++++++>>]<<.[-]<", ",",
 	"[", "]"
     }
+}};
+
+static trivbf octbf[1] = {{
+    .name = "octbf",
+    .class = L_BFCHARS,
+    .help = "BF to BF translation, set cell size *8.",
+
+    .bf = {
+	">>>>>>>>>", "<<<<<<<<<",
+
+	"+>+[<->[->>>>>>>>+<<<<<<<<]]>>>>>>>>[-<<<<<<<<+>>>>>>>>]<<<<<<<<"
+	"<[>>+[<<->>[->>>>>>>+<<<<<<<]]>>>>>>>[-<<<<<<<+>>>>>>>]<<<<<<<<<"
+	"[>>>+[<<<->>>[->>>>>>+<<<<<<]]>>>>>>[-<<<<<<+>>>>>>]<<<<<<<<<[>>"
+	">>+[<<<<->>>>[->>>>>+<<<<<]]>>>>>[-<<<<<+>>>>>]<<<<<<<<<[>>>>>+["
+	"<<<<<->>>>>[->>>>+<<<<]]>>>>[-<<<<+>>>>]<<<<<<<<<[>>>>>>+[<<<<<<"
+	"->>>>>>[->>>+<<<]]>>>[-<<<+>>>]<<<<<<<<<[>>>>>>>+[<<<<<<<->>>>>>"
+	">[->>+<<]]>>[-<<+>>]<<<<<<<<<[->>>>>>>>+<<<<<<<<]]]]]]]",
+
+	"+>[<->[->>>>>>>>+<<<<<<<<]]>>>>>>>>[-<<<<<<<<+>>>>>>>>]<<<<<<<<<"
+	"[>>[<<->>[->>>>>>>+<<<<<<<]]>>>>>>>[-<<<<<<<+>>>>>>>]<<<<<<<<<[>"
+	">>[<<<->>>[->>>>>>+<<<<<<]]>>>>>>[-<<<<<<+>>>>>>]<<<<<<<<<[>>>>["
+	"<<<<->>>>[->>>>>+<<<<<]]>>>>>[-<<<<<+>>>>>]<<<<<<<<<[>>>>>[<<<<<"
+	"->>>>>[->>>>+<<<<]]>>>>[-<<<<+>>>>]<<<<<<<<<[>>>>>>[<<<<<<->>>>>"
+	">[->>>+<<<]]>>>[-<<<+>>>]<<<<<<<<<[>>>>>>>[<<<<<<<->>>>>>>[->>+<"
+	"<]]>>[-<<+>>]<<<<<<<<<[->>>>>>>>-<<<<<<<<]>>>>>>>-<<<<<<<]>>>>>>"
+	"-<<<<<<]>>>>>-<<<<<]>>>>-<<<<]>>>-<<<]>>-<<]>-<",
+
+	">.<", ">[-]>[-]>[-]>[-]>[-]>[-]>[-]>[-]<<<<<<<,<",
+
+	">[<+>[->>>>>>>>+<<<<<<<<]]>>>>>>>>[-<<<<<<<<+>>>>>>>>]<<<<<<<[<<"
+	"+>>[->>>>>>>+<<<<<<<]]>>>>>>>[-<<<<<<<+>>>>>>>]<<<<<<[<<<+>>>[->"
+	">>>>>+<<<<<<]]>>>>>>[-<<<<<<+>>>>>>]<<<<<[<<<<+>>>>[->>>>>+<<<<<"
+	"]]>>>>>[-<<<<<+>>>>>]<<<<[<<<<<+>>>>>[->>>>+<<<<]]>>>>[-<<<<+>>>"
+	">]<<<[<<<<<<+>>>>>>[->>>+<<<]]>>>[-<<<+>>>]<<[<<<<<<<+>>>>>>>[->"
+	">+<<]]>>[-<<+>>]<[<<<<<<<<+>>>>>>>>[->+<]]>[-<+>]<<<<<<<<<[[-]",
+
+	">[<+>[->>>>>>>>+<<<<<<<<]]>>>>>>>>[-<<<<<<<<+>>>>>>>>]<<<<<<<[<<"
+	"+>>[->>>>>>>+<<<<<<<]]>>>>>>>[-<<<<<<<+>>>>>>>]<<<<<<[<<<+>>>[->"
+	">>>>>+<<<<<<]]>>>>>>[-<<<<<<+>>>>>>]<<<<<[<<<<+>>>>[->>>>>+<<<<<"
+	"]]>>>>>[-<<<<<+>>>>>]<<<<[<<<<<+>>>>>[->>>>+<<<<]]>>>>[-<<<<+>>>"
+	">]<<<[<<<<<<+>>>>>>[->>>+<<<]]>>>[-<<<+>>>]<<[<<<<<<<+>>>>>>>[->"
+	">+<<]]>>[-<<+>>]<[<<<<<<<<+>>>>>>>>[->+<]]>[-<+>]<<<<<<<<<]",
+
+
+    },
+    .zero_cell = "[-]>[-]>[-]>[-]>[-]>[-]>[-]>[-]>[-]>[-]<<<<<<<<<<",
+    .clean_tmps = ">>>>>>>>>[-]<<<<<<<<<[-]",
 }};
 
 /*
@@ -2300,6 +2403,7 @@ static trivbf bcdbyte[1] = {{
 	"01AAB08A7AC0B8A71BA8A7ACABAC0B8A7AA1CCA8A7ACA" },
     .help = "Bytewide conversion of https://esolangs.org/wiki/BCDFuck",
     .zero_cell = "000B1ACAAAB1AC",
+    .bytesonly = 1,
 }};
 
 static trivbf * trivlist[] = {
@@ -2312,7 +2416,8 @@ static trivbf * trivlist[] = {
     babylang, matlab, tmcc, heart, iuab, bcdfuck, bcdbyte, xifucklang,
 
     bfout, doubler_12, doubler_copy_LXXH, doubler_12nz, doubler_12r,
-    doubler_17a, doubler_17b, doubler_copy, doubler_copynz,
-    doubler_esolang, bfquadz, bfquadnz, bitbf, bitbf8,
+    doubler_17a, doubler_17b, doubler_copy, doubler_copynz, octbf,
+    doubler_esolang, bfquadz, bfquadnz, bfquad_12, bfquad_12nz,
+    bitbf, bitbf8,
 
 0};

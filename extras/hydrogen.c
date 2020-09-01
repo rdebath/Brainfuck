@@ -102,10 +102,11 @@ struct subst {
 #ifndef NO_XTRA
     { {T_SET,0},
 		"[+]" },
-    { {T_MOV, T_SET4, T_MOV, T_MOV, 0},
-		"[-]>[-]>[-]>[-]" },
 
 #ifdef ENABLE_DOUBLE
+    { {T_MOV, T_ZTEMP2, T_SET2c2, T_MOV, T_MOV, 0},
+		"[-]>[-]>[-]>[-]" },
+
     { {T_MOV, T_ZTEMP2, T_MOV, T_MOV, 0},
 		"[-]>>>[-]" },
 
