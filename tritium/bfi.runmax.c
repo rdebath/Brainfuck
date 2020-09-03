@@ -17,25 +17,6 @@
 #include "big_int.h"
 #include "bfi.runarray.h"
 
-static void run_supertree(void);
-
-/*
- * First check if run_tree_as_array() has an extended cell variant.
- */
-void
-run_maxtree(void)
-{
-    if (cell_length <= (int)(sizeof(C))*CHAR_BIT) {
-	if (verbose)
-	    fprintf(stderr, "Extended array interpreter: %d byte int/cell\n",
-			    (int)sizeof(C));
-	run_tree_as_array();
-	return;
-    }
-
-    run_supertree();
-}
-
 /******************************************************************************/
 
 #ifdef TESTSOFTMULT
@@ -456,8 +437,8 @@ static inline void BI_div_uint(uint_cell ** pa, unsigned int b, unsigned int * r
 }
 #endif
 
-static void
-run_supertree(void)
+void
+run_maxtree(void)
 {
     struct bfi * n = bfprog;
     mem_cell * m;

@@ -86,6 +86,10 @@ convert_tree_to_runarray(int merge_mov)
 	    arraylen += 4;
 	    break;
 
+	case T_DIV:
+	    arraylen += 2;
+	    break;
+
 	default:
 	    arraylen += 3;
 	    break;
@@ -267,6 +271,10 @@ convert_tree_to_runarray(int merge_mov)
 
 	    if (n->count != 0 || n->count2 != 1 || n->count3 != 1)
 		fprintf(stderr, "Invalid %s node counts found\n", tokennames[n->type]);
+	    break;
+
+	case T_DIV:
+	    if (!merge_mov) *p++ = n->offset;
 	    break;
 
 	case T_STOP:

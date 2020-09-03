@@ -132,6 +132,18 @@ print_cpp(void)
 	if (node_type_counts[T_LT])
 	    puts("#define lessthan(x,y,z) p[x] += (p[y] < p[z]); /* unsigned! */");
 
+	if (node_type_counts[T_DIV])
+	    printf("#define divtok(x) %s%s%s%s\n",
+			"/* unsigned div! */\\",
+		"\n"	"  if (p[x+1] != 0) {\\"
+		"\n"	"    ",cpp_type," N = p[x+0], D = p[x+1];\\"
+		"\n"	"    p[x+3] = N/D;\\"
+		"\n"	"    p[x+2] = N%D;\\"
+		"\n"	"  } else {\\"
+		"\n"	"    p[x+3] = 0;\\"
+		"\n"	"    p[x+2] = p[x+0];\\"
+		"\n"	"  }");
+
 	if(node_type_counts[T_MULT] || node_type_counts[T_CMULT]
 	    || node_type_counts[T_WHL]) {
 	    if (add_mask) {
@@ -195,6 +207,33 @@ print_cpp(void)
 		     "else p[x]= 0;}");
 		break;
 	    }
+	}
+
+	if (node_type_counts[T_INPI] || node_type_counts[T_PRTI]) {
+
+	    puts("#ifdef __cplusplus");
+
+	    /* Beware: mixing iostream with read() & write() */
+	    if (node_type_counts[T_INPI])
+		puts("#define getdecimalcell(x) std::cin >> p[x];");
+
+	    if (node_type_counts[T_PRTI])
+		puts("#define putdecimalcell(x) std::cout << p[x] << std::flush;");
+
+	    puts("#else");
+
+	    /* Beware: You must supply integer I/O externs for C */
+	    if (node_type_counts[T_INPI]) {
+		puts("#define getdecimalcell(x) getdeccell(p+x);");
+		printf("  extern void getdeccell(%s * cellv);\n", cpp_type);
+	    }
+
+	    if (node_type_counts[T_PRTI]) {
+		puts("#define putdecimalcell(x) putdeccell(p[x]);");
+		printf("  extern void putdeccell(%s cellv);\n", cpp_type);
+	    }
+
+	    puts("#endif");
 	}
 
 	puts("#endif");
@@ -287,6 +326,10 @@ print_cpp(void)
                       (xc) != '\\' && (xc) != '"' \
                     )
 
+	case T_DIV:
+	    printf("divtok(%d)\n", n->offset);
+	    break;
+
 	case T_PRT:
 	    printf("outcell(%d)\n", n->offset);
 	    break;
@@ -322,6 +365,14 @@ print_cpp(void)
 
 	case T_INP:
 	    printf("inpchar(%d)\n", n->offset);
+	    break;
+
+	case T_PRTI:
+	    printf("putdecimalcell(%d)\n", n->offset);
+	    break;
+
+	case T_INPI:
+	    printf("getdecimalcell(%d)\n", n->offset);
 	    break;
 
 	case T_IF:

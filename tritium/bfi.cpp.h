@@ -15,7 +15,7 @@ X(cpp,CPP,
 #if XX == 4
     if (do_codestyle == c_cpp) {
         if (iostyle == 3) {
-            fprintf(stderr, "The -A option does not support -fintio\n");
+            fprintf(stderr, "The -C option does not support -fintio\n");
             exit(255);
         }
 	opt_no_fullprt = 1;

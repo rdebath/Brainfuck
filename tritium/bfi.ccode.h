@@ -16,9 +16,9 @@ X(ccode,CCODE,
     case c_ccode: run_ccode(); break;                               )
 
 #if (XX == 4) && !defined(DISABLE_RUNC)
-    if (do_run == -1 && do_codestyle == c_default && verbose<3
+    if (do_run <= 0 && do_codestyle == c_default && verbose<3
 	&& (cell_length <= sizeof(C)*CHAR_BIT)) {
-	do_run = 1;
+	do_run = (do_run != 0);
 	do_codestyle = c_ccode;
     }
 #endif

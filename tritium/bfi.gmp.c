@@ -416,6 +416,132 @@ run_gmparray(void)
 	    p += 4;
 	    break;
 
+	case T_DIV:
+	    /* Positive integers do the simple process. */
+	    if (!m[p[1]].f && !m[p[1]+1].f && m[p[1]].v>=0 && m[p[1]+1].v>0) {
+		long N=m[p[1]].v, D=m[p[1]+1].v;
+		m[p[1]+2].f = 0;
+		m[p[1]+2].v = N % D;
+		m[p[1]+3].f = 0;
+		m[p[1]+3].v = N / D;
+
+		p += 2;
+		break;
+	    }
+
+	    /* NOTE, mpz_divmod is signed. If a mask is defined everything
+	     * will become positive, otherwise negative values will cause
+	     * problems.
+	     *
+	     * Dividend/Divisor = Quotient + Remainder/Divisor
+	     *         Dividend = Quotient*Divisor + Remainder
+	     *
+	     * Dividend>0 & Divisor>0       Normal
+	     * Dividend>0 & Divisor==0      R=Dividend, Q=0
+	     * Dividend>0 & Divisor<0       R=Dividend, Q=0
+	     *
+	     * Dividend==0                  R=0 Q=0
+	     *
+	     * Dividend<0 & ...
+	     *    Divisor==0                    R=Dividend, Q=0
+	     *    Divisor<0 & Dividend<Divisor  R=Dividend, Q=0
+	     *    Divisor==1                    R=0 Q=Dividend
+	     *    Dividend==Divisor             R=0 Q=1
+	     *    Else                          R=Infinity Q=Infinity/D
+	     *
+	     * A negative divisor would be a value larger than any
+	     * positive dividend and so give the same result as
+	     * division by zero.
+	     *
+	     * A negative dividend would cause the original code to
+	     * run until negative infinity in order to wrap, without
+	     * a known limit the unsigned value is also unknown.
+	     * However, a result could be assumed under some conditions.
+	     */
+
+	    {
+		int flg = 0;
+		mpz_ptr m0, m1;
+		/* Mask and test dividend cell */
+		if (m[p[1]].f) {
+		    if(do_mask) mpz_and(m[p[1]].b, m[p[1]].b, cell_and);
+		    else
+			flg = (mpz_sgn(m[p[1]].b) < 0);
+		} else {
+#ifndef DISABLE_LONGMASK
+		    if (long_mask) m[p[1]].v &= long_mask;
+#endif
+		    flg = (m[p[1]].v < 0 && !do_mask);
+		}
+		if (flg) {
+		    fprintf(stderr, "DIV command gave infinite loop\n");
+		    exit(1);
+		}
+
+		/* Mask and test divisor cell */
+		if (m[p[1]+1].f) {
+		    if(do_mask) mpz_and(m[p[1]+1].b, m[p[1]+1].b, cell_and);
+		    flg = (mpz_sgn(m[p[1]+1].b) > 0);
+		} else {
+#ifndef DISABLE_LONGMASK
+		    if (long_mask) m[p[1]+1].v &= long_mask;
+#endif
+		    flg = (m[p[1]+1].v > 0);
+		}
+
+		if (flg) { /* If divisor is not zero */
+		    // m[p[1]+2] = N % D
+		    // m[p[1]+3] = N / D
+		    // mpz_divmod (MP_INT *quotient, MP_INT *remainder, MP_INT *dividend, MP_INT *divisor)
+
+		    /* Convert dividend to large int */
+		    if (!m[p[1]].f) {
+			mpz_set_si(t2, m[p[1]].v);
+			if(do_mask && m[p[1]].v < 0) mpz_and(t2, t2, cell_and);
+			m0 = t2;
+		    } else
+			m0 = m[p[1]].b;
+
+		    /* Convert divisor to large int */
+		    if (!m[p[1]+1].f) {
+			mpz_set_si(t3, m[p[1]+1].v);
+			if(do_mask && m[p[1]].v < 0) mpz_and(t3, t3, cell_and);
+			m1 = t3;
+		    } else
+			m1 = m[p[1]+1].b;
+
+		    if (!m[p[1]+2].i)
+			mpz_init(m[p[1]+2].b);
+		    m[p[1]+2].i = m[p[1]+2].f = 1;
+
+		    if (!m[p[1]+3].i)
+			mpz_init(m[p[1]+3].b);
+		    m[p[1]+3].i = m[p[1]+3].f = 1;
+
+		    mpz_divmod(m[p[1]+3].b, m[p[1]+2].b, m0, m1);
+
+		} else {
+		    /* Division by zero is same as division by dividend+1 */
+		    // m[p[1]+2] = m[p[1]]
+		    if (!m[p[1]].f) {
+			m[p[1]+2].f = 0;
+			m[p[1]+2].v = m[p[1]].v;
+		    } else {
+			if (!m[p[1]+2].i)
+			    mpz_init(m[p[1]+2].b);
+
+			m[p[1]+2].i = m[p[1]+2].f = 1;
+			mpz_set(m[p[1]+2].b, m[p[1]].b);
+		    }
+
+		    m[p[1]+3].f = 0;
+		    m[p[1]+3].v = 0;
+		}
+	    }
+
+	    p += 2;
+	    break;
+
 	case T_ADDWZ:
 	    /* This is normally a running dec, it cleans up a rail */
 	    // while(m[p[1]] != 0) { m[p[2]] += p[3]; m += p[4]; }
@@ -548,6 +674,9 @@ run_gmparray(void)
 	    break;
 
 	default:
+	    fprintf(stderr, "Execution error:\nBad node %s\n",
+		tokennames[p[0]]);
+	    /*FALLTHROUGH*/
 	case T_STOP:
 	    goto break_break;
 	}

@@ -85,12 +85,12 @@ characters after your favorite comment marker in a very visible form.
 #ifndef NO_EXT_BE
 #include "clock.h"
 
-enum codestyle { c_default,
+enum codestyle { c_default, c_proftree, c_runarray, c_maxtree,
 #define XX 1
 #include "bfi.be.def"
     };
 int do_codestyle = c_default;
-const char * codestylename[] = { "std"
+const char * codestylename[] = { "default", "profile tree", "run array", "max tree"
 #define XX 8
 #include "bfi.be.def"
 };
@@ -119,6 +119,7 @@ int opt_level = 2;
 int opt_runner = 0;
 int opt_no_calc = 0;
 int opt_no_lessthan = 0;
+int opt_no_div = 0;
 int opt_no_litprt = 0;
 int opt_no_fullprt = 0;
 int opt_no_endif = 0;
@@ -207,6 +208,7 @@ int flatten_loop(struct bfi * v, int constant_count);
 int classify_loop(struct bfi * v);
 int flatten_multiplier(struct bfi * v);
 int test_for_lessthan(struct bfi * v);
+int test_for_divide(struct bfi * v);
 void build_string_in_tree(struct bfi * v);
 void * tcalloc(size_t nmemb, size_t size);
 struct bfi * add_node_after(struct bfi * p);
@@ -590,6 +592,7 @@ checkarg(char * opt, char * arg)
     } else if (!strcmp(opt, "-fno-negtape")) { hard_left_limit = 0; return 1;
     } else if (!strcmp(opt, "-fno-calctok")) { opt_no_calc = 1; return 1;
     } else if (!strcmp(opt, "-fno-lttok")) { opt_no_lessthan = 1; return 1;
+    } else if (!strcmp(opt, "-fno-divtok")) { opt_no_div = 1; return 1;
     } else if (!strcmp(opt, "-fno-endif")) { opt_no_endif = 1; return 1;
     } else if (!strcmp(opt, "-fno-litprt")) { opt_no_litprt = 1; return 1;
     } else if (!strcmp(opt, "-fno-fullprt")) { opt_no_fullprt = 1; return 1;
@@ -705,11 +708,41 @@ main(int argc, char ** argv)
 	filelist[filecount++] = "-";
     }
 
+    if (noheader && do_run<0) do_run = 0;
+
 #ifndef NO_EXT_BE
 #define XX 4
 #include "bfi.be.def"
 
     if (do_run == -1) do_run = (do_codestyle == c_default);
+    if (do_run && do_codestyle == c_default) {
+	if (verbose>2 || debug_mode || enable_trace ||
+	    node_type_counts[T_DUMP] != 0) {
+
+	    if (cell_length <= (int)(sizeof(int))*CHAR_BIT)
+		do_codestyle = c_proftree;
+	} else if (cell_length <= (int)(sizeof(C))*CHAR_BIT) {
+	    do_codestyle = c_runarray;
+	} else {
+	    do_codestyle = c_maxtree;
+	    opt_no_div = 1;
+	}
+
+	if (do_codestyle == c_default) {
+            char cbuf[sizeof(int)*3+10];
+            sprintf(cbuf, "%dbit", cell_length);
+            if (cell_length == INT_MAX)
+                strcpy(cbuf, "unbounded");
+
+	    fprintf(stderr, "ERROR: cannot run combination: "
+			    "%s cells%s%s%s.\n",
+		cbuf,
+		debug_mode? ", debug mode":"",
+		enable_trace? ", trace mode":"",
+		verbose>2 ? ", profiling enabled":"");
+	    exit(1);
+	}
+    }
 #endif
 
     if (iostyle < 0) iostyle = 0;
@@ -1125,6 +1158,9 @@ printtreecell(FILE * efd, int indent, struct bfi * n)
 		n->offset, n->count, n->offset2, n->count2,
 		n->offset3, n->count3);
 	break;
+    case T_DIV:
+	fprintf(efd, "[%d], ", n->offset);
+	break;
 
     case T_CHR:
 	if (n->count >= ' ' && n->count <= '~' && n->count != '\'')
@@ -1292,43 +1328,6 @@ process_file(void)
 	only_uses_putch = 1;
 	for(n=bfprog; n; n=n->next)
 	    putch(n->count);
-    } else if (do_codestyle == c_default && do_run) {
-	if (isatty(STDOUT_FILENO)) setbuf(stdout, 0);
-
-	if (verbose>2 || debug_mode || enable_trace ||
-	    total_nodes == node_type_counts[T_CHR] ||
-	    node_type_counts[T_DUMP] != 0) {
-	    char cbuf[sizeof(int)*3+8];
-	    sprintf(cbuf, "%dbit", cell_length);
-	    if (cell_length == INT_MAX)
-		strcpy(cbuf, "unbounded");
-
-	    if (total_nodes != node_type_counts[T_CHR] && cell_size <= 0) {
-		fprintf(stderr, "ERROR: cannot run combination: "
-				"%s cells%s%s%s.\n",
-		    cbuf,
-		    debug_mode? ", debug mode":"",
-		    enable_trace? ", trace mode":"",
-		    verbose>2 ? ", profiling enabled":"");
-		exit(1);
-	    }
-
-	    if (verbose)
-		fprintf(stderr, "Starting profiling interpreter\n");
-	    run_tree();
-
-	    if (verbose>2) print_tree_stats();
-	} else if (cell_size <= 0) {
-	    if (verbose>1)
-		fprintf(stderr, "Starting maxtree interpreter\n");
-	    run_maxtree();
-	} else {
-	    if (verbose)
-		fprintf(stderr, "Starting array interpreter\n");
-	    run_tree_as_array();
-	}
-
-	unmap_hugeram();
     } else {
 	if (do_run) {
 	    if (verbose)
@@ -1338,6 +1337,19 @@ process_file(void)
 	    if (isatty(STDOUT_FILENO)) setbuf(stdout, 0);
 
 	    switch(do_codestyle) {
+	    case c_proftree:
+		run_tree();
+		if (verbose>2) print_tree_stats();
+		break;
+
+	    case c_runarray:
+		run_tree_as_array();
+		break;
+
+	    case c_maxtree:
+		run_maxtree();
+		break;
+
 	    default:
 		fprintf(stderr, "The '%s' code generator does not "
 				"have a direct run option available.\n",
@@ -1413,6 +1425,9 @@ calculate_stats(void)
 		most_negative_mov = n->count;
 	    if (n->count > most_positive_mov)
 		most_positive_mov = n->count;
+	} else if (t == T_DIV) {
+	    if (min_pointer > n->offset) min_pointer = n->offset;
+	    if (max_pointer < n->offset+3) max_pointer = n->offset+3;
 	} else if (t != T_CHR) {
 	    if (min_pointer > n->offset) min_pointer = n->offset;
 	    if (max_pointer < n->offset) max_pointer = n->offset;
@@ -1598,6 +1613,18 @@ run_tree(void)
 		    int off = (p+n->offset3) - oldp;
 		    if (off < profile_min_cell) profile_min_cell = off;
 		    if (off > profile_max_cell) profile_max_cell = off;
+		}
+		break;
+
+	    case T_DIV:
+		p[n->offset] = UM(p[n->offset]);
+		p[n->offset+1] = UM(p[n->offset+1]);
+		if (p[n->offset+1] != 0) {
+		    p[n->offset+2] = p[n->offset] % p[n->offset+1];
+		    p[n->offset+3] = p[n->offset] / p[n->offset+1];
+		} else {
+		    p[n->offset+2] = p[n->offset];
+		    p[n->offset+3] = 0;
 		}
 		break;
 
@@ -1811,7 +1838,7 @@ pointer_scan(void)
 		if(n4) n4->prev = n;
 		continue;
 
-	    case T_CALC: case T_CALCMULT: case T_LT:
+	    case T_CALC: case T_CALCMULT: case T_LT: case T_DIV:
 		if(verbose>4)
 		    fprintf(stderr, "Push past command.\n");
 		/* Put movement after a normal cmd. */
@@ -1945,7 +1972,7 @@ pointer_regen(void)
 	    n->offset -= current_shift;
 	    break;
 
-	case T_CALC: case T_CALCMULT: case T_LT:
+	case T_CALC: case T_CALCMULT: case T_LT: case T_DIV:
 	    n->offset -= current_shift;
 	    if(n->count2 != 0) n->offset2 -= current_shift;
 	    if(n->count3 != 0) n->offset3 -= current_shift;
@@ -2019,6 +2046,8 @@ invariants_scan(void)
 		    node_changed = flatten_multiplier(n2);
 	    if (!node_changed && n2->type == T_WHL)
 		    node_changed = test_for_lessthan(n2);
+	    if (!node_changed && n2->type == T_WHL)
+		    node_changed = test_for_divide(n2);
 
 	    if (node_changed)
 		n = n3;
@@ -2232,6 +2261,16 @@ find_known_value_recursion(struct bfi * n, int v_offset,
 	        (n->count3 != 0 && n->offset3 == v_offset))
 		n_used = 1;
 	    break;
+
+	case T_DIV:
+	    /* TODO: if offset not in 0..5 continue; */
+	    if(verbose>5) {
+		fprintf(stderr, "Search blocked by: ");
+		printtreecell(stderr, 0,n);
+		fprintf(stderr, "\n");
+	    }
+	    *unknown_found_p = 1;
+	    goto break_break;
 
 	case T_PRT:
 	case T_PRTI:
@@ -2859,6 +2898,7 @@ search_for_update_of_offset(struct bfi *n, struct bfi *v, int n_offset)
 	    break;
 	case T_PRT: case T_PRTI: case T_CHR: case T_NOP:
 	    break;
+	case T_DIV: /*TODO*/
 	default: return 0;  /* Any other type is a problem */
 	}
 	n=n->next;
@@ -3222,7 +3262,7 @@ flatten_loop(struct bfi * v, int constant_count)
 	    if (n->offset == v->offset) return 0;
 	    if (have_mult || have_add || have_set) return 0;
 	    if (n->type != T_CALC) return 0;
-	    if (constant_count <= 0 || constant_count > 9) return 0;
+	    if (constant_count <= 0 || constant_count > 15) return 0;
 	    if (n->count3 != 0 || n->count2 <= 0 || n->count != 0)
 		return 0;
 	    if (n->offset != n->offset2 || n->count2 > 1000 || n->count2 < 1)
@@ -3646,6 +3686,10 @@ flatten_multiplier(struct bfi * v)
  *  T_ADD[1]:-1		m[1] := 0
  * T_END[1]
  *
+ * Test is unsigned, this is an example of the cell order.
+ * a   b    0  0
+ * [<[>>-<<[->>>+<<<]]>>>[-<<<+>>>]<+<<->-]
+ * a-b 0 (a<b) 0
  */
 int
 test_for_lessthan(struct bfi * v)
@@ -3729,6 +3773,113 @@ test_for_lessthan(struct bfi * v)
 }
 
 /*
+ * This function will find and generate T_DIV tokens.
+ * This is a fairly complex implementation of a trivial routine.
+ * The outer loop runs an increment routine "numerator" times.
+ * The increment routine increments the remainder every time, zeroing
+ * it and incrementing the quotient when it equals the denominator.
+ * The two unbalanced loops are used as X!=0 checks. As should be
+ * obvious from the T_MOVs in the tokenised loop, only one of the
+ * conditions is true each time round the loop.
+ *
+ * # n  d     1     0   0  0
+ * [->-[>+>>]>[[-<+>]+>+>>]<<<<<]
+ * # 0  d-n%d n%d+1 n/d 0  0
+ *
+ * As this uses unbalanced loops the relative positions of the four
+ * altered cells cannot be changed so only one offset is required.
+ */
+int
+test_for_divide(struct bfi * v)
+{
+    // Use .type= to silence the silly warning.
+static struct {
+	int type;
+	signed char offset, count, off2, off3;
+    } div_routine[] = {
+	{.type= T_WHL,    0 },
+	{.type=  T_ADD,   0, -1},
+	{.type=  T_ADD,   1, -1},
+	{.type=  T_WHL,   1 },
+	{.type=   T_ADD,  2, 1},
+	{.type=   T_MOV,  0, 3 },
+	{.type=  T_END,   1 },
+	{.type=  T_WHL,   2 },
+	{.type=   T_CALC, 1, 0, 1, 2}, /* m[1] = m[1] + m[2] */
+	{.type=   T_SET,  2, 1},
+	{.type=   T_ADD,  3, 1},
+	{.type=   T_MOV,  0, 3 },
+	{.type=  T_END,   2 },
+	{.type=  T_MOV,   0, -3 },
+	{.type= T_END,    0 },
+	{.type= T_STOP }
+    };
+
+    struct bfi * n;
+    int i, boff;
+
+    if (opt_no_calc || opt_no_div) return 0;
+    boff = v->offset; /* Base offset of code. */
+
+    /* Does the code in the loop match the pattern above? */
+    for(i=0, n=v; div_routine[i].type != T_STOP; i++, n=n->next) {
+	if (n->type != div_routine[i].type) return 0;
+	if (n->type != T_MOV)
+	    if (n->offset-boff != div_routine[i].offset) return 0;
+	if (n->type == T_WHL || n->type == T_END) continue;
+	if (n->count != div_routine[i].count) return 0;
+	if (n->type == T_CALC) {
+	    if (n->count2 != 1 || n->count3 != 1) return 0;
+	    if (n->offset2-boff != div_routine[i].off2 ||
+		n->offset3-boff != div_routine[i].off3) return 0;
+	}
+    }
+
+    /* The code matches, now check for preconditions. */
+    for (i=2; i<6; i++) {
+	int const_found = 0, known_value = 0, non_zero_unsafe = 0;
+	find_known_value(v->prev, v->offset+i,
+		    0, &const_found, &known_value, &non_zero_unsafe);
+	/* First is a 1 other 3 must be zeros */
+	if (!const_found || known_value != (i==2)) return 0;
+    }
+
+    /* The code is is a valid T_DIV */
+    if (verbose>5) fprintf(stderr, "Convert loop to T_DIV @(%d,%d)\n", v->line, v->col);
+
+    for(n=v; n!=v->jmp; n=n->next)
+	if (n->type != T_CALC)
+	    n->type = T_NOP;
+
+    v->jmp->type = T_NOP;
+
+    /* Now create ...
+	T_DIV[0]		// From the first T_ADD
+	T_CALC[1] -= [2]	// From the existing T_CALC
+	T_SET[0]:0		// From the two instr after it.
+	T_ADD[2]:1
+	The tokens after the T_DIV will probably get canceled.
+    */
+
+    v->next->type = T_DIV;
+
+    for(n=v; n!=v->jmp; n=n->next) {
+	if (n->type == T_CALC) {
+	    struct bfi * n2 = n->next;
+	    n->count3 = -1;
+	    n2->type = T_SET;
+	    n2->offset = boff;
+	    n2->count = 0;
+	    n2=n2->next;
+	    n2->type = T_ADD;
+	    n2->offset = boff+2;
+	    n2->count = 1;
+	}
+    }
+    return 1;
+}
+
+/*
  * This moves literal T_CHR nodes back up the list to join to the previous
  * group of similar T_CHR nodes. An additional pointer (prevskip) is set
  * so that they all point at the first in the growing 'string'.
@@ -3752,6 +3903,7 @@ build_string_in_tree(struct bfi * v)
 
 	case T_MOV: case T_ADD: case T_SET: /* Safe */
 	case T_CALC: case T_CALCMULT: case T_LT:
+	case T_DIV:
 	    break;
 
 	case T_PRTI: case T_PRT:

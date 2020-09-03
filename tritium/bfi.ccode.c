@@ -348,6 +348,11 @@ print_c_header(FILE * ofd)
 		fprintf(ofd, "enum { CellTooSmall=1/(sizeof(C)>=sizeof(int)) };\n");
 		if (knr_c_ok) fprintf(ofd, "#endif\n\n");
 	    }
+	    if (node_type_counts[T_DIV] != 0) {
+		if (knr_c_ok) fprintf(ofd, "#ifdef __STDC__\n");
+		fprintf(ofd, "enum { CellTypeMustNotBeSigned = 1/(((%s)-1) >= 0) };\n", cell_type);
+		if (knr_c_ok) fprintf(ofd, "#endif\n\n");
+	    }
 	}
 
     } else if(fixed_mask>0) {
@@ -984,6 +989,32 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    }
 	    break;
 
+	case T_DIV:
+	    if (mask_defined) {
+		pt(ofd, indent,0);
+		fprintf(ofd, "%s = %s;\n", lval(n->offset+1), rvalmsk(n->offset+1) );
+	    }
+	    pt(ofd, indent,n);
+	    fprintf(ofd, "if (%s != 0) {\n", rval(n->offset+1) );
+	    pt(ofd, indent+1,0);
+	    fprintf(ofd, "%s = %s / %s;\n", lval(n->offset+3), rvalmsk(n->offset), rval2(n->offset+1));
+	    pt(ofd, indent+1,0);
+	    fprintf(ofd, "%s = %s %% %s;\n", lval(n->offset+2), rvalmsk(n->offset), rval2(n->offset+1));
+	    pt(ofd, indent,0);
+	    fprintf(ofd, "} else {\n");
+	    pt(ofd, indent+1,0);
+	    fprintf(ofd, "%s = 0;\n", lval(n->offset+3));
+	    pt(ofd, indent+1,0);
+	    fprintf(ofd, "%s = %s;\n", lval(n->offset+2), rval(n->offset));
+	    pt(ofd, indent,0);
+	    fprintf(ofd, "}\n");
+
+	    if (enable_trace) {
+		pt(ofd, indent,0);
+		fprintf(ofd, "t(%d,%d,\"\",m+ %d)\n", n->line, n->col, n->offset);
+	    }
+	    break;
+
 	case T_PRT:
 	    if (!use_functions) {
 		pt(ofd, indent,n);
@@ -1034,7 +1065,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 	    else
 	    {
 		unsigned i = 0, j;
-		int got_perc = 0;
+		int got_perc = (n->count == '%');
 		int lastc = 0;
 		unsigned slen = 4;	/* First char + nul + ? */
 		struct bfi * v = n;

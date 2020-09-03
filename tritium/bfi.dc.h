@@ -14,13 +14,16 @@ X(dc,DC,
     case c_dc: print_dc(); break;                                   ,
     Nothing_Here						    )
 #if XX == 4
-    if (do_codestyle == c_dc && iostyle != 3) {
-	if (iostyle > 0) {
-	    fprintf(stderr,
+    if (do_codestyle == c_dc) {
+	opt_no_div = 1;
+	if (iostyle != 3) {
+	    if (iostyle > 0) {
+		fprintf(stderr,
 		    "The -D option only supports integer or binary I/O.\n");
-	    exit(255);
+		exit(255);
+	    }
+	    iostyle = 0;
 	}
-	iostyle = 0;
     }
 #endif
 #if XX == 9

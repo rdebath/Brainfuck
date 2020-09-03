@@ -96,6 +96,7 @@ checkarg_dynasm(char * opt, char * arg UNUSED)
 |.define REG_A, eax
 |.define REG_AL, al
 |.define REG_D, edx
+|.define REG_DL, dl
 |.define REG_C, ecx
 |.define REG_CW, ecx
 |.define REG_CB, cl
@@ -106,6 +107,7 @@ checkarg_dynasm(char * opt, char * arg UNUSED)
 |.define REG_A, eax
 |.define REG_AL, al
 |.define REG_D, edx
+|.define REG_DL, dl
 |.define REG_C, ecx
 |.define REG_CW, rcx
 |.define REG_CB, cl
@@ -501,6 +503,42 @@ run_dynasm(void)
 	    | cmp REG_D, REG_E
 	    | setb REG_CB
 	    | add REG_A, REG_C
+	    break;
+
+	case T_DIV:
+	    load_acc_offset(n->offset);
+	    set_acc_offset(offset+3);
+
+	    if (cell_mask > 0) {
+		| and REG_A, cell_mask
+	    }
+
+	    | xor REG_D, REG_D
+	    | xchg REG_D,REG_A
+
+	    if (tape_step > 1) {
+		| mov REG_E, [REG_P+ ((n->offset+1)*tape_step) ]
+	    } else {
+		| movzx REG_E, byte [REG_P+ (n->offset+1) ]
+	    }
+
+	    if (cell_mask > 0) {
+		| and REG_E, cell_mask
+	    }
+
+	    | test REG_E,REG_E
+	    | je  >1
+	    | xchg REG_D,REG_A
+	    | div REG_E
+	    /* REG_A = quotient, REG_D = remainder */
+	    | 1:
+
+	    if (tape_step > 1) {
+		| mov [REG_P+ ((n->offset+2)*tape_step) ], REG_D
+	    } else {
+		| mov byte [REG_P+ (n->offset+2) ], REG_DL
+	    }
+
 	    break;
 
 	case T_WHL:

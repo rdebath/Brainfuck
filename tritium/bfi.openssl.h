@@ -23,6 +23,8 @@ X(openssl,OPENSSL,
     if (do_codestyle == c_openssl && do_run == -1) do_run = 1;
     if (do_codestyle == c_openssl && cell_length == 0)
 	set_cell_size(64*1024*1024);
+    if (do_codestyle == c_openssl)
+	opt_no_div = 1;
 #endif
 #if XX == 9
     if (!strcmp(opt, "-fopenssl")) {

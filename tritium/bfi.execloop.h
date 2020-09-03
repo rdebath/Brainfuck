@@ -81,6 +81,18 @@ FNAME(int * p, void * mem)
 	    p += 4;
 	    break;
 
+	case T_DIV:
+	    if (M(m[1]) != 0) {
+		m[2] = M(m[0]) % M(m[1]);
+		m[3] = M(m[0]) / M(m[1]);
+	    } else {
+		m[2] = m[0];
+		m[3] = 0;
+	    }
+
+	    p += 2;
+	    break;
+
 	case T_ADDWZ:
 	    /* This is normally a running dec, it cleans up a rail */
 	    while(M(*m)) {
