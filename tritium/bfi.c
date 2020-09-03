@@ -1284,56 +1284,58 @@ process_file(void)
     } else
 	fprintf(stderr, "Only tree runner linked\n");
 #else
-    if (do_run) {
-	if (total_nodes == node_type_counts[T_CHR])
-	    do_codestyle = c_default; /* Be lazy for a 'Hello World'. */
-	else if (isatty(STDOUT_FILENO))
-	    setbuf(stdout, 0);
-    }
 
-    if (do_codestyle == c_default && do_run) {
-	if (do_run) {
-	    if (verbose>2 || debug_mode || enable_trace ||
-		total_nodes == node_type_counts[T_CHR] ||
-		node_type_counts[T_DUMP] != 0) {
-		char cbuf[sizeof(int)*3+8];
-		sprintf(cbuf, "%dbit", cell_length);
-		if (cell_length == INT_MAX)
-		    strcpy(cbuf, "unbounded");
+    if (do_run && total_nodes == node_type_counts[T_CHR]) {
+	struct bfi * n;
+	if (verbose)
+	    fprintf(stderr, "Nothing left to run, printing T_CHR nodes.\n");
+	only_uses_putch = 1;
+	for(n=bfprog; n; n=n->next)
+	    putch(n->count);
+    } else if (do_codestyle == c_default && do_run) {
+	if (isatty(STDOUT_FILENO)) setbuf(stdout, 0);
 
-		if (total_nodes != node_type_counts[T_CHR] && cell_size <= 0) {
-		    fprintf(stderr, "ERROR: cannot run combination: "
-				    "%s cells%s%s%s.\n",
-			cbuf,
-			debug_mode? ", debug mode":"",
-			enable_trace? ", trace mode":"",
-			verbose>2 ? ", profiling enabled":"");
-		    exit(1);
-		}
+	if (verbose>2 || debug_mode || enable_trace ||
+	    total_nodes == node_type_counts[T_CHR] ||
+	    node_type_counts[T_DUMP] != 0) {
+	    char cbuf[sizeof(int)*3+8];
+	    sprintf(cbuf, "%dbit", cell_length);
+	    if (cell_length == INT_MAX)
+		strcpy(cbuf, "unbounded");
 
-		if (verbose)
-		    fprintf(stderr, "Starting profiling interpreter\n");
-		run_tree();
-
-		if (verbose>2) print_tree_stats();
-	    } else if (cell_size <= 0) {
-		if (verbose>1)
-		    fprintf(stderr, "Starting maxtree interpreter\n");
-		run_maxtree();
-	    } else {
-		if (verbose)
-		    fprintf(stderr, "Starting array interpreter\n");
-		run_tree_as_array();
+	    if (total_nodes != node_type_counts[T_CHR] && cell_size <= 0) {
+		fprintf(stderr, "ERROR: cannot run combination: "
+				"%s cells%s%s%s.\n",
+		    cbuf,
+		    debug_mode? ", debug mode":"",
+		    enable_trace? ", trace mode":"",
+		    verbose>2 ? ", profiling enabled":"");
+		exit(1);
 	    }
 
-	    unmap_hugeram();
+	    if (verbose)
+		fprintf(stderr, "Starting profiling interpreter\n");
+	    run_tree();
+
+	    if (verbose>2) print_tree_stats();
+	} else if (cell_size <= 0) {
+	    if (verbose>1)
+		fprintf(stderr, "Starting maxtree interpreter\n");
+	    run_maxtree();
+	} else {
+	    if (verbose)
+		fprintf(stderr, "Starting array interpreter\n");
+	    run_tree_as_array();
 	}
+
+	unmap_hugeram();
     } else {
 	if (do_run) {
-
 	    if (verbose)
 		fprintf(stderr, "Running tree using '%s' generator\n",
 			codestylename[do_codestyle]);
+
+	    if (isatty(STDOUT_FILENO)) setbuf(stdout, 0);
 
 	    switch(do_codestyle) {
 	    default:
