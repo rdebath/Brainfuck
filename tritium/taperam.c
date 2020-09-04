@@ -21,16 +21,11 @@
 #endif
 #endif
 
-/* Where's the tape memory start */
-char * cell_array_pointer = 0;
-/* Location of all of the tape memory. */
-char * cell_array_low_addr = 0;
-size_t cell_array_alloc_len = 0;
-
 #ifdef USEHUGERAM
-#define MEMSIZE	    2UL*1024*1024*1024
+#define MEMSIZE     2UL*1024*1024*1024
 #define MEMGUARD    16UL*1024*1024
-#define MEMSKIP	    1UL*1024*1024
+#define MEMSKIP     2UL*1024*1024
+#define MEMSIZE64   ((size_t)4*1024*1024*1024*(cell_size==8?1:sizeof(int)))
 
 #ifndef MAP_NORESERVE
 #define MAP_NORESERVE 0
@@ -39,6 +34,14 @@ size_t cell_array_alloc_len = 0;
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
+#endif
+
+/* Where's the tape memory pointer start */
+static char * cell_array_pointer = 0;
+/* Location of the start of the tape memory. */
+static char * cell_array_low_addr = 0;
+#ifdef USEHUGERAM
+static size_t cell_array_alloc_len = 0;
 #endif
 
 /* This is the fallback; it doesn't trap "end of tape". */
@@ -73,7 +76,6 @@ unmap_hugeram(void)
     free(cell_array_low_addr);
     cell_array_pointer = 0;
     cell_array_low_addr = 0;
-    cell_array_alloc_len = 0;
 }
 #endif
 
@@ -148,10 +150,16 @@ void *
 map_hugeram(void)
 {
     char * mp;
-    unsigned long tapelength = MEMSIZE;
+    size_t tapelength, origtapelen;
 
     if (cell_array_pointer != 0)
 	return cell_array_pointer;
+
+    tapelength = MEMSIZE;
+    if (sizeof(size_t) > 4)
+	tapelength = MEMSIZE64;
+
+    origtapelen = tapelength + 2*MEMGUARD;
 
     for(;;) {
 	cell_array_alloc_len = tapelength + 2*MEMGUARD;
@@ -184,11 +192,12 @@ map_hugeram(void)
 	tapelength /= 2;
     }
 
-    if (cell_array_alloc_len < MEMSIZE)
-	if (verbose)
+    if (cell_array_alloc_len < origtapelen)
+	if (verbose || cell_array_alloc_len < MEMSIZE/8)
 	    fprintf(stderr,
-		    "Warning: Only able to map %luMB of cell array, continuing.\n",
-		    tapelength / (1024*1024));
+		    "%s: Mapped %luMB of cell array, continuing.\n",
+		    cell_array_alloc_len>MEMSIZE?"Note":"WARNING",
+		    (unsigned long)(tapelength / (1024*1024)));
 
     cell_array_low_addr = mp;
 
