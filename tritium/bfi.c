@@ -4127,6 +4127,7 @@ getch(int oldch)
 	    p = strdup(input_string+1);
 	free(input_string);
 	input_string = p;
+	if (!goteof && isatty(STDOUT_FILENO)) putchar(c);
     }
     else for(;;) {
 	if (enable_trace || debug_mode) fflush(stdout);
