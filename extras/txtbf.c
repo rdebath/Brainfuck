@@ -87,6 +87,9 @@ int runbf(const char * prog, int longrun);
 #define RUNNERCODE3 ">+++++[<++++++>-]<++[>+>++>+++>++++>+++++>++++++>+++++++<<<<<<<-]"
 #define RUNNERCODE4 ">+++++[<++++++>-]<++[>+>++>+++>++++>->-->---<<<<<<<-]"
 #define RUNNERCODE5 ">+++++[<+++++++>-]<[>+>++>+++<<<-]"
+#define RUNNERCODE6 ">+++++[<+++++>-]<[>++++>++<<-]"
+#define RUNNERCODE7 "+>++++[<++++>-]<[>++++++>+++++++>++>+++++>++++>+++>+<<<<<<<-]"
+#define RUNNERCODE8 "+>++++++[<+++>-]<[>++++++>+++++>++>++++>+>+++<<<<<<-]"
 
 /* Some previously found "Hello World" prefixes, so you don't have to do big runs. */
 const char * hello_world[] = {
@@ -324,8 +327,10 @@ int enable_rerun = 1;
 
 int flg_lookahead = 0;
 int flg_zoned = 0;
+int flg_no_zoned = 0;
 int flg_optimisable = 0;
 int flg_morefound = 0;
+int flg_perline = 0;
 
 int verbose = 0;
 int bytewrap = 0;
@@ -405,6 +410,8 @@ process_arg(const char * arg)
 	blocksize = atol(arg+2);
     } else if (strcmp(arg, "-B") == 0) {
 	blocksize = 8192;
+    } else if (strcmp(arg, "-lines") == 0) {
+	flg_perline = 1;
     } else if (strncmp(arg, "-L", 2) == 0 && arg[2] >= '0' && arg[2] <= '9') {
 	cell_limit = atol(arg+2);
 
@@ -426,6 +433,8 @@ process_arg(const char * arg)
 	flg_morefound = flg_morefound*2+1;
     } else if (strcmp(arg, "-zoned") == 0) {
 	flg_zoned = 1;
+    } else if (strcmp(arg, "-nozoned") == 0) {
+	flg_no_zoned = 1;
 
     } else if (strcmp(arg, "-max") == 0) {
 	wipe_config();
@@ -433,7 +442,7 @@ process_arg(const char * arg)
 	sliploop_maxcell = 8;
 	sliploop_maxind = 8;
 	enable_multloop = 1;
-	multloop_maxcell = 7;
+	multloop_maxcell = 10;
 	multloop_maxloop = 40;
 	multloop_maxinc = 12;
 	enable_twocell = 1;
@@ -515,12 +524,16 @@ process_arg(const char * arg)
 	enable_nastyslide = 2;
 	enable_twocell = 1;
 	bytewrap = 1;
+	flg_optimisable = 1;
+	flg_rtz = 1;
 
     } else if (strcmp(arg, "-evil3") == 0) {
 	wipe_config();
 	enable_nastyslide = 3;
-	enable_twincell = 1;
+	enable_twocell = 1;
 	bytewrap = 1;
+	flg_optimisable = 1;
+	flg_rtz = 1;
 
     } else if (strcmp(arg, "-slip") == 0) {
 	wipe_config();
@@ -557,6 +570,13 @@ process_arg(const char * arg)
 	multloop_maxcell = 10;
 	multloop_maxloop = 40;
 	multloop_maxinc = 7;
+
+    } else if (strcmp(arg, "-mult4") == 0) {
+	wipe_config();
+	enable_multloop = 1;
+	multloop_maxcell = 10;
+	multloop_maxloop = 40;
+	multloop_maxinc = 12;
 
     } else if (strcmp(arg, "-mult-bare") == 0) {
 	multloop_no_prefix = 1;
@@ -637,6 +657,7 @@ process_arg(const char * arg)
 	fprintf(stderr, "-mult   Toggle multiply loops\n");
 	fprintf(stderr, "-mult2  Search long multiply loops (slow)\n");
 	fprintf(stderr, "-mult3  Search long multiply loops (slow)\n");
+	fprintf(stderr, "-mult4  Search long multiply loops (slow)\n");
 	fprintf(stderr, " -multincr=99 Specify multiply loop max increment\n");
 	fprintf(stderr, " -multloop=99 Specify multiply loop max loops\n");
 	fprintf(stderr, " -multcell=99 Specify multiply loop max cells\n");
@@ -699,6 +720,7 @@ main(int argc, char ** argv)
 
     flg_rtz = (flg_rtz || flg_init || flg_clear);
     if (bytewrap) flg_signed = 0;
+    if (flg_lookahead) { flg_zoned = 0; flg_no_zoned = 1; }
 
     if (multloop_maxcell > cell_limit) multloop_maxcell = cell_limit;
     if (sliploop_maxcell > cell_limit) sliploop_maxcell = cell_limit;
@@ -727,18 +749,28 @@ main(int argc, char ** argv)
 		p = linebuf+off;
 	    }
 
-	    if (p-linebuf == blocksize) {
+	    if (p-linebuf == blocksize || (flg_perline && c == '\n')) {
+		int outnl = 0;
+		if (flg_perline && c == '\n') { p--; outnl = 1; }
 		*p++ = 0;
 		if (!flg_clear) flg_init = 1;
-		find_best_conversion(linebuf);
-		output_str("\n");
+		if (linebuf != p-1)
+		    find_best_conversion(linebuf);
+		if (outnl) {
+		    if (flg_init) output_str("[-]");
+		    output_str("++++++++++.");
+		    if (flg_clear) output_str("[-]");
+		    output_str("\n");
+		}
 		p = linebuf;
+		output_str("\n");
 	    }
 	}
 	*p++ = 0;
 	if (ifd != stdin) fclose(ifd);
 
-	find_best_conversion(linebuf);
+	if (linebuf != p-1)
+	    find_best_conversion(linebuf);
     }
 
     return 0;
@@ -763,8 +795,11 @@ find_best_conversion(char * linebuf)
 	if (flg_signed || bytewrap)
 	    gen_special(linebuf, RUNNERCODE4, "mult*32 to 128/-96", 0);
 	gen_special(linebuf, RUNNERCODE5, "Fourcell", 0);
+	gen_special(linebuf, RUNNERCODE6, "Threecell", 0);
+	gen_special(linebuf, RUNNERCODE7, "Eightcell", 0);
+	gen_special(linebuf, RUNNERCODE8, "Sevencell", 0);
 
-	if (!flg_zoned) {
+	if (!flg_zoned && !flg_no_zoned) {
 	    flg_zoned = 1;
 	    gen_special(linebuf, RUNNERCODE5, "Zoned fourcell", 0);
 	    flg_zoned = 0;
@@ -839,9 +874,11 @@ find_best_conversion(char * linebuf)
 		}
 	    }
 
-	    for(subrange_count = 2; subrange_count<45; subrange_count++) {
-		reinit_state();
-		gen_subrange(linebuf,subrange_count,1);
+	    if (!flg_no_zoned) {
+		for(subrange_count = 2; subrange_count<45; subrange_count++) {
+		    reinit_state();
+		    gen_subrange(linebuf,subrange_count,1);
+		}
 	    }
 	}
 
@@ -870,13 +907,18 @@ find_best_conversion(char * linebuf)
 
     if (enable_multloop) {
 	if (verbose>2) fprintf(stderr, "Trying multiply loops @%"PRIdMAX".\n", patterns_searched);
-	/* Hide the unlikey ones */
-	if (!enable_special && multloop_maxloop >= 35 &&
-		multloop_maxcell >= 4 && multloop_maxinc >= 3)
-	    gen_special(linebuf, RUNNERCODE5, "Fourcell", 0);
-	if (!enable_special && multloop_maxloop >= 13 &&
-		multloop_maxcell >= 6 && multloop_maxinc >= 8)
-	    gen_special(linebuf, RUNNERCODE1, "mult English", 0);
+	if (!enable_special && !enable_subrange) {
+	    /* Hide the unlikey ones */
+	    if (multloop_maxloop >= 35 &&
+		    multloop_maxcell >= 4 && multloop_maxinc >= 3)
+		gen_special(linebuf, RUNNERCODE5, "Fourcell", 0);
+	    if (multloop_maxloop >= 24 &&
+		    multloop_maxcell >= 3 && multloop_maxinc >= 5)
+		gen_special(linebuf, RUNNERCODE6, "threecell", 0);
+	    if (multloop_maxloop >= 13 &&
+		    multloop_maxcell >= 6 && multloop_maxinc >= 8)
+		gen_special(linebuf, RUNNERCODE1, "mult English", 0);
+	}
 	gen_multonly(linebuf);
     }
 
@@ -916,10 +958,12 @@ find_best_conversion(char * linebuf)
 	fprintf(stderr, "Total of %"PRIdMAX" patterns searched.\n", patterns_searched);
 
     if (best_len>=0) {
-	if (verbose)
+	if (verbose) {
+	    fflush(stdout);
 	    fprintf(stderr, "BF Size = %d, %.2f bf/char, cells = %d, '%s'\n",
 		best_len, best_len * 1.0/ strlen(linebuf),
 		best_cells, best_name);
+	}
 
 	output_str(best_str);
 	free(str_start); str_start = 0; str_max = str_next = str_mark = 0;
@@ -1141,6 +1185,7 @@ clear_tape(int currcell)
 
 	while (cells[cc] && cc<str_cells_used) cc++;
 	if (cc>=str_cells_used && flg_init) usefn = 0;	/* Don't expand the array */
+	if (cc>=cell_limit) usefn = 0;	/* Don't expand the array */
 	if (usefn)
 	    for(i=cc; i<str_cells_used; i++)
 		if (cells[i]) {usefn = 0; break;}
@@ -1245,16 +1290,27 @@ gen_subrange(char * buf, int subrange, int flg_subzone)
 	int r;
 	if (flg_signed) c = (signed char)c; else c = (unsigned char)c;
 	r = (c+subrange/2)/subrange;
+
+	/* Clamping */
+	if (flg_signed && r*subrange>127) r--;
+	if (flg_signed && r*subrange<-128) r++;
+	if (!flg_signed && r*subrange>255) r--;
+
 	usecell = (r & 0xFF);
 	rng[usecell] = r;
 
 	if (usecell > maxcell) maxcell = usecell;
 
+	/* Cell zero is always zero, it's the loop counter. */
 	if (r == 0) continue;
 	counts[usecell] ++;
+
+	/* Early characters count for more */
+	if (p-buf < 10) counts[usecell] ++;
+	if (p-buf < 5) counts[usecell] += 2;
     }
 
-    /* Dumb sort for simplicity */
+    /* Dumb sort for simplicity, skip cell zero, it's the counter. */
     for(i=1; i<=maxcell; i++)
 	for(j=i+1; j<=maxcell; j++)
 	{
@@ -1295,7 +1351,7 @@ gen_subrange(char * buf, int subrange, int flg_subzone)
     }
 
     /* Generate the init strings */
-    if (maxcell > 1) {
+    if (maxcell) {
 	int f = 0, loopcell = 0;
 	if (currcell == maxcell && !flg_subzone) {
 	    f = 2;
@@ -1348,10 +1404,10 @@ gen_subrange(char * buf, int subrange, int flg_subzone)
 	add_chr(']');
     }
 
-    if (best_len>0 && str_next > best_len) return;	/* Too big already */
-
     if (verbose>3)
-	fprintf(stderr, "Trying %s: %s\n", name, str_start);
+	fprintf(stderr, "Trying %s: %s%s\n", name, str_start, *str_start?"":"{Nil}");
+
+    if (best_len>0 && str_next > best_len) return;	/* Too big already */
 
     /* We have two choices on how to choose which cell to use; either pick
      * whatever is best right now, or stick with the ranges we chose above.
@@ -1362,6 +1418,7 @@ gen_subrange(char * buf, int subrange, int flg_subzone)
     } else {
 	/* Set the translation table */
 	int txn[256] = {};
+	int opt = flg_optimisable;
 	for(i=0; i<=maxcell; i++) txn[rng[i] & 0xFF] = i;
 	str_mark = str_next;
 
@@ -1381,7 +1438,9 @@ gen_subrange(char * buf, int subrange, int flg_subzone)
 	    add_chr('.');
 	}
 
+	flg_optimisable = 1;
 	currcell = clear_tape(currcell);
+	flg_optimisable = opt;
     }
 
     if (rv>=0)
@@ -1404,6 +1463,7 @@ gen_multonly(char * buf)
     int i;
     int max_ch = -128, min_ch = 255;
     char * p;
+    int len = strlen(buf);
 
     for(p=buf; *p;) {
         int c = *p++;
@@ -1419,7 +1479,7 @@ return_to_top:
 	    int toohigh;
 	    for(i=0; ; i++) {
 		toohigh = 0;
-		if (i >= multloop_maxcell) return;
+		if (i >= multloop_maxcell || i >= len+1) return;
 		cellincs[i]++;
 		if (i == 0) {
 		    if (cellincs[i] <= multloop_maxloop) break;
@@ -2526,7 +2586,7 @@ gen_twoflower(char * buf)
 	b = abs(cdiff)/a+t;
 
 	if (a>1) {
-	    int loopcost = 7+a+b+abs(cdiff)-a*b;
+	    int loopcost = 7+a+b+abs(abs(cdiff)-a*b);
 	    int da, db, ddiff;
 	    int newcost = 3;
 
@@ -2534,9 +2594,9 @@ gen_twoflower(char * buf)
 	    t = bestfactor[abs(ddiff)]; da =(t&0xF); t = !!(t&0x10);
 	    db = abs(ddiff)/da+t;
 	    if (da>1)
-		newcost = 10 + da+db+abs(ddiff)-da*db;
+		newcost = 10 + da+db+abs(abs(ddiff)-da*db);
 	    else
-		newcost = 3+ abs(ddiff);
+		newcost = 3 + abs(ddiff);
 	    if (newcost < loopcost) {
 		a = da;
 		b = db;
@@ -2816,6 +2876,7 @@ static char namebuf[128];
     int p1,p2,p3,p4, a1;
     int max_p3 = 15;
     int max_p1 = 15;
+    int bytewrap_override;
 
 static const char * extra_cell[] = {
     "[>[",
@@ -2879,8 +2940,13 @@ static const char * extra_cell[] = {
 
 			    sprintf(namebuf, "Evil Slope %d,%d,%d,%d",
 				    p1,p2,p3,p4);
-			    gen_special(linebuf, codebuf, namebuf, 0);
 
+			    /* For -evil2 I want values -1..255 without
+			     * any real bytewrapping */
+			    bytewrap_override = bytewrap;
+			    if (lvl == 2) bytewrap = 0;
+			    gen_special(linebuf, codebuf, namebuf, 0);
+			    bytewrap = bytewrap_override;
 			}
 		    }
 	    }
