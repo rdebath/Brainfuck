@@ -31,6 +31,7 @@
 
 typedef void (*void_func)(void);
 static const char * putname = "putch";
+static int use_putstr = 0;
 static int fixed_mask = 0;
 static int mask_defined = 0;
 static int indent = 0, is_simple_statement = 0;
@@ -237,6 +238,7 @@ print_c_header(FILE * ofd)
     int l_iostyle = iostyle;
 
     if (cell_mask > 0 && cell_size < 8 && l_iostyle == 1) l_iostyle = 0;
+    use_putstr = 0;
 
     /* Hello world mode ? */
     if (!enable_trace && !do_run && total_nodes == node_type_counts[T_CHR]) {
@@ -436,7 +438,7 @@ print_c_header(FILE * ofd)
     if (do_run) {
 	if (use_dlopen) {
 	    /* The structure defined in this chunk of code should be put into
-	     * a header file for compling into this program and converted into
+	     * a header file for compiling into this program and converted into
 	     * a string so it can be included into the generated code ...
 	     * TODO: configure make to do this.
 	     */
@@ -450,7 +452,7 @@ print_c_header(FILE * ofd)
 		"} bf_init = {brainfuck,0,0,0};\n"
 		"#define mem ((", cell_type, "*)bf_init.memptr)\n"
 		"#define putch (*bf_init.bf_putch)\n"
-		"#define getch (*bf_init.bf_getch)\n"
+		"#define getch (*bf_init.bf_getch)"
 		);
 	} else {
 	    fprintf(ofd, "%s%s%s\n",
@@ -459,6 +461,13 @@ print_c_header(FILE * ofd)
 		"extern ", cell_type, " mem[];\n"
 		"#define brainfuck main");
 	}
+	use_putstr = 1;
+	fprintf(ofd, "%s%s%s\n\n",
+		"static void putstr(const char * s)"
+	"\n"	"{"
+	"\n"	"    while(*s) ",putname,"(*s++);"
+	"\n"	"}"
+	);
     }
     else
     {
@@ -1109,6 +1118,8 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 
 		if ((p == s+1 && *s != '\'') || (p==s+2 && lastc == '\n')) {
 		    fprintf(ofd, "%s('%s');\n", putname, s);
+		} else if (use_putstr) {
+		    fprintf(ofd, "putstr(\"%s\");\n", s);
 		} else if (lastc == '\n') {
 		    *--p = 0; *--p = 0;
 		    fprintf(ofd, "puts(\"%s\");\n", s);
