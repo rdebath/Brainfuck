@@ -230,8 +230,10 @@ outcmd(int ch, int count)
     case '<': prv("m -= %d;", count); break;
     case '.': pr("PUTC(*m);"); break;
     case ',': pr("GETC(*m);"); break;
-    case '[': if (generate_bf) pr("if(*m)");
-	      pr("do {"); ind++; break;
+    case '[': if (generate_bf) pr("if(*m) do {");
+	      else pr("do {");
+	      ind++;
+	      break;
     case ']': ind--; pr("} while(*m);"); break;
     }
 
