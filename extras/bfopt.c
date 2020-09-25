@@ -31,7 +31,7 @@
 const char * current_file;
 int enable_debug = 0;
 int enabled_rle = 0;
-int enable_initopt = 1;
+int enable_initopt = 0;
 int enable_opt = 1;
 int delay_clean = 0;
 int fwd_flush = 0;
@@ -57,7 +57,7 @@ check_argv(const char * arg)
 	enable_opt = enable_initopt = 0;
     } else if (strcmp(arg, "-O1") == 0 || strcmp(arg, "-p") == 0) {
 	enable_initopt=0;
-    } else if (strcmp(arg, "-O2") == 0) {
+    } else if (strcmp(arg, "-O2") == 0 || strcmp(arg, "-O") == 0) {
 	enable_opt = enable_initopt = 1;
     } else if (strcmp(arg, "-dc") == 0 || strcmp(arg, "-delay-clean") == 0) {
 	delay_clean=1;
@@ -108,8 +108,8 @@ main(int argc, char ** argv)
 	    "\n\t"  "-wNN    Width of output lines (0/missing for unlimited)"
 	    "\n\t"  "-R      Decode rle on '+-<>', quoted strings and '='."
 	    "\n\t"  "-m -O0  Turn off optimisation"
-	    "\n\t"  "-p -O1  This is a part of a BF program"
-	    "\n\t"  "-O2     Normal optimisation"
+	    "\n\t"  "-p -O1  This is a part of a BF program (default)"
+	    "\n\t"  "-O -O2  Normal optimisation"
 	    "\n\t"  "-fwd-flush"
 	    "\n\t"  "-ff     Flush cells current first rather than current last."
 	    "\n\t"  "-delay-clean"
@@ -189,7 +189,7 @@ main(int argc, char ** argv)
 		(ch != '#' || !enable_debug) &&
 		((ch != '"' && ch != '=') || !enable_rle)) continue;
 	    /* Check for loop comments; ie: ][ comment ] */
-	    if (lc || (ch=='[' && lastch==']' && enable_opt)) {
+	    if (lc || (ch=='[' && lastch==']' && enable_initopt)) {
 		lc += (ch=='[') - (ch==']'); continue;
 	    }
 	    if (lc) continue;
@@ -318,6 +318,7 @@ flush_tape(int no_output, int keep_knowns)
 
 	    if ((p->v || p->is_set) &&
 		    (curroff != 0 || (tapeoff != 0 || flipcount == 0 || fwd_flush)) &&
+		    (tapeoff != curroff || flipcount == 0 || curroff == 0) &&
 		    (!keep_knowns || p == tape || !delay_clean)) {
 		if (p->cleaned && p->cleaned_val == p->v && p->is_set) {
 		    if (!keep_knowns) clear_cell(p);
