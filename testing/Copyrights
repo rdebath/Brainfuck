@@ -5,6 +5,8 @@ this note.  However, unless noted within the original file, you have a good
 faith expectation that nobody cares, so they are public domain by default.
 
     Cellsize.b Cellsize2.b Cellsize3.b Cellsize4.b Cellsize5.b Counter.b
-    EasyOpt.b Endtest.b Hello.b Hello2.b Precalc.b PrecalcBreak.b Prttab.b
-    Skiploop.b Tribit.b al-count-1.b al-count-2.b cells100k.b cells30k.b
+    EasyOpt.b Endtest.b Hello.b Hello2.b Precalc.b PrecalcBreak.b
+    Prime2.b Prttab.b Skiploop.b Sorry-needs-16.b Sorry-needs-32.b
+    Tribit.b al-count-0.b al-count-1.b al-count-2.b al-count-3.b
+    cells30k.b cells100k.b cell-max.b cell-type.b too-slow.b
 
