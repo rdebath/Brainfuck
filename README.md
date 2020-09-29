@@ -5,16 +5,16 @@ This repository contains various [brainfuck](http://esolangs.org/wiki/Brainfuck)
 
 The classic description of BF is the C translation below, the opcode column is the direct translation used by my Tritium interpreter.
 
-| Opcode | Brainfuck   | C                   |
-| -------|:-----------:|---------------------|
-| T_MOV  | `>`         | ++ptr;              |
-| T_MOV  | `<`         | --ptr;              |
-| T_ADD  | `+`         | ++*ptr;             |
-| T_ADD  | `-`         | --*ptr;             |
-| T_WHL  | `[`         | while (*ptr) {      |
-| T_END  | `]`         | }                   |
-| T_PRT  | `.`         | putchar(*ptr);      |
-| T_INP  | `,`         | ptr[0] = getchar(); |
+| Opcode | Brainfuck   | C                     |
+| -------|:-----------:|-----------------------|
+| T_MOV  | `>`         | `++ptr;`              |
+| T_MOV  | `<`         | `--ptr;`              |
+| T_ADD  | `+`         | `++*ptr;`             |
+| T_ADD  | `-`         | `--*ptr;`             |
+| T_WHL  | `[`         | `while (*ptr) {`      |
+| T_END  | `]`         | `}`                   |
+| T_PRT  | `.`         | `putchar(*ptr);`      |
+| T_INP  | `,`         | `ptr[0] = getchar();` |
 
 There are several BF interpreters and tools in this repository.
 
@@ -27,9 +27,10 @@ There are several BF interpreters and tools in this repository.
     Though for a quick check this "Hello World!" program may be better, however, it has far fewer checks.
 
     ```bf
-    ++++[>++++<-]>[>+>++>[+++++++>]+++[<]>-]>>>>>>>>-.
-    <<<<.<..+++.<.>>>>.<<<.+++.------.>-.<<+.<------.
+    +[>[<-[]>+[>+++>[+++++++++++>][>]-[<]>-]]++++++++++<]>
+    >>>>>----.<<+++.<-..+++.<-.>>>.<<.+++.------.>-.<<+.<.
     ```
+
 
 2. VIM Syntax highlighting file for brainfuck.
 
@@ -103,11 +104,10 @@ There are several BF interpreters and tools in this repository.
     * blub.pl -- "Blub" interpreter in Perl
     * byte2byte.c -- Optimal two cell text to BF converter.
     * cdowhile.c -- A "buggy" BF interpreter that is (surprisingly) still Turing complete.
-    * dblmicrobf.c -- A plain BF interpreter with weird cell sizes.
     * deadbeef.c -- A nice quick interpreter that ONLY has a two command lookahead.
     * easy.c -- A pipelined BF interpreter (or an interpreter for the 'easy' language).
     * Hello_world.bewbs -- An interpreter for strange BF variant.
-    * hydrogen.c -- A component of Tritium that also understands some cell doubling constructs.
+    * hydrogen.c -- A component of Tritium that also understands some cell doubling constructs and weird cell sizes.
     * k-on-fuck.pl -- Another BF variant in perl.
     * lightning.c -- A plain jit interpreter using GNU lightning V2.
     * malbrain.sed -- Convert 'malbrain' to C in sed.
