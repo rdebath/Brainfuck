@@ -97,6 +97,8 @@ void print_banner(FILE * fd, char const * program);
 void calculate_stats(void);
 void printtreecell(FILE * efd, int indent, struct bfi * n);
 void delete_tree(void);
+struct bfi * add_node_after(struct bfi * p);
+void bf_basic_hack(void);
 
 void
 find_known_value(struct bfi * n, int v_offset, struct bfi ** n_found,

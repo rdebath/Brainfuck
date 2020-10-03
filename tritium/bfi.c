@@ -129,6 +129,7 @@ int opt_no_kvmov = 0;
 int opt_regen_mov = -1;
 int opt_pointerrescan = 0;
 int opt_delete_tifs = 0;
+int opt_bfbasic_hack = 0;
 
 int hard_left_limit = -1024;
 int memsize = 0x100000;	/* Default to 1M of tape if otherwise unspecified. */
@@ -211,7 +212,6 @@ int test_for_lessthan(struct bfi * v);
 int test_for_divide(struct bfi * v);
 void build_string_in_tree(struct bfi * v);
 void * tcalloc(size_t nmemb, size_t size);
-struct bfi * add_node_after(struct bfi * p);
 void find_known_value_recursion(struct bfi * n, int v_offset,
 		struct bfi ** n_found,
 		int * const_found_p, int * known_value_p, int * unsafe_p,
@@ -604,6 +604,9 @@ checkarg(char * opt, char * arg)
     } else if (!strcmp(opt, "-fno-loop-offset")) { opt_regen_mov = 1; return 1;
     } else if (!strcmp(opt, "-floop-offset")) { opt_regen_mov = 0; return 1;
     } else if (!strcmp(opt, "-fintio")) { iostyle = 3; return 1;
+#ifndef NO_EXT_BE
+    } else if (!strcmp(opt, "-fbfbasic")) { opt_bfbasic_hack = 1; return 1;
+#endif
     } else if (!strcmp(opt, "-help")) { help_flag++; return 1;
     } else if (!strcmp(opt, "-mem")) {
 	if (arg == 0 || arg[0] < '0' || arg[0] > '9') {
@@ -1263,6 +1266,14 @@ process_file(void)
 	if (opt_level>=2) {
 	    calculate_stats();
 	    if (verbose>5) printtree();
+
+#ifndef NO_EXT_BE
+	    if (opt_bfbasic_hack) {
+		tickstart();
+		bf_basic_hack();
+		tickend("Time for bfbasic scan");
+	    }
+#endif
 
 	    tickstart();
 	    invariants_scan();

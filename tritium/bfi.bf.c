@@ -7,15 +7,12 @@
 #include "bfi.tree.h"
 #include "bfi.bf.h"
 
-static int BFBasic = 0;
 static int bfrle = 0;
 static int col = 0;
 
 int
 checkarg_bf(char * opt, char * arg UNUSED)
 {
-    if (!strcmp(opt, "-fbfbasic")) { BFBasic = 1; return 1; }
-    if (!strcmp(opt, "-fbftif")) { BFBasic = 2; return 1; }
     if (!strcmp(opt, "-bfrle")) { bfrle = 1; return 1; }
     return 0;
 }
@@ -98,24 +95,9 @@ print_bf(void)
 	case T_IF:
 	case T_WHL:
 	    pc('[');
-	    /* This is something that's always true for BF Basic generated
-	     * code. The 'while-switch' loop takes the first few cells and
-	     * next seven are temps that will always be left at zero. This
-	     * fragment explicitly zeros those cells so the optimiser can
-	     * easily see this is true. */
-	    if (BFBasic)
-		if (n->offset == 2) {
-		    if (BFBasic == 1)
-			ps("[-]+> [-]>[-]>[-]>[-]>[-]>[-]>[-]><<<<<<< <");
-		    else
-			ps("[-]+> []>[]>[]>[]>[]>[]>[]><<<<<<< <");
-		}
 	    break;
 
 	case T_END:
-	    if (BFBasic > 1)
-		if (n->offset == 2)
-		    ps("[]");
 	    pc(']');
 	    break;
 
