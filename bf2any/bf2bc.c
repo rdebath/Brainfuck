@@ -70,7 +70,7 @@ gen_code(int ch, int count, char * strn)
     case '>': I; printf("p += %d\n", count); break;
     case '[':
 	if (bytecell) { I; printf("%s %%= 256\n", mc); }
-	I; printf("while(%s != 0){\n", mc);
+	I; printf("while(%s){\n", mc);
 	ind++;
 	break;
     case ']':

@@ -380,7 +380,7 @@ pipe_to_be(char ** filelist, int filecount)
 
 	    if (!di) {
 		if (ch == '\n') continue;
-		if (ch == '%' ) {
+		if (ch == '!' ) {
 		    /* Arg values
 		     *	>0 Compiled for specific bit size
 		     *	=0 Compiled for any bit size >= 8 bits. (default)

@@ -19,7 +19,7 @@
 /*
  * Python translation from BF, runs at about 18,000,000 instructions per second.
  *
- * There is a limit on the number of nested loops was 20 now 100.
+ * There is a limit of 20 nested loops for CPython. Pypy is higher.
  */
 
 static int ind = 0;
