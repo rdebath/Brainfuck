@@ -22,14 +22,14 @@
 
 static BIGNUM ** mem = 0;
 static int dyn_memsize = 0;
-#define MINALLOC 16
+#define MINALLOC 256
 
 static
 BIGNUM **
 alloc_ptr(BIGNUM **p)
 {
     int amt, memoff, i, off;
-    BIGNUM ** nmem;
+    BIGNUM ** nmem = 0;
     if (p >= mem && p < mem+dyn_memsize) return p;
 
     memoff = p-mem; off = 0;
@@ -37,10 +37,19 @@ alloc_ptr(BIGNUM **p)
     else if(memoff>=dyn_memsize) off = memoff-dyn_memsize;
     amt = off / MINALLOC;
     amt = (amt+1) * MINALLOC;
-    nmem = realloc(mem, (dyn_memsize+amt)*sizeof(*mem));
+    /* Current (2020) C compilers are broken for arrays > 50% of memory. */
+    /* I am only allowing INT_MAX array elements */
+    /* And I want to leave some memory for bignums */
+#ifdef SSIZE_MAX
+    if (dyn_memsize < SSIZE_MAX/(int)sizeof(*mem)-amt &&
+	dyn_memsize < INT_MAX-amt )
+#else
+    if (dyn_memsize < INT_MAX/(int)sizeof(*mem)-amt)
+#endif
+	nmem = realloc(mem, (dyn_memsize+amt)*sizeof(*mem));
     if (!nmem) {
-	if(mem) free(mem);
-	fprintf(stderr, "Memory overflow when expanding tape.\n");
+	fprintf(stderr, "Memory overflow when expanding tape to %d cells.\n",
+		dyn_memsize+amt);
 	exit(99);
     } else mem=nmem;
     if (memoff<0) {
@@ -50,7 +59,10 @@ alloc_ptr(BIGNUM **p)
         memoff += amt;
     } else {
         for(i=0; i<amt; i++)
-            mem[dyn_memsize+i] = BN_new();
+            if ((mem[dyn_memsize+i] = BN_new()) == 0) {
+		fprintf(stderr, "Memory overflow when allocating cell.\n");
+		exit(99);
+	    }
     }
     dyn_memsize += amt;
     return mem+memoff;
@@ -74,9 +86,6 @@ run_openssltree(void)
     BIGNUM *t1 = BN_new(), *t2 = BN_new(), *t3 = BN_new();
     int do_mask = (cell_length>0 && cell_length<INT_MAX);
     BN_CTX * BNtmp = BN_CTX_new();
-
-    if (verbose)
-	fprintf(stderr, "Maxtree variant: using OpenSSL Bignums.\n");
 
     only_uses_putch = 1;
     start_runclock();
