@@ -81,7 +81,7 @@ checkarg_dynasm(char * opt, char * arg UNUSED)
 |.endif
 
 |.actionlist actions
-|.section code
+|.section sect0, sect1, sect2, sect3, sect4, sect5, sect6, sect7
 |.globals GLOB_
 
 /*  Using 32 bit working registers for both 32 and 64 bit. The REG_P register
@@ -241,17 +241,9 @@ run_dynasm(void)
 {
     struct bfi * n = bfprog;
     int used_prtchr = 0;
+    int section_used = 0;
     char *strbuf = 0;
     size_t maxstrlen = 0;
-
-    if (total_nodes > 2000000) {
-	if (verbose)
-	    fprintf(stderr, "WARNING: "
-	                    "DynASM is limited to 16Mbyte of code space, "
-			    "Switching to profiling interpreter.\n");
-	run_tree();
-	return;
-    }
 
     if (cell_size == 8) tape_step = 1; else
     tape_step = sizeof(int);
@@ -259,11 +251,12 @@ run_dynasm(void)
 
     if (use_sse4_2 < 0) check_for_sse4_2();
 
-    dasm_init(Dst, 1);
+    dasm_init(Dst, DASM_MAXSECTION);
     dasm_setupglobal(Dst, global_labels, GLOB__MAX);
     dasm_setup(Dst, actions);
 
     /* Create Stack frame. */
+    |.sect0
     | ->start:
     |.if I386
     | push ebp
@@ -939,6 +932,68 @@ run_dynasm(void)
 	    exit(1);
 	}
 	n=n->next;
+
+	/* If this section is nearly full, step onto the next */
+	if (Dst_REF->section->ofs > 0x1000000-0x1000) {
+	    switch(section_used) {
+
+	    case 0:
+		| jmp ->section_1_start
+		| .sect1
+		| ->section_1_start:
+		section_used++;
+		break;
+
+	    case 1:
+		| jmp ->section_2_start
+		| .sect2
+		| ->section_2_start:
+		section_used++;
+		break;
+
+	    case 2:
+		| jmp ->section_3_start
+		| .sect3
+		| ->section_3_start:
+		section_used++;
+		break;
+
+	    case 3:
+		| jmp ->section_4_start
+		| .sect4
+		| ->section_4_start:
+		section_used++;
+		break;
+
+	    case 4:
+		| jmp ->section_5_start
+		| .sect5
+		| ->section_5_start:
+		section_used++;
+		break;
+
+	    case 5:
+		| jmp ->section_6_start
+		| .sect6
+		| ->section_6_start:
+		section_used++;
+		break;
+
+	    case 6:
+		| jmp ->section_7_start
+		| .sect7
+		| ->section_7_start:
+		section_used++;
+		break;
+
+	    default:
+		fprintf(stderr, "ERROR: "
+			"DynASM is limited to 16Mbyte of code space per "
+			"section, Codelen at $%x:$%x\n",
+			section_used, Dst_REF->section->ofs);
+		exit(1);
+	    }
+	}
     }
 
     |->endcode:
@@ -991,6 +1046,14 @@ run_dynasm(void)
 
     if (strbuf) { maxstrlen = 0; free(strbuf); strbuf = 0; }
 
+    /*
+	fprintf(stderr, "Codesize bsize=%d pos=%d epos=%d ofs=%d\n",
+	    (int)(Dst_REF->section->bsize),
+	    (int)(Dst_REF->section->pos),
+	    (int)(Dst_REF->section->epos),
+	    Dst_REF->section->ofs);
+    */
+
     link_and_run(Dst);
     free_saved_memory();
 }
@@ -1015,17 +1078,31 @@ link_and_run(dasm_State ** state)
     char   *codeptr;
     size_t  codelen;
     int     dasm_status = dasm_link(state, &codelen);
+    void*   location_hint = 0;
     if (dasm_status != DASM_S_OK) {
 	fprintf(stderr, "Process dasm_link() failed\n");
 	exit(1);
     }
+
+#if defined(__linux__) && defined(__i386__)
+    /* If the 128M mark is available use it, otherwise drop to the 64M mark.
+     * Leave a gap below on the same 4M page table page. */
+    /* NOTE: Clang x64 generates an illegal relocation for this condition */
+    if (labs((long)link_and_run-0x08048000) < 0x1000000)
+	location_hint = (void*) 0x04048000;
+    else
+	location_hint = (void*) 0x08048000;
+#endif
+#if defined(__linux__) && defined(__x86_64__)
+    location_hint = (void*) 0x08048000;
+#endif
 
 #if !defined(LEGACYOS) && !defined(_WIN32)
 #ifdef MAP_ANONYMOUS
     /* I allocate this with a 'PROT_EXEC' flag set so the kernel can choose
      * to put it in the 'code area' if there is such a thing (i386) */
     codeptr =
-	(char *) mmap(NULL, codelen,
+	(char *) mmap(location_hint, codelen,
 #ifdef NO_MPROTECT
 		      PROT_WRITE |
 #endif
@@ -1086,27 +1163,75 @@ link_and_run(dasm_State ** state)
     }
 #endif
 
-    /* Write generated machine code to a temporary file.
-    // View with:
-    //  objdump -D -b binary -mi386 -Mx86,intel code.bin
-    //  objdump -D -b binary -mi386 -Mx86-64,intel --adjust-vma=0x777777777000 code.bin
-    // or
-    //  ndisasm -b32 -o 0x77777000 /tmp/code-dasm.bin
-    //  ndisasm -b64 -o 0x777777777000 /tmp/code-dasm.bin
-    */
+#if (CPUCHECK == 64) && !defined(__ILP32__)
     if (dump_code)
     {
+	/* Write generated machine code to a temporary file.
+	// View with:
+	//  objdump -D -b binary -mi386 -Mx86,intel --adjust-vma=0x8048000 /tmp/code-dasm.bin
+	//  objdump -D -b binary -mi386 -Mx86-64,intel --adjust-vma=0x8048000 /tmp/code-dasm.bin
+	// or
+	//  ndisasm -u -o 0x8048000 /tmp/code-dasm.bin
+	//  ndisasm -b64 -o 0x8048000 /tmp/code-dasm.bin
+	*/
 	const char *fname = "/tmp/code-dasm.bin";
 	FILE   *f = fopen(fname, "w");
 	fwrite(codeptr, codelen, 1, f);
 	fclose(f);
 	fprintf(stderr, "Dynasm "CPUID" code dumped to file '%s'\n", fname);
-	fprintf(stderr, "codeptr = 0x%lx\n", (unsigned long) codeptr);
-	fprintf(stderr, "codelen = %lu\n", (unsigned long) codelen);
-	fprintf(stderr, "putch   = 0x%lx\n", (unsigned long) &putch);
-	fprintf(stderr, "getch   = 0x%lx\n", (unsigned long) &getch);
-	fprintf(stderr, "failout = 0x%lx\n", (unsigned long) &failout);
+	fprintf(stderr, "codeptr  = 0x%lx\n", (unsigned long) codeptr);
+	fprintf(stderr, "codelen  = %lu\n", (unsigned long) codelen);
+	fprintf(stderr, "putch    = 0x%lx\n", (unsigned long) &putch);
+	fprintf(stderr, "getch    = 0x%lx\n", (unsigned long) &getch);
+	fprintf(stderr, "failout  = 0x%lx\n", (unsigned long) &failout);
+	fprintf(stderr, "putint   = 0x%lx\n", (unsigned long) &putint);
+	fprintf(stderr, "getint   = 0x%lx\n", (unsigned long) &getint);
+	fprintf(stderr, "putsnonl = 0x%lx\n", (unsigned long) &puts_without_nl);
     }
+#else
+    if (dump_code)
+    {
+	/* View for -m32
+	// objdump -D -mi386 -Mx86,intel /tmp/code-dasm.srec
+	// View for -mx32
+	// objdump -D -mi386 -Mx86-64,intel /tmp/code-dasm.srec
+	*/
+	const char *fname = "/tmp/code-dasm.srec";
+	FILE * f = fopen(fname, "w");
+	int i;
+
+	fprintf(stderr, "Dynasm "CPUID" code dumped to file '%s'\n", fname);
+	fprintf(f, "$$ %s-%s\n", CPUID, bfname);
+	fprintf(f, "  codeptr  $%lx\n", (unsigned long) codeptr);
+	fprintf(f, "  putch    $%lx\n", (unsigned long) &putch);
+	fprintf(f, "  getch    $%lx\n", (unsigned long) &getch);
+	fprintf(f, "  failout  $%lx\n", (unsigned long) &failout);
+	fprintf(f, "  putint   $%lx\n", (unsigned long) &putint);
+	fprintf(f, "  getint   $%lx\n", (unsigned long) &getint);
+	fprintf(f, "  puts_without_nl $%lx\n", (unsigned long) &puts_without_nl);
+	fprintf(f, "$$\n");
+
+	fprintf(f, "S004000000FB\n");
+	for(i=0; i < (int)((codelen+31)/32); i++) {
+	    int j, sum = 0;
+	    fprintf(f, "S3");
+	    fprintf(f, "%02X", sum = 4+32+1);
+	    fprintf(f, "%08X", j = (int)(codeptr+i*32));
+	    sum += ((j>>24)&0xFF);
+	    sum += ((j>>16)&0xFF);
+	    sum += ((j>> 8)&0xFF);
+	    sum += ((j    )&0xFF);
+	    for(j=0; j<32; j++)
+		fprintf(f, "%02X", codeptr[i*32+j] & 0xFF);
+	    for(j=0; j<32; j++)
+		sum += (codeptr[i*32+j] & 0xFF);
+	    fprintf(f, "%02X", (sum^0xFF)&0xFF);
+	    fprintf(f, "\n");
+	}
+	fprintf(f, "S70500000000FA\n");
+	fclose(f);
+    }
+#endif
 
     if (verbose)
 	fprintf(stderr, "Compiled %d bytes of "CPUID" Dynasm code, running.\n", (int)codelen);
