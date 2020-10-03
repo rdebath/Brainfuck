@@ -38,14 +38,10 @@
 /* These are mostly for Win32, but probably still a good idea elsewhere. */
 #if defined(LLONG_MAX) && defined(INT64_MAX) && LLONG_MAX == INT64_MAX
 #define PRIdLLONG PRId64
-#else
-#define PRIdLLONG "lld"
 #endif
 
 #if defined(ULLONG_MAX) && defined(UINT64_MAX) && ULLONG_MAX == UINT64_MAX
 #define PRIuLLONG PRIu64
-#else
-#define PRIuLLONG "llu"
 #endif
 #endif
 
@@ -332,9 +328,15 @@ print_info()
 
 #if defined(LLONG_MAX) && !defined(GOT_LLONG)
 #define GOT_LLONG
+#ifdef PRIdLLONG
     printf("Bytes LL%2d, long long      %"PRIdLLONG"%s%s\n",
 	    (int)sizeof(long long), LLONG_MAX,
 	    (sizeof(long long)==sizeof(time_t)?" (time_t)":""), ""
+#else
+    printf("Bytes LL%2d, long long      %.18g%s%s\n",
+	    (int)sizeof(long long), (double)LLONG_MAX,
+	    (sizeof(long long)==sizeof(time_t)?" (time_t)":""), ""
+#endif
 #if defined(INT64_MAX) && INT64_MAX == LLONG_MAX
 	    " (int64_t)"
 #define GOT_INT64
@@ -347,8 +349,8 @@ print_info()
 #endif
 
 #if defined(LONG_LONG_MAX) && !defined(GOT_LLONG)
-    printf("Bytes LL%2d, long long      %llu (non-POSIX)\n",
-	    (int)sizeof(long long), LONG_LONG_MAX);
+    printf("Bytes LL%2d, long long      %.18g (non-POSIX)\n",
+	    (int)sizeof(long long), (double)LONG_LONG_MAX);
 #endif
 
 #if defined(INT64_MAX) && !defined(GOT_INT64)
@@ -365,7 +367,8 @@ print_info()
 
 #if defined(__SIZEOF_INT128__) && defined(INTMAX_MAX)
     if (sizeof(__int128) > sizeof(intmax_t))
-	printf("Bytes I*%2d, __int128 <**** Larger than intmax_t\n", (int)sizeof(__int128));
+	printf("Bytes I*%2d, __int128 <**** %.18g (Larger than intmax_t)\n",
+	    (int)sizeof(__int128), (double)( (((unsigned __int128)-1)>>1)));
 #endif
 
     printf("\n");
@@ -401,7 +404,11 @@ print_info()
 #if defined(ULLONG_MAX)
 #if !defined(ULONG_MAX) || ULONG_MAX != ULLONG_MAX
 #if !defined(UINT64_MAX) || UINT64_MAX != ULLONG_MAX
+#ifdef PRIuLLONG
     printf("Bytes LL%2d, unsigned long l%"PRIuLLONG"\n", (int)sizeof(unsigned long long), ULLONG_MAX);
+#else
+    printf("Bytes LL%2d, unsigned long l%.17g\n", (int)sizeof(unsigned long long), (double)ULLONG_MAX);
+#endif
 #endif
 #endif
 #endif
