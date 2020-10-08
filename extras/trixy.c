@@ -148,6 +148,10 @@ int main(int argc, char **argv)
 		in_format = L_MINIBF;
 		if (compact_bf < 0) compact_bf = 1;
 	    }
+	    else if (!strcmp(argv[ar], "-rle")) {
+		in_format = L_DEADBEEF;
+		db_disable = 7;
+	    }
 	    else break;
 	    continue;
 #ifdef ENABLE_BF2ANY
