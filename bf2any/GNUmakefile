@@ -264,7 +264,7 @@ endif
 endif
 
 bf2crun: bf2crun.o $(COREOBJ)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(TCCLIBS) $(LIBDL)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(TARGET_ARCH) $(TCCLIBS) $(LIBDL) -lm
 
 bf2crun.o: bf2crun.c $(TCCDEP)
 	$(CC) $(CFLAGS) $(TCCFLAG) $(LIBDLFLAG) -c -o $@ bf2crun.c $(TARGET_ARCH)

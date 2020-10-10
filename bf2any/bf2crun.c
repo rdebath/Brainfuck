@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <limits.h>
 
 #ifndef DISABLE_DLOPEN
 #include <dlfcn.h>
@@ -29,7 +30,8 @@
 
 static int ind = 0;
 static int use_unistd = 0;
-static enum { no_run, run_libtcc, run_dll } runmode = run_libtcc;
+static enum { run_maybe, no_run, run_libtcc, run_dll, run_now } runmode = run_maybe;
+static enum { cell32, cell8, cell64, celldouble } celltype = cell32;
 static FILE * ofd;
 #define pr(s)           fprintf(ofd, "%*s" s "\n", ind*4, "")
 #define prv(s,v)        fprintf(ofd, "%*s" s "\n", ind*4, "", (v))
@@ -71,12 +73,39 @@ struct be_interface_s be_interface = { fn_check_arg, gen_code,
 static int
 fn_check_arg(const char * arg)
 {
+    if (strcmp(arg, "+init") == 0) {
+	if (bytecell) celltype = cell8;
+	switch(runmode) {
+	case run_maybe:
+#ifdef ENABLE_LIBTCC
+	    runmode = run_libtcc; break;
+#else
+#ifndef DISABLE_DLOPEN
+	    runmode = run_dll; break;
+#endif
+#endif
+	case no_run: break;
+	case run_now: /*FALLTHROUGH*/
+#ifndef DISABLE_DLOPEN
+	case run_dll: break;
+#endif
+#ifdef ENABLE_LIBTCC
+	case run_libtcc: break;
+#endif
+	default:
+	    fprintf(stderr, "Error: Unable to run the C code\n");
+	    exit(1);
+	}
+	return 1;
+    }
     if (strcmp(arg, "-#") == 0) return 1;
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-d      Dump code"
-	"\n\t"  "-mmove  Use move merging translation."
+	"\n\t"  "-r      Run code"
 	"\n\t"  "-unix   Use \"unistd.h\" for read/write."
+	"\n\t"  "-b64    Use 64bit int as cell type."
+	"\n\t"  "-dbl    Use double as cell type."
 #ifdef ENABLE_LIBTCC
 	"\n\t"  "-ltcc   Use libtcc to run code."
 #endif
@@ -104,8 +133,16 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-d") == 0) {
 	runmode = no_run; return 1;
     } else
+    if (strcmp(arg, "-r") == 0) {
+	if (runmode != run_dll && runmode != run_libtcc)
+	    runmode = run_now;
+	return 1;
+    } else
     if (strcmp(arg, "-b64") == 0) {
-	be_interface.cells_are_ints = 0; return 1;
+	be_interface.cells_are_ints = 0; celltype = cell64; return 1;
+    } else
+    if (strcmp(arg, "-dbl") == 0) {
+	be_interface.cells_are_ints = 0; celltype = celldouble; return 1;
     } else
     if (strcmp(arg, "-unix") == 0) {
 	use_unistd = 1; return 1;
@@ -188,10 +225,18 @@ gen_code(int ch, int count, char * strn)
 	prv("#define TAPESIZE %d", tapesz);
 	pr("#endif");
 
-	if (!bytecell && !be_interface.cells_are_ints) {
-	    pr("#include <stdint.h>");
+	if (!bytecell && celltype != cell32) {
+	    int use_stdint = (celltype == cell64) &&
+		((runmode == no_run) || (sizeof(long)*CHAR_BIT != 64));
+	    if (use_stdint)
+		pr("#include <stdint.h>");
 	    pr("#ifndef C");
-	    pr("#define C uintmax_t");
+	    if (celltype == cell64 && use_stdint)
+		pr("#define C uint64_t");
+	    else if (celltype == cell64)
+		pr("#define C unsigned long");
+	    else
+		pr("#define C double");
 	    pr("#endif");
 	}
 
@@ -200,10 +245,10 @@ gen_code(int ch, int count, char * strn)
 	    pr("#define do_dump() call_dump(mem,m)");
 	    if (bytecell)
 		pr("void call_dump(char *mem, char *m)");
-	    else if (be_interface.cells_are_ints)
+	    else if (celltype == cell32)
 		pr("void call_dump(int *mem, int *m)");
 	    else
-		pr("void call_dump(C *mem, int *m)");
+		pr("void call_dump(C *mem, C *m)");
 	    pr("{");
 	    ind++;
 	    pr("int i;");
@@ -230,7 +275,7 @@ gen_code(int ch, int count, char * strn)
 	    pr("static unsigned char mem[TAPESIZE];");
 	    pr("register unsigned char *m = mem + TAPEOFF;");
 	    pr("register int v;");
-	} else if (be_interface.cells_are_ints) {
+	} else if (celltype == cell32) {
 	    pr("static unsigned int mem[TAPESIZE];");
 	    pr("register unsigned int v, *m = mem + TAPEOFF;");
 	} else {
@@ -274,6 +319,8 @@ gen_code(int ch, int count, char * strn)
     case '.':
 	if (use_unistd)
 	    prv("PUTC(m[%d]);", mov);
+	else if (celltype == celldouble)
+	    prv("putchar((int) m[%d]);", mov);
 	else
 	    prv("putchar(m[%d]);", mov);
 	return;
