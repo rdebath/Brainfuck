@@ -1490,7 +1490,11 @@ run_ccode(void)
 #ifdef __TINYC__
 	use_dlopen = 0;
 #else
-	use_dlopen = ((total_nodes < 4000) || (opt_level > 3));
+	use_dlopen = ((total_nodes < 4000) || (opt_level > 3) || (
+	    cell_length != sizeof(long)*CHAR_BIT &&
+	    cell_length != sizeof(int)*CHAR_BIT &&
+	    cell_length != sizeof(short)*CHAR_BIT &&
+	    cell_length != sizeof(char)*CHAR_BIT));
 #endif
     if (use_dlopen)
 	run_gccode();
