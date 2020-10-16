@@ -505,7 +505,7 @@ print_nasm_elf_header(void)
 	"\n"	"        dd      $$                      ;   p_vaddr"
 	"\n"	"        dd      0                       ;   p_paddr"
 	"\n"	"        dd      filesize                ;   p_filesz"
-	"\n"	"        dd      ramsize                 ;   p_memsz"
+	"\n"	"        dd      filesize                ;   p_memsz"
 	"\n"	"        dd      5                       ;   p_flags"
 	"\n"	"        dd      0x1000                  ;   p_align"
 	"\n"
@@ -538,7 +538,6 @@ print_nasm_elf_header(void)
 	"\n"
 	"\n"	"        section .bflast align=1"
 	"\n"	"        section .bss align=4096"
-	"\n"	"ramsize equ     section..bss.start-orgaddr"
 	"\n"	"filesize equ    section..bflast.start-orgaddr"
 	"\n"	"putchbuf: resb 1"
 	);
