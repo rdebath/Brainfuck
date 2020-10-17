@@ -59,7 +59,7 @@ MORECLANG=$(MOREDEFS) -fsanitize=integer -Wpadded
 
 OBJECTS=bfi.o bfi.version.o bfi.ccode.o bfi.nasm.o bfi.bf.o bfi.dc.o \
 	bfi.dd.o bfi.cpp.o bfi.runarray.o clock.o taperam.o \
-	bfi.openssl.o bfi.gmp.o opt_bfbasic.o
+	bfi.gmp.o opt_bfbasic.o
 
 CONF=-DCNF $(CONF_DYNASM) $(CONF_LIGHTNING) $(CONF_TCCLIB) $(CONF_SSLLIB) $(CONF_GMPLIB) $(CONF_LIBDL)
 LDLIBS=$(GNUSTK) $(LIBS_LIGHTNING) $(LIBS_TCCLIB) $(LIBS_SSLLIB) $(LIBS_GMPLIB) $(GNUDYN) $(LIBS_LIBDL)
@@ -93,7 +93,7 @@ bfi.version.o: bfi.version.h
 bfi.o: \
     bfi.c bfi.tree.h bfi.run.h bfi.be.def bfi.ccode.h bfi.gnulit.h \
     bfi.nasm.h bfi.bf.h bfi.dc.h bfi.dd.h clock.h ov_int.h \
-    bfi.runarray.h bfi.cpp.h bfi.openssl.h bfi.gmp.h
+    bfi.runarray.h bfi.cpp.h bfi.gmp.h
 bfi.bf.o: bfi.bf.c bfi.tree.h bfi.bf.h
 bfi.ccode.o: bfi.ccode.c bfi.tree.h bfi.run.h bfi.ccode.h clock.h
 bfi.dc.o: bfi.dc.c bfi.tree.h bfi.run.h bfi.dc.h
@@ -102,7 +102,6 @@ bfi.runarray.o: bfi.runarray.c bfi.tree.h bfi.run.h bfi.runarray.h \
     clock.h bfi.execloop.h big_int.h
 bfi.dd.o: bfi.dd.c bfi.tree.h bfi.run.h bfi.dd.h
 bfi.cpp.o: bfi.cpp.c bfi.tree.h bfi.run.h bfi.cpp.h
-bfi.openssl.o: bfi.openssl.c bfi.tree.h bfi.run.h bfi.openssl.h clock.h
 bfi.gmp.o: bfi.gmp.c bfi.tree.h bfi.run.h bfi.gmp.h clock.h
 opt_bfbasic.o: opt_bfbasic.c bfi.tree.h
 
@@ -302,12 +301,6 @@ DO_LIBDL1 := $(call try-run,\
 endif
 endif
 
-# Open SSL big numbers ?
-DO_SSL := $(call try-run,\
-	{ echo '$(FHASH)include <openssl/bn.h>'; 			\
-	  echo 'int main(){BIGNUM*t1=BN_new();BN_is_negative(t1);return(0);}'; \
-	  } > $(TMP).c ; $(TRYCC2) $(WERROR) -o $(TMP) -lcrypto,1)
-
 # Open GMP big numbers ?
 DO_GMP := $(call try-run,\
 	{ echo '$(FHASH)include <gmp.h>'; 				\
@@ -381,14 +374,6 @@ CONF_LIGHTNING=
 LIGHTNING_OBJ=bfi.gnulit.o
 $(EXEFILE): $(LIGHTNING_OBJ)
 OBJECTS += $(LIGHTNING_OBJ)
-endif
-
-ifeq ($(DO_SSL),)
-CONF_SSLLIB=-DDISABLE_SSL
-LIBS_SSLLIB=
-else
-CONF_SSLLIB=
-LIBS_SSLLIB=-lcrypto
 endif
 
 ifeq ($(DO_GMP),)
