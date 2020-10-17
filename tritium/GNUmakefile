@@ -110,6 +110,7 @@ opt_bfbasic.o: opt_bfbasic.c bfi.tree.h
 
 clock.o: clock.c clock.h
 taperam.o: taperam.c bfi.tree.h bfi.run.h
+gmp.o: gmp.c gmp.h
 
 ################################################################################
 # Don't configure if we're just cleaning.
@@ -312,7 +313,7 @@ DO_SSL := $(call try-run,\
 # Open GMP big numbers ?
 DO_GMP := $(call try-run,\
 	{ echo '$(FHASH)include <gmp.h>'; 				\
-	  echo 'int main(){mpz_t t1;mpz_init(t1);mpz_fits_slong_p(t1);return(0);}'; \
+	  echo 'int main(){mpz_t t1;mpz_init(t1);return(!mpz_fits_slong_p(t1));}'; \
 	  } > $(TMP).c ; $(TRYCC2) $(WERROR) -o $(TMP) -lgmp,1)
 
 endif	# CC
@@ -393,8 +394,12 @@ LIBS_SSLLIB=-lcrypto
 endif
 
 ifeq ($(DO_GMP),)
-CONF_GMPLIB=-DDISABLE_GMP
+CONF_GMPLIB=-DPD_GMP
 LIBS_GMPLIB=
+GMP_OBJ=gmp.o
+$(EXEFILE): $(GMP_OBJ)
+bfi.gmp.o: gmp.h
+OBJECTS += $(GMP_OBJ)
 else
 CONF_GMPLIB=
 LIBS_GMPLIB=-lgmp

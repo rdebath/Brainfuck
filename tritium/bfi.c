@@ -4517,11 +4517,11 @@ int
 getutf8()
 {
     FILE * fd = stdin;
+    int ch;
     static int utfstate[1];
     static int pending_lo = 0;
     if (pending_lo) { int i = pending_lo; pending_lo=0; return i;}
 
-    int ch;
     do {
 	if (*utfstate >= 0) ch = getc(fd); else ch = -1;
 	if (ch <= 0x7F && *utfstate == 0) return ch;

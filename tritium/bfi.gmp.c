@@ -9,7 +9,12 @@
 #include "bfi.gmp.h"
 
 #ifndef DISABLE_GMP
+#ifdef PD_GMP
+#include "gmp.h"
+#define DISABLE_LONGMASK
+#else
 #include <gmp.h>
+#endif
 
 #include "bfi.run.h"
 #include "bfi.runarray.h"
@@ -125,7 +130,8 @@ run_gmparray(void)
 
     if(cell_length>0 && cell_length<INT_MAX) {
 	do_mask = 1;
-	mpz_ui_pow_ui(cell_and, 2, cell_length);
+	mpz_set_si(cell_and, 1);
+	mpz_mul_2exp(cell_and, cell_and, cell_length);
 	mpz_sub_ui(cell_and, cell_and, 1);
 #ifndef DISABLE_LONGMASK
 	if (mpz_fits_slong_p(cell_and))
@@ -648,6 +654,15 @@ run_gmparray(void)
 	    p += 2;
 	    break;
 
+	case T_PRT:
+	    if (!m[p[1]].f)
+		putch(m[p[1]].v);
+	    else
+		putch(mpz_get_si(m[p[1]].b));
+	    p += 2;
+	    break;
+
+#ifndef PD_GMP
 	case T_INPI:
 	    // Input number
 	    if (!m[p[1]].i)
@@ -661,14 +676,6 @@ run_gmparray(void)
 	    p += 2;
 	    break;
 
-	case T_PRT:
-	    if (!m[p[1]].f)
-		putch(m[p[1]].v);
-	    else
-		putch(mpz_get_si(m[p[1]].b));
-	    p += 2;
-	    break;
-
 	case T_PRTI:
 	    if (!m[p[1]].f)
 		printf("%ld", m[p[1]].v);
@@ -679,6 +686,62 @@ run_gmparray(void)
 	    }
 	    p += 2;
 	    break;
+#endif
+
+#ifdef PD_GMP
+	case T_INPI:
+	    {
+		char *buf = 0;
+		int maxp=0, ptr=0, ch;
+		/* This is for Old Unix so no: rv = scanf("%ms", &bntxtptr); */
+
+		while((ch=getchar()) != EOF) {
+		    if(ch>='0' && ch<='9') {
+			while (ptr+2 > maxp) {
+			    buf = realloc(buf, maxp += 1024);
+			    if(!buf) { perror("realloc"); exit(1); }
+			}
+			buf[ptr++] = ch;
+			buf[ptr] = 0;
+		    } else if (ptr>0) {
+			ungetc(ch, stdin);
+			break;
+		    }
+		}
+
+		if (!buf) {
+		    int c = 1;
+		    switch(eofcell)
+		    {
+		    case 2: c = -1; break;
+		    case 3: c = 0; break;
+		    case 4: c = EOF; break;
+		    }
+		    if (c<=0) {
+			m[p[1]].f = 0;
+			m[p[1]].v = c;
+		    }
+		} else {
+		    mpz_set_str(m[p[1]].b, buf, 0);
+		    free(buf);
+		}
+	    }
+	    break;
+
+	case T_PRTI:
+	    if (!m[p[1]].f)
+		printf("%ld", m[p[1]].v);
+	    else {
+		// Output number
+		char * s;
+		if(do_mask) mpz_and(m[p[1]].b, m[p[1]].b, cell_and);
+		s = mpz_get_str((char*)0, 10, m[p[1]].b);
+		if (s)
+		    printf("%s", s);
+	    }
+	    p += 2;
+	    break;
+#endif
 
 	case T_CHR:
 	    putch(p[1]);
