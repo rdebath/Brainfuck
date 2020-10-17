@@ -10,3 +10,6 @@ lightning-1.2.tar.gz
 	Minor modifications so it will work without autoconf and fail
 	softly on other processors.
 
+fgmp-1.0b5
+	A very small version of GMP 1.0 it's a lot slower than the real
+	thing but much smaller and Public Domain.

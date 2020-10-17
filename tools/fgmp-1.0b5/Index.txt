@@ -1,0 +1,25 @@
+Index of /afs/sipb/project/stk/src/STk-2.2.0/Mp/fgmp-1.0b5
+
+This content is being served through the [1]AFS server
+ronald-ann.mit.edu in the [2]sipb.mit.edu AFS cell. If you have any
+questions about this content, please contact the administrator of this
+directory, who made it publicly available. The administrators of the
+stuff.mit.edu AFS gateway are not responsible for this content and have
+no ability to remove it.
+
+The administrator of this directory is jhawk of sipb.mit.edu.
+
+[ICO]  Name     Last modified    Size
+__________________________________________________________________
+[ ]    Makefile 1993-12-09 07:43 142
+[TXT]  gmp.c    1993-12-09 06:35 38K
+[TXT]  gmp.h    1993-12-09 06:35 4.1K
+[ ]    notes    1993-12-09 06:35 3.5K
+__________________________________________________________________
+
+Apache/2.4.7 (Ubuntu) Server at stuff.mit.edu Port 443
+
+References
+
+1. http://en.wikipedia.org/wiki/Andrew_File_System
+2. https://stuff.mit.edu/afs/sipb.mit.edu/
