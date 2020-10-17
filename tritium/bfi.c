@@ -75,7 +75,6 @@ characters after your favorite comment marker in a very visible form.
 #include "bfi.be.def"
 
 #include "bfi.runarray.h"
-#include "bfi.runmax.h"
 #endif
 
 #ifndef __STDC_ISO_10646__
@@ -85,12 +84,12 @@ characters after your favorite comment marker in a very visible form.
 #ifndef NO_EXT_BE
 #include "clock.h"
 
-enum codestyle { c_default, c_proftree, c_runarray, c_maxtree,
+enum codestyle { c_default, c_proftree, c_runarray,
 #define XX 1
 #include "bfi.be.def"
     };
 int do_codestyle = c_default;
-const char * codestylename[] = { "default", "profile tree", "run array", "max tree"
+const char * codestylename[] = { "default", "profile tree", "run array"
 #define XX 8
 #include "bfi.be.def"
 };
@@ -726,9 +725,6 @@ main(int argc, char ** argv)
 		do_codestyle = c_proftree;
 	} else if (cell_length <= (int)(sizeof(C))*CHAR_BIT) {
 	    do_codestyle = c_runarray;
-	} else {
-	    do_codestyle = c_maxtree;
-	    opt_no_div = 1;
 	}
 
 	if (do_codestyle == c_default) {
@@ -1355,10 +1351,6 @@ process_file(void)
 
 	    case c_runarray:
 		run_tree_as_array();
-		break;
-
-	    case c_maxtree:
-		run_maxtree();
 		break;
 
 	    default:

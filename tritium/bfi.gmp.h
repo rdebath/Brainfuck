@@ -13,7 +13,7 @@ X(gmp,LIBGMP,
     /* No code dump */							,
     case c_gmp: run_gmparray(); break;                           )
 #if XX == 4
-    if (do_run == -1 && do_codestyle == c_default &&
+    if (do_run && do_codestyle == c_default &&
             (cell_length > (int)sizeof(C)*CHAR_BIT ||
 		(cell_length>32 && iostyle == 3)) &&
             verbose<3 && !enable_trace && !debug_mode) {
