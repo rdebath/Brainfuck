@@ -2,7 +2,6 @@
 #define _BFI_BF_H
 
 void print_bf(void);
-int checkarg_bf(char * opt, char * arg);
 #define BE_BF
 #endif
 
@@ -24,14 +23,6 @@ X(bf,BF,
 	    exit(255);
 	}
 	iostyle = 0;
-    }
-#endif
-#if XX == 9
-    {	int f = checkarg_bf(opt, arg);
-	if (f) {
-	    if (do_codestyle == c_default) do_codestyle = c_bf;
-	    return f;
-	}
     }
 #endif
 #endif

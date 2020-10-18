@@ -7,15 +7,7 @@
 #include "bfi.tree.h"
 #include "bfi.bf.h"
 
-static int bfrle = 0;
 static int col = 0;
-
-int
-checkarg_bf(char * opt, char * arg UNUSED)
-{
-    if (!strcmp(opt, "-bfrle")) { bfrle = 1; return 1; }
-    return 0;
-}
 
 static void
 pc(int ch) { if (col>=72) { putchar('\n'); col=0; } col++; putchar(ch); }
@@ -28,12 +20,7 @@ ps(const char * p) {
 
 static void
 pr(char ch, int r) {
-    char wbuf[sizeof(int)*3+8];
-    if (bfrle && r>1) {
-	sprintf(wbuf, "%d%c", r, ch);
-	ps(wbuf);
-    } else
-	while(r-->0) pc(ch);
+    while(r-->0) pc(ch);
 }
 
 /*
@@ -52,7 +39,7 @@ print_bf(void)
     int i, last_offset = 0;
 
     if (!noheader)
-	printf("[ BF%s regenerated from %s ]\n", bfrle?"-RLE":"", bfname);
+	printf("[ BF regenerated from %s ]\n", bfname);
 
     while(n)
     {
@@ -71,7 +58,7 @@ print_bf(void)
 	switch(n->type)
 	{
 	case T_SET:
-	    if (bfrle) pc('='); else ps("[-]");
+	    ps("[-]");
 	    i = n->count;
 	    if(i>0) pr('+', i);
 	    if(i<0) pr('-', -i);

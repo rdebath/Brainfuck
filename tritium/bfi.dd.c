@@ -16,13 +16,34 @@ static void outcmd(int ch, int count);
 
 static char * strbuf;
 static unsigned int maxstrlen = 0, buflen = 0;
+static int bfrle = 0;
+
+int
+checkarg_dd(char * opt, char * arg UNUSED)
+{
+    if (!strcmp(opt, "-bfrle")) { bfrle = 1; return 1; }
+    return 0;
+}
 
 void
 print_dd(void)
 {
     struct bfi * n = bfprog;
+    int is_bfrle = (
+	(node_type_counts[T_CALC] == 0) &&
+	(node_type_counts[T_CALCMULT] == 0) &&
+	(node_type_counts[T_CALCMULT] == 0) &&
+	(node_type_counts[T_IF] == 0) &&
+	(node_type_counts[T_ENDIF] == 0) &&
+	(node_type_counts[T_INPI] == 0) &&
+	(node_type_counts[T_PRTI] == 0) &&
+	(node_type_counts[T_CHR] == 0) &&
+	(cell_size<=0 && cell_length<=0) );
 
-    if (!noheader) {
+    if (bfrle && !is_bfrle)
+	fprintf(stderr, "BF-RLE generation failure\n");
+
+    if (!noheader && !bfrle) {
 	printf("{[ Code generated from %s ]}\n\n", bfname);
 
 	puts("{[    This is not brainfuck, use bf2any's -be-pipe option     ]}");
@@ -30,7 +51,7 @@ print_dd(void)
 	puts("{ -----.<.>>>.<<.<.>>----.+.<+.<.>>>>.<<<--.>>>-.<.<-.>---.<<+ }");
 	puts("{ ++.>>---.<---.<<++++++++++++.------------.>.--.>>++.<<<.++++ }");
 	puts("{ +++++++++.>>>>+.<.<<<.>---.>--.<.>>.[>]<<.                [] }");
-	puts("\n");
+	puts("");
 
 	if (cell_size > 0)
 	    outcmd('!', cell_size);
@@ -39,6 +60,16 @@ print_dd(void)
 
 	if (node_type_counts[T_MOV] != 0 && most_neg_maad_loop)
 	    outcmd('>', -most_neg_maad_loop);
+    } else if (!noheader && bfrle) {
+	printf("{[ Code generated from %s ]}\n\n", bfname);
+
+	puts("{[ This is BF-RLE not brainfuck                               ]}");
+	puts("{++2-[[-]                                                      }");
+	puts("{ ++++[>++++<-]>[>++>[++++++++>]++[<]>-]>>>>>>>++.<<<--.+.<<-- }");
+	puts("{ -----.<.>>>.<<.<.>>----.+.<+.<.>>>>.<<<--.>>>-.<.<-.>---.<<+ }");
+	puts("{ ++.>>---.<---.>>>>>>>>>++.[<]>.>>--.<-.<.>>.<-.<.>>>>>>>>.++ }");
+	puts("{ ++.>>>+.<<<<<--.>++.>-.[>]<<.                            []] }");
+	puts("");
     }
 
     while(n)
@@ -57,7 +88,11 @@ print_dd(void)
 
 	case T_SET:
 	    outcmd('>', n->offset);
-	    outcmd('=', n->count);
+	    if (bfrle) {
+		outcmd('=', 0);
+		outcmd('+', n->count);
+	    } else
+		outcmd('=', n->count);
 	    outcmd('<', n->offset);
 	    break;
 
