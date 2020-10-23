@@ -157,33 +157,36 @@ gen_code(int ch, int count, char * strn)
 	    if (enable_debug)
 		pr("#include <stdio.h>");
 	    pr("#include <unistd.h>");
+	    pr("#ifndef GETC");
 	    if (bytecell) {
 		pr( "#define GETC(x) read(0, &(x), 1)");
 	    } else {
 		pr( "#define GETC(x) "
 		    "{ unsigned char b[1]; if(read(0, b, 1)>0) (x)=*b; }");
 	    }
+	    pr("#endif");
+	    pr("#ifndef PUTC");
 	    if (bytecell)
 		pr( "#define PUTC(x) write(1, &(x), 1);");
 	    else {
 		pr( "#define PUTC(x) "
 		    "{ char b[1]; b[0] = (x); write(1, b, 1); }");
 	    }
+	    pr("#endif");
+	    pr("#ifndef PUTS");
 	    pr( "#define PUTS(x) "
 		"{ const char s[] = x; write(1,s,sizeof(s)-1); }");
-	} else {
+	    pr("#endif");
+	} else
 	    pr("#include <stdio.h>");
-	    pr("#define GETC(x) { int c=getchar(); if(c!=EOF) (x)=c; }");
-	    pr("#define PUTC(x) putchar(x)");
-	}
 
+	prv("#define TAPEOFF %d", tapeinit);
 	pr("#ifdef TAPELEN");
-	prv("#define TAPESIZE (TAPELEN+%d)", tapeinit);
+	pr("#define TAPESIZE (TAPELEN+TAPEOFF)");
 	pr("#endif");
 	pr("#ifndef TAPESIZE");
 	prv("#define TAPESIZE %d", tapesz);
 	pr("#endif");
-	prv("#define TAPEOFF %d", tapeinit);
 
 	if (!bytecell && !be_interface.cells_are_ints) {
 	    pr("#include <stdint.h>");
@@ -209,7 +212,7 @@ gen_code(int ch, int count, char * strn)
 	    ind++;
 	    pr("fprintf(stderr,\" %%d\", mem[i+TAPEOFF]);");
 	    pr("if (m==mem+i+TAPEOFF) fprintf(stderr,\"<\");");
-	    ind--;
+	   ind--;
 	    pr("}");
 	    pr("fprintf(stderr,\"\\n\");");
 	    ind--;
@@ -262,9 +265,19 @@ gen_code(int ch, int count, char * strn)
     case '-': prv2("m[%d] -= %d;", mov, count); return;
     case '>': prv("m += %d;", count); break;
     case '<': prv("m -= %d;", count); break;
-    case '.': prv("PUTC(m[%d]);", mov); return;
+    case ',':
+	if (use_unistd)
+	    prv("GETC(m[%d]);", mov);
+	else
+	    prv("{ int c=getchar(); if(c!=EOF) m[%d]=c; }", mov);
+	break;
+    case '.':
+	if (use_unistd)
+	    prv("PUTC(m[%d]);", mov);
+	else
+	    prv("putchar(m[%d]);", mov);
+	return;
     case '"': print_cstring(strn); break;
-    case ',': prv("GETC(m[%d]);", mov); break;
     case '#': pr("do_dump();"); break;
 
     case '[': prv("while(m[%d]) {", mov); ind++; break;
