@@ -32,9 +32,12 @@
 typedef void (*void_func)(void);
 static const char * putname = "putch";
 static int use_putstr = 0;
-static int fixed_mask = 0;
-static int mask_defined = 0;
 static int indent = 0, is_simple_statement = 0;
+
+static int fixed_mask = 0;              /* Optimised for specific cell size requiring a mask */
+static int mask_defined = 0;
+static char const * cell_type = "C";    /* Cell C variable type */
+static int cell_type_iso = 0;           /* Using exact type from stdint.h */
 
 #define okay_for_cstr(xc) ((xc) != 0 && (xc) <= '~')
 
@@ -69,6 +72,7 @@ static void pt(FILE* ofd, int indent, struct bfi * n);
 static char * rvalmsk(int offset);
 static char * rval(int offset);
 static char * lval(int offset);
+static void set_cell_type(void);
 static void print_c_header(FILE * ofd);
 static void print_lib_funcs(FILE * ofd);
 
@@ -232,6 +236,41 @@ static char namebuf[64];
 }
 
 void
+set_cell_type()
+{
+    /* First try for an, oversized, exact C cell type */
+#if defined(UINT64_MAX)
+    if (cell_length == (int)sizeof(uint64_t)*CHAR_BIT) {
+	cell_type = "uint64_t";
+	cell_type_iso = 1;
+    } else
+#endif
+#if defined(UINTMAX_MAX)
+    if (cell_length == (int)sizeof(uintmax_t)*CHAR_BIT) {
+	cell_type = "uintmax_t";
+	cell_type_iso = 1;
+    } else
+#endif
+    /* Normal integer cell types */
+    if (cell_length > 0) {
+	if (cell_length <= CHAR_BIT)
+	    cell_type = "unsigned char";
+	else if (cell_length == (int)sizeof(short)*CHAR_BIT)
+	    cell_type = "unsigned short";
+	else if (cell_length <= (int)sizeof(int)*CHAR_BIT)
+	    cell_type = "unsigned int";
+    }
+
+    if (cell_size > 0 &&
+	cell_size != sizeof(int)*CHAR_BIT &&
+	cell_size != sizeof(short)*CHAR_BIT &&
+	cell_size != sizeof(char)*CHAR_BIT)
+	fixed_mask = cell_mask;
+    else
+	fixed_mask = 0;
+}
+
+void
 print_c_header(FILE * ofd)
 {
     int memoffset = 0;
@@ -298,8 +337,7 @@ print_c_header(FILE * ofd)
     if (cell_size == 0) {
 	if (cell_type_iso)
 	    fprintf(ofd, "#include <stdint.h>\n\n");
-	else if (cell_length == 0 || cell_length == INT_MAX || 
-		(cell_length > 0 && cell_size == 0)) {
+	else {
 	    if (knr_c_ok)
 		fprintf(ofd, "#ifdef __STDC__\n");
 
@@ -324,6 +362,8 @@ print_c_header(FILE * ofd)
 	    fprintf(ofd, "#define C unsigned long long\n");
 	    fprintf(ofd, "#elif defined(UINTMAX_MAX)\n");
 	    fprintf(ofd, "#define C uintmax_t\n");
+	    fprintf(ofd, "#elif 1\n");
+	    fprintf(ofd, "#define C unsigned long\n");
 	    fprintf(ofd, "#else\n");
 	    fprintf(ofd, "#define C unsigned int\n");
 	    fprintf(ofd, "#endif\n\n");
@@ -331,33 +371,37 @@ print_c_header(FILE * ofd)
 	    if (cell_length != INT_MAX) {
 		mask_defined = 1;
 		fprintf(ofd, "#ifndef M\n");
-		if (cell_length > 0 && cell_length < sizeof(C)*CHAR_BIT) {
-		    fprintf(ofd, "#define M(V) ((V)&(((C)1<<%d)-1))\n", cell_length);
+		if (cell_length > 0 && cell_length < UINTBIG_BIT) {
+		    fprintf(ofd, "#define M(V) ((V)&(((C)2<<%d)-1))\n", cell_length-1);
 
 		    if (knr_c_ok) fprintf(ofd, "#ifdef __STDC__\n");
-		    if (cell_length > sizeof(int)*CHAR_BIT && cell_length < sizeof(C)*CHAR_BIT)
-			fprintf(ofd, "enum { CellTooSmall=1/(sizeof(C)>=%d) };\n",
+		    if (cell_length > sizeof(int)*CHAR_BIT && cell_length < UINTBIG_BIT)
+			fprintf(ofd, "enum { MaskTooBigForCell=1/(sizeof(C)>=%d) };\n",
 			    (cell_length+CHAR_BIT-1)/CHAR_BIT);
 		    if (knr_c_ok) fprintf(ofd, "#endif\n");
 		} else
 		    fprintf(ofd, "#define M(V) V\n");
 		fprintf(ofd, "#endif\n\n");
-		if (knr_c_ok) fprintf(ofd, "#ifdef __STDC__\n");
+	    }
+
+	    if (knr_c_ok) fprintf(ofd, "#ifdef __STDC__\n");
+	    if (cell_length <= 0) {
 		fprintf(ofd, "enum { MaskTooSmall=1/(M(0x80)) };\n");
-		if (knr_c_ok) fprintf(ofd, "#endif\n\n");
+	    } else if (mask_defined) {
+		fprintf(ofd, "enum { MaskTooSmall=1/(C)(M(0x%x)) };\n", INT_MIN);
 	    } else {
-		if (knr_c_ok) fprintf(ofd, "#ifdef __STDC__\n");
 		fprintf(ofd, "enum { CellTooSmall=1/(sizeof(C)>=sizeof(int)) };\n");
-		if (knr_c_ok) fprintf(ofd, "#endif\n\n");
 	    }
+
 	    if (node_type_counts[T_DIV] != 0) {
-		if (knr_c_ok) fprintf(ofd, "#ifdef __STDC__\n");
 		fprintf(ofd, "enum { CellTypeMustNotBeSigned = 1/(((%s)-1) >= 0) };\n", cell_type);
-		if (knr_c_ok) fprintf(ofd, "#endif\n\n");
 	    }
+	    if (knr_c_ok) fprintf(ofd, "#endif\n\n");
 	}
 
-    } else if(fixed_mask>0) {
+    }
+
+    if (fixed_mask>0) {
 	fprintf(ofd, "#define M(V) ((V) & 0x%x)\n\n", fixed_mask);
 	mask_defined = 1;
     }
@@ -1373,11 +1417,7 @@ print_ccode(FILE * ofd)
     struct bfi * n;
     int ipos = 0;
 
-    if (cell_size > 0 &&
-	cell_size != sizeof(int)*CHAR_BIT &&
-	cell_size != sizeof(short)*CHAR_BIT &&
-	cell_size != sizeof(char)*CHAR_BIT)
-	fixed_mask = cell_mask;
+    set_cell_type();
 
     if (do_run || cell_type_iso || use_dynmem || enable_trace ||
 	    node_type_counts[T_DUMP] != 0)

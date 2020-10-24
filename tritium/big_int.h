@@ -6,23 +6,24 @@
 #endif
 #endif
 
-#ifndef C
+#ifndef uintbig_t
 #ifdef __SIZEOF_INT128__
-#define C unsigned __int128
+#define uintbig_t unsigned __int128
 #else
 #ifdef _UINT128_T
-#define C __uint128_t
+#define uintbig_t __uint128_t
 #else
 #if defined(ULLONG_MAX) || defined(__LONG_LONG_MAX__)
-#define C unsigned long long
+#define uintbig_t unsigned long long
 #else
 #if defined(UINTMAX_MAX)
-#define C uintmax_t
+#define uintbig_t uintmax_t
 #else
-#define C unsigned long
+#define uintbig_t unsigned long
 #endif
 #endif
 #endif
 #endif
 #endif
 
+#define UINTBIG_BIT ((int)(CHAR_BIT*sizeof(uintbig_t)))

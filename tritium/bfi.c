@@ -156,8 +156,6 @@ unsigned cell_length = 0;/* Number of bits in cell */
 int cell_size = 0;  /* Number of bits in cell IF they fit in an int. */
 int cell_mask = ~0; /* Mask using & with this. */
 int cell_smask = 0; /* Xor and subtract this; normally MSB of the mask. */
-char const * cell_type = "C";	/* Cell C variable type */
-int cell_type_iso = 0;	/* Using uintmax_t or similar for above. */
 int only_uses_putch = 0;
 
 const char * bfname = "brainfuck";
@@ -238,7 +236,6 @@ int update_opt_runner(struct bfi * n, int * mem, int offset);
 void LongUsage(FILE * fd, const char * errormsg) __attribute__ ((__noreturn__));
 void Usage(const char * why) __attribute__ ((__noreturn__));
 void UsageOptError(char * why) __attribute__ ((__noreturn__));
-void UsageInt64(void) __attribute__ ((__noreturn__));
 void UsageCheckInts(FILE *fd);
 int checkarg(char * opt, char * arg);
 #ifdef _WIN32
@@ -460,37 +457,6 @@ UsageOptError(char * why)
     char buf[256];
     sprintf(buf, "Unknown option '%.200s'", why);
     LongUsage(stderr, buf);
-}
-
-void
-UsageInt64(void)
-{
-    fprintf(stderr,
-	"Directly available cell sizes are 1..%d", (int)(sizeof(int)*CHAR_BIT));
-#if !defined(NO_EXT_BE)
-    if (sizeof(long) > sizeof(int))
-	fprintf(stderr, ",%d", (int)sizeof(long)*CHAR_BIT);
-#if (defined(UINTMAX_MAX) || defined(__SIZEOF_INT128__))
-#if defined(UINTMAX_MAX)
-    if (sizeof(uintmax_t) > sizeof(long))
-	fprintf(stderr, ",%d", (int)sizeof(uintmax_t)*CHAR_BIT);
-#endif
-#if defined(__SIZEOF_INT128__)
-    fprintf(stderr, ",%d", (int)sizeof(__int128)*CHAR_BIT);
-#endif
-#endif
-#endif
-    fprintf(stderr, " bits.\n");
-
-    fprintf(stderr,
-	"The generated C can be configured to use other types "
-	"using the 'C' #define.\n"
-#if !defined(NO_EXT_BE)
-	"The dc(1) generator can have unlimited size cells\n"
-#endif
-	);
-
-    exit(1);
 }
 
 int
@@ -722,7 +688,7 @@ main(int argc, char ** argv)
 
 	    if (cell_length <= (int)(sizeof(int))*CHAR_BIT)
 		do_codestyle = c_proftree;
-	} else if (cell_length <= (int)(sizeof(C))*CHAR_BIT) {
+	} else if (cell_length <= UINTBIG_BIT) {
 	    do_codestyle = c_runarray;
 	}
 
@@ -4217,48 +4183,17 @@ putint(unsigned int ch)
 void
 set_cell_size(int cell_bits)
 {
-#if !defined(NO_EXT_BE)
-    /* First try for an, oversized, exact C cell type */
-#if defined(UINT64_MAX)
-    if (cell_bits == (int)sizeof(uint64_t)*CHAR_BIT) {
-	cell_type = "uint64_t";
-	cell_type_iso = 1;
-    } else
-#endif
-#if defined(UINTMAX_MAX)
-    if (cell_bits == (int)sizeof(uintmax_t)*CHAR_BIT) {
-	cell_type = "uintmax_t";
-	cell_type_iso = 1;
-    } else
-#endif
-    if (cell_bits == (int)sizeof(long)*CHAR_BIT && sizeof(long) > sizeof(int)) {
-	cell_type = "unsigned long";
-    } else
-#if defined(__SIZEOF_INT128__)
-    if (cell_bits == (int)sizeof(__int128)*CHAR_BIT) {
-	cell_type = "unsigned __int128";
-    } else
-#endif
-	cell_type = 0;
-
-    if (cell_bits > (int)sizeof(int)*CHAR_BIT && cell_type == 0) {
-	cell_type = "C";
-    }
-
-    if (cell_type != 0) {
+    if (cell_bits > (int)sizeof(int)*CHAR_BIT) {
 	cell_length = cell_bits;
 	cell_size = 0;
 	cell_mask = ~0;
 	cell_smask = 0;
 
-	if (verbose>5) fprintf(stderr, "Cell type is %s\n", cell_type);
+	if (verbose>5) fprintf(stderr, "Cells are larger than ints\n");
 	return;
     }
-#else
-    cell_type = 0;
-#endif
 
-    if (cell_bits >= (int)sizeof(int)*CHAR_BIT || cell_bits <= 0) {
+    if (cell_bits == (int)sizeof(int)*CHAR_BIT || cell_bits <= 0) {
 	if (cell_bits == -1 && opt_bytedefault) {
 	    cell_size = 8;	/* BF definition not CHAR_BIT */
 	    cell_mask = (2 << (cell_size-1)) - 1;	/* GCC Whinge */
@@ -4285,14 +4220,7 @@ set_cell_size(int cell_bits)
 	fprintf(stderr, "A minimum cell size of 7 bits is needed for ASCII. "
 			"Add -fintio first.\n");
 	exit(1);
-    } else if (cell_size <= CHAR_BIT)
-	cell_type = "unsigned char";
-    else if (cell_mask > 0 && cell_mask <= USHRT_MAX)
-	cell_type = "unsigned short";
-    else if (cell_bits > (int)sizeof(int)*CHAR_BIT) {
-	UsageInt64();
-    } else
-	cell_type = "unsigned int";
+    }
 }
 
 #ifdef _WIN32

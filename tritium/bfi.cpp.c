@@ -258,14 +258,25 @@ cpp_header()
 	cell_mask > 0) {
 	add_mask = 1;
     }
-    unknown_type = (strcmp(cell_type, "C") == 0);
-    if (!unknown_type) cpp_type = cell_type;
+
+    unknown_type = ((cell_size<=0) && cell_length != 64);
+    if (!unknown_type) {
+	if (cell_length <= sizeof(char)*CHAR_BIT)
+	    cpp_type = "unsigned char";
+	else if (cell_length <= sizeof(short)*CHAR_BIT)
+	    cpp_type = "unsigned short";
+	else if (cell_length <= sizeof(int)*CHAR_BIT)
+	    cpp_type = "unsigned int";
+	else if (cell_length > sizeof(int)*CHAR_BIT)
+	    cpp_type = "uint64_t";
+	else
+	    cpp_type = "unsigned long";
+    }
 
     puts("#ifndef bf_start");
     puts("#include <stdlib.h>");
     puts("#include <unistd.h>");
-    if (cell_type_iso || unknown_type)
-	puts("#include <stdint.h>");
+    puts("#include <stdint.h>");
 
     if (unknown_type) {
 	puts("#ifdef __cplusplus");

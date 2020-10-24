@@ -14,7 +14,7 @@ X(gmp,LIBGMP,
     case c_gmp: run_gmparray(); break;                           )
 #if XX == 4
     if (do_run && do_codestyle == c_default &&
-            (cell_length > (int)sizeof(C)*CHAR_BIT ||
+            (cell_length > UINTBIG_BIT ||
 		(cell_length>32 && iostyle == 3)) &&
             verbose<3 && !enable_trace && !debug_mode) {
         do_run = 1;

@@ -17,7 +17,7 @@ X(ccode,CCODE,
 
 #if (XX == 4) && !defined(DISABLE_RUNC)
     if (do_run <= 0 && do_codestyle == c_default && verbose<3
-	&& (cell_length <= sizeof(C)*CHAR_BIT)) {
+	&& (cell_length <= UINTBIG_BIT)) {
 	do_run = (do_run != 0);
 	do_codestyle = c_ccode;
     }
@@ -32,8 +32,7 @@ X(ccode,CCODE,
 
 #if XX == 4
     if (do_codestyle == c_ccode &&
-	    cell_length>sizeof(C)*CHAR_BIT && cell_length != INT_MAX &&
-	    cell_size == 0 && !strcmp(cell_type, "C")) {
+	    cell_length>UINTBIG_BIT && cell_length != INT_MAX) {
 	fprintf(stderr, "The C generator does not support that cell size\n");
 	exit(255);
     }

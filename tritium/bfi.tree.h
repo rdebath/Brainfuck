@@ -41,8 +41,6 @@ extern unsigned cell_length;
 extern int cell_size;
 extern int cell_mask;
 extern int cell_smask;
-extern char const * cell_type;
-extern int cell_type_iso;
 
 #define UM(vx) ((vx) & cell_mask)
 #define SM(vx) ((UM(vx) ^ cell_smask) - cell_smask)

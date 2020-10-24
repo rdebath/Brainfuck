@@ -31,7 +31,7 @@
 #undef DYNAMIC_MASK
 
 #define FNAME run_supermask
-#define icell   C
+#define icell   uintbig_t
 #define EXTENDED_MASK
 #define COOLFUNC
 #include "bfi.execloop.h"
