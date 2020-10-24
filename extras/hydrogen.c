@@ -10,6 +10,10 @@
 #include <unistd.h>
 #include <string.h>
 
+#if defined(__ia64__)
+#define ALIGNED
+#endif
+
 /* Choose a cell size: 0, 1, 2, 4, 127, 255, 65535, others.
  */
 #if MASK <= 1 || !defined(MASK)
@@ -151,6 +155,9 @@ struct bfi { int type; struct bfi *next, *prev, *jmp; int count; } *pgm;
 
 void run(void);
 void * tcalloc(size_t nmemb, size_t size);
+#ifdef BUSERROR
+void enable_buserror(void);
+#endif
 
 int dump_prog = 0;
 
@@ -626,8 +633,12 @@ int main(int argc, char **argv)
 		else
 		    fprintf(stderr, "%s %d \t; %p %p %p\n", tokennames[n->type],
 			    n->jmp->count, n, n->prev, n->jmp);
-	} else
+	} else {
+#ifdef BUSERROR
+	    enable_buserror();
+#endif
 	    run();
+	}
     }
     return !ifd;
 }
@@ -706,6 +717,23 @@ tcalloc(size_t nmemb, size_t size)
 #endif
     exit(42);
 }
+
+#ifdef BUSERROR
+void
+enable_buserror()
+{
+/* This triggers a Bus Error on an unaligned access. */
+#if defined(__GNUC__)
+# if defined(__i386__)
+    /* Enable Alignment Checking on x86 */
+    __asm__("pushf\norl $0x40000,(%esp)\npopf");
+# elif defined(__x86_64__)
+     /* Enable Alignment Checking on x86_64 */
+    __asm__("pushf\norl $0x40000,(%rsp)\npopf");
+# endif
+#endif
+}
+#endif
 
 
 /*
