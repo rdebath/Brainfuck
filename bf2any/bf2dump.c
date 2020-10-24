@@ -106,6 +106,8 @@ static int ind = 0;
     case 'S': printf("%s += v;\n", cell(mov)); break;
     case 'T': printf("%s -= v;\n", cell(mov)); break;
     case '*': printf("%s *= v;\n", cell(mov)); break;
+    case '/': printf("%s /= v;\n", cell(mov)); break;
+    case '%': printf("%s %%= v;\n", cell(mov)); break;
 
     case 'C': printf("%s = v*%d;\n", cell(mov), count); break;
     case 'D': printf("%s = -v*%d;\n", cell(mov), count); break;

@@ -27,6 +27,26 @@
  *      run length encoding is possible. (divmod by 256^N)
  */
 
+/*
+ * Named variables
+ *  F  Full script
+ *  p  Memory pointer
+ *  a  Memory array
+ *  V  Temp memory store
+ *  b  Code store for conditions
+ *  Z  Output bytes old style
+ *  o  Output number as char
+ *  O  Output cell
+ *  Q  Quit with STOP error
+ *  i  Input command
+ *  N  Input command part
+ *  m  mask to 0..255
+ *  M  mask command part
+ *  w  mask to 0..2^bpc
+ *  W  mask command part
+ *  v  2^bpc
+ */
+
 static int do_run = 0;
 static int do_output = 0;
 static int do_input = 0;
@@ -43,6 +63,7 @@ static FILE * ofd;
 static int outputmode = 2;
 static int inputmode = 0;
 static int stackdepth = 0;
+static int bpc = 0;
 
 static check_arg_t fn_check_arg;
 static gen_code_t gen_code;
@@ -68,6 +89,14 @@ fn_check_arg(const char * arg)
     } else if (strcmp(arg, "-d") == 0) {
 	inputmode=0; return 1;
     } else
+    if (strncmp(arg, "-b", 2) == 0 && arg[2] > '0' && arg[2] <= '9') {
+	bpc = strtol(arg+2, 0, 10);
+	if (bpc < 32) {
+	    fprintf(stderr, "Cell size must be a minimum of 32 bits\n");
+	    exit(1);
+	}
+	return 1;
+    }
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-d      Dump code"
@@ -131,6 +160,8 @@ gen_code(int ch, int count, char * strn)
     case 'B':
 	if(bytecell)
 	    pr("lmxsV");
+	else if(bpc>0)
+	    pr("lwxsV");
 	else
 	    pr("lp;asV");
 	break;
@@ -139,6 +170,8 @@ gen_code(int ch, int count, char * strn)
     case 'S': pr("lp;alV+lp:a"); break;
     case 'T': pr("lp;alV-lp:a"); break;
     case '*': pr("lp;alV*lp:a"); break;
+    case '/': pr("lp;alV/lp:a"); break;
+    case '%': pr("lp;alV%%lp:a"); break;
 
     case 'C': prv("lV%s*lp:a", dc_ltoa(count)); break;
     case 'D': prv("lV%s*lp:a", dc_ltoa(-count)); break;
@@ -153,6 +186,8 @@ gen_code(int ch, int count, char * strn)
     case ']':
 	if(bytecell)
 	    pr("lmx0!=b]Sblmx0!=bLbc");
+	else if(bpc>0)
+	    pr("lwx0!=b]Sblwx0!=bLbc");
 	else
 	    pr("lp;a0!=b]Sblp;a0!=bLbc");
 	stackdepth--;
@@ -162,6 +197,8 @@ gen_code(int ch, int count, char * strn)
     case 'E':
 	if(bytecell)
 	    pr("]Sblmx0!=bLbc");
+	else if(bpc>0)
+	    pr("]Sblwx0!=bLbc");
 	else
 	    pr("]Sblp;a0!=bLbc");
 	stackdepth--;
@@ -192,6 +229,8 @@ gen_code(int ch, int count, char * strn)
 
     if ((do_output && outputmode != 2) || bytecell)
 	fprintf(ofd, "[256+]sM [lp;a 256 %% d0>M]sm\n");
+    if (!bytecell && bpc>0)
+	fprintf(ofd, "2 %d^sv[lv+]sW [lp;a lv %% d0>W]sw\n", bpc);
 
     if (do_output)
     {

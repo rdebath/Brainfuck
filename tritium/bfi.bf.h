@@ -7,8 +7,7 @@ void print_bf(void);
 
 #ifdef XX
 X(bf,BF,
-    printf("   -F   Attempt to regenerate BF code. (This disables a lot of optimisations.)\n");
-    printf("   -bfrle Generate an RLE variant of BF\n");,
+    printf("   -F   Attempt to regenerate BF code. (This disables a lot of optimisations.)\n");,
     case 'F': do_codestyle = c_bf; break;                           ,
     case c_bf: print_bf(); break;                                   ,
     Nothing_Here						    )

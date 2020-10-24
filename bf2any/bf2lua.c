@@ -53,6 +53,7 @@ static int maxwhile = MAXWHILE;
 static void print_cstring(char * str);
 
 static int do_dump;
+static int do_dbl;
 static FILE * ofd;
 #ifdef ENABLE_LIBLUA
 static char * luacode = 0;
@@ -76,6 +77,10 @@ fn_check_arg(const char * arg)
         return 1;
     } else
 #endif
+    if (strcmp(arg, "-dbl") == 0) {
+        do_dbl = 1;
+        return 1;
+    } else
     if (strncmp(arg, "-w", 2) == 0) {
 	maxwhile = strtol(arg+2, 0, 10);
 	return 1;
@@ -127,13 +132,42 @@ gen_code(int ch, int count, char * strn)
     }
 
     if (do_tape) {
-	fprintf(ofd, "local m = setmetatable({},{__index=function() return 0 end})\n");
-	fprintf(ofd, "local p = 1\n");
-	fprintf(ofd, "local v = 0\n");
-	/* Arrays are faster if populated from 1, negative indexes are ok.
-	   Luajit likes zero. */
-	fprintf(ofd, "for i=0,32 do m[i] = 0 end\n");
-	fprintf(ofd, "\n");
+	fprintf(ofd, "%s\n",
+	    "if jit then jit.opt.start(\"loopunroll=200\") end");
+
+	if (do_dbl)
+	    fprintf(ofd, "%s\n",
+		     "local m = setmetatable({},{__index=function() return 0 end})"
+		"\n" "local v = 0"
+		"\n" "local p = 1"
+		"\n" "local div = function(n,d) return math.floor(n/d); end"
+		"\n" "do local i; for i=1,32 do m[i] = 0 end; end"
+		);
+	else {
+	    const char * luajit_type = bytecell? "uint8_t": "uint64_t";
+	    /* For Lua Arrays are faster if populated from 1, negative
+	     * indexes are ok. Luajit likes zero. Luajit's ffi gives me a
+	     * real 64bit unsigned int, so divmod can work properly. The
+	     * 32bit ints do NOT work, but uint8_t does and is rather quick.
+	     */
+	    fprintf(ofd, "%s%s%s%d%s%s%s%d%s\n",
+		     "local m, v, p, ffi, div"
+		"\n" "if type(rawget(_G, \"jit\")) ~= 'table' then"
+		"\n" "  m = setmetatable({},{__index=function() return 0 end})"
+		"\n" "  v = 0"
+		"\n" "  p = 1"
+		"\n" "  local i"
+		"\n" "  for i=1,32 do m[i] = 0 end"
+		"\n" "  div = function(n,d) return math.floor(n/d); end"
+		"\n" "else"
+		"\n" "  ffi = require(\"ffi\")"
+		"\n" "  m = ffi.new(\"",luajit_type,"[",tapesz,"]\");"
+		"\n" "  v = ffi.new(\"",luajit_type,"\")"
+		"\n" "  p = ",tapeinit,""
+		"\n" "  div = function(n,d) return n/d; end"
+		"\n" "end"
+		);
+	}
     }
 
     if (icount < maxwhile) {
@@ -238,6 +272,8 @@ loutcmd(int ch, int count, struct instruction *n)
     case 'S': I; fprintf(ofd, "m[p] = m[p]+v\n"); break;
     case 'T': I; fprintf(ofd, "m[p] = m[p]-v\n"); break;
     case '*': I; fprintf(ofd, "m[p] = m[p]*v\n"); break;
+    case '/': I; fprintf(ofd, "m[p] = div(m[p], v)\n"); break;
+    case '%': I; fprintf(ofd, "m[p] = m[p]%%v\n"); break;
 
     case 'C': I; fprintf(ofd, "m[p] = v*%d\n", count); break;
     case 'D': I; fprintf(ofd, "m[p] = -v*%d\n", count); break;
@@ -292,7 +328,7 @@ loutcmd(int ch, int count, struct instruction *n)
 	if (do_output) {
 	    fprintf(ofd, "\n");
 	    fprintf(ofd, "function putch()\n");
-	    fprintf(ofd, "    io.write(string.char(m[p]%%256))\n");
+	    fprintf(ofd, "    io.write(string.char(tonumber(m[p]%%256)))\n");
 	    fprintf(ofd, "    io.flush()\n");
 	    fprintf(ofd, "end\n");
 	}

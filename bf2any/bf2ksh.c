@@ -46,7 +46,7 @@ gen_code(int ch, int count, char * strn)
 	if (ch == '>') { curr_offset += count; return; }
 	if (ch == '<' && curr_offset > count) { curr_offset -= count; return; }
 	if (ch != '"' && ch != '~') {
-	    pr("typeset -i M P V");
+	    pr("typeset -i -u M P V");
 	    prv("P=%d", curr_offset);
 	    curr_offset = -1;
 	}
@@ -57,7 +57,8 @@ gen_code(int ch, int count, char * strn)
 	pr("#!/bin/ksh");
 	pr("(eval 'set -o sh +o sh') 2>/dev/null && set +o sh 2>/dev/null");
 	pr("(eval 'set -o posix +o posix') 2>/dev/null && set +o posix 2>/dev/null");
-	pr("if (eval 'typeset -i M P V && M[1]=3 && ((M[500]+=(1),1)) &&");
+	pr("if (eval 'typeset -i -u M P V && M[1]=3 && ((M[500]+=(1),1)) &&");
+	pr("   ((P=-1)) && ((P>10)) && ((P%%10>0)) &&");
 	pr("   ((M[1]+=1)) && [[ ${M[1]} -eq 4 && ${M[500]} -eq 1 ]]' ) 2>/dev/null");
 	pr("then :");
 	pr("else");
@@ -94,6 +95,8 @@ gen_code(int ch, int count, char * strn)
     case 'S': arith(); pr("M[P]+=V,"); break;
     case 'T': arith(); pr("M[P]-=V,"); break;
     case '*': arith(); pr("M[P]*=V,"); break;
+    case '/': arith(); pr("M[P]/=V,"); break;
+    case '%': arith(); pr("M[P]%%=V,"); break;
 
     case 'C': arith(); prv("M[P]=V*%d,", count); break;
     case 'D': arith(); prv("M[P]=-V*%d,", count); break;

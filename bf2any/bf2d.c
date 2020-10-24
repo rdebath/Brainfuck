@@ -37,8 +37,9 @@ gen_code(int ch, int count, char * strn)
 		pr("int v;");
 		dumbcast = "cast(char) ";
 	    } else {
-		prv("int[] mem; mem.length = %d; mem[] = 0;", tapesz);
-		prv("int v, m = %d;", tapeinit);
+		prv("uint[] mem; mem.length = %d; mem[] = 0;", tapesz);
+		pr("uint v;");
+		prv("int m = %d;", tapeinit);
 	    }
 	    pr("stdout.setvbuf(0, _IONBF);");
 	}
@@ -58,6 +59,8 @@ gen_code(int ch, int count, char * strn)
     case 'S': pr("mem[m] += v;"); break;
     case 'T': pr("mem[m] -= v;"); break;
     case '*': pr("mem[m] *= v;"); break;
+    case '/': pr("mem[m] /= v;"); break;
+    case '%': pr("mem[m] %%= v;"); break;
 
     case 'C': prv2("mem[m] = %s(v*%d);", dumbcast, count); break;
     case 'D': prv2("mem[m] = %s(-v*%d);", dumbcast, count); break;

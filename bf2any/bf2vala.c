@@ -47,13 +47,21 @@ gen_code(int ch, int count, char * strn)
 	puts("}");
 	break;
 
-    case '=': I; printf("m[p] = %d;\n", count); break;
+    case '=':
+	if (bytecell) {
+	    I; printf("m[p] = %d;\n", count & 0xFF);
+	} else {
+	    I; printf("m[p] = %d;\n", count);
+	}
+	break;
     case 'B': I; printf("v = m[p];\n"); break;
     case 'M': I; printf("m[p] = m[p]+v*%d;\n", count); break;
     case 'N': I; printf("m[p] = m[p]-v*%d;\n", count); break;
     case 'S': I; printf("m[p] = m[p]+v;\n"); break;
     case 'T': I; printf("m[p] = m[p]-v;\n"); break;
     case '*': I; printf("m[p] = m[p]*v;\n"); break;
+    case '/': I; printf("m[p] = m[p]/v;\n"); break;
+    case '%': I; printf("m[p] = m[p]%%v;\n"); break;
 
     case 'C': I; printf("m[p] = v*%d;\n", count); break;
     case 'D': I; printf("m[p] = -v*%d;\n", count); break;

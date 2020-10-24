@@ -87,6 +87,20 @@ gen_code(int ch, int count, char * strn)
     case 'S': I; printf("%s += v\n", cm); break;
     case 'T': I; printf("%s -= v\n", cm); break;
     case '*': I; printf("%s *= v\n", cm); break;
+    case '/':
+	if (bytecell) {
+	    I; printf("if (%s < 0) %s += 256\n", cm, cm);
+	    I; printf("if (v < 0) v += 256\n");
+	}
+	I; printf("%s = int(%s / v)\n", cm, cm);
+	break;
+    case '%':
+	if (bytecell) {
+	    I; printf("if (%s < 0) %s += 256\n", cm, cm);
+	    I; printf("if (v < 0) v += 256\n");
+	}
+	I; printf("%s %%= v\n", cm);
+	break;
 
     case 'C': I; printf("%s = v*%d\n", cm, count); break;
     case 'D': I; printf("%s = -v*%d\n", cm, count); break;

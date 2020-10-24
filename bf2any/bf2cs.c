@@ -24,33 +24,38 @@ gen_code(int ch, int count, char * strn)
     case '!':
 	pr("using System;");
 	pr("class Program {");
-	ind++;
-	pr("public static void Main() {");
+	pr(" public static void Main() {");
+	pr("  unchecked {");
 	ind++;
 	if (!count) {
-	    prv("var M = new long[%d];", tapesz);
+	    prv("var M = new ulong[%d];", tapesz);
 	    prv("var P = %d;", tapeinit);
-	    pr("long V = 0;");
+	    pr("ulong V = 0;");
+	    pr("int InpCh = 0;");
+	    pr("V = V|0;");
+	    pr("InpCh = InpCh|0;");
 	}
 	break;
 
     case 'X': pr("throw new System.InvalidOperationException(\"Infinite Loop detected.\");"); break;
 
-    case '=': prv("M[P] = %d;", count); break;
+    case '=': prv("M[P] = (ulong)%d;", count); break;
     case 'B': pr("V = M[P];"); break;
-    case 'M': prv("M[P] += V*%d;", count); break;
-    case 'N': prv("M[P] -= V*%d;", count); break;
+    case 'M': prv("M[P] += V*(ulong)%d;", count); break;
+    case 'N': prv("M[P] -= V*(ulong)%d;", count); break;
     case 'S': pr("M[P] += V;"); break;
     case 'T': pr("M[P] -= V;"); break;
     case '*': pr("M[P] *= V;"); break;
+    case '/': pr("M[P] /= V;"); break;
+    case '%': pr("M[P] %%= V;"); break;
 
-    case 'C': prv("M[P] = V*%d;", count); break;
-    case 'D': prv("M[P] = -V*%d;", count); break;
+    case 'C': prv("M[P] = V*(ulong)%d;", count); break;
+    case 'D': prv("M[P] = 0 - V*(ulong)%d;", count); break;
     case 'V': pr("M[P] = V;"); break;
-    case 'W': pr("M[P] = -V;"); break;
+    case 'W': pr("M[P] = 0 - V;"); break;
 
-    case '+': prv("M[P] += %d;", count); break;
-    case '-': prv("M[P] -= %d;", count); break;
+    case '+': prv("M[P] += (ulong)%d;", count); break;
+    case '-': prv("M[P] -= (ulong)%d;", count); break;
     case '>': prv("P += %d;", count); break;
     case '<': prv("P -= %d;", count); break;
     case '.':
@@ -63,8 +68,8 @@ gen_code(int ch, int count, char * strn)
 	    pr("Console.Write((Char)((ulong)M[P]>0xFFFF?0xFFFD:M[P]));\n");
 	break;
     case ',':
-	pr("V=Console.Read();");
-	pr("if(V != -1) { M[P] = V; }");
+	pr("InpCh = Console.Read();");
+	pr("if(InpCh != -1) { M[P] = (ulong) InpCh; }");
 	break;
     case '"': print_cstring(strn); break;
 
@@ -74,7 +79,7 @@ gen_code(int ch, int count, char * strn)
     case 'I': prv("if(%sM[P]!=0) {", bytecell?"(byte)":""); ind++; break;
     case 'E': ind--; pr("}"); break;
 
-    case '~': ind--; pr("}"); ind--; pr("}"); break;
+    case '~': ind--; pr("  }") ; pr(" }"); pr("}"); break;
     }
 }
 

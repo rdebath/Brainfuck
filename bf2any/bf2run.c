@@ -23,8 +23,10 @@ static size_t tapealloc;
 
 #define TOKEN_LIST(Mac) \
     Mac(STOP) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
-    Mac(SET) Mac(BEG) Mac(MUL) Mac(MUL1) Mac(SETNV) Mac(MULV) Mac(SETV) \
-    Mac(ZFIND) Mac(RAILC) Mac(RAILZ) Mac(CHR) Mac(DUMP) Mac(NOP)
+    Mac(SET) Mac(BEG) Mac(MUL) Mac(MUL1) Mac(SETNV) Mac(MULV) \
+    Mac(DIVV) Mac(MODV) Mac(SETV) \
+    Mac(ZFIND) Mac(RAILC) Mac(RAILZ) Mac(CHR) \
+    Mac(DUMP) Mac(NOP)
 
 #define GEN_TOK_ENUM(NAME) T_ ## NAME,
 enum token { TOKEN_LIST(GEN_TOK_ENUM) TCOUNT};
@@ -109,6 +111,8 @@ gen_code(int ch, int count, char * strn)
     case 'S': *mptr++ = t = T_MUL1; break;
     case 'T': *mptr++ = t = T_MUL; *mptr++ = -1; break;
     case '*': *mptr++ = t = T_MULV; break;
+    case '/': *mptr++ = t = T_DIVV; break;
+    case '%': *mptr++ = t = T_MODV; break;
 
     case 'C': *mptr++ = t = T_SETNV; *mptr++ = count; break;
     case 'D': *mptr++ = t = T_SETNV; *mptr++ = -count; break;
@@ -263,6 +267,7 @@ dumpprog(int * p, int * ep)
 	case T_PRT: case T_INP:
 	case T_BEG: case T_MUL1:
 	case T_SETV: case T_MULV:
+	case T_DIVV: case T_MODV:
 	case T_DUMP: case T_NOP:
 	    break;
 	case T_WHL: case T_END:
@@ -336,6 +341,8 @@ runprog_int(register int * p, register tcell *mp)
 
 	case T_MUL1: *mp += a; p+=2; break;
 	case T_MULV: *mp *= a; p+=2; break;
+	case T_DIVV: *mp /= a; p+=2; break;
+	case T_MODV: *mp %= a; p+=2; break;
 	case T_SETV: *mp = a; p+=2; break;
 	case T_MUL: *mp += p[2] * a; p+=3; break;
 	case T_SETNV: *mp = p[2] * a; p+=3; break;

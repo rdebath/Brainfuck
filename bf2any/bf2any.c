@@ -422,7 +422,7 @@ pipe_to_be(char ** filelist, int filecount)
 	    m0 = (ch == '[' || ch == ']' || ch == '.' || ch == ',' ||
 		  ch == 'I' || ch == 'E' || ch == 'B' || ch == 'S' ||
 		  ch == 'T' || ch == 'V' || ch == 'W' || ch == '"' ||
-		  ch == 'X' || ch == '*');
+		  ch == 'X' || ch == '*' || ch == '/' || ch == '%');
 
 	    if (!m) {
 		multi = 0;

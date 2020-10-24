@@ -5,15 +5,13 @@
 #include "bf2any.h"
 
 /*
+ * FreeBasic translation from BF, runs at about 2,800,000,000 instructions per second.
  * VB.NET translation from BF, runs at about 2,000,000,000 instructions per second.
  *
- * Brandy basic translation from BF, runs at about 15,000,000 instructions per second.
- * bwbasic (-bw) translation from BF, runs at about 100,000 instructions per second.
+ * Brandy basic (-bbc) translation from BF, runs at about 15,000,000 instructions per second.
  * bas-2.3 (-ansi) translation from BF, runs at about 1,500,000 instructions per second.
- * MOLE-Basic-0.7 (-goto|sort) translation from BF, runs at about 400,000 instructions per second.
- *	WHILE/WEND is broken in MOLE Basic.
- *
- * FreeBasic translation from BF, runs at about 2,800,000,000 instructions per second.
+ * MOLE-Basic-0.7 (-mole|sort) translation from BF, runs at about 400,000 instructions per second.
+ * bwbasic (-bw) translation from BF, runs at about 100,000 instructions per second.
  *
  * Are these supposed to be the same language!!
  */
@@ -32,15 +30,18 @@ static char tapeptr[16]="P";
 static char tempcell[16]="V";
 static char tapename[16]="M";
 static char modop[16]="MOD";
+static char divop[16]="\\";
 
-static enum { loop_ansi, loop_wend, loop_endw, loop_vb, loop_goto }
+static enum { loop_ansi, loop_wend, loop_endwhile, loop_end_while, loop_yabasic, loop_goto }
     loop_style = loop_ansi;
 static enum { init_none, init_ansi, init_bacon, init_vb, init_fbas, init_bas256 }
     init_style = init_ansi;
-static enum { end_none, end_end, end_system, end_vb }
-    end_style = end_end;
-static enum { io_ansi, io_bbc, io_vb, io_fbas, io_bas256, io_bacon }
+static enum { end_none, end_ansi, end_system, end_vb }
+    end_style = end_ansi;
+static enum { io_ansi, io_bbc, io_vb, io_fbas, io_bas256, io_bacon, io_yabasic, io_mole }
     io_style = io_ansi;
+static enum { if_ansi, if_endif, if_goto }
+    if_style = if_ansi;
 
 static void print_string(char * str);
 
@@ -67,11 +68,13 @@ line_no_indent(void)
 static int
 fn_check_arg(const char * arg)
 {
-    if (strcmp("-bbc", arg) ==0) {
+    if (strcmp("-bbc", arg) ==0 || strcmp("-brandy", arg) ==0) {
+	strcpy(divop, "/");
 	init_style = init_ansi;
-	loop_style = loop_endw;
-	end_style = end_end;
+	loop_style = loop_endwhile;
+	end_style = end_ansi;
 	io_style = io_bbc;
+	if_style = if_endif;
 	strcpy(tapecell, "M%(P%)");
 	strcpy(tapeptr, "P%");
 	strcpy(tempcell, "V%");
@@ -87,27 +90,51 @@ fn_check_arg(const char * arg)
     } else
     if (strcmp("-wend", arg) ==0) {
 	loop_style = loop_wend;
+	if_style = if_ansi;
 	return 1;
     } else
     if (strcmp("-ansi", arg) ==0) {
+	strcpy(divop, "\\");
 	init_style = init_ansi;
 	loop_style = loop_ansi;
-	end_style = end_end;
+	end_style = end_ansi;
 	io_style = io_ansi;
+	if_style = if_ansi;
 	return 1;
     } else
     if (strcmp("-vb", arg) ==0) {
+	strcpy(divop, "/");
 	init_style = init_vb;
-	loop_style = loop_vb;
+	loop_style = loop_end_while;
 	end_style = end_vb;
 	io_style = io_vb;
+	if_style = if_ansi;
+	return 1;
+    } else
+    if (strcmp("-yabasic", arg) ==0) {
+	loop_style = loop_yabasic;
+	io_style = io_yabasic;
+	if_style = if_endif;
 	return 1;
     } else
     if (strcmp("-goto", arg) ==0) {
+	strcpy(divop, "\\");
 	init_style = init_ansi;
 	loop_style = loop_goto;
-	end_style = end_end;
+	end_style = end_ansi;
 	io_style = io_ansi;
+	if_style = if_goto;
+	enable_linenos = 1;
+	if (do_indent == 0) do_indent--;
+	return 1;
+    } else
+    if (strcmp("-mole", arg) ==0) {
+	strcpy(divop, "");
+	init_style = init_ansi;
+	loop_style = loop_goto;
+	end_style = end_ansi;
+	io_style = io_mole;
+	if_style = if_goto;
 	enable_linenos = 1;
 	if (do_indent == 0) do_indent--;
 	return 1;
@@ -115,34 +142,43 @@ fn_check_arg(const char * arg)
     if (strcmp("-bacon", arg) ==0) {
 	/* BaCon basic, uses square brackets -- wrong. */
 	strcpy(tapecell, "M[P]");
+	strcpy(divop, "/");
+	strcpy(modop, "%");
 	init_style = init_bacon;
 	loop_style = loop_wend;
-	end_style = end_end;
+	end_style = end_ansi;
 	io_style = io_bacon;
+	if_style = if_ansi;
 	return 1;
     } else
     if (strcmp("-bw", arg) ==0) {
+	strcpy(divop, ""); /* There isn't one, use MOD expression */
 	init_style = init_ansi;
 	loop_style = loop_ansi;
 	end_style = end_system;
 	io_style = io_ansi;
+	if_style = if_ansi;
 	return 1;
     } else
     if (strcmp("-free", arg) ==0) {
+	strcpy(divop, "\\");
 	init_style = init_fbas;
-	loop_style = loop_wend;
+	loop_style = loop_wend; /* Also loop_ansi */
 	end_style = end_none;
 	io_style = io_fbas;
+	if_style = if_endif; /* Also if_ansi */
 	return 1;
     } else
     if (strcmp("-bas256", arg) ==0) {
 	/* basic256 basic, uses square brackets -- wrong. */
 	strcpy(tapecell, "M[P]");
+	strcpy(divop, "/");
 	strcpy(modop, "%");
 	init_style = init_bas256;
-	loop_style = loop_endw;
-	end_style = end_end;
+	loop_style = loop_endwhile;
+	end_style = end_ansi;
 	io_style = io_bas256;
+	if_style = if_ansi;
 	return 1;
     } else
     if (strcmp("-indent", arg) ==0) {
@@ -153,19 +189,25 @@ fn_check_arg(const char * arg)
 	do_indent = -1;
 	return 1;
     } else
+    if (strcmp("-no-intdiv", arg) ==0) {
+	strcpy(divop, "");
+	return 1;
+    } else
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "default is ansi"
-	"\n\t"  "-ansi   ANSI basic (do while style loop)"
-	"\n\t"  "-free   Free BASIC"
-	"\n\t"  "-bbc    BBC Basic"
-	"\n\t"  "-wend   Like ansi but use While ... Wend"
-	"\n\t"  "-goto   Basic using GOTOs and line numbers (may need 'sort -n')"
-	"\n\t"  "-vb     Microsoft VB.NET"
-	"\n\t"  "-bw     BWBasic"
-	"\n\t"  "-%      ANSI basic with % variables"
-	"\n\t"  "-bacon  BaCon"
-	"\n\t"  "-bas256 Basic256"
+	"\n\t"  "-ansi       ANSI basic (do while style loop)"
+	"\n\t"  "-free       Free BASIC"
+	"\n\t"  "-bbc        BBC Basic (Also -brandy)"
+	"\n\t"  "-wend       Like ansi but use While ... Wend"
+	"\n\t"  "-goto       Basic using GOTOs and line numbers (may need 'sort -n')"
+	"\n\t"  "-vb         Microsoft VB.NET"
+	"\n\t"  "-bw         BWBasic"
+	"\n\t"  "-bacon      BaCon"
+	"\n\t"  "-bas256     Basic256"
+	"\n\t"  "-%          Add a '%' suffix to variables"
+	"\n\t"  "-no-indent  Don't indent the code."
+	"\n\t"  "-no-intdiv  Don't use integer div operation."
 	);
 	return 1;
     } else
@@ -207,11 +249,11 @@ gen_code(int ch, int count, char * strn)
 		if (bytecell) {
 		    I; printf("Dim %s() As UByte\n", tapename);
 		} else {
-		    I; printf("Dim %s() As Integer\n", tapename);
+		    I; printf("Dim %s() As UInteger\n", tapename);
 		}
 		I; printf("ReDim %s(%d)\n", tapename, tapesz);
 		I; printf("Dim %s As Integer\n", tapeptr);
-		I; printf("Dim %s As Integer\n", tempcell);
+		I; printf("Dim %s As UInteger\n", tempcell);
 		I; printf("Dim shared InpStr As string\n");
 		I; printf("%s = %d\n", tapeptr, tapeinit);
 		printf("\n");
@@ -262,7 +304,7 @@ gen_code(int ch, int count, char * strn)
 	switch(end_style) {
 	    case end_none:
 		break;
-	    case end_end:
+	    case end_ansi:
 		I; printf("END\n");
 		break;
 	    case end_system:
@@ -276,31 +318,31 @@ gen_code(int ch, int count, char * strn)
 		break;
 	}
 	if (do_output && io_style == io_bbc) {
-	    I; printf("DEF PROCPRT(C%%)\n");
-	    I; printf("IF C%%=10 THEN PRINT ELSE PRINT CHR$(C%%);\n");
-	    I; printf("ENDPROC\n");
+	    I; puts("DEF PROCPRT(C%)");
+	    I; puts("IF C%=10 THEN PRINT ELSE PRINT CHR$(C%);");
+	    I; puts("ENDPROC");
 	}
 	if (do_input && io_style == io_bbc) {
-	    I; printf("DEF PROCINP\n");
-	    I; printf("IF I%% = 0 THEN\n");
+	    I; puts("DEF PROCINP");
+	    I; puts("IF I% = 0 THEN");
 	    ind ++;
-	    I; printf("INPUT \"\" A$\n");
-	    I; printf("I%% = 1\n");
+	    I; puts("INPUT \"\" A$");
+	    I; puts("I% = 1");
 	    ind --;
-	    I; printf("ENDIF\n");
+	    I; puts("ENDIF");
 
-	    I; printf("IF A$ = \"\" THEN\n");
+	    I; puts("IF A$ = \"\" THEN");
 	    ind ++;
-	    I; printf("%s = 10\n", tapecell);
-	    I; printf("I%% = 0\n");
+	    I; printf("%s%s\n", tapecell," = 10");
+	    I; puts("I% = 0");
 	    ind --;
-	    I; printf("ELSE\n");
+	    I; puts("ELSE");
 	    ind ++;
-	    I; printf("%s = ASC(A$)\n", tapecell);
-	    I; printf("A$ = MID$(A$,2)\n");
+	    I; printf("%s%s\n", tapecell," = ASC(A$)");
+	    I; puts("A$ = MID$(A$,2)");
 	    ind --;
-	    I; printf("ENDIF\n");
-	    I; printf("ENDPROC\n");
+	    I; puts("ENDIF");
+	    I; puts("ENDPROC");
 	}
 	break;
 
@@ -328,6 +370,16 @@ gen_code(int ch, int count, char * strn)
     case 'S': I; printf("%s=%s+%s\n", tapecell, tapecell, tempcell); break;
     case 'T': I; printf("%s=%s-%s\n", tapecell, tapecell, tempcell); break;
     case '*': I; printf("%s=%s*%s\n", tapecell, tapecell, tempcell); break;
+    case '/':
+	if (*divop) {
+	    I; printf("%s=%s %s %s\n", tapecell, tapecell, divop, tempcell);
+	} else {
+	    I; printf("%s%s%s%s%s%s%s%s%s%s%s\n",
+		tapecell,"= (",tapecell," - (",tapecell," ",modop," ",tempcell,")) / ",tempcell
+		);
+	}
+	break;
+    case '%': I; printf("%s=%s %s %s\n", tapecell, tapecell, modop, tempcell); break;
 
     case 'C': I; printf("%s=%s*%d\n", tapecell, tempcell, count); break;
     case 'D': I; printf("%s=-%s*%d\n", tapecell, tempcell, count); break;
@@ -340,7 +392,7 @@ gen_code(int ch, int count, char * strn)
     case '>': I; printf("%s=%s+%d\n", tapeptr, tapeptr, count); break;
     case '.':
 	switch(io_style) {
-	case io_ansi:
+	case io_ansi: case io_mole: case io_bacon:
 	    I; printf("IF %s<>10 THEN PRINT CHR$(%s);\n", tapecell, tapecell);
 	    I; printf("IF %s=10 THEN PRINT\n", tapecell);
 	    break;
@@ -359,24 +411,51 @@ gen_code(int ch, int count, char * strn)
 	    I; printf("IF %s <> 10 THEN PRINT CHR(%s);\n", tapecell, tapecell);
 	    I; printf("IF %s = 10 THEN PRINT\n", tapecell);
 	    break;
-	case io_bacon:
-	    I; printf("IF %s <> 10 THEN PRINT CHR$(%s);\n", tapecell, tapecell);
-	    I; printf("IF %s = 10 THEN PRINT\n", tapecell);
+	case io_yabasic:
+	    I; printf("IF %s <> 10 THEN PRINT CHR$(%s); : ENDIF\n", tapecell, tapecell);
+	    I; printf("IF %s = 10 THEN PRINT : ENDIF\n", tapecell);
 	    break;
 	}
 	break;
     case '"': print_string(strn); break;
     case ',':
 	switch(io_style) {
-	case io_ansi:
-	    I; printf("IF A$ = \"\" THEN\n");
-	    ind ++;
-	    I; printf("INPUT \"\",A$\n");
-	    I; printf("A$ = A$ + CHR$(10)\n");
-	    ind --;
-	    I; printf("END IF\n");
-	    I; printf("%s = ASC(A$)\n", tapecell);
-	    I; printf("A$ = MID$(A$,2)\n");
+	case io_ansi: case io_mole:
+	    if (if_style == if_goto) {
+
+		int if_lno, saveline;
+		if_lno = lineno;
+		lineno += lineinc;
+		ind ++;
+		if (io_style == io_mole) {
+		    I; printf("INPUT A$\n");
+		    I; printf("A$ = A$ + CHR$(10)\n");
+		} else {
+		    I; printf("INPUT \"\",A$\n");
+		    I; printf("A$ = A$ + CHR$(10)\n");
+		}
+		ind --;
+		saveline = lineno;
+		lineno = if_lno;
+		I; printf("IF A$ <> \"\" THEN GOTO %d\n", saveline+lineinc*2);
+		lineno = saveline;
+		I; printf("REM END IF %d\n", if_lno+lineinc*2);
+		I; printf("%s = ASC(A$)\n", tapecell);
+		I; printf("A$ = MID$(A$,2)\n");
+
+	    } else {
+
+		I; printf("IF A$ = \"\" THEN\n");
+		ind ++;
+		/* NB: Comma means "don't print a '?'" */
+		I; printf("INPUT \"\",A$\n");
+		I; printf("A$ = A$ + CHR$(10)\n");
+		ind --;
+		I; printf("END IF\n");
+		I; printf("%s = ASC(A$)\n", tapecell);
+		I; printf("A$ = MID$(A$,2)\n");
+
+	    }
 	    break;
 	case io_vb:
 	    I; printf("Do\n");
@@ -406,15 +485,25 @@ gen_code(int ch, int count, char * strn)
 	    ind --;
 	    I; printf("END IF\n");
 	    I; printf("%s = ASC(A$)\n", tapecell);
-	    I; printf("A$ = RIGHT(A$,LENGTH(A$)-1)\n");
+	    I; printf("A$ = RIGHT(A$,LENGTH(A$)-1)\n"); /* Nope: MID$ */
 	    break;
 	case io_bacon:
 	    I; printf("IF A$ = \"\" THEN\n");
 	    ind ++;
 	    I; printf("INPUT \"\",A$\n");
-	    I; printf("A$ = A$ & CHR$(10)\n");
+	    I; printf("A$ = A$ & CHR$(10)\n"); /* Note '&' operator */
 	    ind --;
 	    I; printf("END IF\n");
+	    I; printf("%s = ASC(A$)\n", tapecell);
+	    I; printf("A$ = MID$(A$,2)\n");
+	    break;
+	case io_yabasic:
+	    I; printf("IF A$ = \"\" THEN\n");
+	    ind ++;
+	    I; printf("INPUT \"\"  A$\n"); /* No ',' flag */
+	    I; printf("A$ = A$ + CHR$(10)\n");
+	    ind --;
+	    I; printf("ENDIF\n");
 	    I; printf("%s = ASC(A$)\n", tapecell);
 	    I; printf("A$ = MID$(A$,2)\n");
 	    break;
@@ -440,12 +529,14 @@ gen_code(int ch, int count, char * strn)
 	    case loop_wend:
 		I; printf("WHILE %s<>0\n", tapecell);
 		break;
-	    case loop_vb:
+	    case loop_end_while:
 		I; printf("While %s<>0\n", tapecell);
 		break;
-	    case loop_endw:
+	    case loop_endwhile:
 		I; printf("WHILE %s<>0\n", tapecell);
 		break;
+	    case loop_yabasic:
+		I; printf("WHILE (%s<>0)\n", tapecell);
 	}
 	ind++;
 	break;
@@ -475,12 +566,14 @@ gen_code(int ch, int count, char * strn)
 	    case loop_wend:
 		I; printf("WEND\n");
 		break;
-	    case loop_vb:
+	    case loop_end_while:
 		I; printf("End While\n");
 		break;
-	    case loop_endw:
+	    case loop_endwhile:
 		I; printf("ENDWHILE\n");
 		break;
+	    case loop_yabasic:
+		I; printf("WEND\n");
 	}
 	break;
     case 'I':
@@ -502,8 +595,8 @@ gen_code(int ch, int count, char * strn)
 	break;
     case 'E':
 	ind--;
-	switch(loop_style) {
-	    case loop_goto:
+	switch(if_style) {
+	    case if_goto:
 		{
 		    struct stkdat * n = sp;
 		    int saveline;
@@ -516,6 +609,9 @@ gen_code(int ch, int count, char * strn)
 		    I; printf("REM END IF %d\n", n->id+lineinc*2);
 		    free(n);
 		}
+		break;
+	    case if_endif:
+		I; printf("ENDIF\n");
 		break;
 	    default:
 		I; printf("END IF\n");

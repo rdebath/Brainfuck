@@ -88,7 +88,7 @@ gen_code(int ch, int count, char * strn)
 	    }
 	    printf("#if defined(BPC) && (BPC > 0)\n");
 	    printf("enum { CellsTooSmall=1/((BPC)>=32) };\n");
-	    printf("#define mp_mask_BPC(c) E(mp_mod_2d(c, BPC, c))\n");
+	    printf("#define mp_mask_BPC(c) E(mp_mod(c, mask, c))\n");
 	    printf("#else\n");
 	    printf("#define mp_mask_BPC(c)\n");
 	    printf("#endif\n");
@@ -182,6 +182,9 @@ gen_code(int ch, int count, char * strn)
 	I; printf("register mp_int * p;\n");
 	I; printf("register int c, bn_err = 0;\n");
 	I; printf("mp_int v[1], t1[1], t2[1];\n");
+	   printf("#ifdef BPC\n");
+	I; printf("mp_int mask[1];\n");
+	   printf("#endif\n");
 	I; printf("mp_init_multi(v, t1, t2, 0);\n");
 	I; printf("setbuf(stdout, 0);\n");
 	I; printf("p = move_ptr(mem,0);\n");
@@ -198,6 +201,12 @@ gen_code(int ch, int count, char * strn)
 	I; printf("exit(255);\n");
 	ind--;
 	I; printf("}\n");
+
+	   printf("\n");
+	   printf("#ifdef BPC\n");
+	I; printf("E(mp_init_set(mask, 1));\n");
+	I; printf("E(mp_mul_2d(mask, BPC, mask));\n");
+	   printf("#endif\n");
 
 	break;
 
@@ -255,10 +264,14 @@ gen_code(int ch, int count, char * strn)
 	I; printf("E(mp_sub(p, v, p));\n");
 	break;
 
+    case 'V':
+	count = 1;
+	if (0) {
+    case 'W':
+	    count = -1;
+	}
     case 'C':
     case 'D':
-    case 'V':
-    case 'W':
 	if (count > 1 && count <= 127) {
 	    I; printf("E(mp_mul_d(v, %d, p));\n", count);
 	} else
@@ -276,6 +289,14 @@ gen_code(int ch, int count, char * strn)
     case '*':
 	I; printf("E(mp_mul(p, v, p));\n");
 	I; printf("mp_mask_BPC(p);\n");
+	break;
+
+    case '/':
+	I; printf("E(mp_div(p, v, p, 0));\n");
+	break;
+
+    case '%':
+	I; printf("E(mp_div(p, v, 0, p));\n");
 	break;
 
     case 'X': I; printf("fprintf(stderr, \"Abort: Infinite Loop.\\n\"); exit(1);\n"); break;

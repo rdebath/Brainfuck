@@ -46,8 +46,8 @@ gen_code(int ch, int count, char * strn)
 	printf("SET NOCOUNT ON\n");
 	printf("DECLARE @Tape TABLE(pcell Integer, tcell Integer);\n");
 	printf("DECLARE @pcell Integer;\n");
-	printf("DECLARE @ccell Integer;\n");
-	printf("DECLARE @vcell Integer;\n");
+	printf("DECLARE @ccell BigInt;\n");
+	printf("DECLARE @vcell BigInt;\n");
 	printf("DECLARE @linebuf varchar(8000);\n");
 	printf("set @linebuf = ''\n");
 	printf("set @ccell = 0\n");
@@ -65,13 +65,35 @@ gen_code(int ch, int count, char * strn)
     case '=': I; printf("set @ccell = %d\n", count); break;
     case 'B':
 	if(bytecell) { I; printf("set @ccell = @ccell & 255\n"); }
+	else { I; printf("set @ccell = @ccell & 0xFFFFFFFF\n"); }
 	I; printf("set @vcell = @ccell\n");
 	break;
     case 'M': I; printf("set @ccell = @ccell+@vcell*%d\n", count); break;
     case 'N': I; printf("set @ccell = @ccell-@vcell*%d\n", count); break;
     case 'S': I; printf("set @ccell = @ccell+@vcell\n"); break;
     case 'T': I; printf("set @ccell = @ccell-@vcell\n"); break;
-    case '*': I; printf("set @ccell = @ccell*@vcell\n"); break;
+    case '*':
+	if(bytecell) { I; printf("set @vcell = @vcell & 255\n"); }
+	else {
+	    I; printf("set @vcell = @vcell & 0xFFFFFFFF\n");
+	    I; printf("IF @vcell > 0x7FFFFFFF set @vcell = @vcell - 0x100000000\n");
+	}
+	I; printf("set @ccell = @ccell*@vcell\n");
+	break;
+    case '/':
+	if(bytecell) { I; printf("set @ccell = @ccell & 255\n"); }
+	else { I; printf("set @ccell = @ccell & 0xFFFFFFFF\n"); }
+	if(bytecell) { I; printf("set @vcell = @vcell & 255\n"); }
+	else { I; printf("set @vcell = @vcell & 0xFFFFFFFF\n"); }
+	I; printf("set @ccell = @ccell/@vcell\n");
+	break;
+    case '%':
+	if(bytecell) { I; printf("set @ccell = @ccell & 255\n"); }
+	else { I; printf("set @ccell = @ccell & 0xFFFFFFFF\n"); }
+	if(bytecell) { I; printf("set @vcell = @vcell & 255\n"); }
+	else { I; printf("set @vcell = @vcell & 0xFFFFFFFF\n"); }
+	I; printf("set @ccell = @ccell%%@vcell\n");
+	break;
 
     case 'C': I; printf("set @ccell = @vcell*%d\n", count); break;
     case 'D': I; printf("set @ccell = -@vcell*%d\n", count); break;
@@ -83,8 +105,16 @@ gen_code(int ch, int count, char * strn)
     case '+': I; printf("set @ccell = @ccell + %d\n", count); break;
     case '-': I; printf("set @ccell = @ccell - %d\n", count); break;
     case '<':
+	if(bytecell) { I; printf("set @ccell = @ccell & 255\n"); }
+	else {
+	    I; printf("set @ccell = @ccell & 0xFFFFFFFF\n");
+	    I; printf("IF @ccell > 0x7FFFFFFF set @ccell = @ccell - 0x100000000\n");
+	}
+
 	I; printf("update @Tape set tcell = @ccell where pcell = @pcell\n");
+
 	I; printf("set @pcell = @pcell - %d\n", count);
+
 	I; printf("select @ccell = tcell from @Tape where pcell = @pcell\n");
 	I; printf("IF @@rowcount = 0 BEGIN\n");
 	I; printf("  SET @ccell = 0;\n");
@@ -92,8 +122,16 @@ gen_code(int ch, int count, char * strn)
 	I; printf("END\n");
 	break;
     case '>':
+	if(bytecell) { I; printf("set @ccell = @ccell & 255\n"); }
+	else {
+	    I; printf("set @ccell = @ccell & 0xFFFFFFFF\n");
+	    I; printf("IF @ccell > 0x7FFFFFFF set @ccell = @ccell - 0x100000000\n");
+	}
+
 	I; printf("update @Tape set tcell = @ccell where pcell = @pcell\n");
+
 	I; printf("set @pcell = @pcell + %d\n", count);
+
 	I; printf("select @ccell = tcell from @Tape where pcell = @pcell\n");
 	I; printf("IF @@rowcount = 0 BEGIN\n");
 	I; printf("  SET @ccell = 0;\n");

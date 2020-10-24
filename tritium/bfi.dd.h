@@ -18,7 +18,6 @@ X(dd,DD,
     if (do_codestyle == c_dd) {
 	opt_no_lessthan = 1;
 	opt_no_fullprt = 1;
-	opt_no_div = 1;
 	if (opt_regen_mov < 0) opt_regen_mov = 1;
 
         if (iostyle == 3) {

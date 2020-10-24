@@ -193,7 +193,11 @@ gen_code(int ch, int count, char * strn)
     case 'N': I; printf("mpz_submul_ui(*p, v, %d);\n", count); break;
     case 'S': I; printf("mpz_add(*p, *p, v);\n"); break;
     case 'T': I; printf("mpz_sub(*p, *p, v);\n"); break;
+
     case '*': I; printf("mpz_mul(*p, *p, v);\n"); break;
+		/* NB: using trunc() as BF loves zeros, fdiv is floor() */
+    case '/': I; printf("mpz_tdiv_q(*p, *p, v);\n"); break;
+    case '%': I; printf("mpz_tdiv_r(*p, *p, v);\n"); break;
 
     case 'C': I; printf("mpz_mul_ui(*p, v, %d);\n", count); break;
     case 'D':

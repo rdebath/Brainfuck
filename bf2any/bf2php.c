@@ -58,6 +58,8 @@ gen_code(int ch, int count, char * strn)
     case 'S': I; printf("%s = %s+$v;\n", mc, mc); break;
     case 'T': I; printf("%s = %s-$v;\n", mc, mc); break;
     case '*': I; printf("%s = %s*$v;\n", mc, mc); break;
+    case '/': I; printf("%s = intval(%s / $v);\n", mc, mc); break;
+    case '%': I; printf("%s = %s %% $v;\n", mc, mc); break;
 
     case 'C': I; printf("%s = $v*%d;\n", mc, count); break;
     case 'D': I; printf("%s = -$v*%d;\n", mc, count); break;

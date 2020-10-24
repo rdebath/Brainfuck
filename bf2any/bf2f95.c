@@ -25,8 +25,13 @@ gen_code(int ch, int count, char * strn)
 	printf("PROGRAM brainfuck\n");
 	if (!count) {
 	    printf("%s%d%s%d%s",
-		    "  INTEGER, DIMENSION(0:",tapesz,") :: m = 0\n"
-		    "  INTEGER :: r, v, p = ", tapeinit, "\n"
+		    "  INTEGER, PARAMETER :: si64 = selected_int_kind(18)\n"
+		    "  INTEGER, PARAMETER :: si32 = selected_int_kind(9)\n"
+		    "  \n"
+		    "  INTEGER (KIND=si32), DIMENSION(0:",tapesz,") :: m = 0\n"
+		    "  INTEGER (KIND=si32):: v\n"
+		    "  INTEGER (KIND=si64):: n, d\n"
+		    "  INTEGER :: r, p = ", tapeinit, "\n"
 		    "  CHARACTER :: ch\n\n"
 		);
 	}
@@ -46,6 +51,40 @@ gen_code(int ch, int count, char * strn)
     case 'S': I; printf("m(p) = m(p)+v\n"); break;
     case 'T': I; printf("m(p) = m(p)-v\n"); break;
     case '*': I; printf("m(p) = m(p)*v\n"); break;
+    case '/':
+	if (bytecell) {
+	    I; printf("IF (m(p) .LT. 0) THEN\n");
+	    I; printf("m(p) = m(p) + 256\n");
+	    ind--; I; printf("END IF\n");
+	    I; printf("IF (v .LT. 0) THEN\n");
+	    I; printf("v = v + 256\n");
+	    ind--; I; printf("END IF\n");
+	    I; printf("m(p) = m(p)/v\n");
+	} else {
+	    I; printf("n = m(p)\n");
+	    I; printf("IF (n .LT. 0) n = n + 4294967296_si64\n");
+	    I; printf("d = v\n");
+	    I; printf("IF (d .LT. 0) d = d + 4294967296_si64\n");
+	    I; printf("m(p) = n/d\n");
+	}
+	break;
+    case '%':
+	if (bytecell) {
+	    I; printf("IF (m(p) .LT. 0) THEN\n");
+	    I; printf("m(p) = m(p) + 256\n");
+	    ind--; I; printf("END IF\n");
+	    I; printf("IF (v .LT. 0) THEN\n");
+	    I; printf("v = v + 256\n");
+	    ind--; I; printf("END IF\n");
+	    I; printf("m(p) = mod(m(p), v)\n");
+	} else {
+	    I; printf("n = m(p)\n");
+	    I; printf("IF (n .LT. 0) n = n + 4294967296_si64\n");
+	    I; printf("d = v\n");
+	    I; printf("IF (d .LT. 0) d = d + 4294967296_si64\n");
+	    I; printf("m(p) = mod(n, d)\n");
+	}
+	break;
 
     case 'C': I; printf("m(p) = v*%d\n", count); break;
     case 'D': I; printf("m(p) = -v*%d\n", count); break;

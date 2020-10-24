@@ -66,55 +66,82 @@ gen_code(int ch, int count, char * strn)
 	    printf("%s\n", cmdprefix);
 	I; printf("function brainfuck() {\n");
 	ind ++;
-	I; printf("$m = @([int]0) * %d\n", tapesz);
-	I; printf("$p = %d\n", tapeinit);
+	if(bytecell) {
+	    I; printf("$m = @([byte]0) * %d\n", tapesz);
+	    I; printf("$p = %d\n", tapeinit);
+	    I; printf("$c = 0\n");
+	    I; printf("$w = 0xFF\n");
+	} else {
+	    I; printf("$m = @([uint32]0) * %d\n", tapesz);
+	    I; printf("$p = %d\n", tapeinit);
+	    I; printf("[int64]$c = 0\n");
+	    I; printf("[int64]$w = 0x7FFFFFFF; $w=$w*2+1\n");
+	}
 	break;
 
-    case '=': I; printf("$m[$p]=%d\n", count); break;
-    case 'B':
-	if(bytecell) { I; printf("$m[$p]=$m[$p] -band 255;\n"); }
-	I; printf("$v=$m[$p]\n");
-	break;
-    case 'M': I; printf("$m[$p]=$m[$p]+$v*%d\n", count); break;
-    case 'N': I; printf("$m[$p]=$m[$p]-$v*%d\n", count); break;
-    case 'S': I; printf("$m[$p]=$m[$p]+$v\n"); break;
-    case 'T': I; printf("$m[$p]=$m[$p]-$v\n"); break;
-    case '*': I; printf("$m[$p]=$m[$p]*$v\n"); break;
+    case '=': I; printf("$c=%d\n", count); break;
+    case 'B': I; printf("$v=$c -band $w\n"); break;
+    case 'M': I; printf("$c=$c+$v*%d\n", count); break;
+    case 'N': I; printf("$c=$c-$v*%d\n", count); break;
+    case 'S': I; printf("$c=$c+$v\n"); break;
+    case 'T': I; printf("$c=$c-$v\n"); break;
 
-    case 'C': I; printf("$m[$p]=$v*%d\n", count); break;
-    case 'D': I; printf("$m[$p]=-$v*%d\n", count); break;
-    case 'V': I; printf("$m[$p]=$v\n"); break;
-    case 'W': I; printf("$m[$p]=-$v\n"); break;
+    case '*':
+	I; printf("$c=$c -band $w\n");
+	I; printf("if ($c -gt 0x7FFFFFFF){ $c -= ($w+1);}\n");
+	I; printf("$c=$c*$v\n");
+	break;
+    case '/':
+	I; printf("$c=$c -band $w\n");
+	I; printf("$c=($c - $c%%$v)/$v\n");
+	break;
+    case '%':
+	I; printf("$c=$c -band $w\n");
+	I; printf("$c=$c%%$v\n");
+	break;
+
+    case 'C': I; printf("$c=$v*%d\n", count); break;
+    case 'D': I; printf("$c=-$v*%d\n", count); break;
+    case 'V': I; printf("$c=$v\n"); break;
+    case 'W': I; printf("$c=-$v\n"); break;
 
     case 'X': I; printf("throw 'Aborting Infinite Loop'\n"); break;
 
-    case '+': I; printf("$m[$p]+=%d;\n", count); break;
-    case '-': I; printf("$m[$p]-=%d;\n", count); break;
-    case '<': I; printf("$p-=%d;\n", count); break;
-    case '>': I; printf("$p+=%d;\n", count); break;
+    case '+': I; printf("$c+=%d;\n", count); break;
+    case '-': I; printf("$c-=%d;\n", count); break;
+    case '<':
+	I; printf("$m[$p]=$c -band $w;");
+	   printf("$p-=%d;", count);
+	   printf("$c=$m[$p]\n");
+	break;
+    case '>':
+	I; printf("$m[$p]=$c -band $w;");
+	   printf("$p+=%d;", count);
+	   printf("$c=$m[$p]\n");
+	break;
     case '[':
-	if(bytecell) { I; printf("$m[$p]=$m[$p] -band 255;\n"); }
-	I; printf("while ($m[$p] -ne 0){\n"); ind++; break;
+	I; printf("$c=$c -band $w\n");
+	I; printf("while ($c -ne 0){\n"); ind++; break;
     case ']':
-	if(bytecell) { I; printf("$m[$p]=$m[$p] -band 255;\n"); }
+	I; printf("$c=$c -band $w\n");
 	ind--; I; printf("}\n");
 	break;
     case 'I':
-	if(bytecell) { I; printf("$m[$p]=$m[$p] -band 255;\n"); }
-	I; printf("if ($m[$p] -ne 0){\n"); ind++; break;
+	I; printf("$c=$c -band $w\n");
+	I; printf("if ($c -ne 0){\n"); ind++; break;
     case 'E':
 	ind--; I; printf("}\n");
 	break;
     case '.':
 	if (do_unbuffered) {
-	    I; printf("Write-Host $([char]$m[$p]) -nonewline\n");
+	    I; printf("Write-Host $([char]$c) -nonewline\n");
 	} else {
-	    I; printf("outchar $m[$p]\n");
+	    I; printf("outchar $c\n");
 	}
 	break;
     case '"': print_string(strn); break;
     case ',':
-	I; printf("inchar\n");
+	I; printf("inchar; $c = $script:ch\n");
 	do_input = 1;
 	break;
     case '~':
@@ -152,10 +179,10 @@ gen_code(int ch, int count, char * strn)
 	    printf("    }\n");
 	    printf("    if ($script:line -eq \"\") {\n");
 	    printf("        $script:gotline = $false;\n");
-	    printf("        $m[$p]=10;\n");
+	    printf("        $script:ch=10;\n");
 	    printf("        return;\n");
 	    printf("    }\n");
-	    printf("    $m[$p] = [int]($script:line.Substring(0,1).ToCharArray()[0]);\n");
+	    printf("    $script:ch = [int]($script:line.Substring(0,1).ToCharArray()[0]);\n");
 	    printf("    $script:line = $script:line.Substring(1);\n");
 	    printf("}\n");
 	    printf("$script:line = \"\"\n");

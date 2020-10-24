@@ -66,6 +66,7 @@ static void putlabel(unsigned long num);
 #define SCMD_LABEL	" ;;"
 /* Semicolon has arguments to MOD, DIV and SUB swapped relative to WS and Forth
  * (the additive operations may also be swapped but it's impossible to tell) */
+#define SCMD_DIV	SCMD_SWAP "⁏⁏⁏"
 #define SCMD_MOD	SCMD_SWAP "⁏  "
 #define SCMD_MUL	"⁏⁏;"
 #define SCMD_OUTCHAR	"⁏ ;;"
@@ -73,7 +74,7 @@ static void putlabel(unsigned long num);
 #define SCMD_PUSH	";;;"
 #define SCMD_READCHAR	"⁏ ⁏;"
 #define SCMD_STORE	"; ;"
-#define SCMD_SUB	"⁏;⁏"
+#define SCMD_SUB	SCMD_SWAP "⁏;⁏"
 #define SCMD_SWAP	";⁏;"
 
 #define SBIT_ZERO	";"
@@ -285,6 +286,28 @@ gen_code(int ch, int count, char * strn)
 	putsnum(0);
 	PRTTOK(FETCH);
 	PRTTOK(MUL);
+	PRTTOK(STORE);
+	break;
+
+    case '/':
+	PRTTOK(DUP);
+	PRTTOK(DUP);
+	PRTTOK(FETCH);
+	PRTTOK(PUSH);
+	putsnum(0);
+	PRTTOK(FETCH);
+	PRTTOK(DIV);
+	PRTTOK(STORE);
+	break;
+
+    case '%':
+	PRTTOK(DUP);
+	PRTTOK(DUP);
+	PRTTOK(FETCH);
+	PRTTOK(PUSH);
+	putsnum(0);
+	PRTTOK(FETCH);
+	PRTTOK(MOD);
 	PRTTOK(STORE);
 	break;
 

@@ -38,10 +38,10 @@ print_dd(void)
 	(node_type_counts[T_INPI] == 0) &&
 	(node_type_counts[T_PRTI] == 0) &&
 	(node_type_counts[T_CHR] == 0) &&
-	(cell_size<=0 && cell_length<=0) );
+	(node_type_counts[T_DIV] == 0) );
 
     if (bfrle && !is_bfrle)
-	fprintf(stderr, "BF-RLE generation failure\n");
+	fprintf(stderr, "Warning: Additional be-pipe tokens generated.\n");
 
     if (!noheader && !bfrle) {
 	printf("{[ Code generated from %s ]}\n\n", bfname);
@@ -176,6 +176,60 @@ print_dd(void)
 	    exit(99);
 	    break;
 
+	case T_DIV:
+	    // p[n->offset] = UM(p[n->offset]);
+	    outcmd('>', n->offset);
+	    outcmd('B', 0);
+	    outcmd('<', n->offset);
+	    // p[n->offset+2] = p[n->offset];
+	    outcmd('>', n->offset+2);
+	    outcmd('V', 0);
+	    outcmd('<', n->offset+2);
+	    // p[n->offset+3] = 0;
+	    outcmd('>', n->offset+3);
+	    outcmd('=', 0);
+	    outcmd('<', n->offset+3);
+
+	    // p[n->offset+1] = UM(p[n->offset+1]);
+	    // if (p[n->offset+1] != 0) {
+	    outcmd('>', n->offset+1);
+	    outcmd('I', 0);
+	    outcmd('<', n->offset+1);
+
+	    //     p[n->offset+3] = p[n->offset] / p[n->offset+1];
+	    outcmd('>', n->offset);
+	    outcmd('B', 0);
+	    outcmd('<', n->offset);
+	    outcmd('>', n->offset+3);
+	    outcmd('V', 0);
+	    outcmd('<', n->offset+3);
+	    outcmd('>', n->offset+1);
+	    outcmd('B', 0);
+	    outcmd('<', n->offset+1);
+	    outcmd('>', n->offset+3);
+	    outcmd('/', 0);
+	    outcmd('<', n->offset+3);
+
+	    //     p[n->offset+2] = p[n->offset] % p[n->offset+1];
+	    outcmd('>', n->offset);
+	    outcmd('B', 0);
+	    outcmd('<', n->offset);
+	    outcmd('>', n->offset+2);
+	    outcmd('V', 0);
+	    outcmd('<', n->offset+2);
+	    outcmd('>', n->offset+1);
+	    outcmd('B', 0);
+	    outcmd('<', n->offset+1);
+	    outcmd('>', n->offset+2);
+	    outcmd('%', 0);
+	    outcmd('<', n->offset+2);
+
+	    // }
+	    outcmd('>', n->offset+1);
+	    outcmd('E', 0);
+	    outcmd('<', n->offset+1);
+	    break;
+
 	case T_IF:
 	    outcmd('>', n->offset);
 	    outcmd('I', 0);
@@ -303,9 +357,13 @@ void outcmd(int ch, int count)
 
     if (ch == '+' && count < 0) { ch = '-'; count = -count; }
     if (ch == '-' && count <= 0) { ch = '+'; count = -count; }
-    if (ch == 'M' && count < 0) { ch = 'N'; count = -count; }
     if (ch == 'M' && count == 1) { ch = 'S'; count = 0; }
     if (ch == 'M' && count == -1) { ch = 'T'; count = 0; }
+    if (ch == 'M' && count < 0) { ch = 'N'; count = -count; }
+
+    if (ch == 'C' && count == 1) { ch = 'V'; count = 0; }
+    if (ch == 'C' && count == -1) { ch = 'W'; count = 0; }
+    if (ch == 'C' && count < 0) { ch = 'D'; count = -count; }
 
     if (ch == '>' && count == 0) return;
     if (ch == '+' && count == 0) return;

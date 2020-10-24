@@ -12,11 +12,27 @@
 static int ind = 0;
 #define I printf("%*s", ind*4, "")
 static int used_o = 0;
+static int bpc = 0;
 
+static check_arg_t fn_check_arg;
 static gen_code_t gen_code;
-struct be_interface_s be_interface = {.gen_code=gen_code};
+struct be_interface_s be_interface = {.check_arg=fn_check_arg, .gen_code=gen_code};
 
 static void print_cstring(const char * str);
+
+static int
+fn_check_arg(const char * arg)
+{
+    if (strncmp(arg, "-b", 2) == 0 && arg[2] > '0' && arg[2] <= '9') {
+	bpc = strtol(arg+2, 0, 10);
+	if (bpc < 32) {
+	    fprintf(stderr, "Cell size must be a minimum of 32 bits\n");
+	    exit(1);
+	}
+	return 1;
+    }
+    return 0;
+}
 
 static const char *
 cell(int mov)
@@ -44,7 +60,10 @@ gen_code(int ch, int count, char * strn)
 
     case '=': I; printf("%s = %d\n", mc, count); break;
     case 'B':
-	if(bytecell) { I; printf("%s %%= 256\n", mc); }
+	if(bytecell || bpc>0) {
+	    I; printf("%s = %s%%w\n", mc, mc);
+	    I; printf("if (%s<0) %s=%s+w\n", mc, mc, mc);
+	}
 	I; printf("v = %s\n", mc);
 	break;
     case 'M': I; printf("%s = %s+v*%d\n", mc, mc, count); break;
@@ -52,6 +71,8 @@ gen_code(int ch, int count, char * strn)
     case 'S': I; printf("%s = %s+v\n", mc, mc); break;
     case 'T': I; printf("%s = %s-v\n", mc, mc); break;
     case '*': I; printf("%s = %s*v\n", mc, mc); break;
+    case '/': I; printf("%s = %s/v\n", mc, mc); break;
+    case '%': I; printf("%s = %s%%v\n", mc, mc); break;
 
     case 'C': I; printf("%s = v*%d\n", mc, count); break;
     case 'D': I; printf("%s = -v*%d\n", mc, count); break;
@@ -69,7 +90,10 @@ gen_code(int ch, int count, char * strn)
     case '<': I; printf("p -= %d\n", count); break;
     case '>': I; printf("p += %d\n", count); break;
     case '[':
-	if (bytecell) { I; printf("%s %%= 256\n", mc); }
+	if(bytecell || bpc>0) {
+	    I; printf("%s = %s%%w\n", mc, mc);
+	    I; printf("if (%s<0) %s=%s+w\n", mc, mc, mc);
+	}
 	I; printf("while(%s){\n", mc);
 	ind++;
 	break;
@@ -79,11 +103,17 @@ gen_code(int ch, int count, char * strn)
 	} else if (count < 0) {
 	    I; printf("p -= %d\n", -count);
 	}
-	if (bytecell) { I; printf("%s %%= 256\n", mc); }
+	if(bytecell || bpc>0) {
+	    I; printf("%s = %s%%w\n", mc, mc);
+	    I; printf("if (%s<0) %s=%s+w\n", mc, mc, mc);
+	}
 	ind--; I; printf("}\n");
 	break;
     case 'I':
-	if (bytecell) { I; printf("%s %%= 256\n", mc); }
+	if(bytecell || bpc>0) {
+	    I; printf("%s = %s%%w\n", mc, mc);
+	    I; printf("if (%s<0) %s=%s+w\n", mc, mc, mc);
+	}
 	I; printf("if(%s != 0){\n", mc);
 	ind++;
 	break;
@@ -107,6 +137,11 @@ gen_code(int ch, int count, char * strn)
 	ind++;
 	if (!count) {
 	    I; printf("%s%d%s", "p = ", tapeinit, "\n");
+	    if (bytecell) {
+		I; printf("%s", "w = 256\n");
+	    } else if (bpc>0) {
+		I; printf("%s%d%s", "w = 2^", bpc, "\n");
+	    }
 	}
 	break;
 
@@ -137,7 +172,7 @@ gen_code(int ch, int count, char * strn)
 	    puts("}");
 	}
 
-	puts("\nv = x()\nquit");
+	puts("\nscale = 0\nv = x()\nquit");
 	break;
     }
 }

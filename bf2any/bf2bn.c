@@ -82,9 +82,10 @@ gen_code(int ch, int count, char * strn)
 	printf("#define MINALLOC 16\n");
 	puts("");
 
-	if(bytecell)
-	    printf("#define BN_mask_BPC(c) BN_mask_bits(c, 8)\n");
-	else {
+	if(bytecell) {
+	    printf("#define BPC 8\n");
+	    printf("#define BN_mask_BPC(c) if(!BN_nnmod(c, c, mask, BNtmp)) goto BN_op_failed\n");
+	} else {
 	    if (bpc) {
 		printf("#ifndef BPC\n");
 		printf("#define BPC %d\n", bpc);
@@ -92,7 +93,7 @@ gen_code(int ch, int count, char * strn)
 	    }
 	    printf("#if defined(BPC) && (BPC > 0)\n");
 	    printf("enum { CellsTooSmall=1/((BPC)>=32) };\n");
-	    printf("#define BN_mask_BPC(c) BN_mask_bits(c, BPC)\n");
+	    printf("#define BN_mask_BPC(c) if(!BN_nnmod(c, c, mask, BNtmp)) goto BN_op_failed\n");
 	    printf("#else\n");
 	    printf("#define BN_mask_BPC(c)\n");
 	    printf("#endif\n");
@@ -208,6 +209,9 @@ gen_code(int ch, int count, char * strn)
 	I; printf("register int c;\n");
 	I; printf("BIGNUM *v = BN_new();\n");
 	I; printf("BIGNUM *t1 = BN_new();\n");
+	   printf("#ifdef BPC\n");
+	I; printf("BIGNUM *mask = BN_new();\n");
+	   printf("#endif\n");
 	I; printf("BN_CTX * BNtmp = BN_CTX_new();\n");
 	I; printf("setbuf(stdout, 0);\n");
 	I; printf("p = move_ptr(mem,0);\n");
@@ -221,6 +225,11 @@ gen_code(int ch, int count, char * strn)
 	I; printf("exit(255);\n");
 	ind--;
 	I; printf("}\n");
+	   printf("#ifdef BPC\n");
+	I; printf("if(!BN_set_word(mask, 2)) goto BN_op_failed;\n");
+	I; printf("if(!BN_set_word(t1, BPC)) goto BN_op_failed;\n");
+	I; printf("if(!BN_exp(mask, mask, t1, BNtmp)) goto BN_op_failed;\n");
+	   printf("#endif\n");
 	break;
 
     case '~': I; printf("return 0;\n}\n"); break;
@@ -259,6 +268,16 @@ gen_code(int ch, int count, char * strn)
 
     case '*':
 	I; printf("if(!BN_mul(*p, *p, v, BNtmp)) goto BN_op_failed;\n");
+	break;
+
+    case '/':
+	/* Documented as trunc() */
+	I; printf("if(!BN_div(*p, 0, *p, v, BNtmp)) goto BN_op_failed;\n");
+	break;
+
+    case '%':
+	/* Documented as trunc() */
+	I; printf("if(!BN_div(0, *p, *p, v, BNtmp)) goto BN_op_failed;\n");
 	break;
 
     case 'C':

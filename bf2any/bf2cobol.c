@@ -78,9 +78,9 @@ gen_code(int ch, int count, char * strn)
 		I; printf("01 chr    BINARY-LONG GLOBAL.\n");
 	    } else {
 		I; printf("01 WORD-TAPE.\n");
-		I; printf("  02 m    BINARY-LONG OCCURS %d TIMES.\n", tapesz);
+		I; printf("  02 m    BINARY-LONG UNSIGNED OCCURS %d TIMES.\n", tapesz);
 		I; printf("01 p      BINARY-LONG VALUE %d.\n", tapeinit);
-		I; printf("01 v      BINARY-LONG.\n");
+		I; printf("01 v      BINARY-LONG UNSIGNED.\n");
 		I; printf("01 chr    BINARY-LONG GLOBAL.\n");
 	    }
 	    I; printf("01 inpl   PIC X(%d) GLOBAL.\n", maxinpline);
@@ -122,7 +122,18 @@ gen_code(int ch, int count, char * strn)
 
 	break;
 
-    case '=': I; printf("MOVE %d TO m(p)\n", count); break;
+    case '=':
+	if (bytecell) {
+	    I; printf("MOVE %d TO m(p)\n", count & 0xFF);
+	} else {
+	    if (count < 0) {
+		I; printf("MOVE 0 TO m(p)\n");
+		I; printf("SUBTRACT %d FROM m(p)\n", -count);
+	    } else {
+		I; printf("MOVE %d TO m(p)\n", count);
+	    }
+	}
+	break;
     case 'B':
 	I; printf("MOVE m(p) TO v\n");
 	break;
@@ -131,6 +142,8 @@ gen_code(int ch, int count, char * strn)
     case 'S': I; printf("ADD v TO m(p)\n"); break;
     case 'T': I; printf("SUBTRACT v FROM m(p)\n"); break;
     case '*': I; printf("COMPUTE m(p) EQUAL m(p)*v\n"); break;
+    case '/': I; printf("COMPUTE m(p) EQUAL m(p)/v\n"); break;
+    case '%': I; printf("COMPUTE m(p) EQUAL FUNCTION MOD(m(p), v)\n"); break;
 
     case 'C': I; printf("COMPUTE m(p) EQUAL v*%d\n", count); break;
     case 'D': I; printf("COMPUTE m(p) EQUAL -v*%d\n", count); break;

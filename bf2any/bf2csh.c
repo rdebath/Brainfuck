@@ -49,6 +49,8 @@ gen_code(int ch, int count, char * strn)
     case 'S': pr("@ M[$P]+=$V"); break;
     case 'T': pr("@ M[$P]-=$V"); break;
     case '*': pr("@ M[$P]*=$V"); break;
+    case '/': pr("@ M[$P]/=$V"); break;
+    case '%': pr("@ M[$P]%%=$V"); break;
 
     case 'C': prv("@ M[$P]=$V * %d", count); break;
     case 'D': prv("@ M[$P]=-$V * %d", count); break;

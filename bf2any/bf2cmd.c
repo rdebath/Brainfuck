@@ -83,6 +83,8 @@ gen_code(int ch, int count, char * strn)
     case 'S': printf("SET /A MEMORY%%PTR%%=MEMORY%%PTR%%+V\r\n"); break;
     case 'T': printf("SET /A MEMORY%%PTR%%=MEMORY%%PTR%%-V\r\n"); break;
     case '*': printf("SET /A MEMORY%%PTR%%=MEMORY%%PTR%%*V\r\n"); break;
+    case '/': printf("SET /A MEMORY%%PTR%%=MEMORY%%PTR%%/V\r\n"); break;
+    case '%': printf("SET /A MEMORY%%PTR%%=MEMORY%%PTR%% %%%% V\r\n"); break;
 
     case 'C': printf("SET /A MEMORY%%PTR%%=V*%d\r\n", count); break;
     case 'D': printf("SET /A MEMORY%%PTR%%=-V*%d\r\n", count); break;

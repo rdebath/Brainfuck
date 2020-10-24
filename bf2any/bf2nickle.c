@@ -8,7 +8,7 @@
  * Nickle translation from BF, runs at about 12,000,000 instructions per second.
  */
 
-static int ind = 0, use_utf8, hello_world, unbounded_tape;
+static int ind = 0, use_utf8, hello_world, unbounded_tape, bpc;
 #define I printf("%*s", ind*2, "")
 
 static check_arg_t fn_check_arg;
@@ -23,6 +23,14 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-M") == 0) {
         unbounded_tape = 1;
         return 1;
+    }
+    if (strncmp(arg, "-b", 2) == 0 && arg[2] > '0' && arg[2] <= '9') {
+        bpc = strtol(arg+2, 0, 10);
+	if (bpc < 32) {
+	    fprintf(stderr, "Cell size must be a minimum of 32 bits\n");
+	    exit(1);
+	}
+	return 1;
     }
     return 0;
 }
@@ -53,6 +61,11 @@ gen_code(int ch, int count, char * strn)
 		    "  int p = ", tapeinit, ";\n"
 		    "  exception inf_loop(string msg);\n"
 		);
+	    if (bpc) {
+		printf("%s%d%s",
+		    "  int msk = 2**",bpc,";\n"
+		);
+	    }
 	}
 	break;
     case '~':
@@ -63,6 +76,7 @@ gen_code(int ch, int count, char * strn)
     case '=': I; printf("m[p] = %d;\n", count); break;
     case 'B':
 	if (bytecell) { I; puts("m[p] &= 255;"); }
+	else if (bpc) { I; puts("m[p] %= msk;"); }
 	I; printf("v = m[p];\n");
 	break;
     case 'M': I; printf("m[p] = m[p]+v*%d;\n", count); break;
@@ -70,6 +84,8 @@ gen_code(int ch, int count, char * strn)
     case 'S': I; printf("m[p] = m[p]+v;\n"); break;
     case 'T': I; printf("m[p] = m[p]-v;\n"); break;
     case '*': I; printf("m[p] = m[p]*v;\n"); break;
+    case '/': I; printf("m[p] = m[p]//v;\n"); break;
+    case '%': I; printf("m[p] = m[p]%%v;\n"); break;
 
     case 'C': I; printf("m[p] = v*%d;\n", count); break;
     case 'D': I; printf("m[p] = -v*%d;\n", count); break;
@@ -89,16 +105,19 @@ gen_code(int ch, int count, char * strn)
 	break;
     case '[':
 	if (bytecell) { I; puts("m[p] &= 255;"); }
+	else if (bpc) { I; puts("m[p] %= msk;"); }
 	I; printf("while (m[p] != 0) {\n");
 	ind++;
 	break;
     case ']':
 	if (bytecell) { I; puts("m[p] &= 255;"); }
+	else if (bpc) { I; puts("m[p] %= msk;"); }
 	ind--;
 	I; printf("}\n");
 	break;
     case 'I':
 	if (bytecell) { I; puts("m[p] &= 255;"); }
+	else if (bpc) { I; puts("m[p] %= msk;"); }
 	I; printf("if (m[p] != 0) {\n");
 	ind++;
 	break;

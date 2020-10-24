@@ -14,6 +14,7 @@ static int ind = 0;
 static int safetapeoff = 0, curtapeoff = 0;
 static int utf8_conv = 0;
 static int unbounded_tape = 0;
+static int bpc = 0;
 
 static void print_cstring(char * str);
 
@@ -30,6 +31,14 @@ fn_check_arg(const char * arg)
     }
     if (strcmp(arg, "-u") == 0) {
 	utf8_conv = 1;
+	return 1;
+    }
+    if (strncmp(arg, "-b", 2) == 0 && arg[2] > '0' && arg[2] <= '9') {
+	bpc = strtol(arg+2, 0, 10);
+	if (bpc < 32) {
+	    fprintf(stderr, "Cell size must be a minimum of 32 bits\n");
+	    exit(1);
+	}
 	return 1;
     }
     return 0;
@@ -71,12 +80,15 @@ gen_code(int ch, int count, char * strn)
 	    printf("%s%d%s", "p = ", tapeinit, "\n");
 	    if (unbounded_tape)
 		puts("m.push(0) while p>=m.length");
+	    if (bpc)
+		printf("%s%d%s", "msk = 2**", bpc, "\n");
 	}
 	break;
 
     case '=': I; printf("%s = %d\n", cm, count); break;
     case 'B':
 	if(bytecell) { I; printf("%s &= 255\n", cm); }
+	else if(bpc) { I; printf("%s %%= msk\n", cm); }
 	I; printf("v= %s\n", cm);
 	break;
     case 'M': I; printf("%s += v*%d\n", cm, count); break;
@@ -84,6 +96,8 @@ gen_code(int ch, int count, char * strn)
     case 'S': I; printf("%s += v\n", cm); break;
     case 'T': I; printf("%s -= v\n", cm); break;
     case '*': I; printf("%s *= v\n", cm); break;
+    case '/': I; printf("%s /= v\n", cm); break;
+    case '%': I; printf("%s %%= v\n", cm); break;
 
     case 'C': I; printf("%s = v*%d\n", cm, count); break;
     case 'D': I; printf("%s = -v*%d\n", cm, count); break;
@@ -108,6 +122,7 @@ gen_code(int ch, int count, char * strn)
 	break;
     case '[':
 	if(bytecell) { I; printf("%s &= 255\n", cm); }
+	else if(bpc) { I; printf("%s %%= msk\n", cm); }
 	I; printf("while %s != 0\n", cm);
 	ind++;
 	curtapeoff = safetapeoff = 0;
@@ -120,11 +135,13 @@ gen_code(int ch, int count, char * strn)
 	}
 
 	if(bytecell) { I; printf("%s &= 255\n", cm); }
+	else if(bpc) { I; printf("%s %%= msk\n", cm); }
 	ind--; I; printf("end\n");
 	curtapeoff = safetapeoff = 0;
 	break;
     case 'I':
 	if(bytecell) { I; printf("%s &= 255\n", cm); }
+	else if(bpc) { I; printf("%s %%= msk\n", cm); }
 	I; printf("if %s != 0\n", cm);
 	ind++;
 	curtapeoff = safetapeoff = 0;
@@ -144,6 +161,7 @@ gen_code(int ch, int count, char * strn)
 	if(!utf8_conv) printf("print (%s & 255).chr\n", cm);
 	else {
 	    if(bytecell) { I; printf("%s &= 255\n", cm); }
+	    else if(bpc) { I; printf("%s %%= msk\n", cm); }
 	    printf("begin print '' << %s rescue print (%s & 255).chr end\n", cm, cm);
 	}
 	break;

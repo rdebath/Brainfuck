@@ -101,10 +101,9 @@ gen_code(int ch, int count, char * strn)
     if ((p = strchr(bf,ch))) {
 	const char * bcmd = bcdbytebf[p-bf];
 
-	if ((ch == '+' || ch =='-') && count >= 16) {
+	if ((ch == '+' || ch =='-' ) && count >= 16) {
+	    if (ch == '-') { count = -count; ch = '+'; bcmd = bcdbytebf[2]; }
 	    count &= 0xFF;
-	    if (ch == '-') count = 256 - count;
-	    ch = '+';
 
 	    while (count >= 16) {
 		int hi = count / 16;

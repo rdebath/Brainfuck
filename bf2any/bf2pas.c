@@ -136,9 +136,9 @@ loutcmd(int ch, int count, struct instruction *n)
 	if (bytecell)
 	    prv("tape : packed array [0..%d] of byte;", tapesz);
 	else
-	    prv("tape : packed array [0..%d] of longint;", tapesz);
+	    prv("tape : packed array [0..%d] of cardinal;", tapesz);
 	pr("tapepos : longint;");
-	pr("v : longint;");
+	pr("v : cardinal;");
 	if (has_inp)
 	    pr("inch : char;");
 	ind --;
@@ -151,13 +151,23 @@ loutcmd(int ch, int count, struct instruction *n)
 	prv("tapepos := %d;", tapeinit);
 	break;
 
-    case '=': prv("tape[tapepos] := %d;", count); break;
+    case '=':
+	if (bytecell) {
+	    prv("tape[tapepos] := %d;", count & 0xFF);
+	} else if (count<0) {
+	    pr("tape[tapepos] := 0;");
+	    prv("tape[tapepos] := tape[tapepos] - %d;", -count);
+	} else
+	    prv("tape[tapepos] := %d;", count);
+	break;
     case 'B': pr("v := tape[tapepos];"); break;
     case 'M': prv("tape[tapepos] := tape[tapepos] + %d*v;", count); break;
     case 'N': prv("tape[tapepos] := tape[tapepos] - %d*v;", count); break;
     case 'S': pr("tape[tapepos] := tape[tapepos] + v;"); break;
     case 'T': pr("tape[tapepos] := tape[tapepos] - v;"); break;
     case '*': pr("tape[tapepos] := tape[tapepos] * v;"); break;
+    case '/': pr("tape[tapepos] := tape[tapepos] div v;"); break;
+    case '%': pr("tape[tapepos] := tape[tapepos] mod v;"); break;
 
     case 'C': prv("tape[tapepos] := %d*v;", count); break;
     case 'D': prv("tape[tapepos] := %d* -v;", count); break;

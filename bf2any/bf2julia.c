@@ -37,6 +37,7 @@ static int ind = 0;
 #define I printf("%*s", ind*4, "")
 static int lblcount = 0;
 static int icount = 0;
+static char * inttype = "Int";
 
 static void print_cstring(char * str);
 static int use_function = -1;
@@ -56,9 +57,17 @@ fn_check_arg(const char * arg)
 	use_function = 1;
 	return 1;
     }
+
+    if (strcmp(arg, "-b32") == 0) { inttype = "Int32"; return 1; }
+    if (strcmp(arg, "-b64") == 0) { inttype = "Int64"; return 1; }
+    if (strcmp(arg, "-b128") == 0) { inttype = "Int128"; return 1; }
+
     if (strcmp("-h", arg) ==0) {
 	fprintf(stderr, "%s\n",
 	"\t"    "-nofunc Do NOT include a function wrapper (SLOW)"
+	"\n\t"    "-b32    Use Int32"
+	"\n\t"    "-b64    Use Int64"
+	"\n\t"    "-b128   Use Int128"
 	);
 	return 1;
     }
@@ -169,8 +178,8 @@ loutcmd(int ch, int count, struct instruction *n)
 	if (use_function)
 	    puts("function brainfuck(m,p)");
 	else
-	    printf( "%s%d%s%d%s",
-		    "let m = zeros(Int, ",tapesz,"), "
+	    printf( "%s%s%s%d%s%d%s",
+		    "let m = zeros(", inttype, ", ",tapesz,"), "
 		    "p = ", tapeinit, "\n");
 	ind++;
 	break;
@@ -180,7 +189,7 @@ loutcmd(int ch, int count, struct instruction *n)
 	    I; puts("p");
 	    ind--;
 	    I; puts("end\n");
-	    I; printf("brainfuck(zeros(Int,%d), %d)\n", tapesz, tapeinit);
+	    I; printf("brainfuck(zeros(%s,%d), %d)\n", inttype, tapesz, tapeinit);
 	} else {
 	    ind--;
 	    I; puts("end");
@@ -189,7 +198,7 @@ loutcmd(int ch, int count, struct instruction *n)
 
     case '=': I; printf("m[p] = %d\n", count); break;
     case 'B':
-	if(bytecell) { I; printf("m[p] %%= 256;\n"); }
+	if(bytecell) { I; printf("m[p] = mod(m[p], 256);\n"); }
 	I; printf("v = m[p]\n");
 	break;
     case 'M': I; printf("m[p] = m[p]+v*%d\n", count); break;
@@ -197,6 +206,9 @@ loutcmd(int ch, int count, struct instruction *n)
     case 'S': I; printf("m[p] = m[p]+v\n"); break;
     case 'T': I; printf("m[p] = m[p]-v\n"); break;
     case '*': I; printf("m[p] = m[p]*v\n"); break;
+
+    case '/': I; printf("m[p] = signed(div(unsigned(m[p]), unsigned(v)))\n"); break;
+    case '%': I; printf("m[p] = signed(mod(unsigned(m[p]), unsigned(v)))\n"); break;
 
     case 'C': I; printf("m[p] = v*%d\n", count); break;
     case 'D': I; printf("m[p] = -v*%d\n", count); break;
@@ -210,16 +222,16 @@ loutcmd(int ch, int count, struct instruction *n)
     case '<': I; printf("p -= %d\n", count); break;
     case '>': I; printf("p += %d\n", count); break;
     case '[':
-	if(bytecell) { I; printf("m[p] %%= 256;\n"); }
+	if(bytecell) { I; printf("m[p] = mod(m[p], 256);\n"); }
 	I; printf("while m[p] != 0\n");
 	ind++;
 	break;
     case ']':
-	if(bytecell) { I; printf("m[p] %%= 256;\n"); }
+	if(bytecell) { I; printf("m[p] = mod(m[p], 256);\n"); }
 	ind--; I; printf("end\n");
 	break;
     case 'I':
-	if(bytecell) { I; printf("m[p] %%= 256;\n"); }
+	if(bytecell) { I; printf("m[p] = mod(m[p], 256);\n"); }
 	I; printf("if m[p] != 0\n");
 	ind++;
 	break;

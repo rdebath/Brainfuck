@@ -460,7 +460,7 @@ ruby_header()
 {
     printf("%s\n",
 	    "#ifdef RUBY"
-    "\n"    "#define bf_start(msz,moff) m = Array.new(msz, 0); p = moff; bmsk = (1<<BFBITS)-1;"
+    "\n"    "#define bf_start(msz,moff) m = Array.new(msz+moff, 0); p = moff; bmsk = (1<<BFBITS)-1;"
     "\n"    "#define posn(l,c) /* Line l Column c */"
     "\n"    "#define bf_dump(l,c) /* Hmmm */"
     "\n"    "#define bf_end()"

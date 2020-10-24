@@ -22,6 +22,7 @@ static int ind = 0;
 #define oputs(str) fprintf(ofd, "%s\n", (str))
 static int do_dump = 0;
 static int hello_world = 0;
+static int bpc = 0;
 
 static FILE * ofd;
 static int use_utf8 = 0;
@@ -42,6 +43,14 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-d") == 0) {
 	do_dump = 1;
 	return 1;
+    } else
+    if (strncmp(arg, "-b", 2) == 0 && arg[2] > '0' && arg[2] <= '9') {
+        bpc = strtol(arg+2, 0, 10);
+        if (bpc < 32) {
+            fprintf(stderr, "Cell size must be a minimum of 32 bits\n");
+            exit(1);
+        }
+        return 1;
     } else
 #ifdef ENABLE_LIBTCL
     if (strcmp(arg, "-r") == 0) {
@@ -88,6 +97,9 @@ gen_code(int ch, int count, char * strn)
 		    "proc run_bf {} {\n"
 		    "set d [lrepeat ",tapesz," 0]\n"
 		    "set dc ", tapeinit, "\n");
+
+	    if (bpc)
+		fprintf(ofd, "%s%d%s", "set msk [expr {2**",bpc,"}]\n");
 	}
 	break;
     case '~':
@@ -98,6 +110,7 @@ gen_code(int ch, int count, char * strn)
     case '=': I; fprintf(ofd, "lset d $dc %d\n", count); break;
     case 'B':
 	if(bytecell) { I; oputs("lset d $dc [expr {[lindex $d $dc] % 256}]"); }
+	else if(bpc) { I; oputs("lset d $dc [expr {[lindex $d $dc] % $msk}]"); }
 	I; fprintf(ofd, "set v [lindex $d $dc]\n");
 	break;
 
@@ -106,15 +119,13 @@ gen_code(int ch, int count, char * strn)
     case 'S': I; fprintf(ofd, "lset d $dc [expr {[lindex $d $dc] +$v}]\n"); break;
     case 'T': I; fprintf(ofd, "lset d $dc [expr {[lindex $d $dc] -$v}]\n"); break;
     case '*': I; fprintf(ofd, "lset d $dc [expr {[lindex $d $dc] *$v}]\n"); break;
+    case '/': I; fprintf(ofd, "lset d $dc [expr {[lindex $d $dc] /$v}]\n"); break;
+    case '%': I; fprintf(ofd, "lset d $dc [expr {[lindex $d $dc] %%$v}]\n"); break;
 
     case 'C': I; fprintf(ofd, "lset d $dc [expr { $v*%d}]\n", count); break;
     case 'D': I; fprintf(ofd, "lset d $dc [expr { -$v*%d}]\n", count); break;
     case 'V': I; fprintf(ofd, "lset d $dc $v\n"); break;
     case 'W': I; fprintf(ofd, "lset d $dc [expr { -$v}]\n"); break;
-
-#if 0
-    case 'X': I; fprintf(ofd, "die(\"Abort: Infinite Loop.\\n\");\n"); break;
-#endif
 
     case '+': I; fprintf(ofd, "lset d $dc [expr {[lindex $d $dc] + %d}]\n", count); break;
     case '-': I; fprintf(ofd, "lset d $dc [expr {[lindex $d $dc] - %d}]\n", count); break;
@@ -122,15 +133,18 @@ gen_code(int ch, int count, char * strn)
     case '>': I; fprintf(ofd, "incr dc %d\n", count); break;
     case '[':
 	if(bytecell) { I; oputs("lset d $dc [expr {[lindex $d $dc] % 256}]"); }
+	else if(bpc) { I; oputs("lset d $dc [expr {[lindex $d $dc] % $msk}]"); }
 	I; fprintf(ofd, "while {[lindex $d $dc] != 0} {\n");
 	ind++;
 	break;
     case ']':
 	if(bytecell) { I; oputs("lset d $dc [expr {[lindex $d $dc] % 256}]"); }
+	else if(bpc) { I; oputs("lset d $dc [expr {[lindex $d $dc] % $msk}]"); }
 	ind--; I; fprintf(ofd, "}\n");
 	break;
     case 'I':
 	if(bytecell) { I; oputs("lset d $dc [expr {[lindex $d $dc] % 256}]"); }
+	else if(bpc) { I; oputs("lset d $dc [expr {[lindex $d $dc] % $msk}]"); }
 	I; fprintf(ofd, "if {[lindex $d $dc] != 0} {\n");
 	ind++;
 	break;
@@ -143,6 +157,7 @@ gen_code(int ch, int count, char * strn)
 	break;
     case '.':
 	if(bytecell) { I; oputs("lset d $dc [expr {[lindex $d $dc] & 255}]"); }
+	else if(bpc) { I; oputs("lset d $dc [expr {[lindex $d $dc] % $msk}]"); }
 	I; oputs("puts -nonewline [format %c [lindex $d $dc]]");
 	break;
     case '"': print_cstring(strn); break;

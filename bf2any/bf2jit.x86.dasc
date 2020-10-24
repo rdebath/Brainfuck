@@ -585,6 +585,10 @@ gen_code(int ch, int count, char * strn)
 
 	link_and_run(Dst);
 	break;
+
+    default:
+	fprintf(stderr, "Unimplemented backend command 0x%02x\n", ch);
+	exit(1);
     }
 }
 

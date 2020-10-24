@@ -31,6 +31,7 @@ static int use_putcell = 0;
 static int use_putstr = 0;
 static int use_getcell = 0;
 static int unbounded_tape = 0;
+static int bpc = 0;
 
 static FILE * ofd;
 #ifdef ENABLE_LIBPY
@@ -64,6 +65,14 @@ fn_check_arg(const char * arg)
     if (strcmp(arg, "-oslib") == 0) {
 	use_oslib = 1;
 	return 1;
+    } else
+    if (strncmp(arg, "-b", 2) == 0 && arg[2] > '0' && arg[2] <= '9') {
+        bpc = strtol(arg+2, 0, 10);
+        if (bpc < 32) {
+            fprintf(stderr, "Cell size must be a minimum of 32 bits\n");
+            exit(1);
+        }
+        return 1;
     } else
     return 0;
 }
@@ -123,6 +132,7 @@ gen_code(int ch, int count, char * strn)
 	    I; fprintf(ofd, "m = defaultdict(int)\n");
 	}
 	I; fprintf(ofd, "p = %d\n", tapeinit);
+	if(bpc) { I; fprintf(ofd, "msk = 2**%d\n", bpc); }
 	break;
 
     case '~':
@@ -261,6 +271,7 @@ gen_code(int ch, int count, char * strn)
     case '=': I; fprintf(ofd, "%s = %d\n", mc, count); break;
     case 'B':
 	if(bytecell) { I; fprintf(ofd, "%s &= 255\n", mc); }
+	else if(bpc) { I; fprintf(ofd, "%s %%= msk\n", mc); }
 	I; fprintf(ofd, "v = %s\n", mc);
 	break;
     case 'M': I; fprintf(ofd, "%s = %s+v*%d\n", mc, mc, count); break;
@@ -268,6 +279,8 @@ gen_code(int ch, int count, char * strn)
     case 'S': I; fprintf(ofd, "%s = %s+v\n", mc, mc); break;
     case 'T': I; fprintf(ofd, "%s = %s-v\n", mc, mc); break;
     case '*': I; fprintf(ofd, "%s = %s*v\n", mc, mc); break;
+    case '/': I; fprintf(ofd, "%s = %s//v\n", mc, mc); break;
+    case '%': I; fprintf(ofd, "%s = %s%%v\n", mc, mc); break;
 
     case 'C': I; fprintf(ofd, "%s = v*%d\n", mc, count); break;
     case 'D': I; fprintf(ofd, "%s = -v*%d\n", mc, count); break;
@@ -282,6 +295,7 @@ gen_code(int ch, int count, char * strn)
     case '>': I; fprintf(ofd, "p += %d\n", count); break;
     case '[':
 	if(bytecell) { I; fprintf(ofd, "%s &= 255\n", mc); }
+	else if(bpc) { I; fprintf(ofd, "%s %%= msk\n", mc); }
 	I; fprintf(ofd, "while %s :\n", mc); ind++; break;
     case ']':
         if (count > 0) {
@@ -290,14 +304,14 @@ gen_code(int ch, int count, char * strn)
             I; fprintf(ofd, "p -= %d\n", -count);
 	}
 
-	if(bytecell) {
-	    I; fprintf(ofd, "%s &= 255\n", mc);
-	}
+	if(bytecell) { I; fprintf(ofd, "%s &= 255\n", mc); }
+	else if(bpc) { I; fprintf(ofd, "%s %%= msk\n", mc); }
 	ind--;
 	break;
 
     case 'I':
 	if(bytecell) { I; fprintf(ofd, "%s &= 255\n", mc); }
+	else if(bpc) { I; fprintf(ofd, "%s %%= msk\n", mc); }
 	I; fprintf(ofd, "if %s :\n", mc); ind++; break;
     case 'E':
         if (count > 0) {
@@ -310,6 +324,7 @@ gen_code(int ch, int count, char * strn)
 
     case '"': print_string(strn); break;
     case '.':
+	if(bpc) { I; fprintf(ofd, "%s %%= msk\n", mc); }
 	I; fprintf(ofd, "putcell(%s)\n", mc);
 	use_putcell = 1;
 	break;

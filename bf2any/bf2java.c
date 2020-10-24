@@ -331,7 +331,7 @@ loutcmd(int ch, int count, struct instruction *n)
 		"\n"
 		"\n"	"",public_class,"class ",classname," {"
 		"\n"	"    static byte[] m;"
-		"\n"	"    static int p;"
+		"\n"	"    static int p, n, d;"
 		"\n"	"    static byte v;");
 	    if (do_input) printf("%s\n",
 		"\n"	"    private static void i() {"
@@ -412,6 +412,24 @@ loutcmd(int ch, int count, struct instruction *n)
     case 'S': I; printf("m[p] += v;\n"); break;
     case 'T': I; printf("m[p] -= v;\n"); break;
     case '*': I; printf("m[p] *= v;\n"); break;
+    case '/':
+	if (bytecell) {
+	    I; printf("n = m[p]; if (n<0) n += 256;\n");
+	    I; printf("d = v; if (v<0) v += 256;\n");
+	    I; printf("m[p] = (byte) (n / d);\n");
+	} else {
+	    I; printf("m[p] = Integer.divideUnsigned(m[p], v);\n");
+	}
+	break;
+    case '%':
+	if (bytecell) {
+	    I; printf("n = m[p]; if (n<0) n += 256;\n");
+	    I; printf("d = v; if (v<0) v += 256;\n");
+	    I; printf("m[p] = (byte) (n %% d);\n");
+	} else {
+	    I; printf("m[p] = Integer.remainderUnsigned(m[p], v);\n");
+	}
+	break;
 
     case 'C':
 	if (bytecell) {

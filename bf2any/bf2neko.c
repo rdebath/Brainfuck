@@ -45,6 +45,8 @@ gen_code(int ch, int count, char * strn)
     case 'S': I; printf("m[p] = m[p]+v\n"); break;
     case 'T': I; printf("m[p] = m[p]-v\n"); break;
     case '*': I; printf("m[p] = m[p]*v\n"); break;
+    case '/': I; printf("m[p] = $idiv(m[p], v)\n"); break;
+    case '%': I; printf("m[p] = m[p] %% v\n"); break;
 
     case 'C': I; printf("m[p] = v*%d\n", count); break;
     case 'D': I; printf("m[p] = -v*%d\n", count); break;

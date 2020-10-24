@@ -217,6 +217,9 @@ gen_code(int ch, int count, char * strn)
 	} else
 	    pr("#include <stdio.h>");
 
+	if (celltype == celldouble)
+	    pr("#include <math.h>");
+
 	prv("#define TAPEOFF %d", tapeinit);
 	pr("#ifdef TAPELEN");
 	pr("#define TAPESIZE (TAPELEN+TAPEOFF)");
@@ -225,8 +228,8 @@ gen_code(int ch, int count, char * strn)
 	prv("#define TAPESIZE %d", tapesz);
 	pr("#endif");
 
-	if (!bytecell && celltype != cell32) {
-	    int use_stdint = (celltype == cell64) &&
+	if (celltype == cell64) {
+	    int use_stdint =
 		((runmode == no_run) || (sizeof(long)*CHAR_BIT != 64));
 	    if (use_stdint)
 		pr("#include <stdint.h>");
@@ -240,13 +243,15 @@ gen_code(int ch, int count, char * strn)
 	    pr("#endif");
 	}
 
-	if (enable_debug) {
+	if (enable_debug && (bytecell || celltype == cell32)) {
 	    pr("#ifndef do_dump");
 	    pr("#define do_dump() call_dump(mem,m)");
 	    if (bytecell)
 		pr("void call_dump(char *mem, char *m)");
 	    else if (celltype == cell32)
 		pr("void call_dump(int *mem, int *m)");
+	    else if (celltype == celldouble)
+		pr("void call_dump(double *mem, double *m)");
 	    else
 		pr("void call_dump(C *mem, C *m)");
 	    pr("{");
@@ -278,6 +283,9 @@ gen_code(int ch, int count, char * strn)
 	} else if (celltype == cell32) {
 	    pr("static unsigned int mem[TAPESIZE];");
 	    pr("register unsigned int v, *m = mem + TAPEOFF;");
+	} else if (celltype == celldouble) {
+	    pr("static double mem[TAPESIZE];");
+	    pr("register double v, *m = mem + TAPEOFF;");
 	} else {
 	    pr("static C mem[TAPESIZE];");
 	    pr("register C v, *m = mem + TAPEOFF;");
@@ -300,6 +308,18 @@ gen_code(int ch, int count, char * strn)
     case 'S': prv("m[%d] += v;", mov); return;
     case 'T': prv("m[%d] -= v;", mov); return;
     case '*': prv("m[%d] *= v;", mov); return;
+    case '/':
+	if (celltype != celldouble)
+	    prv("m[%d] /= v;", mov);
+	else /* NB: fmod() is "rounded toward zero to an integer" */
+	    prv2("m[%d] = trunc(m[%d]/v);", mov, mov);
+	return;
+    case '%':
+	if (celltype != celldouble)
+	    prv("m[%d] %%= v;", mov);
+	else
+	    prv2("m[%d] = fmod(m[%d], v);", mov, mov);
+	return;
 
     case 'C': prv2("m[%d] = v*%d;", mov, count); return;
     case 'D': prv2("m[%d] = -v*%d;", mov, count); return;

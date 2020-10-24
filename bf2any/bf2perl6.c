@@ -43,11 +43,11 @@ gen_code(int ch, int count, char * strn)
     case '!':
 	printf( "%s\n", "#!/usr/bin/env perl6");
 	if (!count) {
-	    printf( "%s\n", "my int32 ($p, $v, $c);");
+	    printf( "%s\n", "my uint32 ($p, $v, $c);");
 	    if (bytecell)
 		printf("my uint8 @m;\n");
 	    else
-		printf("my int32 @m;\n");
+		printf("my uint32 @m;\n");
 	    printf("%s%d%s", "$p = ", tapeinit, ";\n");
 	}
 	break;
@@ -61,6 +61,8 @@ gen_code(int ch, int count, char * strn)
     case 'S': I; printf("%s = %s+$v;\n", mc, mc); break;
     case 'T': I; printf("%s = %s-$v;\n", mc, mc); break;
     case '*': I; printf("%s = %s*$v;\n", mc, mc); break;
+    case '/': I; printf("%s = %s div $v;\n", mc, mc); break;
+    case '%': I; printf("%s = %s%%$v;\n", mc, mc); break;
 
     case 'C': I; printf("%s = $v*%d;\n", mc, count); break;
     case 'D': I; printf("%s = -$v*%d;\n", mc, count); break;
