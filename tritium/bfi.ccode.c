@@ -1076,7 +1076,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		unsigned i = 0, j;
 		int got_perc = (n->count == '%');
 		int lastc = 0;
-		unsigned slen = 4;	/* First char + nul + ? */
+		unsigned slen = 8;	/* First char + nul + ? */
 		struct bfi * v = n;
 		char *s, *p;
 		while(v->next && v->next->type == T_CHR &&
