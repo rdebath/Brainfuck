@@ -59,7 +59,7 @@ MORECLANG=$(MOREDEFS) -fsanitize=integer -Wpadded
 
 OBJECTS=bfi.o bfi.version.o bfi.ccode.o bfi.nasm.o bfi.bf.o \
 	bfi.dd.o bfi.cpp.o bfi.runarray.o clock.o taperam.o \
-	bfi.gmp.o opt_bfbasic.o
+	bfi.gmp.o opt_bfbasic.o md5.o hashmem.o
 
 CONF=-DCNF $(CONF_DYNASM) $(CONF_LIGHTNING) $(CONF_TCCLIB) $(CONF_SSLLIB) $(CONF_GMPLIB) $(CONF_LIBDL)
 LDLIBS=$(GNUSTK) $(LIBS_LIGHTNING) $(LIBS_TCCLIB) $(LIBS_SSLLIB) $(LIBS_GMPLIB) $(GNUDYN) $(LIBS_LIBDL)
@@ -95,7 +95,8 @@ bfi.o: \
     bfi.nasm.h bfi.bf.h bfi.dd.h clock.h ov_int.h \
     bfi.runarray.h bfi.cpp.h bfi.gmp.h
 bfi.bf.o: bfi.bf.c bfi.tree.h bfi.bf.h
-bfi.ccode.o: bfi.ccode.c bfi.tree.h bfi.run.h bfi.ccode.h clock.h
+bfi.ccode.o: bfi.ccode.c bfi.tree.h bfi.run.h bfi.ccode.h clock.h \
+    md5.h hashmem.h
 bfi.nasm.o: bfi.nasm.c bfi.tree.h bfi.nasm.h
 bfi.runarray.o: bfi.runarray.c bfi.tree.h bfi.run.h bfi.runarray.h \
     clock.h bfi.execloop.h big_int.h
@@ -107,6 +108,8 @@ opt_bfbasic.o: opt_bfbasic.c bfi.tree.h
 clock.o: clock.c clock.h
 taperam.o: taperam.c bfi.tree.h bfi.run.h
 gmp.o: gmp.c gmp.h
+md5.o: md5.c md5.h
+hashmem.o: hashmem.c hashmem.h
 
 ################################################################################
 # Don't configure if we're just cleaning.

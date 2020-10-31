@@ -11,11 +11,20 @@
 #include <limits.h>
 #include <string.h>
 
+#if (_POSIX_VERSION >= 200809L)
+#define ENABLE_MD5FUNC
+#endif
+
 #include "bfi.tree.h"
 #include "bfi.run.h"
 #include "clock.h"
 #include "bfi.ccode.h"
 #include "big_int.h"
+
+#ifdef ENABLE_MD5FUNC
+#include "md5.h"
+#include "hashmem.h"
+#endif
 
 #ifndef DISABLE_TCCLIB
 #include <libtcc.h>
@@ -45,6 +54,7 @@ static int use_direct_getchar = 0;
 static int use_dynmem = 0;
 static int use_goto = 0;
 static int use_functions = -1;
+static int use_md5dedup = -1;
 static int libtcc_specials = 0;
 static int knr_c_ok = 1;
 static int tiny_tape = 0;
@@ -75,6 +85,10 @@ static char * lval(int offset);
 static void set_cell_type(void);
 static void print_c_header(FILE * ofd);
 static void print_lib_funcs(FILE * ofd);
+
+#ifdef ENABLE_MD5FUNC
+static struct hashtab * hashtab[1] = {0};
+#endif
 
 int
 checkarg_ccode(char * opt, char * arg UNUSED)
@@ -117,8 +131,9 @@ checkarg_ccode(char * opt, char * arg UNUSED)
 	return 1;
     }
     if (!strcmp(opt, "-fgoto")) { use_goto = 1; return 1; }
-    if (!strcmp(opt, "-ffunct")) { use_functions = 1; return 1; }
-    if (!strcmp(opt, "-fno-funct")) { use_functions = 0; return 1; }
+    if (!strcmp(opt, "-ffunct")) { use_functions = 1; use_md5dedup = 1; return 1; }
+    if (!strcmp(opt, "-fno-funct")) { use_functions = 0; use_md5dedup = 0; return 1; }
+    if (!strcmp(opt, "-fflat-funct")) { use_functions = 1; use_md5dedup = 0; return 1; }
     return 0;
 }
 
@@ -1435,6 +1450,8 @@ print_ccode(FILE * ofd)
 	use_functions = (total_nodes-node_type_counts[T_CHR] >= 5000);
 #endif
 
+    if (use_md5dedup<0) use_md5dedup = use_functions;
+
     if (verbose)
 	fprintf(stderr, "Generating C Code.\n");
 
@@ -1484,6 +1501,8 @@ print_ccode(FILE * ofd)
 	    ( n->type == T_ENDIF && n->jmp->type == T_IF)) &&
 		n->iprof-n->jmp->iprof > 5) {
 	    int ti = indent;
+
+#ifndef ENABLE_MD5FUNC
 	    indent = 0;
 
 	    if (!knr_c_ok)
@@ -1494,7 +1513,57 @@ print_ccode(FILE * ofd)
 		    cell_type, n->jmp->count, cell_type, cell_type);
 	    print_c_body(ofd, n->jmp, n->next);
 	    fprintf(ofd, "  return m;\n}\n\n");
+#else
+	    char * fn_code;
+	    size_t fn_len;
+	    FILE * codefd = open_memstream(&fn_code, &fn_len);
+	    int is_dup = 0;
 
+	    indent = 0;
+
+	    print_c_body(codefd, n->jmp, n->next);
+	    putc('\0', codefd); /* Make it easy */
+	    fclose(codefd);
+
+	    if (use_md5dedup)
+	    {
+		int i;
+		int * vnum;
+		char hashid[64];
+		MD5_CTX mdContext;
+
+		MD5Init (&mdContext);
+		MD5Update (&mdContext, fn_code, fn_len-1);
+		MD5Final (&mdContext);
+
+		for (i = 0; i < 16; i++)
+		    sprintf(hashid+i*2, "%02x", mdContext.digest[i]);
+
+		vnum = find_entry(hashtab, hashid);
+		if (vnum) {
+		    is_dup = 1;
+		    n->jmp->count = *vnum;
+		} else {
+		    vnum = malloc(sizeof*vnum);
+		    *vnum = n->jmp->count;
+		    set_entry(hashtab, hashid, vnum);
+		}
+	    }
+
+	    if (!is_dup)
+	    {
+		if (!knr_c_ok)
+		    fprintf(ofd, "static %s * bf%d(register %s * m)\n{\n",
+			cell_type, n->jmp->count, cell_type);
+		else
+		    fprintf(ofd, "static %s * bf%d FD((register %s * m),(m) register %s * m;)\n{\n",
+			cell_type, n->jmp->count, cell_type, cell_type);
+		fprintf(ofd, "%s", fn_code);
+		fprintf(ofd, "  return m;\n}\n\n");
+	    }
+
+	    free(fn_code);
+#endif
 	    indent = ti;
 
 	    n->jmp->type = T_CALL;
