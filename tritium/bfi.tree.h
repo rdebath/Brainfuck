@@ -52,8 +52,8 @@ extern int cell_smask;
     Mac(IF) Mac(ENDIF) Mac(MULT) Mac(CMULT) \
     Mac(ZFIND) Mac(MFIND) Mac(ADDWZ) Mac(LT) Mac(DIV) \
     Mac(CALC2) Mac(CALC3) Mac(CALC4) Mac(CALC5) \
-    Mac(PRTI) Mac(INPI) Mac(STOP) Mac(SUSP) Mac(DUMP) \
-    Mac(NOP) Mac(DEAD) Mac(CALL)
+    Mac(PRTI) Mac(INPI) Mac(STOP) Mac(FINI) Mac(DUMP) \
+    Mac(NOP) Mac(DEAD) Mac(CALL) Mac(SUSP)
 
 #define GEN_TOK_ENUM(NAME) T_ ## NAME,
 enum token { TOKEN_LIST(GEN_TOK_ENUM) TCOUNT};

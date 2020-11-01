@@ -36,6 +36,7 @@ X(ccode,CCODE,
 	fprintf(stderr, "The C generator does not support that cell size\n");
 	exit(255);
     }
+    if (do_codestyle == c_ccode) special_eof = 1;
 #endif
 #if XX == 9
     {	int f = checkarg_ccode(opt, arg);

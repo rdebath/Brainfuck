@@ -136,6 +136,7 @@ int enable_trace = 0;
 int debug_mode = 0;
 int iostyle = -1; /* 0=Binary, 1=UTF8, 2=ASCII, 3=Integer. */
 int eofcell = 0; /* 0=>?, 1=> No Change, 2= -1, 3= 0, 4=EOF, 5=No Input, 6=Abort. */
+int special_eof = 0; /* Does backend have special eof? */
 char * input_string = 0;
 char * program_string = 0;
 int libc_allows_utf8 = 0;
@@ -428,7 +429,6 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("    not support all these options. NASM is 8 bits only. The BF\n");
     printf("    generator does not include the ability to generate most of\n");
     printf("    the optimisation facilities.\n");
-    printf("    Many don't support -E2,-E3 and -E4.\n");
     printf("    Most code generators only support binary I/O.\n");
 #endif
 
@@ -847,9 +847,7 @@ static int dld, inp, rle = 0, num = -1, ov_flg, loopid, zstate;
 	case ']': ch = T_END; break;
 	case '.': ch = T_PRT; break;
 	case ',':
-	    if (eofcell == 5) ch = T_NOP;
-	    else if (eofcell == 6) ch = T_STOP;
-	    else { ch = T_INP; inp = 1; }
+	    if (eofcell != 5) ch = T_INP; else ch = T_NOP;
 	    break;
 	case '#':
 	    if(debug_mode) ch = T_DUMP; else ch = T_NOP;
@@ -977,9 +975,30 @@ static int dld, inp, rle = 0, num = -1, ov_flg, loopid, zstate;
 	    n->offset = pending_mov;
 	    p = n = new_node(p, T_CHR, curr_line, curr_col);
 	    n->count = 10;
+	} else if (n->type == T_INP) {
+	    int initcell = 1;
+	    if (!special_eof)
+		switch(eofcell) {
+		case 2: initcell = -1; break;
+		case 3: initcell = 0; break;
+		case 4: initcell = EOF; break;
+		}
+	    if (initcell<=0) {
+		n->type = T_SET;
+		n->count = initcell;
+		n->offset = pending_mov;
+		p = n = new_node(p, ch, curr_line, curr_col);
+	    }
+
+	    if (eofcell == 5) n->type = T_NOP;
+	    else if (eofcell == 6) n->type = T_STOP;
+	    else inp = 1;
+
+	    if (iostyle == 3) n->type = T_INPI;
+
+	    n->count = c;
+	    n->offset = pending_mov;
 	} else {
-	    if (iostyle == 3 && n->type == T_INP)
-		n->type = T_INPI;
 	    n->count = c;
 	    n->offset = pending_mov;
 	}

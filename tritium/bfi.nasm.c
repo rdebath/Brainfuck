@@ -824,19 +824,6 @@ print_nasm_footer(void)
 	printf("\tinc edx\n");
 	printf("\tmov al, 3\n");
 	printf("\tint 0x80\t; read(ebx, ecx, edx);\n");
-	if (eofcell > 1) {
-	    printf("\tcmp eax,0\n");
-	    printf("\tjg .noeof\n");
-	    if (eofcell == 3)
-		printf("\tmov byte ptr [ecx], 0\n");
-#if EOF != -1
-	    else if (eofcell == 4)
-		printf("\tmov byte ptr [ecx], %d\n", EOF);
-#endif
-	    else
-		printf("\tmov byte ptr [ecx], 0xFF\n");
-	    printf(".noeof:\n");
-	}
 	printf("\tret\n");
 	printf("section .bftext\n");
 	printf("%%endif    ; bin format\n");

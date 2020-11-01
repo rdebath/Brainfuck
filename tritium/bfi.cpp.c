@@ -174,12 +174,6 @@ print_cpp(void)
 #undef okay_for_cstr
 
 	case T_INP:
-	    switch(eofcell)
-	    {
-	    case 2: printf("set_i(%d,%d)\n", n->offset, -1); break;
-	    case 3: printf("set_i(%d,%d)\n", n->offset, 0); break;
-	    case 4: printf("set_i(%d,%d)\n", n->offset, EOF); break;
-	    }
 	    printf("inpchar(%d)\n", n->offset);
 	    break;
 

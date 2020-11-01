@@ -709,19 +709,7 @@ run_gmparray(void)
 		    }
 		}
 
-		if (!buf) {
-		    int c = 1;
-		    switch(eofcell)
-		    {
-		    case 2: c = -1; break;
-		    case 3: c = 0; break;
-		    case 4: c = EOF; break;
-		    }
-		    if (c<=0) {
-			m[p[1]].f = 0;
-			m[p[1]].v = c;
-		    }
-		} else {
+		if (buf) {
 		    mpz_set_str(m[p[1]].b, buf, 0);
 		    free(buf);
 		}
@@ -753,6 +741,9 @@ run_gmparray(void)
 		tokennames[p[0]]);
 	    /*FALLTHROUGH*/
 	case T_STOP:
+	    fprintf(stderr, "STOP Command executed.\n");
+	    /*FALLTHROUGH*/
+	case T_FINI:
 	    goto break_break;
 	}
     }

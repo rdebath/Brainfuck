@@ -326,7 +326,7 @@ convert_tree_to_runarray(int merge_mov)
 	n = n->next;
     }
     if (merge_mov) *p++ = 0;
-    *p++ = T_STOP;
+    *p++ = T_FINI;
 
     return progarray;
 }

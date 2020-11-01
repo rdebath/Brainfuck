@@ -177,6 +177,9 @@ FNAME(int * p, void * mem)
 	    break;
 
 	case T_STOP:
+            fprintf(stderr, "STOP Command executed.\n");
+            /*FALLTHROUGH*/
+	case T_FINI:
 	    goto break_break;
 	}
     }

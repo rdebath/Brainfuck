@@ -239,12 +239,6 @@ print_dd(void)
 
 	case T_INP:
 	    outcmd('>', n->offset);
-	    if (eofcell == 3)
-		outcmd('=', 0);
-	    else if (eofcell == 2)
-		outcmd('=', -1);
-	    else if (eofcell == 4)
-		outcmd('=', EOF);
 	    outcmd(',', 0);
 	    outcmd('<', n->offset);
 	    break;
