@@ -45,6 +45,10 @@
 #define jit_negr jit_negr_i
 #define jit_muli jit_muli_i
 #define jit_mulr jit_mulr_i
+#define jit_divi_u jit_divi_ui
+#define jit_divr_u jit_divr_ui
+#define jit_remi_u jit_modi_ui
+#define jit_remr_u jit_modr_ui
 #define jit_addr jit_addr_i
 #define jit_andi jit_andi_i
 #define jit_extr_uc jit_extr_uc_i
@@ -71,6 +75,7 @@ static jit_state_t *_jit;
  */
 
 #define REG_P   JIT_V1
+#define REG_M   JIT_V2
 #define REG_ACC JIT_R0
 #define REG_A1	JIT_R1
 #define REG_A2	JIT_R2
@@ -137,7 +142,11 @@ load_acc_offset(int offset)
     acc_offset = offset;
     if (tape_step > 1) {
 	if (acc_offset) {
-	    jit_ldxi_i(REG_ACC, REG_P, acc_offset * tape_step);
+#ifdef jit_ldxi_ui
+	    jit_ldxi_ui(REG_ACC, REG_P, acc_offset * tape_step);
+#else
+	    jit_ldxi(REG_ACC, REG_P, acc_offset * tape_step);
+#endif
 	} else {
 	    jit_ldr_i(REG_ACC, REG_P);
 	}
@@ -151,7 +160,11 @@ load_acc_offset(int offset)
 
     acc_loaded = 1;
     acc_dirty = 0;
-    acc_hi_dirty = (tape_step*8 != cell_size);
+    acc_hi_dirty = (tape_step*8 != cell_size) && (cell_mask>0);
+
+#ifdef jit_ldxi_ui
+    acc_hi_dirty = 1; // Register size is 64bits
+#endif
 }
 
 static void failout(void) __attribute__ ((__noreturn__));
@@ -370,6 +383,73 @@ run_gnulightning(void)
 
 	    jit_ltr_u(REG_A1, REG_A1, REG_A2);
 	    jit_addr(REG_ACC, REG_ACC, REG_A1);
+            break;
+
+	case T_DIV:
+	    load_acc_offset(n->offset);
+	    clean_acc();
+	    acc_const = acc_loaded = 0;
+
+	    if (stackptr >= maxstack) {
+		loopstack = realloc(loopstack,
+			    ((maxstack+=32)+2)*sizeof(*loopstack));
+		if (loopstack == 0) {
+		    perror("loop stack realloc failure");
+		    exit(1);
+		}
+	    }
+
+	    if (tape_step > 1) {
+#ifdef jit_ldxi_ui
+		jit_ldxi_ui(REG_A1, REG_P, (n->offset+1) * tape_step);
+#else
+		jit_ldxi(REG_A1, REG_P, (n->offset+1) * tape_step);
+#endif
+		jit_stxi_i((n->offset+2) * tape_step, REG_P, REG_ACC);
+		jit_movi(REG_A2, 0);
+		jit_stxi_i((n->offset+3) * tape_step, REG_P, REG_A2);
+	    } else {
+		jit_ldxi_uc(REG_A1, REG_P, n->offset+1);
+		jit_stxi_uc(n->offset+2, REG_P, REG_ACC);
+		jit_movi(REG_A2, 0);
+		jit_stxi_uc(n->offset+3, REG_P, REG_A2);
+	    }
+
+	    acc_hi_dirty = 0;
+	    if (cell_mask == 0xFF) {
+		jit_extr_uc(REG_ACC,REG_ACC);
+		jit_extr_uc(REG_A1,REG_A1);
+	    } else if (cell_mask > 0) {
+		jit_andi(REG_ACC, REG_ACC, cell_mask);
+		jit_andi(REG_A1, REG_A1, cell_mask);
+#ifdef jit_extr_ui
+	    } else {
+		jit_extr_ui(REG_ACC,REG_ACC);
+		jit_extr_ui(REG_A1,REG_A1);
+#endif
+	    }
+
+#ifdef GNULIGHTv1
+	    loopstack[stackptr] = jit_beqi_i(jit_forward(), REG_A1, 0);
+
+	    jit_remr_u(REG_A2, REG_ACC, REG_A1);
+	    jit_divr_u(REG_ACC, REG_ACC, REG_A1);
+#endif
+#ifdef GNULIGHTv2
+	    loopstack[stackptr] = jit_beqi(REG_A1, 0);
+
+	    jit_qdivr_u(REG_ACC, REG_A2, REG_ACC, REG_A1);
+#endif
+
+	    if (tape_step > 1) {
+		jit_stxi_i((n->offset+3) * tape_step, REG_P, REG_ACC);
+		jit_stxi_i((n->offset+2) * tape_step, REG_P, REG_A2);
+	    } else {
+		jit_stxi_uc(n->offset+3, REG_P, REG_ACC);
+		jit_stxi_uc(n->offset+2, REG_P, REG_A2);
+	    }
+
+	    jit_patch(loopstack[stackptr]);
 	    break;
 
 	case T_IF: case T_MULT: case T_CMULT:
@@ -387,11 +467,15 @@ run_gnulightning(void)
 		}
 	    }
 
-	    if (cell_mask > 0 && acc_hi_dirty) {
+	    if (acc_hi_dirty) {
 		if (cell_mask == 0xFF)
 		    jit_extr_uc(REG_ACC,REG_ACC);
-		else
+		else if (cell_mask>0)
 		    jit_andi(REG_ACC, REG_ACC, cell_mask);
+#ifdef jit_extr_ui
+		else
+		    jit_extr_ui(REG_ACC,REG_ACC);
+#endif
 	    }
 
 #ifdef GNULIGHTv1
@@ -415,11 +499,15 @@ run_gnulightning(void)
 		exit(1);
 	    }
 
-	    if (cell_mask > 0 && acc_hi_dirty) {
+	    if (acc_hi_dirty) {
 		if (cell_mask == 0xFF)
 		    jit_extr_uc(REG_ACC,REG_ACC);
-		else
+		else if (cell_mask > 0)
 		    jit_andi(REG_ACC, REG_ACC, cell_mask);
+#ifdef jit_extr_ui
+		else
+		    jit_extr_ui(REG_ACC,REG_ACC);
+#endif
 	    }
 
 #ifdef GNULIGHTv1

@@ -26,8 +26,6 @@ X(gnulightning,GNULIGHTNING,
 	fprintf(stderr, "The GNU Lightning generator does not support that cell size\n");
 	exit(255);
     }
-    if (do_codestyle == c_gnulightning)
-	opt_no_div = 1;
 #endif
 #if XX == 6
 if (cell_size == 0 && do_codestyle == c_gnulightning) set_cell_size(-1);
