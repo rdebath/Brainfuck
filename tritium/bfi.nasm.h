@@ -15,7 +15,6 @@ X(nasm,NASM,
 #if XX == 4
     if (do_codestyle == c_nasm)
     {
-	opt_no_div = 1;
 	if (cell_length && cell_size != 8) {
 	    fprintf(stderr, "The 'nasm' generator only supports 8 bit cells.\n");
 	    exit(255);

@@ -71,6 +71,7 @@ print_nasm(void)
     char charmap[256];
     char const * neartok = "";
     int i;
+    int div_id = 0;
 
     memset(charmap, 0, sizeof(charmap));
     outp_line = -1;
@@ -148,6 +149,7 @@ print_nasm(void)
 	case T_PRT: i+=9; break;
 	case T_CHR: i+=9; break;
 	case T_INP: i+=9; break;
+	case T_DIV: i+=24; break;
 	default: i+=6; break;
 #else
 	case T_MOV: i+=6; break;
@@ -157,6 +159,7 @@ print_nasm(void)
 	case T_PRT: i+=12; break;
 	case T_CHR: i+=9; break;
 	case T_INP: i+=24; break;
+	case T_DIV: i+=24; break;
 	default: i+=12; break;
 #endif
 	}
@@ -307,6 +310,25 @@ print_nasm(void)
 	    printf("\tcmp ebx,edi\n");
 	    printf("\tsetb al\n");
 	    printf("\tadd byte ptr [ecx%s],al\n", oft(n->offset));
+	    break;
+
+	case T_DIV:
+	    printf("\tmov byte ptr [ecx%s],0\n", oft(n->offset+3));
+	    printf("\tmovzx eax,byte ptr [ecx%s]\n", oft(n->offset));
+	    printf("\tmov byte ptr [ecx%s],al\n", oft(n->offset+2));
+
+	    printf("\tmovzx ebx,byte ptr [ecx%s]\n", oft(n->offset+1));
+
+	    printf("\tcmp dh,bl\n");
+	    printf("\tjz zerodiv_%d\n", ++div_id);
+
+	    printf("\tdiv bl\n");
+	    printf("\tmov byte ptr [ecx%s],al\n", oft(n->offset+3)); /* Div */
+	    printf("\tmov byte ptr [ecx%s],ah\n", oft(n->offset+2)); /* Mod */
+
+	    printf("zerodiv_%d:\n", div_id);
+	    printf("\txor edx,edx\n");
+	    printf("\tinc edx\n");
 	    break;
 
 	case T_CHR:
