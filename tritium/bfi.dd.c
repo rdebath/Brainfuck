@@ -15,7 +15,7 @@
 static void outcmd(int ch, int count);
 
 static char * strbuf;
-static unsigned int maxstrlen = 0, buflen = 0;
+static unsigned int buflen = 0;
 static int bfrle = 0;
 
 int
@@ -38,6 +38,7 @@ print_dd(void)
 	(node_type_counts[T_INPI] == 0) &&
 	(node_type_counts[T_PRTI] == 0) &&
 	(node_type_counts[T_CHR] == 0) &&
+	(node_type_counts[T_STR] == 0) &&
 	(node_type_counts[T_DIV] == 0) );
 
     if (bfrle && !is_bfrle)
@@ -267,28 +268,24 @@ print_dd(void)
 	    break;
 
 	case T_CHR:
+	    outcmd('B', 0);
+	    if (iostyle != 1)
+		outcmd('=', n->count & 0xFF);
+	    else
+		outcmd('=', n->count);
+	    outcmd('.', 0);
+	    outcmd('V', 0);
+	    break;
+
+	case T_STR:
 	    {
-		unsigned i = 0;
-		struct bfi * v = n;
-		while(v && v->type == T_CHR) {
-
-		    if (i+2 > maxstrlen) {
-			if (maxstrlen) maxstrlen *= 2; else maxstrlen = 4096;
-			strbuf = realloc(strbuf, maxstrlen);
-			if (!strbuf) {
-			    fprintf(stderr, "Reallocate of string buffer failed\n");
-			    exit(42);
-			}
-		    }
-
-		    strbuf[i++] = (char) /*GCC -Wconversion*/ v->count;
-		    n = v;
-		    v = v->next;
-		}
-		strbuf[i] = 0;
-		buflen = i;
+		buflen = n->str->length;
+		strbuf = n->str->buf;
+		outcmd('"', 0);
+		strbuf = 0;
+		if (n->next && n->next->type == T_STR)
+		    outcmd(' ', 0); /* Oops, need NOP spacer. */
 	    }
-	    outcmd('"', 0);
 	    break;
 
 	case T_INP:
@@ -380,6 +377,8 @@ ddump(int ch, int count)
 
     if (ch == '"') {
 	int sch; unsigned i = 0;
+	int restore_cell = 0;
+	int in_q = 0;
 	if (buflen == 0) return;
 
 	if (col+60>maxcol) {
@@ -387,27 +386,46 @@ ddump(int ch, int count)
 	    col = 0;
 	}
 
-	putchar('"'); col++;
 	for(i=0; i<buflen; i++) {
-	    sch = strbuf[i];
-	    if (col > maxcol-(sch == '"')-2 + 80) {
-		printf("\"\n\"");
-		col = 1;
-	    }
-	    if (sch == '"') {
-		putchar(sch);
-		putchar(sch);
-		col+=2;
-	    } else if (sch == '\n') {
-		putchar(sch);
-		col = 0;
+	    sch = (signed char) strbuf[i];
+	    if (iostyle != 1) sch &= 0xFF;
+	    if ((sch<32||sch>127) && !(sch == '\n' && in_q)) {
+		if (col > maxcol-8 + 80) {
+		    if (in_q) putchar('"');
+		    putchar('\n');
+		    in_q = col = 0;
+		}
+		if (in_q) { col++; in_q=0; putchar('"'); }
+		if (!restore_cell) { restore_cell=1; col++; putchar('B'); }
+		if (sch < 0) {
+		    col += printf("%d~=", ~sch);
+		} else {
+		    col += printf("%d=", sch);
+		}
+		putchar('.');
 	    } else {
-		putchar(sch);
-		col++;
+		if (col > maxcol-(sch == '"')-2-!in_q + 80) {
+		    if (in_q) putchar('"');
+		    printf("\n\"");
+		    col = 1;
+		    in_q = 1;
+		}
+		if (!in_q) { col++; putchar('"'); in_q = 1; }
+		if (sch == '"') {
+		    putchar(sch);
+		    putchar(sch);
+		    col+=2;
+		} else if (sch == '\n') {
+		    putchar(sch);
+		    col = 0;
+		} else {
+		    putchar(sch);
+		    col++;
+		}
 	    }
 	}
-	col++;
-	putchar('"');
+	if (in_q) { col++; putchar('"'); in_q =0; }
+	if (restore_cell) { col++; putchar('V'); restore_cell=0; }
 	return;
 
     } else if (ch == '=' && count < 0) {

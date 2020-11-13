@@ -128,11 +128,6 @@ print_cpp(void)
 	    }
 	    break;
 
-#define okay_for_cstr(xc) \
-                    ( (xc) >= ' ' && (xc) <= '~' && \
-                      (xc) != '\\' && (xc) != '"' \
-                    )
-
 	case T_DIV:
 	    printf("and_mask(%d)\n", n->offset);
 	    printf("and_mask(%d)\n", n->offset+1);
@@ -145,33 +140,36 @@ print_cpp(void)
 	    break;
 
 	case T_CHR:
-	    if (!okay_for_cstr(n->count) ||
-		    !n->next || n->next->type != T_CHR) {
-
+	    if (iostyle != 1)
+		printf("outchar(%d)\n", n->count & 0xFF);
+	    else
 		printf("outchar(%d)\n", n->count);
-	    } else {
-		unsigned i = 0, j;
-		struct bfi * v = n;
-		char *s, *p;
-		while(v->next && v->next->type == T_CHR &&
-			    okay_for_cstr(v->next->count)) {
-		    v = v->next;
-		    i++;
-		}
-		p = s = malloc(i+2);
+	    break;
 
-		for(j=0; j<i; j++) {
-		    *p++ = (char) /*GCC -Wconversion*/ n->count;
-		    n = n->next;
+	case T_STR:
+	    {
+		int i, j=0;
+		for(i=0; i<n->str->length; i++) {
+		    int ch = (signed char) n->str->buf[i];
+		    if (iostyle != 1) ch &= 0xFF;
+		    if (ch >= ' ' && ch <= '~' && ch != '\\' && ch != '"') {
+			/* Safe chars, too long? */
+			if (i-j>160) {
+			    printf("outstr(\"%.*s\")\n", i-j, n->str->buf+j);
+			    j=i;
+			}
+		    } else {
+			if (i>j)
+			    printf("outstr(\"%.*s\")\n", i-j, n->str->buf+j);
+			printf("outchar(%d)\n", ch);
+			j=i+1;
+		    }
 		}
-		*p++ = (char) /*GCC -Wconversion*/ n->count;
-		*p++ = 0;
-
-		printf("outstr(\"%s\")\n", s);
-		free(s);
+		i = n->str->length;
+		if (i>j)
+		    printf("outstr(\"%.*s\")\n", i-j, n->str->buf+j);
 	    }
 	    break;
-#undef okay_for_cstr
 
 	case T_INP:
 	    printf("inpchar(%d)\n", n->offset);
@@ -319,10 +317,10 @@ cpp_header()
     printf("%s%s%s\n",
 	"#define bf_start(msz,moff) ",cpp_type," mem[msz+moff]; \\");
 
-    if (node_type_counts[T_CHR] || node_type_counts[T_PRT])
+    if (node_type_counts[T_CHR] || node_type_counts[T_STR] || node_type_counts[T_PRT])
 	printf("  void putch(%s c) {char s=(int)c; write(1,&s,1);} \\\n", cpp_type);
 
-    if (node_type_counts[T_CHR])
+    if (node_type_counts[T_STR])
 	puts("  void putstr(const char *s) {const char *p=s; while(*p)p++; write(1,s,p-s);} \\");
 
     printf("%s%s%s\n",
@@ -411,7 +409,7 @@ cpp_header()
     if (node_type_counts[T_DUMP])
 	puts("#define bf_dump(l,c) /* Hmmm */");
 
-    if (node_type_counts[T_CHR]) {
+    if (node_type_counts[T_CHR] || node_type_counts[T_STR]) {
 	printf("%s\n",
 	    "#define outchar(x) putch(x);"
     "\n"	"#define outstr(x) putstr(x);");

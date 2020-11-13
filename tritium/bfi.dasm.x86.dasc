@@ -242,8 +242,6 @@ run_dynasm(void)
     struct bfi * n = bfprog;
     int used_prtchr = 0;
     int section_used = 0;
-    char *strbuf = 0;
-    size_t maxstrlen = 0;
 
     if (cell_size == 8) tape_step = 1; else
     tape_step = sizeof(int);
@@ -744,45 +742,30 @@ run_dynasm(void)
 	    clean_acc();
 	    acc_const = acc_loaded = 0;
 
-            if (n->count <= 0 || (n->count >= 127 && iostyle == 1) ||
-                    !n->next || n->next->type != T_CHR) {
-		used_prtchr = 1;
+	    used_prtchr = 1;
+	    if (count >= 0 && count < 256) {
+		| mov REG_AL, (count)
+		| call ->prtchr
+		break;
+	    }
 
-		if (count >= 0 && count < 256) {
-		    | mov REG_AL, (count)
-		    | call ->prtchr
-		    break;
+	    | mov REG_A, (count)
+	    | call ->prtchrw
+	    break;
+
+	case T_STR:
+	    clean_acc();
+	    acc_const = acc_loaded = 0;
+
+	    {
+		char *s = malloc(n->str->length+1);
+		if (!s) {
+		    fprintf(stderr, "Save of string failed\n");
+		    exit(43);
 		}
-
-		| mov REG_A, (count)
-		| call ->prtchrw
-	    } else {
-                unsigned i = 0;
-                struct bfi * v = n;
-                char *s;
-                while(v && v->type == T_CHR && v->count > 0 &&
-                            (v->count < 127 || iostyle != 1)) {
-
-                    if (i+2 > maxstrlen) {
-                        if (maxstrlen) maxstrlen *= 2; else maxstrlen = 4096;
-                        strbuf = realloc(strbuf, maxstrlen);
-                        if (!strbuf) {
-                            fprintf(stderr, "Reallocate of string buffer failed\n");
-                            exit(42);
-                        }
-                    }
-
-                    strbuf[i++] = (char) /*GCC -Wconversion*/ v->count;
-                    n = v;
-                    v = v->next;
-                }
-                strbuf[i] = 0;
-                s = strdup(strbuf);
-                if (!s) {
-                    fprintf(stderr, "Save of string failed\n");
-                    exit(43);
-                }
-                save_ptr_for_free(s);
+		memcpy(s, n->str->buf, n->str->length);
+		s[n->str->length] = 0;
+		save_ptr_for_free(s);
 
 		|.if I386
 		| mov REG_A, s
@@ -807,7 +790,6 @@ run_dynasm(void)
 #endif
 		| call  rax
 		|.endif
-
 	    }
 	    break;
 
@@ -883,6 +865,18 @@ run_dynasm(void)
 	    acc_const = acc_loaded = 0;
 	    | mov dword [esp], (count)
 	    | call &putch
+	    break;
+
+	case T_STR:
+	    clean_acc();
+	    acc_const = acc_loaded = 0;
+	    {
+		int i;
+		for(i=0; i<n->str->length; i++) {
+		    | mov dword [esp], (n->str->buf[i])
+		    | call &putch
+		}
+	    }
 	    break;
 
 	case T_INP:
@@ -1043,8 +1037,6 @@ run_dynasm(void)
 	| jmp  rax
 	|.endif
     }
-
-    if (strbuf) { maxstrlen = 0; free(strbuf); strbuf = 0; }
 
     /*
 	fprintf(stderr, "Codesize bsize=%d pos=%d epos=%d ofs=%d\n",

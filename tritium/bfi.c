@@ -120,7 +120,6 @@ int opt_no_calc = 0;
 int opt_no_lessthan = 0;
 int opt_no_div = 0;
 int opt_no_litprt = 0;
-int opt_no_fullprt = 0;
 int opt_no_endif = 0;
 int opt_no_kv_recursion = 0;
 int opt_no_loop_classify = 0;
@@ -369,8 +368,6 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("        Disable the T_IF and T_ENDIF tokens.\n");
     printf("   -fno-litprt\n");
     printf("        Disable the T_CHR token and printf() strings.\n");
-    printf("   -fno-fullprt\n");
-    printf("        The T_CHR can only cope with simple ASCII.\n");
     printf("   -fno-kv-recursion\n");
     printf("        Disable recursive known value optimisations.\n");
     printf("   -fno-loop-classify\n");
@@ -559,7 +556,6 @@ checkarg(char * opt, char * arg)
     } else if (!strcmp(opt, "-fno-divtok")) { opt_no_div = 1; return 1;
     } else if (!strcmp(opt, "-fno-endif")) { opt_no_endif = 1; return 1;
     } else if (!strcmp(opt, "-fno-litprt")) { opt_no_litprt = 1; return 1;
-    } else if (!strcmp(opt, "-fno-fullprt")) { opt_no_fullprt = 1; return 1;
     } else if (!strcmp(opt, "-fno-kv-recursion")) { opt_no_kv_recursion = 1; return 1;
     } else if (!strcmp(opt, "-fno-loop-classify")) { opt_no_loop_classify = 1; return 1;
     } else if (!strcmp(opt, "-fno-kv-mov")) { opt_no_kvmov = 1; return 1;
@@ -1187,8 +1183,6 @@ printtreecell(FILE * efd, int indent, struct bfi * n)
 	    fprintf(efd, "prev $%d, ", n->prev->inum);
 	if(n->jmp)
 	    fprintf(efd, "jmp $%d, ", n->jmp->inum);
-	if(n->prevskip)
-	    fprintf(efd, "skip $%d, ", n->prevskip->inum);
 	if(n->iprof)
 	    fprintf(efd, "prof %d, ", n->iprof);
 	if(n->line || n->col)
@@ -1312,13 +1306,19 @@ process_file(void)
 	fprintf(stderr, "Only tree runner linked\n");
 #else
 
-    if (do_run && total_nodes == node_type_counts[T_CHR]) {
+    if (do_run && total_nodes == node_type_counts[T_CHR] + node_type_counts[T_STR]) {
 	struct bfi * n;
 	if (verbose)
-	    fprintf(stderr, "Nothing left to run, printing T_CHR nodes.\n");
+	    fprintf(stderr, "Nothing left to run, printing character nodes.\n");
 	only_uses_putch = 1;
 	for(n=bfprog; n; n=n->next)
-	    putch(n->count);
+	    if (n->type == T_CHR)
+		putch(n->count);
+	    else if (n->type == T_STR) {
+		int i;
+		for(i=0; i<n->str->length; i++)
+		    putch(n->str->buf[i]);
+	    }
     } else {
 	if (do_run) {
 	    if (verbose)
@@ -1415,7 +1415,7 @@ calculate_stats(void)
 	} else if (t == T_DIV) {
 	    if (min_pointer > n->offset) min_pointer = n->offset;
 	    if (max_pointer < n->offset+3) max_pointer = n->offset+3;
-	} else if (t != T_CHR) {
+	} else {
 	    if (min_pointer > n->offset) min_pointer = n->offset;
 	    if (max_pointer < n->offset) max_pointer = n->offset;
 	}
@@ -1477,7 +1477,7 @@ print_tree_stats(void)
 	    fprintf(stderr, "Tape cells used %d..%d\n",
 		profile_min_cell, profile_max_cell);
 
-	if (verbose>1 && node_type_counts[T_CHR] != total_nodes)
+	if (verbose>1)
 	    printtree();
     }
 }
@@ -1628,6 +1628,7 @@ run_tree(void)
 
 	    case T_PRT:
 	    case T_CHR:
+	    case T_STR:
 	    case T_INP:
 	    if (opt_runner) {
 		if (n->type == T_INP) {
@@ -1635,13 +1636,15 @@ run_tree(void)
 		    exit(1);
 		} else {
 		    struct bfi *v = add_node_after(opt_run_end);
-		    v->type = T_CHR;
+		    v->type = n->type == T_STR?T_STR:T_CHR;
 		    v->line = n->line;
 		    v->col = n->col;
 		    v->count = (n->type == T_PRT?UM(p[n->offset]):n->count);
 		    opt_run_end = v;
-		    if (opt_no_litprt || (opt_no_fullprt && v->count != '\n'
-			&& (v->count < ' ' || v->count > '~'))) {
+		    if (v->type == T_STR) {
+			v->str = tcalloc(1, n->str->maxlen+sizeof*(n->str));
+			v->str = n->str;
+		    } else if (opt_no_litprt) {
 			v->type = T_SET;
 			v = add_node_after(opt_run_end);
 			v->type = T_PRT;
@@ -1658,6 +1661,13 @@ run_tree(void)
 		{
 		case T_CHR:
 		    putch(n->count);
+		    break;
+		case T_STR:
+		    {
+			int i;
+			for(i=0; i<n->str->length; i++)
+			    putch(n->str->buf[i]);
+		    }
 		    break;
 		case T_PRT:
 		    putch(p[n->offset]);
@@ -1727,8 +1737,10 @@ run_tree(void)
 			n->type, n->offset, n->count);
 		exit(1);
 	}
-	if (enable_trace && n->type != T_PRT && n->type != T_DUMP &&
-		n->type != T_CHR && n->type != T_PRTI && n->type != T_ENDIF) {
+	if (enable_trace &&
+		n->type != T_PRT && n->type != T_PRTI &&
+		n->type != T_CHR && n->type != T_STR &&
+		n->type != T_DUMP && n->type != T_ENDIF) {
 	    int off = (p+n->offset) - oldp;
 	    fflush(stdout); /* Keep in sequence if merged */
 	    fprintf(stderr, "P(%d,%d):", n->line, n->col);
@@ -1746,7 +1758,15 @@ delete_tree(void)
 {
     struct bfi * n = bfprog, *p;
     bfprog = 0;
-    while(n) { p = n; n=n->next; free(p); }
+    while(n) {
+	p = n; n=n->next;
+	if (p->type == T_STR) {
+	    p->str->length = 0;
+	    free(p->str);
+	    p->str = 0;
+	}
+	free(p);
+    }
 }
 
 /*
@@ -1806,7 +1826,8 @@ pointer_scan(void)
 		}
 		continue;
 
-	    case T_PRT: case T_PRTI: case T_CHR:
+	    case T_PRT: case T_PRTI:
+	    case T_CHR: case T_STR:
 	    case T_INP: case T_INPI:
 	    case T_ADD: case T_SET:
 	    case T_DUMP: case T_STOP:
@@ -1953,7 +1974,8 @@ pointer_regen(void)
 	    n->offset -= current_shift;
 	    break;
 
-	case T_PRT: case T_PRTI: case T_CHR:
+	case T_PRT: case T_PRTI:
+	case T_CHR: case T_STR:
 	case T_INP: case T_INPI:
 	case T_ADD: case T_SET:
 	    n->offset -= current_shift;
@@ -2227,6 +2249,7 @@ find_known_value_recursion(struct bfi * n, int v_offset,
 	{
 	case T_NOP:
 	case T_CHR:
+	case T_STR:
 	    break;
 
 	case T_SET:
@@ -2450,10 +2473,7 @@ find_known_value_recursion(struct bfi * n, int v_offset,
 	    *unknown_found_p = 1;
 	    goto break_break;
 	}
-	if (n->prevskip)
-	    n=n->prevskip;
-	else
-	    n=n->prev;
+	n=n->prev;
 
 	if (n_stop && n_stop == n) {
 	    /* Hit the 'stop' node */
@@ -2684,9 +2704,6 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 	case T_PRT: /* Print literal character. */
 	    if (opt_no_litprt) break; /* BE can't cope */
 	    known_value = UM(known_value);
-	    if (opt_no_fullprt && known_value != '\n' &&
-		(known_value < ' ' || known_value > '~'))
-		break;
 	    if (known_value < 128 || known_value > UCSMAX || iostyle != 1)
 		known_value = (signed char) known_value;
 	    v->type = T_CHR;
@@ -2883,7 +2900,7 @@ search_for_update_of_offset(struct bfi *n, struct bfi *v, int n_offset)
 	    if (n->offset == n_offset)
 		return 0;
 	    break;
-	case T_PRT: case T_PRTI: case T_CHR: case T_NOP:
+	case T_PRT: case T_PRTI: case T_CHR: case T_STR: case T_NOP:
 	    break;
 	case T_DIV: /*TODO*/
 	default: return 0;  /* Any other type is a problem */
@@ -3868,12 +3885,9 @@ static struct {
 
 /*
  * This moves literal T_CHR nodes back up the list to join to the previous
- * group of similar T_CHR nodes. An additional pointer (prevskip) is set
- * so that they all point at the first in the growing 'string'.
+ * nodes in a T_STR node.
  *
- * This allows the constant searching to disregard these nodes in one step.
- *
- * Because the nodes are all together it can also help the code generators
+ * Because the nodes are all together it helps the code generators
  * build "printf" commands.
  */
 void
@@ -3896,7 +3910,7 @@ build_string_in_tree(struct bfi * v)
 	case T_PRTI: case T_PRT:
 	    return; /* Not a string */
 
-	case T_CHR:
+	case T_CHR: case T_STR:
 	    found = 1;
 	    break;
 	}
@@ -3905,7 +3919,7 @@ build_string_in_tree(struct bfi * v)
     }
 
     if (verbose>5) {
-	if (n && n->type == T_CHR)
+	if (n && (n->type == T_CHR || n->type == T_STR))
 	    fprintf(stderr, "Found string at ");
 	else
 	    fprintf(stderr, "Found other at ");
@@ -3916,18 +3930,49 @@ build_string_in_tree(struct bfi * v)
     }
 
     if (n) {
+	/* Unhook v */
 	v->prev->next = v->next;
 	if (v->next) v->next->prev = v->prev;
-	v->next = n->next;
-	v->prev = n;
-	if(v->next) v->next->prev = v;
-	v->prev->next = v;
 
-	/* Skipping past the whole string with prev */
-	if (n->prevskip)
-	    v->prevskip = n->prevskip;
-	else if (n->type == T_CHR)
-	    v->prevskip = n;
+	if (n->type == T_CHR && n->count != 0 &&
+		(iostyle != 1 || n->count < 128) &&
+		v->count != 0 &&
+		(iostyle != 1 || v->count < 128)) {
+
+	    /* Upgrade n to a T_STR */
+	    struct string *nstr = tcalloc(1, 2*sizeof*nstr);
+	    nstr->maxlen = sizeof*nstr;
+	    nstr->buf[nstr->length++] = n->count;
+	    n->type = T_STR;
+	    n->count = 1;
+	    n->str = nstr;
+	}
+
+	if (n->type == T_STR && v->count != 0 &&
+		(iostyle != 1 || v->count < 128)) {
+	    /* Append char in v to n */
+	    if (n->str->length >= n->str->maxlen) {
+		struct string *nstr;
+		nstr = realloc(n->str, n->str->maxlen*2+sizeof*nstr);
+		if (!nstr) {
+		    perror("Extending string");
+		    exit(1);
+		}
+		nstr->maxlen *= 2;
+		n->str = nstr;
+	    }
+	    n->str->buf[n->str->length++] = v->count;
+	    n->count = n->str->length;
+	    v->type = T_NOP;
+	    free(v);
+
+	} else {
+	    /* Place T_CHR */
+	    v->next = n->next;
+	    v->prev = n;
+	    if(v->next) v->next->prev = v;
+	    v->prev->next = v;
+	}
     } else if (v->prev) {
 	v->prev->next = v->next;
 	if (v->next) v->next->prev = v->prev;

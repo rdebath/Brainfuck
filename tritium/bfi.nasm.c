@@ -67,7 +67,6 @@ void
 print_nasm(void)
 {
     struct bfi * n = bfprog;
-    char string_buffer[BUFSIZ+2], *sp = string_buffer;
     char charmap[256];
     char const * neartok = "";
     int i;
@@ -76,7 +75,7 @@ print_nasm(void)
     memset(charmap, 0, sizeof(charmap));
     outp_line = -1;
 
-    hello_world = (total_nodes == node_type_counts[T_CHR] &&
+    hello_world = (total_nodes == node_type_counts[T_CHR] + node_type_counts[T_STR] &&
 		    !noheader && !qmagic && !omagic);
 
 /* System calls used ...
@@ -148,6 +147,7 @@ print_nasm(void)
 	case T_CALC: i+=6; break;
 	case T_PRT: i+=9; break;
 	case T_CHR: i+=9; break;
+	case T_STR: i+=9*n->str->length; break;
 	case T_INP: i+=9; break;
 	case T_DIV: i+=24; break;
 	default: i+=6; break;
@@ -158,6 +158,7 @@ print_nasm(void)
 	case T_CALC: i+=64; break;
 	case T_PRT: i+=12; break;
 	case T_CHR: i+=9; break;
+	case T_STR: i+=9*n->str->length; break;
 	case T_INP: i+=24; break;
 	case T_DIV: i+=24; break;
 	default: i+=12; break;
@@ -168,18 +169,9 @@ print_nasm(void)
     n = bfprog;
     while(n)
     {
-	if (sp != string_buffer) {
-	    if ( n->type != T_CHR ||
-		(sp >= string_buffer + sizeof(string_buffer) - 2)
-	       ) {
-		print_asm_string(charmap, string_buffer, sp-string_buffer);
-		sp = string_buffer;
-	    }
-	}
 
 	if (enable_trace) {
-	    if (n->line != 0 && n->line != outp_line &&
-		n->type != T_CHR && !intel_gas) {
+	    if (n->line != 0 && n->line != outp_line && !intel_gas) {
 		printf("%%line %d+0 %s\n", n->line, bfname);
 		outp_line = n->line;
 	    }
@@ -332,7 +324,15 @@ print_nasm(void)
 	    break;
 
 	case T_CHR:
-	    *sp++ = (char) /*GCC -Wconversion*/ n->count;
+	    {
+		char buf[8];
+		buf[0] = (char) /*GCC -Wconversion*/ n->count;
+		print_asm_string(charmap, buf, 1);
+	    }
+	    break;
+
+	case T_STR:
+	    print_asm_string(charmap, n->str->buf, n->str->length);
 	    break;
 
 	case T_PRT:
@@ -435,10 +435,6 @@ print_nasm(void)
 	    exit(99);
 	}
 	n=n->next;
-    }
-
-    if(sp != string_buffer) {
-	print_asm_string(charmap, string_buffer, sp-string_buffer);
     }
 
     print_asm_footer();
@@ -1165,81 +1161,85 @@ print_nasm_elf_hello_world(void)
 
     printf("\tsection\t.text\n");
     printf("\tsection\t.rodata align=1\n");
-    for(n = bfprog; n; n=n->next) {
-	if (n->next && (n->count & 0xFF) == '\n') {
-	    printf("\tdb\t10\n");
-	    break;
-	}
-    }
     printf("msg:\n");
 
     {
 	char txtbuf[80], *p=0;
-	int l = 0, instrn = 0;
+	int l = 0, instrn = 0, i;
 	for(n = bfprog; n; n=n->next) {
 	    int need;
+	    int ch = n->count & 0xFF;
+	    char *bp, buf[8];
+	    int ln;
+	    if (n->type == T_CHR) { *(bp=buf)=ch; ln=1; }
+	    else {bp = n->str->buf; ln = n->str->length; }
 
-	    bytecount++;
+	    for(i=0; i<ln; i++)
+	    {
+		ch = bp[i];
 
-	    if (n->count >= ' ' && n->count <= '~' && n->count != '\'') {
-		if (instrn) need = 2; else need = 5;
-	    } else if (n->count == 10)
-		need = 4 + instrn;
-	    else
-		need = 6 + instrn;
+		bytecount++;
 
-	    if (l+need>64) {
-		printf("%s\n", txtbuf);
-		l = 0;
-		instrn = 0;
-	    }
+		if (ch >= ' ' && ch <= '~' && ch != '\'') {
+		    if (instrn) need = 2; else need = 5;
+		} else if (ch == 10)
+		    need = 4 + instrn;
+		else
+		    need = 6 + instrn;
 
-	    if (l==0) {
-		strcpy(txtbuf, "\tdb\t");
-		p = txtbuf + strlen(txtbuf);
-	    }
-
-	    if (n->count >= ' ' && n->count <= '~' && n->count != '\'') {
-		if (!instrn) {
-		    if (l) {
-			strcpy(p, ", '");
-			p+=3;
-			l+=3;
-		    } else {
-			strcpy(p, "'");
-			p++;
-			l++;
-		    }
-		    instrn = 1;
+		if (l+need>64) {
+		    printf("%s\n", txtbuf);
+		    l = 0;
+		    instrn = 0;
 		}
-		l++;
-		*p++ = n->count;
-		*p = '\'';
-		p[1] = 0;
-	    } else {
-		if (instrn) { *p++ = '\''; l++; instrn=0; }
-		if (n->count == 10) {
-		    if (l) {
-			sprintf(p, ", %d", n->count & 0xFF);
-			p += 4;
-			l += 4;
-		    } else {
-			sprintf(p, "%d", n->count & 0xFF);
-			p += 2;
-			l += 2;
+
+		if (l==0) {
+		    strcpy(txtbuf, "\tdb\t");
+		    p = txtbuf + strlen(txtbuf);
+		}
+
+		if (ch >= ' ' && ch <= '~' && ch != '\'') {
+		    if (!instrn) {
+			if (l) {
+			    strcpy(p, ", '");
+			    p+=3;
+			    l+=3;
+			} else {
+			    strcpy(p, "'");
+			    p++;
+			    l++;
+			}
+			instrn = 1;
 		    }
+		    l++;
+		    *p++ = ch;
+		    *p = '\'';
+		    p[1] = 0;
 		} else {
-		    if (l) {
-			sprintf(p, ", 0x%02x", n->count & 0xFF);
-			p += 6;
-			l += 6;
+		    if (instrn) { *p++ = '\''; l++; instrn=0; }
+		    if (ch == 10) {
+			if (l) {
+			    sprintf(p, ", %d", ch);
+			    p += 4;
+			    l += 4;
+			} else {
+			    sprintf(p, "%d", ch);
+			    p += 2;
+			    l += 2;
+			}
 		    } else {
-			sprintf(p, "0x%02x", n->count & 0xFF);
-			p += 4;
-			l += 4;
+			if (l) {
+			    sprintf(p, ", 0x%02x", ch);
+			    p += 6;
+			    l += 6;
+			} else {
+			    sprintf(p, "0x%02x", ch);
+			    p += 4;
+			    l += 4;
+			}
 		    }
-		}
 
+		}
 	    }
 	}
 	if (l>0) printf("%s\n", txtbuf);

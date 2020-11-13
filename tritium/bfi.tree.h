@@ -48,7 +48,7 @@ extern int cell_smask;
 
 #define TOKEN_LIST(Mac) \
     Mac(MOV) Mac(ADD) Mac(PRT) Mac(INP) Mac(WHL) Mac(END) \
-    Mac(SET) Mac(CALC) Mac(CALCMULT) Mac(CHR) \
+    Mac(SET) Mac(CALC) Mac(CALCMULT) Mac(CHR) Mac(STR) \
     Mac(IF) Mac(ENDIF) Mac(MULT) Mac(CMULT) \
     Mac(ZFIND) Mac(MFIND) Mac(ADDWZ) Mac(LT) Mac(DIV) \
     Mac(CALC2) Mac(CALC3) Mac(CALC4) Mac(CALC5) \
@@ -57,6 +57,8 @@ extern int cell_smask;
 
 #define GEN_TOK_ENUM(NAME) T_ ## NAME,
 enum token { TOKEN_LIST(GEN_TOK_ENUM) TCOUNT};
+
+struct string { int length; int maxlen; char buf[0]; };
 
 struct bfi
 {
@@ -78,7 +80,7 @@ struct bfi
     int iprof;
 
     struct bfi *prev;
-    struct bfi *prevskip;
+    struct string *str;
 };
 
 extern struct bfi *bfprog;

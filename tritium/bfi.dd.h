@@ -17,7 +17,6 @@ X(dd,DD,
 #if XX == 4
     if (do_codestyle == c_dd) {
 	opt_no_lessthan = 1;
-	opt_no_fullprt = 1;
 	if (opt_regen_mov < 0) opt_regen_mov = 1;
 
         if (iostyle == 3) {
@@ -28,7 +27,8 @@ X(dd,DD,
 #endif
 #if XX == 9
     if (do_codestyle == c_default) {
-	if (checkarg_dd(opt, arg)) {
+	if (!strcmp(opt, "-bfrle")) {
+	    (void) checkarg_dd(opt, arg);
 	    do_codestyle = c_dd;
 	    opt_no_calc = opt_no_endif = opt_no_litprt = 1;
 	    return 1;

@@ -295,13 +295,14 @@ print_c_header(FILE * ofd)
     use_putstr = 0;
 
     /* Hello world mode ? */
-    if (!enable_trace && !do_run && total_nodes == node_type_counts[T_CHR]) {
+    if (!enable_trace && !do_run &&
+	    total_nodes == node_type_counts[T_CHR] + node_type_counts[T_STR]) {
 	int okay = 1;
 	int ascii_only = 1;
 	struct bfi * n = bfprog;
 	/* Check the string; be careful. */
 	while(n && okay) {
-	    if (n->type != T_CHR || !okay_for_cstr(n->count))
+	    if (n->type != T_STR && (n->type != T_CHR || !okay_for_cstr(n->count)))
 		okay = 0;
 
 	    if (n->type == T_CHR && (n->count <= 0 || n->count > 127))
@@ -530,7 +531,7 @@ print_c_header(FILE * ofd)
     }
     else
     {
-	if (node_type_counts[T_INP] != 0 ||
+	if (node_type_counts[T_INP] != 0 || node_type_counts[T_STR] != 0 ||
 	    node_type_counts[T_PRT] != 0 || node_type_counts[T_CHR] != 0) {
 	    if (l_iostyle == 1) {
 		if (knr_c_ok) fprintf(ofd, "#if defined(__STDC__) && defined(__STDC_ISO_10646__)\n");
@@ -565,8 +566,8 @@ print_c_header(FILE * ofd)
 	}
 
 	/* Anything special needed for putch? */
-	if ((node_type_counts[T_CHR] != 0 || node_type_counts[T_PRT] != 0) &&
-	    l_iostyle == 1) {
+	if ((node_type_counts[T_CHR] != 0 || node_type_counts[T_STR] != 0 ||
+		node_type_counts[T_PRT] != 0) && l_iostyle == 1) {
 	    gen_putch = 1;
 
 	    if (knr_c_ok)
@@ -731,7 +732,7 @@ print_c_header(FILE * ofd)
 		"\n"	"  register CELL * m = move_ptr(alloc_ptr(mem),0);" );
 	}
 
-	if (node_type_counts[T_INP] != 0 ||
+	if (node_type_counts[T_INP] != 0 || node_type_counts[T_STR] != 0 ||
 	    node_type_counts[T_PRT] != 0 || node_type_counts[T_CHR] != 0) {
 	    if (l_iostyle == 1) {
 		if (knr_c_ok)
@@ -1124,69 +1125,63 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 
 	case T_CHR:
 	    pt(ofd, indent,n);
-	    if (!okay_for_cstr(n->count)) {
-		if (n->count == '\n')
-		    fprintf(ofd, "%s('\\n');\n", putname);
-		else
-		    fprintf(ofd, "%s(%d);\n", putname, n->count);
-	    }
+	    if (n->count == '\n')
+		fprintf(ofd, "%s('\\n');\n", putname);
 	    else
+		fprintf(ofd, "%s(%d);\n", putname, n->count);
+	    break;
+
+	case T_STR:
 	    {
-		unsigned i = 0, j;
-		int got_perc = (n->count == '%');
-		int lastc = 0;
-		unsigned slen = 8;	/* First char + nul + ? */
-		struct bfi * v = n;
-		char *s, *p;
-		while(v->next && v->next->type == T_CHR &&
-			    okay_for_cstr(v->next->count)) {
-		    v = v->next;
-		    if (v->count == '%') got_perc = 1;
-		    if (v->count < ' ' || v->count > '~' || v->count == '\\' || v->count == '"')
-			slen+=3;
-		    i++;
-		    slen++;
-		    if (v->next && v->next->count == '\n')
-			;
-		    else if (slen > 132 || (slen>7 && v->count == '\n'))
-			break;
-		}
-		p = s = malloc(slen);
+		int j = 0;
+		for(; j<n->str->length; j++) {
+		    char s[256], *p = s;
+		    int got_perc = 0;
+		    int lastc = 0;
 
-		for(j=0; j<=i; j++) {
-		    lastc = n->count;
-		    if (n->count == '\n') { *p++ = '\\'; *p++ = 'n'; } else
-		    if (n->count == '\r') { *p++ = '\\'; *p++ = 'r'; } else
-		    if (n->count == '\a') { *p++ = '\\'; *p++ = 'a'; } else
-		    if (n->count == '\b') { *p++ = '\\'; *p++ = 'b'; } else
-		    if (n->count == '\t') { *p++ = '\\'; *p++ = 't'; } else
-		    if (n->count == '\\') { *p++ = '\\'; *p++ = '\\'; } else
-		    if (n->count == '"') { *p++ = '\\'; *p++ = '"'; } else
-		    if (n->count < ' ') {
-			int c = n->count & 0xFF;
-			*p++ = '\\';
-			*p++ = '0' + ((c>>6) & 0x3);
-			*p++ = '0' + ((c>>3) & 0x7);
-			*p++ = '0' + ((c   ) & 0x7);
-		    } else
-			*p++ = (char) /*GCC -Wconversion*/ n->count;
-		    if (j!=i)
-			n = n->next;
-		}
-		*p = 0;
+		    for(; j<n->str->length; j++) {
+			int ch = n->str->buf[j] & 0xFF;
+			int nch = 0;
+			if (j+1 < n->str->length)
+			    nch = n->str->buf[j+1] & 0xFF;
+			lastc = ch;
 
-		if ((p == s+1 && *s != '\'') || (p==s+2 && lastc == '\n')) {
-		    fprintf(ofd, "%s('%s');\n", putname, s);
-		} else if (use_putstr) {
-		    fprintf(ofd, "putstr(\"%s\");\n", s);
-		} else if (lastc == '\n') {
-		    *--p = 0; *--p = 0;
-		    fprintf(ofd, "puts(\"%s\");\n", s);
-		} else if (!got_perc)
-		    fprintf(ofd, "printf(\"%s\");\n", s);
-		else
-		    fprintf(ofd, "printf(\"%%s\", \"%s\");\n", s);
-		free(s);
+			if (ch == '%') got_perc = 1;
+			if (ch == '\n') { *p++ = '\\'; *p++ = 'n'; } else
+			if (ch == '\r') { *p++ = '\\'; *p++ = 'r'; } else
+			if (ch == '\a') { *p++ = '\\'; *p++ = 'a'; } else
+			if (ch == '\b') { *p++ = '\\'; *p++ = 'b'; } else
+			if (ch == '\t') { *p++ = '\\'; *p++ = 't'; } else
+			if (ch == '\\') { *p++ = '\\'; *p++ = '\\'; } else
+			if (ch == '"') { *p++ = '\\'; *p++ = '"'; } else
+			if (ch < ' ') {
+			    int c = ch & 0xFF;
+			    *p++ = '\\';
+			    *p++ = '0' + ((c>>6) & 0x3);
+			    *p++ = '0' + ((c>>3) & 0x7);
+			    *p++ = '0' + ((c   ) & 0x7);
+			} else
+			    *p++ = (char) /*GCC -Wconversion*/ ch;
+
+			if ((p>s+7 && ch == '\n' && nch != '\n') ||
+				p > s+sizeof(s)-16)
+			    break;
+		    }
+		    *p = 0;
+
+		    pt(ofd, indent,n);
+		    if ((p == s+1 && *s != '\'') || (p==s+2 && lastc == '\n')) {
+			fprintf(ofd, "%s('%s');\n", putname, s);
+		    } else if (use_putstr) {
+			fprintf(ofd, "putstr(\"%s\");\n", s);
+		    } else if (lastc == '\n') {
+			*--p = 0; *--p = 0;
+			fprintf(ofd, "puts(\"%s\");\n", s);
+		    } else if (!got_perc)
+			fprintf(ofd, "printf(\"%s\");\n", s);
+		    else
+			fprintf(ofd, "printf(\"%%s\", \"%s\");\n", s);
+		}
 	    }
 	    break;
 
@@ -1438,17 +1433,20 @@ print_ccode(FILE * ofd)
 	    node_type_counts[T_DUMP] != 0)
 	knr_c_ok = 0;
 
-    if (use_functions<0 && opt_level<1)
-	use_functions = 0;
-    if (use_functions<0 && total_nodes == node_type_counts[T_CHR])
-	use_functions = 0;
+    {
+	int i = node_type_counts[T_CHR] + node_type_counts[T_STR];
+	if (use_functions<0 && opt_level<1)
+	    use_functions = 0;
+	if (use_functions<0 && total_nodes == i)
+	    use_functions = 0;
 #if defined(__GNUC__) && __GNUC__ < 3
-    if (use_functions<0)
-	use_functions = (total_nodes-node_type_counts[T_CHR] >= 1000);
+	if (use_functions<0)
+	    use_functions = (total_nodes-i >= 1000);
 #else
-    if (use_functions<0)
-	use_functions = (total_nodes-node_type_counts[T_CHR] >= 5000);
+	if (use_functions<0)
+	    use_functions = (total_nodes-i >= 5000);
 #endif
+    }
 
     if (use_md5dedup<0) use_md5dedup = use_functions;
 

@@ -90,6 +90,10 @@ convert_tree_to_runarray(int merge_mov)
 	    arraylen += 2;
 	    break;
 
+	case T_STR:
+	    arraylen += 3+3*n->str->length;
+	    break;
+
 	default:
 	    arraylen += 3;
 	    break;
@@ -129,6 +133,19 @@ convert_tree_to_runarray(int merge_mov)
 
 	case T_CHR:
 	    *p++ = n->count;
+	    break;
+
+	case T_STR:
+	    {
+		int i;
+		p[-1] = T_CHR;
+		*p++ = n->str->buf[0];
+		for (i=1; i<n->str->length; i++) {
+		    if (merge_mov) *p++ = 0;
+		    *p++ = T_CHR;
+		    *p++ = n->str->buf[i];
+		}
+	    }
 	    break;
 
 	case T_ADD: case T_SET:

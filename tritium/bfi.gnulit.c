@@ -204,8 +204,6 @@ run_gnulightning(void)
 {
     struct bfi * n = bfprog;
     int maxstack = 0, stackptr = 0;
-    char *strbuf = 0;
-    size_t maxstrlen = 0;
 #ifdef GNULIGHTv1
     jit_insn** loopstack = 0;
     jit_insn *codeBuffer;
@@ -574,46 +572,32 @@ run_gnulightning(void)
 	    clean_acc();
 	    acc_const = acc_loaded = 0;
 
-	    if (n->count <= 0 || (n->count >= 127 && iostyle == 1) ||
-		    !n->next || n->next->type != T_CHR) {
-		jit_movi(REG_ACC, n->count);
+	    jit_movi(REG_ACC, n->count);
 #ifdef GNULIGHTv1
-		jit_prepare_i(1);
-		jit_pusharg_i(REG_ACC);
-		jit_finish(putch);
+	    jit_prepare_i(1);
+	    jit_pusharg_i(REG_ACC);
+	    jit_finish(putch);
 #endif
 #ifdef GNULIGHTv2
-		jit_prepare();
-		jit_pushargr(REG_ACC);
-		jit_finishi(putch);
+	    jit_prepare();
+	    jit_pushargr(REG_ACC);
+	    jit_finishi(putch);
 #endif
-	    } else {
-		unsigned i = 0;
-		struct bfi * v = n;
-		char *s;
-		while(v && v->type == T_CHR && v->count > 0 &&
-			    (v->count < 127 || iostyle != 1)) {
+	    break;
 
-		    if (i+2 > maxstrlen) {
-			if (maxstrlen) maxstrlen *= 2; else maxstrlen = 4096;
-			strbuf = realloc(strbuf, maxstrlen);
-			if (!strbuf) {
-			    fprintf(stderr, "Reallocate of string buffer failed\n");
-			    exit(42);
-			}
-		    }
+	case T_STR:
+	    clean_acc();
+	    acc_const = acc_loaded = 0;
 
-		    strbuf[i++] = (char) /*GCC -Wconversion*/ v->count;
-		    n = v;
-		    v = v->next;
-		}
-		strbuf[i] = 0;
-		s = strdup(strbuf);
+	    {
+		char *s = malloc(n->str->length+1);
 		if (!s) {
 		    fprintf(stderr, "Save of string failed\n");
 		    exit(43);
 		}
-		save_ptr_for_free(s);
+                memcpy(s, n->str->buf, n->str->length);
+                s[n->str->length] = 0;
+                save_ptr_for_free(s);
 
 #ifdef GNULIGHTv1
 		jit_movi_p(REG_ACC, s);
@@ -718,8 +702,6 @@ run_gnulightning(void)
     }
 
     jit_ret();
-
-    if (strbuf) { maxstrlen = 0; free(strbuf); strbuf = 0; }
 
     delete_tree();
 
