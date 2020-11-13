@@ -430,9 +430,8 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("    NOTE: Some of the code generators are quite limited and do\n");
     printf("    not support all these options. NASM is 8 bits only. The BF\n");
     printf("    generator does not include the ability to generate most of\n");
-    printf("    the optimisation facilities.  The dc(1) generator defaults\n");
-    printf("    to -E6 as standard dc(1) has no character input routines.\n");
-    printf("    Many (including dc(1)) don't support -E2,-E3 and -E4.\n");
+    printf("    the optimisation facilities.\n");
+    printf("    Many don't support -E2,-E3 and -E4.\n");
     printf("    Most code generators only support binary I/O.\n");
 #endif
 
