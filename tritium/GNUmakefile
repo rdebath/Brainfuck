@@ -59,7 +59,7 @@ MORECLANG=$(MOREDEFS) -fsanitize=integer -Wpadded
 
 OBJECTS=bfi.o bfi.version.o bfi.ccode.o bfi.nasm.o bfi.bf.o \
 	bfi.dd.o bfi.cpp.o bfi.runarray.o clock.o taperam.o \
-	bfi.gmp.o opt_bfbasic.o md5.o hashmem.o
+	bfi.gmp.o opt_bfbasic.o md5.o hashmem.o opt_runner.o
 
 CONF=-DCNF $(CONF_DYNASM) $(CONF_LIGHTNING) $(CONF_TCCLIB) $(CONF_SSLLIB) $(CONF_GMPLIB) $(CONF_LIBDL)
 LDLIBS=$(GNUSTK) $(LIBS_LIGHTNING) $(LIBS_TCCLIB) $(LIBS_SSLLIB) $(LIBS_GMPLIB) $(GNUDYN) $(LIBS_LIBDL)
@@ -104,6 +104,7 @@ bfi.dd.o: bfi.dd.c bfi.tree.h bfi.run.h bfi.dd.h
 bfi.cpp.o: bfi.cpp.c bfi.tree.h bfi.run.h bfi.cpp.h
 bfi.gmp.o: bfi.gmp.c bfi.tree.h bfi.run.h bfi.gmp.h clock.h
 opt_bfbasic.o: opt_bfbasic.c bfi.tree.h
+opt_runner.o: opt_runner.c bfi.tree.h bfi.run.h
 
 clock.o: clock.c clock.h
 taperam.o: taperam.c bfi.tree.h bfi.run.h

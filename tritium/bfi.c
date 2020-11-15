@@ -75,6 +75,7 @@ characters after your favorite comment marker in a very visible form.
 #include "bfi.be.def"
 
 #include "bfi.runarray.h"
+#include "opt_runner.h"
 #endif
 
 #ifndef __STDC_ISO_10646__
@@ -168,8 +169,6 @@ const char* tokennames[] = { TOKEN_LIST(GEN_TOK_STRING) };
 
 struct bfi *bfprog = 0;
 
-struct bfi *opt_run_start, *opt_run_end;
-
 /* Stats */
 double run_time = 0, io_time = 0;
 int loaded_nodes = 0;
@@ -227,10 +226,6 @@ int getint(int oldch);
 void putch(int oldch);
 void putint(unsigned int oldch);
 void set_cell_size(int cell_bits);
-
-/* Trial run. */
-void try_opt_runner(void);
-int update_opt_runner(struct bfi * n, int * mem, int offset);
 
 /* Other functions. */
 void LongUsage(FILE * fd, const char * errormsg) __attribute__ ((__noreturn__));
@@ -547,9 +542,11 @@ checkarg(char * opt, char * arg)
 	}
 	return 1;
 
+#ifndef NO_EXT_BE
     } else if (!strcmp(opt, "-Orun")) {
 	opt_runner = 1;
 	return 1;
+#endif
     } else if (!strcmp(opt, "-fno-negtape")) { hard_left_limit = 0; return 1;
     } else if (!strcmp(opt, "-fno-calctok")) { opt_no_calc = 1; return 1;
     } else if (!strcmp(opt, "-fno-lttok")) { opt_no_lessthan = 1; return 1;
@@ -705,9 +702,18 @@ main(int argc, char ** argv)
     }
 #endif
 
+#ifndef NO_EXT_BE
+    if (opt_runner) {
+	if (do_run) {
+	    opt_runner = 0; /* Run it in one go */
+	    fprintf(stderr, "WARNING: Ignoring -Orun option because we're running\n");
+	} else if (cell_length==0)
+	    set_cell_size(-1);
+    }
+#endif
+
     if (iostyle < 0) iostyle = 0;
-    if (do_run) opt_runner = 0; /* Run it in one go */
-    if (cell_length==0 && (do_run || opt_runner))
+    if (cell_length==0 && opt_runner)
 	set_cell_size(-1);
 
 #ifndef NO_EXT_BE
@@ -1276,7 +1282,9 @@ process_file(void)
 		trim_trailing_sets();
 	}
 
+#ifndef NO_EXT_BE
 	if (opt_runner) try_opt_runner();
+#endif
 
 	if (opt_regen_mov != 0)
 	    pointer_regen();
@@ -1284,8 +1292,11 @@ process_file(void)
 	if (verbose>2)
 	    fprintf(stderr, "Optimise level %d complete\n", opt_level);
 	if (verbose>5) printtree();
-    } else
+    }
+#ifndef NO_EXT_BE
+    else
 	if (opt_runner) try_opt_runner();
+#endif
 
     if (verbose)
 	print_tree_stats();
@@ -1494,8 +1505,6 @@ run_tree(void)
     int *p, *oldp;
     struct bfi * n = bfprog;
 
-    if (!opt_runner) only_uses_putch = 1;
-
     oldp = p = map_hugeram();
     start_runclock();
 
@@ -1626,87 +1635,43 @@ run_tree(void)
 	    case T_ENDIF:
 		break;
 
-	    case T_PRT:
 	    case T_CHR:
+		putch(n->count);
+		break;
+
 	    case T_STR:
-	    case T_INP:
-	    if (opt_runner) {
-		if (n->type == T_INP) {
-		    fprintf(stderr, "Error: Trial run optimise hit input command\n");
-		    exit(1);
-		} else {
-		    struct bfi *v = add_node_after(opt_run_end);
-		    v->type = n->type == T_STR?T_STR:T_CHR;
-		    v->line = n->line;
-		    v->col = n->col;
-		    v->count = (n->type == T_PRT?UM(p[n->offset]):n->count);
-		    opt_run_end = v;
-		    if (v->type == T_STR) {
-			v->str = tcalloc(1, n->str->maxlen+sizeof*(n->str));
-			v->str = n->str;
-		    } else if (opt_no_litprt) {
-			v->type = T_SET;
-			v = add_node_after(opt_run_end);
-			v->type = T_PRT;
-			v->line = n->line;
-			v->col = n->col;
-			opt_run_end = v;
-		    } else
-			if (v->count < 128 || v->count > UCSMAX || iostyle != 1)
-			    v->count = (signed char) v->count;
-		}
-		break;
-	    } else {
-		switch(n->type)
 		{
-		case T_CHR:
-		    putch(n->count);
-		    break;
-		case T_STR:
-		    {
-			int i;
-			for(i=0; i<n->str->length; i++)
-			    putch(n->str->buf[i]);
-		    }
-		    break;
-		case T_PRT:
-		    putch(p[n->offset]);
-		    break;
-		case T_INP:
-		    p[n->offset] = getch(p[n->offset]);
-		    break;
+		    int i;
+		    for(i=0; i<n->str->length; i++)
+			putch(n->str->buf[i]);
 		}
 		break;
-	    }
+
+	    case T_PRT:
+		putch(p[n->offset]);
+		break;
+
+	    case T_INP:
+		p[n->offset] = getch(p[n->offset]);
+		break;
 
 	    case T_PRTI:
-		if (opt_runner) {
-		    fprintf(stderr, "Error: Trial run optimise hit T_PRTI.\n");
-		    exit(1);
-		}
 		putint(p[n->offset]);
 		break;
 
 	    case T_INPI:
-		if (opt_runner) {
-		    fprintf(stderr, "Error: Trial run optimise hit T_INPI.\n");
-		    exit(1);
-		}
 		p[n->offset] = getint(p[n->offset]);
 		break;
 
 	    case T_STOP:
-		if (opt_runner)
-		    fprintf(stderr, "Error: Trial run optimise hit T_STOP.\n");
-		else
-		    fprintf(stderr, "STOP Command executed.\n");
+		fprintf(stderr, "STOP Command executed.\n");
 		exit(1);
 
 	    case T_NOP:
 		break;
 
 	    case T_DUMP:
-		if (!opt_runner) {
+		{
 		    int i, doff, off = (p+n->offset) - oldp;
 		    fflush(stdout); /* Keep in sequence if merged */
 		    fprintf(stderr, "P(%d,%d):", n->line, n->col);
@@ -1723,13 +1688,6 @@ run_tree(void)
 		    fprintf(stderr, "\n");
 		}
 		break;
-
-	    case T_SUSP:
-		n=n->next;
-		if( update_opt_runner(n, oldp, p-oldp) )
-		    continue;
-		else
-		    goto break_break;
 
 	    default:
 		fprintf(stderr, "Execution error:\n"
@@ -1749,7 +1707,6 @@ run_tree(void)
 	n = n->next;
     }
 
-break_break:;
     finish_runclock(&run_time, &io_time);
 }
 
@@ -3981,159 +3938,6 @@ build_string_in_tree(struct bfi * v)
 	if (v->next) v->next->prev = v;
 	v->prev = 0;
     }
-}
-
-/*
- * This function contains the code for the '-Orun' option.
- * The option simply runs the optimised tree until it finds a loop containing
- * an input instruction. Then everything it's run gets converted onto a print
- * string and some code to setup the tape.
- *
- * For a good benchmark program this should do nothing, but frequently it'll
- * change the compiled program into a 'Hello World'.
- *
- * TODO: If there are NO T_INP instructions we could use a fast runner and
- *      just intercept the output.
- *
- *	I could continue running until we actually hit the T_INP instruction,
- *	I would need to save the current tape state so that it can be rolled
- *	back to the beginning of the loop.
- *
- *	This method could also be used in the middle of the program, just stop
- *	when you find a calculation based on an unknown.
- *
- *	A simple counter would stop this hanging on an infinite loop.
- */
-void
-try_opt_runner(void)
-{
-    struct bfi *v = bfprog, *n = 0;
-    int lp = 0;
-
-    if (cell_size <= 0) return;	/* Oops! */
-
-    while(v && v->type != T_INP && v->type != T_STOP &&
-	    v->type != T_INPI && v->type != T_PRTI) {
-	if (v->orgtype == T_END) lp--;
-	if(!lp && v->orgtype != T_WHL) n=v;
-	if (v->orgtype == T_WHL) lp++;
-	v=v->next;
-    }
-
-    if (n == 0) return;
-
-    if (verbose>5) {
-	fprintf(stderr, "Inserting T_SUSP node after: ");
-	printtreecell(stderr, 0, n);
-	fprintf(stderr, "\nSearch stopped by : ");
-	printtreecell(stderr, 0, v);
-	fprintf(stderr, "\n");
-    }
-    v = add_node_after(n);
-    v->type = T_SUSP;
-
-    if (verbose>5) printtree();
-
-    opt_run_start = opt_run_end = tcalloc(1, sizeof*bfprog);
-    opt_run_start->inum = bfi_num++;
-    opt_run_start->type = T_NOP;
-    if (verbose>3)
-	fprintf(stderr, "Running trial run optimise\n");
-    run_tree();
-    if (verbose>2) {
-	fprintf(stderr, "Trial run optimise finished.\n");
-	print_tree_stats();
-    }
-}
-
-int
-update_opt_runner(struct bfi * n, int * mem, int offset)
-{
-    struct bfi *v = bfprog;
-    int i;
-
-    if (n && n->orgtype == T_WHL && UM(mem[offset + n->offset]) == 0) {
-	/* Move the T_SUSP */
-	int lp = 1;
-	if (verbose>3)
-	    fprintf(stderr, "Trial run optimise triggered on dead loop.\n");
-
-	v = n->jmp;
-	n = 0;
-
-	while(v && v->type != T_INP && v->type != T_INPI && v->type != T_STOP) {
-	    if (v->orgtype == T_END) lp--;
-	    if(!lp && v->orgtype != T_WHL) n=v;
-	    if (v->orgtype == T_WHL) lp++;
-	    v=v->next;
-	}
-
-	if (verbose>5) {
-	    fprintf(stderr, "Inserting T_SUSP node after: ");
-	    printtreecell(stderr, 0, n);
-	    fprintf(stderr, "\nSearch stopped by : ");
-	    printtreecell(stderr, 0, v);
-	    fprintf(stderr, "\n");
-	}
-
-	v = add_node_after(n);
-	v->type = T_SUSP;
-	return 1;
-    }
-
-    if (verbose>3)
-	fprintf(stderr, "Trial run optimise triggered.\n");
-
-    while(v!=n) {
-	bfprog = v->next;
-	v->type = T_NOP;
-	free(v);
-	v = bfprog;
-    }
-
-    if (bfprog) {
-	for(i=profile_min_cell; i<=profile_max_cell; i++) {
-	    if (UM(mem[i]) != 0) {
-		v = add_node_after(opt_run_end);
-		v->type = T_SET;
-		v->offset = i;
-		if (cell_size == 8)
-		    v->count = UM(mem[i]);
-		else
-		    v->count = SM(mem[i]);
-		opt_run_end = v;
-	    }
-	}
-
-	if (offset) {
-	    v = add_node_after(opt_run_end);
-	    v->type = T_MOV;
-	    v->count = offset;
-	    opt_run_end = v;
-	}
-    }
-
-    if (opt_run_start && opt_run_start->type == T_NOP) {
-	v = opt_run_start->next;
-	if (v) v->prev = 0;
-	v = opt_run_start;
-	opt_run_start = opt_run_start->next;
-	free(v);
-    }
-
-    if (opt_run_start) {
-	if (opt_no_litprt && bfprog) {
-	    struct bfi *v2 = add_node_after(opt_run_end);
-	    v2->type = T_SET;
-	    v2->count = 0;
-	    opt_run_end = v2;
-	}
-	opt_run_end->next = bfprog;
-	bfprog = opt_run_start;
-	if (opt_run_end->next)
-	    opt_run_end->next->prev = opt_run_end;
-    }
-    return 0;
 }
 
 int
