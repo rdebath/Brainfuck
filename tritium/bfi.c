@@ -1631,8 +1631,8 @@ run_tree(void)
 		p[n->offset] = UM(p[n->offset]);
 		p[n->offset+1] = UM(p[n->offset+1]);
 		if (p[n->offset+1] != 0) {
-		    p[n->offset+2] = p[n->offset] % p[n->offset+1];
-		    p[n->offset+3] = p[n->offset] / p[n->offset+1];
+		    p[n->offset+2] = (unsigned)p[n->offset] % p[n->offset+1];
+		    p[n->offset+3] = (unsigned)p[n->offset] / p[n->offset+1];
 		} else {
 		    p[n->offset+2] = p[n->offset];
 		    p[n->offset+3] = 0;
