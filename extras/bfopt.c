@@ -33,6 +33,7 @@ int enable_debug = 0;
 int enabled_rle = 0;
 int enable_initopt = 0;
 int enable_opt = 1;
+int enable_loopc = 0;
 int delay_clean = 0;
 int fwd_flush = 0;
 int maxcol=72;
@@ -58,7 +59,9 @@ check_argv(const char * arg)
     } else if (strcmp(arg, "-O1") == 0 || strcmp(arg, "-p") == 0) {
 	enable_initopt=0;
     } else if (strcmp(arg, "-O2") == 0 || strcmp(arg, "-O") == 0) {
-	enable_opt = enable_initopt = 1;
+	enable_opt = enable_initopt = enable_loopc = 1;
+    } else if (strcmp(arg, "-nc") == 0) {
+	enable_loopc = 0;
     } else if (strcmp(arg, "-dc") == 0 || strcmp(arg, "-delay-clean") == 0) {
 	delay_clean=1;
     } else if (strcmp(arg, "-ff") == 0 || strcmp(arg, "-fwd-flush") == 0) {
@@ -86,7 +89,7 @@ int
 main(int argc, char ** argv)
 {
     char * pgm = argv[0];
-    int ch, lastch=']', c=0, m, b=0, lc=0, ar, inp=0;
+    int ch, lastch= (enable_initopt?']':0), c=0, m, b=0, lc=0, ar, inp=0;
     FILE * ifd;
     int digits = 0, number = 0, multi = 1;
     int qstring = 0;
@@ -189,7 +192,7 @@ main(int argc, char ** argv)
 		(ch != '#' || !enable_debug) &&
 		((ch != '"' && ch != '=') || !enable_rle)) continue;
 	    /* Check for loop comments; ie: ][ comment ] */
-	    if (lc || (ch=='[' && lastch==']' && enable_initopt)) {
+	    if (lc || (ch=='[' && lastch==']' && enable_loopc)) {
 		lc += (ch=='[') - (ch==']'); continue;
 	    }
 	    if (lc) continue;
@@ -220,10 +223,12 @@ main(int argc, char ** argv)
 	if (ifd != stdin) fclose(ifd);
     }
     if(c) outrun(lastch, c);
+    if(lc>0)
+	fprintf(stderr, "Warning: End of file in comment\n");
     if(b>0) {
-	fprintf(stderr, "Warning: closing unbalanced '[' command.\n");
-	outrun('=', 0);
-	while(b>0){ outrun(']', 1); b--;} /* Not enough ']', add some. */
+	fprintf(stderr, "Warning: not closing unbalanced bracket\n");
+	// outrun('=', 0);
+	// while(b>0){ outrun(']', 1); b--;} /* Not enough ']', add some. */
     }
     outrun('~', 0);
     return 0;
@@ -385,12 +390,12 @@ flush_tape(int no_output, int keep_knowns)
 
 void outopt(int ch, int count)
 {
-    if (deadloop) {
+    if (deadloop && ch != '~') {
 	if (ch == '[') deadloop++;
 	if (ch == ']') deadloop--;
 	return;
     }
-    if (ch == '[') {
+    if (ch == '[' && enable_loopc) {
 	if (tape->is_set && tape->v == 0) {
 	    deadloop++;
 	    return;
@@ -416,23 +421,15 @@ void outopt(int ch, int count)
 	    tape->cleaned = 1;
 	    tape->cleaned_val = tape->v;
 	}
-
-	/* I could save the cleaned tape state at the beginning of a loop,
-	 * then when we find the matching end loop the two tapes could be
-	 * merged to give a tape of known values after the loop ends.
-	 * This would not break the pipeline style of this code.
-	 *
-	 * This would also give states where a cell is known to have one
-	 * of two or more different values. */
 	return;
 
     case '.':
-	flush_tape(0,1);
+	flush_tape(0,enable_loopc);
 	outcmd(ch, count);
 	return;
 
     case ',':
-	flush_tape(0,1);
+	flush_tape(0,enable_loopc);
 	clear_cell(tape);
 	outcmd(ch, count);
 	return;
