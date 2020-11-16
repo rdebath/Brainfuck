@@ -46,6 +46,9 @@ jobs:
             env: TARGET_ARCH=-mx32
         -
             os: osx
+            env: TARGET_ARCH=-m32
+        -
+            os: osx
             env: TARGET_ARCH=-mx32
         -
             arch: s390x
