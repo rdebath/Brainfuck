@@ -1937,7 +1937,7 @@ loaddll(const char * dlname)
     /* Normally this would use RTLD_LAZY, but here it should be v.short. */
     handle = dlopen(dlname, RTLD_NOW | RTLD_LOCAL);
     if (!handle) {
-	fprintf(stderr, "%s\n", dlerror());
+	fprintf(stderr, "dlopen() failed: %s\n", dlerror());
 	exit(EXIT_FAILURE);
     }
 

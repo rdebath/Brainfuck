@@ -21,7 +21,13 @@
 # To manually disable a 'JITter' add one or more of the options below to the
 # make command line.
 #
-# make DO_TCC= DO_LIGHT= DO_LIGHT2= DO_MYLIGHT= DO_LIBDL1= DO_LIBDL2= DO_DYNASM=
+# make DO_DYNASM= DO_LIBDL= DO_TCC= DO_LIGHT=
+#
+# If you want a static compile please use DO_STATIC=1 to also disable automatic
+# use of "-ldl" as this tends to be broken.
+#
+# OTOH using "STATIC_TOOLS=1" leaves libc as a shared library and static links
+# other libraries.
 #
 # The internal GNU lightning and Dynasm can also be removed by deleting the
 # relevent parts of the tools directory.
@@ -36,6 +42,7 @@ INSTALL=install -p
 ISTRIP=-s
 INSTALLDIR=/usr/local/bin
 INSTALLEXT=
+DO_STATIC=
 # DEFS=
 # LDFLAGS=
 
@@ -61,8 +68,8 @@ OBJECTS=bfi.o bfi.version.o bfi.ccode.o bfi.nasm.o bfi.bf.o \
 	bfi.dd.o bfi.cpp.o bfi.runarray.o clock.o taperam.o \
 	bfi.gmp.o opt_bfbasic.o md5.o hashmem.o opt_runner.o
 
-CONF=-DCNF $(CONF_DYNASM) $(CONF_LIGHTNING) $(CONF_TCCLIB) $(CONF_SSLLIB) $(CONF_GMPLIB) $(CONF_LIBDL)
-LDLIBS=$(GNUSTK) $(LIBS_LIGHTNING) $(LIBS_TCCLIB) $(LIBS_SSLLIB) $(LIBS_GMPLIB) $(GNUDYN) $(LIBS_LIBDL)
+CONF=-DCNF $(CONF_DYNASM) $(CONF_LIGHTNING) $(CONF_TCCLIB) $(CONF_SSLLIB) $(CONF_GMPLIB) $(CONF_LIBDL) $(STATIC_CPP)
+LDLIBS=$(GNUSTK) $(LIBS_LIGHTNING) $(LIBS_TCCLIB) $(LIBS_SSLLIB) $(LIBS_GMPLIB) $(GNUDYN) $(LIBS_LIBDL) $(STATICLINK)
 
 $(EXEFILE): $(OBJECTS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(EXEFILE) $(OBJECTS) $(LDLIBS) $(TARGET_ARCH)
@@ -221,7 +228,7 @@ GCCTRIPLE=$(shell $(CC) $(TARGET_ARCH) -dumpmachine 2>/dev/null)
 
 ifeq ($(findstring arm-linux,$(GCCTRIPLE)),)
 MNATIVE := $(call try-run,\
-        { echo 'int main(){return 0;}'; } > $(TMP).c ; \
+        { echo 'int main(void){return 0;}'; } > $(TMP).c ; \
 	$(CC) $(TARGET_ARCH) -march=native $(TMP).c -o $(TMP),1)
 
 ifneq ($(MNATIVE),)
@@ -246,38 +253,40 @@ TRYCC2=$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) $(TARGET_ARCH) $(TMP).c
 # Do libtcc.h and -ltcc exist ?
 DO_TCC := $(call try-run,\
 	{ echo '$(FHASH)include <libtcc.h>';			\
-	  echo 'int main(){tcc_new();return 0;}';	\
+	  echo 'int main(void){tcc_new();return 0;}';	\
 	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -ltcc -ldl,1)
 
+DO_LIGHT=1
+ifneq ($(DO_LIGHT),)
 # How about lightning.h V2 ?
 DO_LIGHT2 := $(call try-run,\
 	{ echo '$(FHASH)include <lightning.h>'; 			\
-	  echo 'int main(){jit_state_t*_jit=0;jit_emit();return 0;}';	\
+	  echo 'int main(void){jit_state_t*_jit=0;jit_emit();return 0;}';	\
 	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -llightning,1)
 
 ifeq ($(DO_LIGHT2),)
 # How about lightning.h V2 with a static library, needs -lm ?
 DO_LIGHT3 := $(call try-run,\
 	{ echo '$(FHASH)include <lightning.h>'; 			\
-	  echo 'int main(){jit_state_t*_jit=0;jit_emit();return 0;}';	\
+	  echo 'int main(void){jit_state_t*_jit=0;jit_emit();return 0;}';	\
 	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -llightning -lm,1)
 
 ifeq ($(DO_LIGHT3),)
 # No? How about lightning.h V1 ?
-DO_LIGHT := $(call try-run,\
+DO_LIGHT1 := $(call try-run,\
 	{ echo '$(FHASH)include <lightning.h>';			\
-	  echo 'int main(){char * startptr[2048];';		\
+	  echo 'int main(void){char * startptr[2048];';		\
 	  echo 'jit_flush_code(startptr, jit_get_ip().ptr);';	\
 	  echo 'return 0;}';					\
 	  } > $(TMP).c ; $(TRYCC2) -w -o $(TMP),1)
 
-ifeq ($(DO_LIGHT),)
+ifeq ($(DO_LIGHT1),)
 ifeq ($(findstring WINDOWS,$(CPUFOUND)),)
 # Alright, does my copy compile ?
 ifneq ($(TOOLDIR),)
 DO_MYLIGHT := $(call try-run,\
 	{ echo '$(FHASH)include <lightning.h>';			\
-	  echo 'int main(){char * startptr[2048];';		\
+	  echo 'int main(void){char * startptr[2048];';		\
 	  echo 'jit_flush_code(startptr, jit_get_ip().ptr);';	\
 	  echo 'return 0;}';					\
 	  } > $(TMP).c ; $(TRYCC2) -I $(TOOLDIR) -w -o $(TMP),1)
@@ -286,28 +295,35 @@ endif
 endif
 endif
 endif
+endif
 
 # And shared libraries ?
+DO_LIBDL=1
+ifneq ($(DO_LIBDL),)
 ifneq ($(wildcard /usr/include/dlfcn.h),)
-
-DO_LIBDL2 := $(call try-run,\
-	{ echo '$(FHASH)include <dlfcn.h>'; \
-	  echo 'int main(){dlerror();return 0;}'; \
-	  } > $(TMP).c ; $(TRYCC2) -o $(TMP),1)
-
-ifeq ($(DO_LIBDL2),)
-# Maybe it needs -ldl
+# Can we use -ldl, even if it's empty
 DO_LIBDL1 := $(call try-run,\
 	{ echo '$(FHASH)include <dlfcn.h>'; \
-	  echo 'int main(){dlerror();return 0;}'; \
-	  } > $(TMP).c ; $(TRYCC2) -o $(TMP) -ldl,1)
+	  echo 'void*(*fn)(const char*,int)=dlopen;int main(void){return!fn;}'; \
+	  } > $(TMP).c ; $(TRYCC2) $(WERROR) -o $(TMP) -ldl,1)
+
+ifeq ($(DO_LIBDL1),)
+# Maybe -ldl is merged into libc
+DO_LIBDL2 := $(call try-run,\
+	{ echo '$(FHASH)include <dlfcn.h>'; \
+	  echo 'void*(*fn)(const char*,int)=dlopen;int main(void){return!fn;}'; \
+	  } > $(TMP).c ; $(TRYCC2) $(WERROR) -o $(TMP),1)
 endif
+endif
+else
+DO_LIBDL1=
+DO_LIBDL2=
 endif
 
 # Open GMP big numbers ?
 DO_GMP := $(call try-run,\
 	{ echo '$(FHASH)include <gmp.h>'; 				\
-	  echo 'int main(){mpz_t t1;mpz_init(t1);return(!mpz_fits_slong_p(t1));}'; \
+	  echo 'int main(void){mpz_t t1;mpz_init(t1);return(!mpz_fits_slong_p(t1));}'; \
 	  } > $(TMP).c ; $(TRYCC2) $(WERROR) -o $(TMP) -lgmp,1)
 
 endif	# CC
@@ -324,6 +340,11 @@ ifneq ($(STATIC_TOOLS),)
 # Other libraries (eg: libc) remain normally dynamic.
 GNUSTK=-Wl,-Bstatic
 GNUDYN=-Wl,-Bdynamic
+endif
+
+ifneq ($(DO_STATIC),)
+STATICLINK=-static
+STATIC_CPP=-DDISABLE_RUNC=1
 endif
 
 ################################################################################
@@ -352,7 +373,7 @@ LIBS_TCCLIB=-ltcc
 endif
 endif
 
-ifeq ($(DO_LIGHT)$(DO_LIGHT2)$(DO_LIGHT3)$(DO_MYLIGHT),)
+ifeq ($(DO_LIGHT1)$(DO_LIGHT2)$(DO_LIGHT3)$(DO_MYLIGHT),)
 CONF_LIGHTNING=-DDISABLE_GNULIGHTNING
 LIBS_LIGHTNING=
 else
@@ -365,7 +386,7 @@ LIBS_LIGHTNING=-llightning -lm
 TYPE_LIGHTNING=
 else
 LIBS_LIGHTNING=
-ifneq ($(DO_LIGHT),)
+ifneq ($(DO_LIGHT1),)
 TYPE_LIGHTNING=-DGNULIGHTv1 $(GNULGT)
 else
 TYPE_LIGHTNING=-DGNULIGHTv1 $(GNULGT) -I $(TOOLDIR)
