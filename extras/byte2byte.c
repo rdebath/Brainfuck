@@ -414,7 +414,7 @@ initbytebftab()
 				if (to >= -128 && to <= 127) to &= 0xFF; else to = -1;
 			    }
 
-			    if (to >= 0 && to <= 256 && bytebftab[from][to].len > len) {
+			    if (to >= 0 && to < 256 && bytebftab[from][to].len > len) {
 				*p++ = '>';
 				i = ini;
 				while(i>0) { i--; *p++ = '+'; }
