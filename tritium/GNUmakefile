@@ -177,7 +177,8 @@ else
 TMP :=/tmp/_test-$$$$
 cc-option = $(shell set -e;               \
 	echo Checking $(CC) "$(1)" > $(LOGDEV); \
-	if ($(CC) $(1) -c -x c /dev/null -o $(TMP) ) >$(LOGDEV) 2>&1;      \
+	echo > $(TMP).c ; \
+	if ($(CC) $(1) -c $(TMP).c -o $(TMP) ) >$(LOGDEV) 2>&1;      \
 	then echo "$(2)";               \
 	else echo "$(3)";               \
 	fi;                             \
@@ -447,7 +448,7 @@ endif
 ################################################################################
 BUILDOPT=$(CC) $(CFLAGS) $(LDFLAGS) $(LDLIBS) $(TARGET_ARCH) $(CVER)
 BUILDFLG :=.build-opts.$(shell echo '$(BUILDOPT)' | sum | tr -d '\040\055' )
-$(OBJECTS) tmp.dasm.c: $(BUILDFLG)
+$(EXEFILE) $(OBJECTS) tmp.dasm.c: $(BUILDFLG)
 $(BUILDFLG):
 	-@rm -f .build-opts.*
 	-@echo '$(BUILDOPT)' > $(BUILDFLG)
