@@ -2709,6 +2709,7 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 
 		    /*
 		     * Move the set out of the loop, if it's a simple one.
+		     * Otherwise, just create a new set there.
 		     */
 		    if (n && n->type == T_SET) {
 			n->type = T_NOP;
@@ -2716,12 +2717,12 @@ scan_one_node(struct bfi * v, struct bfi ** move_v UNUSED)
 			if (n) n->next = n2->next; else bfprog = n2->next;
 			if (n2->next) n2->next->prev = n;
 			free(n2);
-
-			n2 = add_node_after(v);
-			n2->type = T_SET;
-			n2->count = 0;
-			n2->offset = v->offset;
 		    }
+
+		    n2 = add_node_after(v);
+		    n2->type = T_SET;
+		    n2->count = 0;
+		    n2->offset = v->offset;
 
 #if 1
 		    /* Also note the loop variable may have been saved as it

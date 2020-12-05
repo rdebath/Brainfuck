@@ -1064,7 +1064,7 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 		fprintf(ofd, "%s = %s;\n", lval(n->offset+1), rvalmsk(n->offset+1) );
 	    }
 	    pt(ofd, indent,n);
-	    fprintf(ofd, "if (%s != 0) {\n", rval(n->offset+1) );
+	    fprintf(ofd, "if(%s != 0) {\n", rval(n->offset+1) );
 	    pt(ofd, indent+1,0);
 	    fprintf(ofd, "%s = %s / %s;\n", lval(n->offset+3), rvalmsk(n->offset), rval2(n->offset+1));
 	    pt(ofd, indent+1,0);
@@ -1234,7 +1234,8 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 #endif
 
 	    if (n->next->next && n->next->next->jmp == n && !enable_trace &&
-		(n->next->type == T_SET || n->next->type == T_STOP)) {
+		(   n->next->type == T_SET || n->next->type == T_ADD ||
+		    n->next->type == T_STOP)) {
 		fprintf(ofd, "if(%s) ", rvalmsk(n->offset));
 		is_simple_statement = 1;
 	    } else if (!use_goto) {
@@ -1402,7 +1403,10 @@ print_c_body(FILE* ofd, struct bfi * n, struct bfi * e)
 
 	case T_CALL:
 	    pt(ofd, indent,n);
-	    fprintf(ofd, "m = bf%d(m);\n", n->count);
+	    if (n->jmp->type == T_ENDIF)
+		fprintf(ofd, "if(%s) m = bf%d(m);\n", rvalmsk(n->offset), n->count);
+	    else
+		fprintf(ofd, "m = bf%d(m);\n", n->count);
 	    n=n->jmp;
 	    break;
 
@@ -1509,7 +1513,10 @@ print_ccode(FILE * ofd)
 	    else
 		fprintf(ofd, "static %s * bf%d FD((register %s * m),(m) register %s * m;)\n{\n",
 		    cell_type, n->jmp->count, cell_type, cell_type);
-	    print_c_body(ofd, n->jmp, n->next);
+	    if (n->type == T_ENDIF)
+		print_c_body(ofd, n->jmp->next, n);
+	    else
+		print_c_body(ofd, n->jmp, n->next);
 	    fprintf(ofd, "  return m;\n}\n\n");
 #else
 	    char * fn_code;
@@ -1519,7 +1526,10 @@ print_ccode(FILE * ofd)
 
 	    indent = 0;
 
-	    print_c_body(codefd, n->jmp, n->next);
+	    if (n->type == T_ENDIF)
+		print_c_body(codefd, n->jmp->next, n);
+	    else
+		print_c_body(codefd, n->jmp, n->next);
 	    putc('\0', codefd); /* Make it easy */
 	    fclose(codefd);
 
