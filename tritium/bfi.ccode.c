@@ -410,7 +410,7 @@ print_c_header(FILE * ofd)
 	    }
 
 	    if (node_type_counts[T_DIV] != 0) {
-		fprintf(ofd, "enum { CellTypeMustNotBeSigned = 1/(((%s)-1) >= 0) };\n", cell_type);
+		fprintf(ofd, "enum { CellTypeMustNotBeSigned = 1/(((%s)-1) > 0) };\n", cell_type);
 	    }
 	    if (knr_c_ok) fprintf(ofd, "#endif\n\n");
 	}
