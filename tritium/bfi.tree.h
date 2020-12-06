@@ -20,7 +20,9 @@
 
 #else
 #define UNUSED
+#ifndef __attribute__
 #define __attribute__(__ignored__)
+#endif
 #endif
 
 #ifndef __has_builtin         // Optional of course.

@@ -49,5 +49,7 @@ extern struct be_interface_s be_interface;
 
 #else
 #define UNUSED
+#ifndef __attribute__
 #define __attribute__(__ignored__)
+#endif
 #endif
