@@ -55,6 +55,7 @@ static int use_dynmem = 0;
 static int use_goto = 0;
 static int use_functions = -1;
 static int use_md5dedup = -1;
+static int disable_indent = 0;
 static int libtcc_specials = 0;
 static int knr_c_ok = 1;
 static int tiny_tape = 0;
@@ -134,6 +135,9 @@ checkarg_ccode(char * opt, char * arg UNUSED)
     if (!strcmp(opt, "-ffunct")) { use_functions = 1; use_md5dedup = 1; return 1; }
     if (!strcmp(opt, "-fno-funct")) { use_functions = 0; use_md5dedup = 0; return 1; }
     if (!strcmp(opt, "-fflat-funct")) { use_functions = 1; use_md5dedup = 0; return 1; }
+    if (!strcmp(opt, "-fno-md5")) { use_md5dedup = 0; return 1; }
+    if (!strcmp(opt, "-fno-indent")) { disable_indent = 1; return 1; }
+    if (!strcmp(opt, "-fno-knr")) { knr_c_ok = 0; return 1; }
     return 0;
 }
 
@@ -142,7 +146,9 @@ pt(FILE* ofd, int indent_to, struct bfi * n)
 {
     int i, j;
     for(j=(n==0 || !enable_trace); j<2; j++) {
-	if (max_indent > 10) {
+	if (disable_indent)
+	    fprintf(ofd, "  ");
+	else if (max_indent > 10) {
 	    int k = indent_to;
 	    if (max_indent < 64) k = 2*k+2; else k++;
 	    if (k>128) k = 128;
