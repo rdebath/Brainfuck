@@ -418,9 +418,15 @@ cpp_header()
     if (node_type_counts[T_PRT])
 	puts("#define outcell(x) putch(p[x]);");
 
-    if (node_type_counts[T_INP])
-	puts("#define inpchar(x) "
-	     "{unsigned char a[1]; if(read(0,a,1)>0) p[x]= *a;}");
+    if (node_type_counts[T_INP]) {
+	if (eofcell != 7)
+	    puts("#define inpchar(x) "
+		 "{unsigned char a[1]; if(read(0,a,1)>0) p[x]= *a;}");
+	else
+	    puts("#define inpchar(x) "
+		 "{unsigned char a[1]; if(read(0,a,1)>0) p[x]= *a; else exit(0);}"
+		 );
+    }
 
     if (node_type_counts[T_INPI] || node_type_counts[T_PRTI]) {
 
@@ -456,7 +462,8 @@ cpp_header()
 static void
 ruby_header()
 {
-    printf("%s\n",
+    char * inpcode = (eofcell==7)?"|| (raise 'EOF on input') ;":"&&";
+    printf("%s%s%s\n",
 	    "#ifdef RUBY"
     "\n"    "#define bf_start(msz,moff) m = Array.new(msz+moff, 0); p = moff; bmsk = (1<<BFBITS)-1;"
     "\n"    "#define posn(l,c) /* Line l Column c */"
@@ -490,7 +497,7 @@ ruby_header()
     "\n"    "#define lp_end(x,y) end"
     "\n"    "#define if_start(x,y) if m[p+x] != 0"
     "\n"    "#define if_end(x) end"
-    "\n"    "#define inpchar(x) (c = $stdin.getc) != nil && m[p+x] = c.ord"
+    "\n"    "#define inpchar(x) (c = $stdin.getc) != nil ",inpcode," m[p+x] = c.ord"
     "\n"    "#define getdecimalcell(x) m[p+x] = Integer(gets) rescue 0;"
     "\n"    "#define putdecimalcell(x) print m[p+x].to_s;"
     "\n"    "#define bf_err() raise 'Aborting Infinite Loop.'"

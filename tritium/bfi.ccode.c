@@ -553,10 +553,20 @@ print_c_header(FILE * ofd)
     if (!do_run) {
 	if (node_type_counts[T_INP] != 0 || node_type_counts[T_INPI] != 0)
 	{
-	    if (l_iostyle == 0 && node_type_counts[T_INPI] == 0 &&
-		(eofcell == 4 || (eofcell == 2 && EOF == -1))) {
+	    if (l_iostyle == 0 && eofcell == 4 &&
+		    node_type_counts[T_INPI] == 0) {
 		use_direct_getchar = 1;
 	    } else {
+		fprintf(ofd, "#ifndef EOFCELL\n");
+		switch(eofcell) {
+		default:
+		case 1: fprintf(ofd, "#define EOFCELL 1\n"); break;
+		case 2: fprintf(ofd, "#define EOFCELL -1\n"); break;
+		case 3: fprintf(ofd, "#define EOFCELL 0\n"); break;
+		case 4: fprintf(ofd, "#define EOFCELL EOF\n"); break;
+		case 7: fprintf(ofd, "#define EOFCELL 2\n"); break;
+		}
+		fprintf(ofd, "#endif\n\n");
 		if (knr_c_ok)
 		    fprintf(ofd, "%s%s%s%s%s%s%s",
 			"#ifdef __STDC__\n"
@@ -840,38 +850,14 @@ print_lib_funcs(FILE * ofd)
 		fprintf(ofd, "\tch = getchar();\n");
 	    fprintf(ofd, "  } while (ch == '\\r');\n");
 	}
-	switch(eofcell) {
-	default:
-	    fprintf(ofd, "#ifndef EOFCELL\n");
-	    fprintf(ofd, "  if (ch != EOF) return ch;\n");
-	    fprintf(ofd, "  return oldch;\n");
-	    fprintf(ofd, "#else\n");
-	    fprintf(ofd, "#if EOFCELL == EOF\n");
-	    fprintf(ofd, "  return ch;\n");
-	    fprintf(ofd, "#else\n");
-	    fprintf(ofd, "  if (ch != EOF) return ch;\n");
-	    fprintf(ofd, "  return EOFCELL;\n");
-	    fprintf(ofd, "#endif\n");
-	    fprintf(ofd, "#endif\n");
-	    break;
-	case 1:
-	    fprintf(ofd, "  if (ch != EOF) return ch;\n");
-	    fprintf(ofd, "  return oldch;\n");
-	    break;
-	case 3:
-	    fprintf(ofd, "  if (ch != EOF) return ch;\n");
-	    fprintf(ofd, "  return 0;\n");
-	    break;
-	case 2:
-	#if EOF != -1
-	    fprintf(ofd, "  if (ch != EOF) return ch;\n");
-	    fprintf(ofd, "  return -1;\n");
-	    break;
-	#endif
-	case 4:
-	    fprintf(ofd, "  return ch;\n");
-	    break;
-	}
+
+	fprintf(ofd, "  if (ch != EOF) return ch;\n");
+	fprintf(ofd, "  if (EOFCELL == 2) {\n");
+	fprintf(ofd, "    fprintf(stderr, \"^D\\n\");\n");
+	fprintf(ofd, "    exit(0);\n");
+	fprintf(ofd, "  }\n");
+	fprintf(ofd, "  clearerr(stdin);\n");
+	fprintf(ofd, "  return (EOFCELL<=0)?EOFCELL:oldch;\n");
 	fprintf(ofd, "}\n");
     }
 }

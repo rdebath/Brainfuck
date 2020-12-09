@@ -135,7 +135,7 @@ int memsize = 0x100000;	/* Default to 1M of tape if otherwise unspecified. */
 int enable_trace = 0;
 int debug_mode = 0;
 int iostyle = -1; /* 0=Binary, 1=UTF8, 2=ASCII, 3=Integer. */
-int eofcell = 0; /* 0=>?, 1=> No Change, 2= -1, 3= 0, 4=EOF, 5=No Input, 6=Abort. */
+int eofcell = 0; /* 0=>?, 1=> No Change, 2= -1, 3= 0, 4=EOF, 5=No Input, 6=Abort, 7=EOF->Exit */
 int special_eof = 0; /* Does backend have special eof? */
 char * input_string = 0;
 char * program_string = 0;
@@ -503,6 +503,7 @@ checkarg(char * opt, char * arg)
 	case 'n': eofcell = 1; break;
 	case 'e': eofcell = 2; break;
 	case 'z': eofcell = 3; break;
+	case 'x': eofcell = 7; break;
 
 	case 'b':
 	    if (!arg_is_num) {
@@ -3986,12 +3987,16 @@ getch(int oldch)
     unpause_runclock();
 
     if (!goteof) return c;
+    clearerr(stdin);
     switch(eofcell)
     {
+    default: return oldch;
     case 2: return -1;
     case 3: return 0;
     case 4: return EOF;
-    default: return oldch;
+    case 7:
+	fprintf(stderr, "^D\n");
+	exit(0);
     }
 }
 
@@ -4017,6 +4022,7 @@ getint(int oldch)
     unpause_runclock();
 
     if (!goteof) return c;
+    clearerr(stdin);
     return oldch;
 }
 
