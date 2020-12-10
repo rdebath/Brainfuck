@@ -5,6 +5,8 @@
  *
  * Robert de Bath (c) 2013 GPL v2 or later.
  */
+
+#ifndef RUNCMD
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -157,6 +159,10 @@ void run(void);
 void * tcalloc(size_t nmemb, size_t size);
 #ifdef BUSERROR
 void enable_buserror(void);
+#endif
+#ifdef ENABLE_DOUBLE
+int try_16bit(void);
+void run16(void);
 #endif
 
 int dump_prog = 0;
@@ -633,6 +639,10 @@ int main(int argc, char **argv)
 		else
 		    fprintf(stderr, "%s %d \t; %p %p %p\n", tokennames[n->type],
 			    n->jmp->count, n, n->prev, n->jmp);
+#ifdef ENABLE_DOUBLE
+	} else if (try_16bit()) {
+	    run16();
+#endif
 	} else {
 #ifdef BUSERROR
 	    enable_buserror();
@@ -735,6 +745,7 @@ enable_buserror()
 }
 #endif
 
+#endif
 
 /*
  * An interpreter that uses an arry of ints to store the instructions
@@ -748,7 +759,11 @@ void
 #if defined(__GNUC__) && ((__GNUC__>4) || (__GNUC__==4 && __GNUC_MINOR__>=4))
 __attribute((optimize(3),hot,aligned(64)))
 #endif
+#ifdef RUNCMD
+RUNCMD(void)
+#else
 run(void)
+#endif
 {
     struct bfi * n = pgm;
     int arraylen = 0;
@@ -818,9 +833,7 @@ run(void)
 	    break;
 #endif
 #endif
-	case T_NOP:
-	    fprintf(stderr, "Warning: %s node found.\n", tokennames[n->type]);
-	    break;
+	case T_NOP: break;
 
 	default:
 	    fprintf(stderr, "Invalid node type found = %s\n",
@@ -1290,3 +1303,67 @@ break_break:;
 #undef icell
 #undef M
 }
+
+#ifdef ENABLE_DOUBLE
+#undef ENABLE_DOUBLE
+int
+try_16bit()
+{
+    struct bfi * n = pgm;
+
+    if (!n || n->type != T_MOV || n->count % 3 != 1)
+	return 0;
+
+    for(n=n->next; n; n=n->next) {
+	switch(n->type) {
+
+	case T_MOV: /* MOD 3 */
+	    if (n->next == 0) break;
+	    if (n->count % 3 != 0) return 0;
+	    break;
+
+	case T_INP: case T_PRT:
+	case T_SAVE2: case T_SET2: case T_ADD2: case T_SUB2: case T_MUL2:
+	case T_QSET2: case T_SET4: case T_WHL2: case T_END2:
+	case T_ZFIND2: case T_MFIND2: case T_ADDWZ2: case T_ZTEMP2:
+	    break;
+
+	default:
+#if 0
+	    fprintf(stderr, "Try16 failed on node = %s\n", tokennames[n->type]);
+#endif
+	    return 0;
+	}
+    }
+
+    /* Convert to 16 bit cells */
+    for(n=pgm; n; n=n->next) {
+	switch(n->type) {
+	case T_MOV: n->count /= 3; if(n->count == 0) n->type = T_NOP; break;
+
+	case T_INP: break;
+	case T_PRT: break;
+	case T_SAVE2: n->type = T_SAVE; break;
+	case T_SET2: case T_SET4: n->type = T_SET; break;
+	case T_ADD2: n->type = T_ADD; break;
+	case T_SUB2: n->type = T_ADD; n->count = -n->count; break;
+	case T_MUL2: n->type = T_MUL; break;
+	case T_QSET2: n->type = T_QSET; break;
+	case T_WHL2: n->type = T_WHL; break;
+	case T_END2: n->type = T_END; break;
+	case T_ZFIND2: n->type = T_ZFIND; n->count /= 3; break;
+	case T_MFIND2: n->type = T_MFIND; n->count /= 3; break;
+	case T_ADDWZ2: n->type = T_ADDWZ; n->count /= 3; break;
+	case T_ZTEMP2: n->type = T_NOP; break;
+	}
+    }
+    return 1;
+}
+
+#define RUNCMD run16
+#define icell	unsigned short
+#define M(x) x
+
+#include __FILE__
+
+#endif

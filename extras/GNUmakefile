@@ -6,7 +6,9 @@ CLIST=$(filter-out cdowhile.c lightning.c trixy_if.c %.tmp.c,$(wildcard *.c))
 EXELIST := $(patsubst %.c,%,$(CLIST))
 OBJECTS := $(patsubst %.c,%.o,$(CLIST)) ook.o
 ILIST=qtable.h qtable.tmp.h byte2byte.tmp.out
-EXTRAS=bf1k bf0k bfas ook hydrogen16 hydrogen32 hydrogen64
+EXTRAS=ook \
+    hydrogen3k hydrogen1k hydrogen0k hydrogenasc \
+    hydrogen8 hydrogen16 hydrogen32 hydrogen64
 
 ALLEXE = $(EXELIST) $(MOREEXE) $(EXTRAS) $(LIBDL_EXE) $(LIGHTNINGEXE)
 
@@ -32,14 +34,20 @@ install:
 # Delete the direct to exe rule to make sure %.o files are used for ccache.
 % : %.c
 
-bf1k: hydrogen.c
+hydrogen3k: hydrogen.c
+	$(CC) -DMASK=3071 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
+
+hydrogen1k: hydrogen.c
 	$(CC) -DMASK=999 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
 
-bf0k: hydrogen.c
+hydrogen0k: hydrogen.c
 	$(CC) -DMASK=256 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
 
-bfas: hydrogen.c
+hydrogenasc: hydrogen.c
 	$(CC) -DMASK=126 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
+
+hydrogen8: hydrogen.c
+	$(CC) -DMASK=1 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
 
 hydrogen16: hydrogen.c
 	$(CC) -DMASK=2 $(CFLAGS) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
