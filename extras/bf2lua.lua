@@ -14,7 +14,7 @@ local ft = {}
 
 -- Head of the script we will run
 ft[#ft+1] = [[
--- Brainfuck code 
+-- Brainfuck code
 local p = 0
 local m = setmetatable({},{__index=function() return 0 end})
 
