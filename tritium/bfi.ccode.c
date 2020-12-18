@@ -1431,7 +1431,7 @@ print_ccode(FILE * ofd)
 
     {
 	int i = node_type_counts[T_CHR] + node_type_counts[T_STR];
-	if (use_functions<0 && opt_level<1)
+	if (use_functions<0 && opt_level<=0)
 	    use_functions = 0;
 	if (use_functions<0 && total_nodes == i)
 	    use_functions = 0;
@@ -1599,7 +1599,8 @@ run_ccode(void)
 #ifdef __TINYC__
 	use_dlopen = 0;
 #else
-	use_dlopen = ((total_nodes < 4000) || (opt_level > 3) || (
+	use_dlopen = ((total_nodes < 4000) || (opt_level > 1) || (
+	    cell_length > 0 &&
 	    cell_length != sizeof(long)*CHAR_BIT &&
 	    cell_length != sizeof(int)*CHAR_BIT &&
 	    cell_length != sizeof(short)*CHAR_BIT &&
@@ -1844,8 +1845,7 @@ compile_and_run(void)
     const char * cc = CC;
     const char * copt = "";
     const char * pic_cmd = "";
-    if (opt_level >= 3)
-	copt = " -O3";
+    if (opt_level >= 2) copt = opt_level==2 ? " -O2" : " -O3";
 
     if (cc_cmd) cc = cc_cmd;
 

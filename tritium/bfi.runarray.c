@@ -165,7 +165,7 @@ convert_tree_to_runarray(int merge_mov)
 	    /*FALLTHROUGH*/
 
 	case T_WHL:
-	    if (opt_level>=1) {
+	    if (opt_level>0) {
 		struct bfi *n1, *n2=0, *n3=0, *n4=0;
 		n1 = n->next;
 		if (n1) n2 = n1->next;

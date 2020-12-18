@@ -115,7 +115,7 @@ int rle_input = 0;
 int do_run = -1;
 
 int opt_bytedefault = 0;
-int opt_level = 2;
+int opt_level = 1;
 int opt_runner = 0;
 int opt_no_calc = 0;
 int opt_no_lessthan = 0;
@@ -129,6 +129,7 @@ int opt_regen_mov = -1;
 int opt_pointerrescan = 0;
 int opt_delete_tifs = 0;
 int opt_bfbasic_hack = 0;
+int opt_enable_rle = 1;
 
 int hard_left_limit = -1024;
 int memsize = 0x100000;	/* Default to 1M of tape if otherwise unspecified. */
@@ -310,9 +311,8 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("\n");
     printf("   -On  'Optimisation' level.\n");
     printf("   -O0      Turn off all optimisation, just leave RLE.\n");
-    printf("   -O1      Only enable pointer motion optimisation.\n");
-    printf("   -O2      Allow a few simple optimisations.\n");
-    printf("   -O3      Maximum normal level, default.\n");
+    printf("   -O -O1   Normal optimisation, default.\n");
+    printf("   -O2 -O3  Extra optimisation using C compiler.\n");
     printf("   -Orun    When generating code run the interpreter over it first.\n");
     printf("   -m   Turn off all optimisation and RLE.\n");
     printf("\n");
@@ -373,6 +373,8 @@ void LongUsage(FILE * fd, const char * errormsg)
     printf("        Regenerate pointer move tokens to remove offsets to loops.\n");
     printf("   -fpointer-rescan\n");
     printf("        Rerun the pointer scan pass after other optimisations.\n");
+    printf("   -fno-rle\n");
+    printf("        Turn off initial RLE processing.\n");
     printf("   -fdelete-tifs\n");
     printf("        Delete trivial infinite loops '[]' from output after optimisation.\n");
 #ifndef NO_EXT_BE
@@ -471,7 +473,6 @@ checkarg(char * opt, char * arg)
 #define XX 3
 #include "bfi.be.def"
 #endif
-	case 'm': opt_level= -1; break;
 	case 'T': enable_trace=1; break;
 
 	case '8': set_cell_size(8); break;
@@ -493,6 +494,8 @@ checkarg(char * opt, char * arg)
 	    if (!arg_is_num) { opt_level = 1; break; }
 	    opt_level = strtol(arg,0,10);
 	    return 2;
+	case 'm': opt_level=0; opt_enable_rle=0; break;
+
 	case 'E':
 	    if (!arg_is_num) {
 		eofcell = 4;	/* tape[cell] = getchar(); */
@@ -561,6 +564,7 @@ checkarg(char * opt, char * arg)
     } else if (!strcmp(opt, "-fdelete-tifs")) { opt_delete_tifs = 1; return 1;
     } else if (!strcmp(opt, "-fno-loop-offset")) { opt_regen_mov = 1; return 1;
     } else if (!strcmp(opt, "-floop-offset")) { opt_regen_mov = 0; return 1;
+    } else if (!strcmp(opt, "-fno-rle")) { opt_enable_rle = 0; return 1;
     } else if (!strcmp(opt, "-fintio")) { iostyle = 3; return 1;
 #ifndef NO_EXT_BE
     } else if (!strcmp(opt, "-fbfbasic")) { opt_bfbasic_hack = 1; return 1;
@@ -873,7 +877,7 @@ static int dld, inp, rle = 0, num = -1, ov_flg, loopid, zstate;
 #ifndef NO_PREOPT
 	/* Simple syntax optimisation. This will be done by later passes,
 	 * but it's far cheaper to do it here. */
-	if (opt_level>=0) {
+	if (opt_enable_rle) {
 	    /* Comment loops, can never be run */
 	    /* This BF code isn't just dead it's been buried in soft peat
 	     * for three months and recycled as firelighters. */
@@ -1235,53 +1239,51 @@ process_file(void)
 	    } } while(0)
 
     if (verbose>5) printtree();
-    if (opt_level>=1) {
+    if (opt_level>0) {
 	if (verbose>1)
-	    fprintf(stderr, "Starting optimise level %d, cell_size %d(%d)\n",
-		    opt_level, cell_size, cell_length);
+	    fprintf(stderr, "Starting optimise for cell_size %d(%d)\n",
+		    cell_size, cell_length);
 
 	tickstart();
 	pointer_scan();
 	tickend("Time for pointer scan");
 
-	if (opt_level>=2) {
-	    calculate_stats();
-	    if (verbose>5) printtree();
+	calculate_stats();
+	if (verbose>5) printtree();
 
 #ifndef NO_EXT_BE
-	    if (opt_bfbasic_hack) {
-		tickstart();
-		bf_basic_hack();
-		tickend("Time for bfbasic scan");
-	    }
+	if (opt_bfbasic_hack) {
+	    tickstart();
+	    bf_basic_hack();
+	    tickend("Time for bfbasic scan");
+	}
 #endif
 
+	tickstart();
+	invariants_scan();
+	tickend("Time for invariant scan");
+
+	if (opt_delete_tifs && node_type_counts[T_STOP] != 0)
+	    delete_tifs();
+
+	if (opt_pointerrescan) {
 	    tickstart();
-	    invariants_scan();
-	    tickend("Time for invariant scan");
-
-	    if (opt_delete_tifs && node_type_counts[T_STOP] != 0)
-		delete_tifs();
-
-	    if (opt_pointerrescan) {
-		tickstart();
-		calculate_stats();
-		if (min_pointer < 0) {
-		    struct bfi * n = tcalloc(1, sizeof*n);
-		    n->inum = bfi_num++;
-		    n->type = T_MOV;
-		    n->orgtype = T_NOP;
-		    n->next = bfprog;
-		    n->count = -min_pointer;
-		    bfprog = n;
-		}
-		pointer_scan();
-		tickend("Time for second pointer scan");
+	    calculate_stats();
+	    if (min_pointer < 0) {
+		struct bfi * n = tcalloc(1, sizeof*n);
+		n->inum = bfi_num++;
+		n->type = T_MOV;
+		n->orgtype = T_NOP;
+		n->next = bfprog;
+		n->count = -min_pointer;
+		bfprog = n;
 	    }
-
-	    if (!noheader)
-		trim_trailing_sets();
+	    pointer_scan();
+	    tickend("Time for second pointer scan");
 	}
+
+	if (!noheader)
+	    trim_trailing_sets();
 
 #ifndef NO_EXT_BE
 	if (opt_runner) try_opt_runner();
