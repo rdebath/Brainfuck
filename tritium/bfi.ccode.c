@@ -1462,14 +1462,15 @@ print_ccode(FILE * ofd)
 	if (!noheader)
 	    print_c_header(ofd);
 	else
-	    fprintf(ofd, "int bf(register %s * m)\n{\n", cell_type);
+	    fprintf(ofd, "%s bf(register %s * m)\n{\n", cell_type, cell_type);
 
 	print_c_body(ofd, bfprog, (struct bfi *)0);
 
-	fprintf(ofd, "  return 0;\n}\n");
-
-	if (!noheader)
+	if (!noheader) {
+	    fprintf(ofd, "  return 0;\n}\n");
 	    print_lib_funcs(ofd);
+	} else
+	    fprintf(ofd, "  return m;\n}\n");
 	return;
     }
 
