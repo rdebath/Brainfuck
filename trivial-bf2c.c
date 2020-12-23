@@ -17,6 +17,7 @@ int main(int argc, char ** argv) {
 	char * s;
 	int c;
 	FILE * fd = argc>1?fopen(argv[1],"r"):stdin;
+	if(!fd) { perror(argv[1]); return 1; }
 
 	puts(	"#include <stdio.h>"
 	"\n"	"int array[30000];"

@@ -10,10 +10,12 @@ int main(int argc, char ** argv) {
 	int c;
 	int loopid = 1;
 	int sp=0, stk[9999];
+	FILE * fd = argc>1?fopen(argv[1],"r"):stdin;
+	if(!fd) { perror(argv[1]); return 1; }
 
 	printf("%s\n", header);
 
-	while((c=getchar()) != EOF)
+	while((c=getc(fd)) != EOF)
 		if ((s = strchr(bf, c))) {
 			if (c == '[') {
 				printf(cc[s-bf], loopid+1, loopid);
@@ -97,7 +99,7 @@ char * header =
 "\n"	"        dd      $$                      ;   p_vaddr"
 "\n"	"        dd      0                       ;   p_paddr"
 "\n"	"        dd      filesize                ;   p_filesz"
-"\n"	"        dd      ramsize                 ;   p_memsz"
+"\n"	"        dd      filesize                ;   p_memsz"
 "\n"	"        dd      5                       ;   p_flags"
 "\n"	"        dd      0x1000                  ;   p_align"
 "\n"
@@ -124,7 +126,6 @@ char * header =
 "\n"
 "\n"	"        section .bflast align=1"
 "\n"	"        section .bss align=4096"
-"\n"	"ramsize equ     section..bss.start-orgaddr"
 "\n"	"filesize equ    section..bflast.start-orgaddr"
 "\n"	"mem:"
 "\n"
@@ -203,6 +204,7 @@ char * cc[] = {
     "xor eax,eax\nxor edi,edi\nmov rsi,r12\nxor edx,edx\ninc edx\nsyscall"
 };
 
+#ifdef USE_ELF
 char * header =
 	";"
 "\n"	"; Small, self-contained 64-bit ELF executable for NASM"
@@ -288,4 +290,5 @@ char * header =
 "\n"	"    mov     r12,mem"
 "\n"
 ;
+#endif
 #endif

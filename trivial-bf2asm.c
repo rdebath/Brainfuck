@@ -133,10 +133,12 @@ int main(int argc, char ** argv) {
 	char * s;
 	int c;
 	int ind=1;
+	FILE * fd = argc>1?fopen(argv[1],"r"):stdin;
+	if(!fd) { perror(argv[1]); return 1; }
 
 	printf("%s", header);
 
-	while((c=getchar()) != EOF)
+	while((c=getc(fd)) != EOF)
 		if ((s = strchr(bf, c))) {
 			if (c == '[') {
 				printf(cc[s-bf], ind+1, ind+2);
