@@ -27,15 +27,19 @@
  * just prints "Hello world" style programs.
  */
 
-#define MAXWHILE 4096
+#define MAXJUMP 65000
+#define MAXDEPTH 192
 
 struct instruction {
     int ch;
     int count;
     int ino;
     int icount;
+    int nest_count;
+    int use_function;
     struct instruction * next;
     struct instruction * loop;
+    struct instruction * up;
     char * cstr;
 };
 static struct instruction *pgm = 0, *last = 0, *jmpstack = 0;
@@ -48,7 +52,9 @@ static int ind = 0;
 
 static int lblcount = 0;
 static int icount = 0;
-static int maxwhile = MAXWHILE;
+static int maxjump = MAXJUMP;
+static int maxdepth = MAXDEPTH;
+static int nest_count = 0;
 
 static void print_cstring(char * str);
 
@@ -81,8 +87,12 @@ fn_check_arg(const char * arg)
         do_dbl = 1;
         return 1;
     } else
-    if (strncmp(arg, "-w", 2) == 0) {
-	maxwhile = strtol(arg+2, 0, 10);
+    if (strncmp(arg, "-J", 2) == 0) {
+	maxjump = strtol(arg+2, 0, 10);
+	return 1;
+    }
+    if (strncmp(arg, "-D", 2) == 0) {
+	maxdepth = strtol(arg+2, 0, 10);
 	return 1;
     }
     return 0;
@@ -94,7 +104,18 @@ gen_code(int ch, int count, char * strn)
     struct instruction * n = calloc(1, sizeof*n), *n2;
     if (!n) { perror("bf2lua"); exit(42); }
 
-    icount ++;
+    /* Estimate the lengths a little better than "everything is 16" */
+    switch(ch)
+    {
+    case '=': icount += 8; break;
+    case '>': case '<': icount += 6; break;
+    case '.': case ',': icount += 4; break;
+    case 'B': case 'I': case '[': case ']':
+	icount += 16 + 8*(bytecell!=0);
+	break;
+    default: icount += 16; break;
+    }
+
     n->ch = ch;
     n->count = count;
     n->icount = icount;
@@ -114,6 +135,12 @@ gen_code(int ch, int count, char * strn)
 	n->loop = jmpstack; jmpstack = n;
     } else if (n->ch == ']' || n->ch == 'E') {
 	n->loop = jmpstack; jmpstack = jmpstack->loop; n->loop->loop = n;
+	if (jmpstack) {
+	    if (jmpstack->nest_count <= n->loop->nest_count)
+		jmpstack->nest_count = n->loop->nest_count+1;
+	} else if (nest_count <= n->loop->nest_count)
+	    nest_count = n->loop->nest_count+1;
+	n->loop->up = jmpstack;
     }
 
     if (ch != '~') return;
@@ -170,17 +197,18 @@ gen_code(int ch, int count, char * strn)
 	}
     }
 
-    if (icount < maxwhile) {
+    if (icount < maxjump && nest_count < maxdepth) {
 	for(n=pgm; n; n=n->next)
 	    loutcmd(n->ch, n->count, n);
     } else {
 	for(n=pgm; n; n=n->next) {
+	    int idiff;
 	    if (n->ch != ']' && n->ch != 'E') continue;
-	    if (n->icount-n->loop->icount <= maxwhile) continue;
+	    idiff = n->icount-n->loop->icount;
+	    if (idiff <= maxjump && n->loop->nest_count < maxdepth) continue;
 	    loutcmd(1000, 1, n->loop);
 	    for(n2 = n->loop->next; n != n2; n2=n2->next) {
-		if ((n2->ch == '[' || n2->ch == 'I')
-			&& n2->loop->icount-n2->icount > maxwhile) {
+		if ((n2->ch == '[' || n2->ch == 'I') && n2->use_function) {
 		    loutcmd(n2->ch, n2->count, n);
 		    I; fprintf(ofd, "bf%d()\n", n2->ino);
 		    n2 = n2->loop;
@@ -189,11 +217,28 @@ gen_code(int ch, int count, char * strn)
 		    loutcmd(n2->ch, n2->count, n2);
 	    }
 	    loutcmd(1001, 1, n);
+
+	    n->loop->use_function = 1;
+
+	    /* Reduce the later icounts so I don't keep creating functions */
+	    for(n2=n->next; n2; n2=n2->next)
+		n2->icount -= idiff;
+
+	    /* Recalculate how many nested loops too */
+	    for(n2=pgm; n2; n2=n2->next) {
+		if (n2->ch == '[' || n2->ch == 'I')
+		    n2->nest_count = 0;
+		else if (n2->ch == ']' || n2->ch == 'E') {
+		    struct instruction * n3 = n2->loop, *n4 = n3->up;
+
+		    if (n4 && !n4->use_function && n3->nest_count >= n4->nest_count)
+			n4->nest_count = n3->nest_count+1;
+		}
+	    }
 	}
 
 	for(n=pgm; n; n=n->next) {
-	    if ((n->ch != '[' && n->ch != 'I')
-		    || n->loop->icount-n->icount <= maxwhile)
+	    if ((n->ch != '[' && n->ch != 'I') || n->use_function == 0)
 		loutcmd(n->ch, n->count, n);
 	    else {
 		loutcmd(n->ch, n->count, n);
