@@ -446,9 +446,9 @@ void run(void)
 
 	    if (mem[m]) {
 		profile['['*4 + 2] ++;
-		profile['-'*4 + 0] += mem[m];
+		profile['-'*4 + 0] += (unsigned)mem[m];
 		profile[']'*4 + 1] ++;
-		profile[']'*4 + 2] += mem[m]-1;
+		profile[']'*4 + 2] += (unsigned)mem[m]-1;
 	    } else
 		profile['['*4 + 1]++;
 
