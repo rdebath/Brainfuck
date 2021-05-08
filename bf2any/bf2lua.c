@@ -14,6 +14,7 @@
 #endif
 
 #include "bf2any.h"
+#include "move_opt.h"
 
 /*
  * Lua translation from BF, runs at about 39,000,000 instructions per second.
@@ -33,6 +34,7 @@
 struct instruction {
     int ch;
     int count;
+    int mov;
     int ino;
     int icount;
     int nest_count;
@@ -44,7 +46,7 @@ struct instruction {
 };
 static struct instruction *pgm = 0, *last = 0, *jmpstack = 0;
 
-static void loutcmd(int ch, int count, struct instruction *n);
+static void loutcmd(int ch, int count, int mov, struct instruction *n);
 
 static int do_input = 0, do_output = 0, do_tape = 0;
 static int ind = 0;
@@ -98,26 +100,46 @@ fn_check_arg(const char * arg)
     return 0;
 }
 
+static const char *
+cell(int mov)
+{
+    static char buf[6+3+sizeof(mov)*3];
+    if (mov == 0) return "m[p]";
+    if (mov < 0)
+	sprintf(buf, "m[p-%d]", -mov);
+    else
+	sprintf(buf, "m[p+%d]", mov);
+    return buf;
+}
+
 static void
 gen_code(int ch, int count, char * strn)
 {
+    int mov = 0;
     struct instruction * n = calloc(1, sizeof*n), *n2;
     if (!n) { perror("bf2lua"); exit(42); }
+
+    move_opt(&ch, &count, &mov);
+    if (ch == 0) return;
 
     /* Estimate the lengths a little better than "everything is 16" */
     switch(ch)
     {
-    case '=': icount += 8; break;
-    case '>': case '<': icount += 6; break;
     case '.': case ',': icount += 4; break;
+    case '>': case '<': icount += 6; break;
+    case '=': case 'V': icount += 8; break;
+    case '+': case '-': icount += 14; break;
+    case 'M': case 'N': icount += 18; break;
     case 'B': case 'I': case '[': case ']':
-	icount += 16 + 8*(bytecell!=0);
+	icount += 8 + 16*(bytecell!=0);
 	break;
     default: icount += 16; break;
     }
+    if (mov) icount += 2;
 
     n->ch = ch;
     n->count = count;
+    n->mov = mov;
     n->icount = icount;
     if (ch == '"')
 	n->cstr = strdup(strn);
@@ -199,24 +221,24 @@ gen_code(int ch, int count, char * strn)
 
     if (icount < maxjump && nest_count < maxdepth) {
 	for(n=pgm; n; n=n->next)
-	    loutcmd(n->ch, n->count, n);
+	    loutcmd(n->ch, n->count, n->mov, n);
     } else {
 	for(n=pgm; n; n=n->next) {
 	    int idiff;
 	    if (n->ch != ']' && n->ch != 'E') continue;
 	    idiff = n->icount-n->loop->icount;
 	    if (idiff <= maxjump && n->loop->nest_count < maxdepth) continue;
-	    loutcmd(1000, 1, n->loop);
+	    loutcmd(1000, 1, 0, n->loop);
 	    for(n2 = n->loop->next; n != n2; n2=n2->next) {
 		if ((n2->ch == '[' || n2->ch == 'I') && n2->use_function) {
-		    loutcmd(n2->ch, n2->count, n);
+		    loutcmd(n2->ch, n2->count, n2->mov, n2);
 		    I; fprintf(ofd, "bf%d()\n", n2->ino);
 		    n2 = n2->loop;
-		    loutcmd(n2->ch, n2->count, n);
+		    loutcmd(n2->ch, n2->count, n2->mov, n2);
 		} else
-		    loutcmd(n2->ch, n2->count, n2);
+		    loutcmd(n2->ch, n2->count, n2->mov, n2);
 	    }
-	    loutcmd(1001, 1, n);
+	    loutcmd(1001, 1, 0, n);
 
 	    n->loop->use_function = 1;
 
@@ -239,12 +261,12 @@ gen_code(int ch, int count, char * strn)
 
 	for(n=pgm; n; n=n->next) {
 	    if ((n->ch != '[' && n->ch != 'I') || n->use_function == 0)
-		loutcmd(n->ch, n->count, n);
+		loutcmd(n->ch, n->count, n->mov, n);
 	    else {
-		loutcmd(n->ch, n->count, n);
+		loutcmd(n->ch, n->count, n->mov, n);
 		I; fprintf(ofd, "bf%d()\n", n->ino);
 		n=n->loop;
-		loutcmd(n->ch, n->count, n);
+		loutcmd(n->ch, n->count, n->mov, n);
 	    }
 	}
     }
@@ -288,8 +310,10 @@ gen_code(int ch, int count, char * strn)
 }
 
 void
-loutcmd(int ch, int count, struct instruction *n)
+loutcmd(int ch, int count, int mov, struct instruction *n)
 {
+    const char *cm = cell(mov);
+
     switch(ch) {
     case 1000:
 	fprintf(ofd, "function bf%d()\n", n->ino);
@@ -307,50 +331,62 @@ loutcmd(int ch, int count, struct instruction *n)
 	}
 	break;
 
-    case '=': I; fprintf(ofd, "m[p] = %d\n", count); break;
+    case '=': I; fprintf(ofd, "%s = %d\n", cm, count); break;
     case 'B':
-	if(bytecell) { I; fprintf(ofd, "m[p] = m[p]%%256\n"); }
-	I; fprintf(ofd, "v = m[p]\n");
+	if(bytecell) { I; fprintf(ofd, "%s = %s%%256\n", cm, cm); }
+	I; fprintf(ofd, "v = %s\n", cm);
 	break;
-    case 'M': I; fprintf(ofd, "m[p] = m[p]+v*%d\n", count); break;
-    case 'N': I; fprintf(ofd, "m[p] = m[p]-v*%d\n", count); break;
-    case 'S': I; fprintf(ofd, "m[p] = m[p]+v\n"); break;
-    case 'T': I; fprintf(ofd, "m[p] = m[p]-v\n"); break;
-    case '*': I; fprintf(ofd, "m[p] = m[p]*v\n"); break;
-    case '/': I; fprintf(ofd, "m[p] = div(m[p], v)\n"); break;
-    case '%': I; fprintf(ofd, "m[p] = m[p]%%v\n"); break;
+    case 'M': I; fprintf(ofd, "%s = %s+v*%d\n", cm, cm, count); break;
+    case 'N': I; fprintf(ofd, "%s = %s-v*%d\n", cm, cm, count); break;
+    case 'S': I; fprintf(ofd, "%s = %s+v\n", cm, cm); break;
+    case 'T': I; fprintf(ofd, "%s = %s-v\n", cm, cm); break;
+    case '*': I; fprintf(ofd, "%s = %s*v\n", cm, cm); break;
+    case '/': I; fprintf(ofd, "%s = div(%s, v)\n", cm, cm); break;
+    case '%': I; fprintf(ofd, "%s = %s%%v\n", cm, cm); break;
 
-    case 'C': I; fprintf(ofd, "m[p] = v*%d\n", count); break;
-    case 'D': I; fprintf(ofd, "m[p] = -v*%d\n", count); break;
-    case 'V': I; fprintf(ofd, "m[p] = v\n"); break;
-    case 'W': I; fprintf(ofd, "m[p] = -v\n"); break;
+    case 'C': I; fprintf(ofd, "%s = v*%d\n", cm, count); break;
+    case 'D': I; fprintf(ofd, "%s = -v*%d\n", cm, count); break;
+    case 'V': I; fprintf(ofd, "%s = v\n", cm); break;
+    case 'W': I; fprintf(ofd, "%s = -v\n", cm); break;
 
     case 'X': I; fprintf(ofd, "error('Aborting Infinite Loop')\n"); break;
 
-    case '+': I; fprintf(ofd, "m[p] = m[p]+%d\n", count); break;
-    case '-': I; fprintf(ofd, "m[p] = m[p]-%d\n", count); break;
+    case '+': I; fprintf(ofd, "%s = %s+%d\n", cm, cm, count); break;
+    case '-': I; fprintf(ofd, "%s = %s-%d\n", cm, cm, count); break;
     case '>': I; fprintf(ofd, "p = p+%d\n", count); break;
     case '<': I; fprintf(ofd, "p = p-%d\n", count); break;
-    case '.': I; fprintf(ofd, "putch()\n"); do_output=1; break;
+    case '.': I; fprintf(ofd, "putch(%d)\n", mov); do_output=1; break;
     case '"': print_cstring(n->cstr); break;
-    case ',': I; fprintf(ofd, "getch()\n"); do_input=1; break;
+    case ',': I; fprintf(ofd, "getch(%d)\n", mov); do_input=1; break;
 
     case '[':
-	if(bytecell) { I; fprintf(ofd, "m[p] = m[p]%%256\n"); }
-	I; fprintf(ofd, "while m[p]~=0 do\n");
+	if(bytecell) { I; fprintf(ofd, "%s = %s%%256\n", cm, cm); }
+	I; fprintf(ofd, "while %s~=0 do\n", cm);
 	ind++;
 	break;
     case ']':
-	if(bytecell) { I; fprintf(ofd, "m[p] = m[p]%%256\n"); }
+        if (count > 0) {
+            I; fprintf(ofd, "p = p + %d\n", count);
+        } else if (count < 0) {
+            I; fprintf(ofd, "p = p - %d\n", -count);
+        }
+
+	if(bytecell) { I; fprintf(ofd, "%s = %s%%256\n", cm, cm); }
 	ind--; I; fprintf(ofd, "end\n");
 	break;
 
     case 'I':
-	if(bytecell) { I; fprintf(ofd, "m[p] = m[p]%%256\n"); }
-	I; fprintf(ofd, "if m[p]~=0 then\n");
+	if(bytecell) { I; fprintf(ofd, "%s = %s%%256\n", cm, cm); }
+	I; fprintf(ofd, "if %s~=0 then\n", cm);
 	ind++;
 	break;
     case 'E':
+        if (count > 0) {
+            I; fprintf(ofd, "p = p + %d\n", count);
+        } else if (count < 0) {
+            I; fprintf(ofd, "p = p - %d\n", -count);
+        }
+
 	ind--; I; fprintf(ofd, "end\n");
 	break;
 
@@ -362,18 +398,18 @@ loutcmd(int ch, int count, struct instruction *n)
 
 	if (do_input) {
 	    fprintf(ofd, "\n");
-	    fprintf(ofd, "function getch()\n");
+	    fprintf(ofd, "function getch(poff)\n");
 	    fprintf(ofd, "    local Char = io.read(1)\n");
 	    fprintf(ofd, "    if Char then\n");
-	    fprintf(ofd, "        m[p] = string.byte(Char)\n");
+	    fprintf(ofd, "        m[p+poff] = string.byte(Char)\n");
 	    fprintf(ofd, "    end\n");
 	    fprintf(ofd, "end\n");
 	}
 
 	if (do_output) {
 	    fprintf(ofd, "\n");
-	    fprintf(ofd, "function putch()\n");
-	    fprintf(ofd, "    io.write(string.char(tonumber(m[p]%%256)))\n");
+	    fprintf(ofd, "function putch(poff)\n");
+	    fprintf(ofd, "    io.write(string.char(tonumber(m[p+poff]%%256)))\n");
 	    fprintf(ofd, "    io.flush()\n");
 	    fprintf(ofd, "end\n");
 	}
