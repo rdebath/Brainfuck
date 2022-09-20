@@ -365,7 +365,9 @@ print_c_header(FILE * ofd)
 
 	    fprintf(ofd, "#include <limits.h>\n");
 	    fprintf(ofd, "/* LLONG_MAX came in after inttypes.h, limits.h is very old. */\n");
+	    fprintf(ofd, "/* We need stdlib.h to set _POSIX_VERSION if limits.h doesn't. */\n");
 	    fprintf(ofd, "#if _POSIX_VERSION >= 199506L || defined(LLONG_MAX)\n");
+	    fprintf(ofd, "#include <stdlib.h>\n");
 	    fprintf(ofd, "#include <inttypes.h>\n");
 	    fprintf(ofd, "#endif\n");
 
@@ -384,7 +386,7 @@ print_c_header(FILE * ofd)
 	    fprintf(ofd, "#define C unsigned long long\n");
 	    fprintf(ofd, "#elif defined(UINTMAX_MAX)\n");
 	    fprintf(ofd, "#define C uintmax_t\n");
-	    fprintf(ofd, "#elif 1\n");
+	    fprintf(ofd, "#elif defined(ULONG_MAX) && LONG_MAX>INT_MAX\n");
 	    fprintf(ofd, "#define C unsigned long\n");
 	    fprintf(ofd, "#else\n");
 	    fprintf(ofd, "#define C unsigned int\n");
