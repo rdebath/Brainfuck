@@ -59,10 +59,9 @@ char * bf(char * p, int r) {
 		    else if((c = getc(f)) != EOF) *p=c,p[1]=':'; else exit(2);
 		}
 	    }
-	    if(!r) { *(p=pgm)=':'; continue; }
 	    break;
 	}
-	p++;
+	if (!r) *(p=pgm)=':'; else p++;
     }
 }
 

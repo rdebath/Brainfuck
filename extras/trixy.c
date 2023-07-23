@@ -937,14 +937,7 @@ void bfprinter(char * b)
         case ',': if((c=getchar())!=EOF)tl[m]=c;break;
         case '[': if(tl[m]==0)while((i+=(*p=='[')-(*p==']'))&&p[1])p++;break;
         case ']':
-	    if (ss<=p) {
-		char * p2;
-		ss=p+1;
-		for(p2 = ss; *p2 && *p2 != '.'; p2++);
-		/* If we've got to the end of the code, stop running it. */
-		if (*p2 == 0) {p = p2; break;}
-	    }
-
+	    if (ss<=p) ss=p+1;
 	    if(tl[m]!=0)while((i+=(*p==']')-(*p=='['))&&p>b)p--;
 	    break;
 
@@ -976,12 +969,13 @@ void bfprinter(char * b)
 	    col = 0;
 
 	    c = tl[m];
-	    if (c > ' ' && c <= '~'
+	    if (c > ' ' && c <= '~' && c != '\\'
 		    && c != '-' && c != '+' && c != '<' && c != '>'
 		    && c != '[' && c != ']' && c != ',' && c != '.') {
 		printf("%c\n", c);
 	    } else if (c == '\n') { printf("\\n\n");
 	    } else if (c == '\r') { printf("\\r\n");
+	    } else if (c == '\\') { printf("\\\\\n");
 	    } else if (c == ' ') { printf("\\s\n");
 	    } else if (c == '.') { printf("dot\n");
 	    } else if (c == ',') { printf("comma\n");
