@@ -555,7 +555,7 @@ print_c_header(FILE * ofd)
     if (!do_run) {
 	if (node_type_counts[T_INP] != 0 || node_type_counts[T_INPI] != 0)
 	{
-	    if (l_iostyle == 0 && eofcell == 4 &&
+	    if (l_iostyle == 0 && eofcell == 4 && input_string == 0 &&
 		    node_type_counts[T_INPI] == 0) {
 		use_direct_getchar = 1;
 	    } else {
@@ -834,6 +834,20 @@ print_lib_funcs(FILE * ofd)
 
 	fprintf(ofd, "{\n");
 	fprintf(ofd, "  int ch;\n");
+	if (input_string && !do_run) {
+	    char * ip = input_string;
+	    fprintf(ofd, "  static char input_string[] = \"");
+	    for(; *ip; ip++) {
+		if (*ip >= ' ' && *ip <= '~' && *ip != '\\')
+		    fputc(*ip, ofd);
+		else if (*ip == '\n')
+		    fprintf(ofd, "\\n");
+		else
+		    fprintf(ofd, "\\%03o", (unsigned char)*ip);
+	    }
+	    fprintf(ofd, "\", *ip = input_string;\n");
+	    fprintf(ofd, "  if (*ip) { int ch = *ip++; putchar(ch); return ch; }\n");
+	}
 	if (iostyle == 0) {
 	    fprintf(ofd, "  ch = getchar();\n");
 	} else {
