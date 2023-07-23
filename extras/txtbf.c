@@ -64,7 +64,7 @@ void gen_nestloop(char * buf);
 void gen_nestloop8(char * buf);
 void gen_slipnest(char * buf);
 void gen_special(char * buf, const char * initcode, const char * name, int usercode);
-void gen_twoflower(char * buf);
+void gen_twoflower(char * buf, int);
 void gen_twincell(char * buf);
 void gen_trislipnest(char * buf);
 void gen_countslide(char * linebuf);
@@ -118,6 +118,7 @@ const char * hello_world[] = {
     ">++++[<++++>-]<[>+++>+++>+++>+++<<<<-]",
     ">+++++++[<+++>-]<++[>+>++>+++>++++>+++++>+++++++<<<<<<-]",
     ">+++++++[<++++>-]<[>+++>++++>++++<<<-]",
+    ">++++++[<+++++++++>-]<[->+>+>+>+>+>+<<<<<<]",
 
     0 };
 
@@ -334,7 +335,7 @@ int flg_perline = 0;
 
 int verbose = 0;
 int bytewrap = 0;
-int maxcol = 72;
+int maxcol = -1;
 int blocksize = 0;
 int cell_limit = MAX_CELLS;
 
@@ -809,8 +810,10 @@ find_best_conversion(char * linebuf)
     }
 
     if (enable_twocell) {
-	if (verbose>2) fprintf(stderr, "Trying two cell routine.\n");
-	gen_twoflower(linebuf);
+	int i;
+	if (verbose>2) fprintf(stderr, "Trying two and three cell routines.\n");
+	for(i=0; i<5; i++)
+	    gen_twoflower(linebuf, i);
     }
 
 #ifndef NOQTABLE
@@ -819,6 +822,9 @@ find_best_conversion(char * linebuf)
 	gen_twincell(linebuf);
     }
 #endif
+
+    if (best_len<0)
+	gen_special(linebuf, "", "Bare cells", 0);
 
     if (enable_special) {
 	const char ** hellos;
@@ -867,7 +873,7 @@ find_best_conversion(char * linebuf)
 		reinit_state();
 		gen_subrange(linebuf,subrange_count,0);
 
-		for(subrange_count = 2; subrange_count<45; subrange_count++) {
+		for(subrange_count = 2; subrange_count<50; subrange_count++) {
 		    if (subrange_count == 10) continue;
 		    reinit_state();
 		    gen_subrange(linebuf,subrange_count,0);
@@ -875,7 +881,7 @@ find_best_conversion(char * linebuf)
 	    }
 
 	    if (!flg_no_zoned) {
-		for(subrange_count = 2; subrange_count<45; subrange_count++) {
+		for(subrange_count = 2; subrange_count<50; subrange_count++) {
 		    reinit_state();
 		    gen_subrange(linebuf,subrange_count,1);
 		}
@@ -954,6 +960,9 @@ find_best_conversion(char * linebuf)
 	flg_lookahead = 0;
     }
 
+    if (best_len<0)
+	gen_special(linebuf, "", "Bare cells", 0);
+
     if (verbose>1 && patterns_searched>1)
 	fprintf(stderr, "Total of %"PRIdMAX" patterns searched.\n", patterns_searched);
 
@@ -976,11 +985,12 @@ output_str(const char * s)
 {
 static int col = 0;
     int ch;
+    if (maxcol < 0) maxcol = 72+(strlen(s) < 80)*8;
 
     while (*s)
     {
 	ch = *s++;
-	if ((col>=maxcol && maxcol) || ch == '\n') {
+	if ((col>=maxcol && maxcol>0) || ch == '\n') {
 	    putchar('\n');
 	    col = 0;
 	    if (ch == ' ' || ch == '\n') ch = 0;
@@ -1487,6 +1497,7 @@ return_to_top:
 			cellincs[i] = 127;
 			break;
 		    }
+		    cellincs[i] = 1;
 		} else {
 		    if (!bytewrap && (
 			    cellincs[i]*cellincs[0] > 255 ||
@@ -1495,8 +1506,11 @@ return_to_top:
 			    ))
 			toohigh = 1;
 		    if (cellincs[i] <= multloop_maxinc) break;
+		    if (cellincs[0] == 0 || !flg_signed)
+			cellincs[i] = 1;
+		    else
+			cellincs[i] = -multloop_maxinc;
 		}
-		cellincs[i] = 1;
 	    }
 
 	    if (toohigh) goto return_to_top;
@@ -1563,8 +1577,13 @@ return_to_top:
 		cells[i] = cellincs[i] * cellincs[0];
 		if(bytewrap) cells[i] &= 255;
 		add_chr('>');
-		for(j=0; j<cellincs[i]; j++)
-		    add_chr('+');
+		if (cellincs[i]>0) {
+		    for(j=0; j<cellincs[i]; j++)
+			add_chr('+');
+		} else if (cellincs[i]<0){
+		    for(j=0; j<-cellincs[i]; j++)
+			add_chr('-');
+		}
 	    }
 
 	    for(i=1; i<=maxcell; i++)
@@ -2174,6 +2193,9 @@ gen_special(char * buf, const char * initcode, const char * name, int usercode)
 	remaining_offset = m;
     }
 
+    /* Too many cells ? */
+    if (!usercode && maxcell>cell_limit) return;
+
     if (bytewrap_override)
 	fprintf(stderr,
 		"WARNING: Assuming bytewrapped interpreter for code %s\n",
@@ -2560,18 +2582,18 @@ static char bestfactor[] = {
 };
 
 void
-gen_twoflower(char * buf)
+gen_twoflower(char * buf, int nl_cell)
 {
 
     const int maxcell = 1;
-    int i;
+    int i, two_dirty = 0, three_dirty = 0;
     char * p;
 
     reinit_state();
     patterns_searched++;
 
     /* Clear the working cells */
-    if (flg_init) add_str("[-]>[-]<");
+    if (flg_init) { add_str("[-]"); two_dirty = 1; three_dirty = 1; }
 
     str_cells_used = maxcell+1;
 
@@ -2580,6 +2602,81 @@ gen_twoflower(char * buf)
 	int cdiff,t;
 	int a,b,c = *p++;
 	if (flg_signed) c = (signed char)c; else c = (unsigned char)c;
+
+	/* Special: Print NL using cells[1] */
+	if (c == 10 && nl_cell == 1 && cells[0] != 0) {
+	    if (!two_dirty && cells[1] == 10)
+		add_str(">.<");
+	    else if (two_dirty || cells[1] != 0)
+		add_str(">[-]++++++++++.<");
+	    else
+		add_str(">++++++++++.<");
+	    two_dirty = 0;
+	    cells[1] = 10;
+	    continue;
+	}
+
+	/* Special: Cells[2] is used for either NL or Space */
+	if ((c == 10 && nl_cell == 2) || (c == 32 && nl_cell == 3)) {
+	    if (three_dirty || cells[2] != c) {
+		str_cells_used=3;
+		cells[2] = c;
+		if (three_dirty || cells[2] != c) {
+		    add_str(">>[-]<<");
+		    three_dirty = 0;
+		}
+		if (two_dirty && c != 10) {
+		    add_str(">[-]<");
+		    two_dirty = 0;
+		}
+		if (c == 10)
+		    add_str(">>++++++++++.<<");
+		else
+		    add_str(">++++[>++++++++<-]>.<<");
+	    } else
+		add_str(">>.<<");
+	    continue;
+	}
+
+	/* Special: Cells[2] is used for Space and Cells[1] for NL */
+	if ((c == 10 || c == 32) && nl_cell == 4) {
+	    if (cells[2] == c) {
+		add_str(">>.<<");
+	    } else if (c == 10) {
+		if (!two_dirty && cells[1] == 10)
+		    add_str(">.<");
+		else if (two_dirty || cells[1] != 0)
+		    add_str(">[-]++++++++++.<");
+		else
+		    add_str(">++++++++++.<");
+		two_dirty = 0;
+		cells[1] = 10;
+	    } else {
+		if (cells[2] == 10 && !two_dirty && cells[1] == 0)
+		    add_str(">+++[>+++++++<-]>+.<<");
+		else if (cells[1] == 10 && !three_dirty && cells[2] == 0)
+		    add_str(">[>+++<-]>++.<<");
+		else if (cells[1] == 10 && three_dirty)
+		    add_str(">>[-]<[>+++<-]>++.<<");
+		else if (three_dirty && !two_dirty && cells[1] == 0)
+		    add_str(">>[-]<++++[>++++++++<-]>.<<");
+		else {
+		    add_str(">>[-]<[-]++++[>++++++++<-]>.<<");
+		    two_dirty = 0;
+		}
+		cells[2] = c;
+		cells[1] = 0;
+		three_dirty = 0;
+		str_cells_used=3;
+	    }
+	    continue;
+	}
+
+	if (bytewrap) {
+	    c = (unsigned char)c;
+	    if (abs(c - cells[0]) > 128)
+		c = (signed char)c;
+	}
 
 	cdiff = c - cells[0];
 	t = bestfactor[abs(cdiff)]; a =(t&0xF); t = !!(t&0x10);
@@ -2620,7 +2717,21 @@ gen_twoflower(char * buf)
 	if (a) {
 	    add_chr('>');
 
-	    for(i=0; i<b; i++) add_chr('+');
+	    if (two_dirty) { add_str("[-]"); two_dirty = 0; }
+
+	    if (cells[1]) {
+		int tdiff = abs(b-cells[1]), tmov = b;
+		if (tdiff > b+3)
+		    add_str("[-]");
+		else
+		    tmov = (b-cells[1]);
+
+		while(tmov > 0) { add_chr('+'); tmov--; }
+		while(tmov < 0) { add_chr('-'); tmov++; }
+		cells[1] = 0;
+	    } else {
+		for(i=0; i<b; i++) add_chr('+');
+	    }
 
 	    add_str("[<");
 	    while(a > 0) { add_chr('+'); a--; }
@@ -2637,7 +2748,13 @@ gen_twoflower(char * buf)
 
     clear_tape(0);
 
-    check_if_best(buf, "twocell");
+    switch(nl_cell) {
+    case 1: check_if_best(buf, "twocell-nl"); break;
+    case 2: check_if_best(buf, "threecell-nl"); break;
+    case 3: check_if_best(buf, "threecell-sp"); break;
+    case 4: check_if_best(buf, "threecell-mx"); break;
+    default: check_if_best(buf, "twocell"); break;
+    }
 }
 
 /*******************************************************************************
@@ -2808,12 +2925,12 @@ static const char * extra_cell[] = {
 		if (a1 == 1 && !(p4 < -1 || p4 > 1)) continue;
 
 		if (p4 != 0 && (flg_signed || bytewrap || p4>0))
-		    for(p3=2; p3<20; p3++)
+		    for(p3=2; p3<60; p3++)
 		    {
 			if (a1 == 0 && p3 < 5) continue;
 			if (a1 == 1 && p3 >= 5) continue;
 
-			for(p1=7; p1<64; p1++)
+			for(p1=5-4*(cell_limit<10); p1<64; p1++)
 			{
 			    int i,t,a,b,c=0;
 			    if ( (p1-1)*p3+p4 > 255) continue;
