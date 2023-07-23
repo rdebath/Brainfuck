@@ -231,8 +231,10 @@ outopt(int ch, int count)
 		add_string(c);
 
 		/* Limit the buffer size. */
-		if (sav_str_len >= 128*1024 - (tape->v=='\n')*1024)
+		if (sav_str_len >= 128*1024 - (tape->v=='\n')*1024) {
+		    flush_tape(0,1);
 		    flush_string();
+		}
 		break;
 	    }
 	}

@@ -1556,6 +1556,14 @@ static trivbf chinese[1] = {{
     .help = "Some random Chinese characters.",
 }};
 
+/* Some random Chinese words 2 */
+static trivbf chinese2[1] = {{
+    .name = "chinese2", .name2 = "chi2",
+    .class = L_CDWORDS,
+    .bf = { "右", "左", "上", "下", "出", "里", "始", "末" },
+    .help = "Some random Chinese characters.",
+}};
+
 /* https://github.com/mescam/zerolang */
 static trivbf zero[1] = {{
     .name = "zero",
@@ -2093,7 +2101,7 @@ static trivbf octbf[1] = {{
 
 
     },
-    .zero_cell = "[-]>[-]>[-]>[-]>[-]>[-]>[-]>[-]>[-]>[-]<<<<<<<<<<",
+    .zero_cell = "[-]>[-]>[-]>[-]>[-]>[-]>[-]>[-]>[-]>[-]<<<<<<<<<",
     .clean_tmps = ">>>>>>>>>[-]<<<<<<<<<[-]",
 }};
 
@@ -2409,11 +2417,12 @@ static trivbf bcdbyte[1] = {{
 static trivbf * trivlist[] = {
 
     rhoprime, cbyte, ook, blub, f__k, f__krle, pogaack, trip, nicebf,
-    bc, bc_rle, fish, dotty, lisp0, bewbs, moo, chinese, zero, yolang,
-    k_on_fuck, petooh, arabic, dc1, dc2, dc3, dc4, nyan, atpling, cupid,
-    ternary, pikalang, spoon, troll, roadrunner, brainbool, clojure,
-    nasm, nasmmagic, cgalang, brainfuq, emojifuck, trigram, cbyte_rle,
-    babylang, matlab, tmcc, heart, iuab, bcdfuck, bcdbyte, xifucklang,
+    bc, bc_rle, fish, dotty, lisp0, bewbs, moo, chinese, chinese2,
+    zero, yolang, k_on_fuck, petooh, arabic, dc1, dc2, dc3, dc4,
+    nyan, atpling, cupid, ternary, pikalang, spoon, troll, roadrunner,
+    brainbool, clojure, nasm, nasmmagic, cgalang, brainfuq, emojifuck,
+    trigram, cbyte_rle, babylang, matlab, tmcc, heart, iuab, bcdfuck,
+    bcdbyte, xifucklang,
 
     bfout, doubler_12, doubler_copy_LXXH, doubler_12nz, doubler_12r,
     doubler_17a, doubler_17b, doubler_copy, doubler_copynz, octbf,
