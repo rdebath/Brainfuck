@@ -36,7 +36,7 @@ int enable_opt = 1;
 int enable_loopc = 0;
 int delay_clean = 0;
 int fwd_flush = 0;
-int maxcol=72;
+int maxcol= -1;
 
 void outrun(int ch, int count);
 void outopt(int ch, int count);
@@ -446,21 +446,43 @@ void outopt(int ch, int count)
 
 /****************************************************************************/
 
-static int col=0;
+static int col=0, init_count = 0;
+static char init_buf[8200];
 
 static void
 pc(int ch)
 {
+    if (maxcol < 0) {
+	int i;
+	if (init_count < (int)sizeof(init_buf)-1 && ch != '\n') {
+	    init_buf[init_count++] = ch;
+	    col++;
+	    return;
+	}
+	if (init_count < 80) maxcol = 80;
+	else {
+	    int o, l = init_count;
+            for(o = 0; o<2 && maxcol < 0; o++) {
+                for(int w = 79; w>19; w--) {
+                    if ((l+o)%w == 0 && (w>=60 || (l+o)/w <= w/2)) {
+                        maxcol = w;
+                        break;
+                    }
+                }
+            }
+	}
+	if (maxcol < 0) maxcol = 72;
+
+	col -= init_count;
+	for(i=0; i<init_count; i++)
+	    pc(init_buf[i]);
+    }
     if ((col>=maxcol && maxcol) || ch == '\n') {
         putchar('\n');
         col = 0;
         if (ch == ' ' || ch == '\n') ch = 0;
     }
-    if (ch) {
-        putchar(ch);
-        if ((ch&0xC0) != 0x80) /* Count UTF-8 */
-            col++;
-    }
+    if (ch) { putchar(ch); col++; }
 }
 
 void
