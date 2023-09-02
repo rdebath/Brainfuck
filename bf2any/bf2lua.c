@@ -47,6 +47,8 @@ struct instruction {
 static struct instruction *pgm = 0, *last = 0, *jmpstack = 0;
 
 static void loutcmd(int ch, int count, int mov, struct instruction *n);
+static void print_byteset();
+static void print_bytemod(const char *cm);
 
 static int do_input = 0, do_output = 0, do_tape = 0;
 static int ind = 0;
@@ -61,7 +63,7 @@ static int nest_count = 0;
 static void print_cstring(char * str);
 
 static int do_dump;
-static int do_dbl;
+static int no_jit_test;
 static FILE * ofd;
 #ifdef ENABLE_LIBLUA
 static char * luacode = 0;
@@ -85,8 +87,8 @@ fn_check_arg(const char * arg)
         return 1;
     } else
 #endif
-    if (strcmp(arg, "-dbl") == 0) {
-        do_dbl = 1;
+    if (strcmp(arg, "-nj") == 0 || strcmp(arg, "-b0") == 0) {
+        no_jit_test = 1;
         return 1;
     } else
     if (strncmp(arg, "-J", 2) == 0) {
@@ -97,6 +99,19 @@ fn_check_arg(const char * arg)
 	maxdepth = strtol(arg+2, 0, 10);
 	return 1;
     }
+    if (strcmp(arg, "-h") == 0) {
+        fprintf(stderr, "%s\n",
+#ifdef ENABLE_LIBLUA
+        "\n\t"  "-r      Run using liblua"
+#endif
+        "\n\t"  "-d      Don't run using liblua, dump the lua"
+        "\n\t"  "-nj     No support code for luajit"
+        "\n\t"  "-J <N>  Max jump"
+        "\n\t"  "-D <N>  Max depth"
+        );
+        return 1;
+    }
+
     return 0;
 }
 
@@ -181,10 +196,8 @@ gen_code(int ch, int count, char * strn)
     }
 
     if (do_tape) {
-	fprintf(ofd, "%s\n",
-	    "if jit then jit.opt.start(\"loopunroll=200\") end");
 
-	if (do_dbl)
+	if (no_jit_test)
 	    fprintf(ofd, "%s\n",
 		     "local m = setmetatable({},{__index=function() return 0 end})"
 		"\n" "local v = 0"
@@ -193,6 +206,9 @@ gen_code(int ch, int count, char * strn)
 		"\n" "do local i; for i=1,32 do m[i] = 0 end; end"
 		);
 	else {
+	    fprintf(ofd, "%s\n",
+		"if jit then jit.opt.start(\"loopunroll=200\") end");
+
 	    const char * luajit_type = bytecell? "uint8_t": "uint64_t";
 	    /* For Lua Arrays are faster if populated from 1, negative
 	     * indexes are ok. Luajit likes zero. Luajit's ffi gives me a
@@ -201,7 +217,7 @@ gen_code(int ch, int count, char * strn)
 	     */
 	    fprintf(ofd, "%s%s%s%d%s%s%s%d%s\n",
 		     "local m, v, p, ffi, div"
-		"\n" "if type(rawget(_G, \"jit\")) ~= 'table' then"
+		"\n" "if type(jit) ~= 'table' then"
 		"\n" "  m = setmetatable({},{__index=function() return 0 end})"
 		"\n" "  v = 0"
 		"\n" "  p = 1"
@@ -318,6 +334,7 @@ loutcmd(int ch, int count, int mov, struct instruction *n)
     case 1000:
 	fprintf(ofd, "function bf%d()\n", n->ino);
 	ind++;
+	print_byteset();
 	break;
     case 1001:
 	ind--;
@@ -328,12 +345,13 @@ loutcmd(int ch, int count, int mov, struct instruction *n)
 	if(do_tape) {
 	    fprintf(ofd, "function brainfuck()\n");
 	    ind++;
+	    print_byteset();
 	}
 	break;
 
     case '=': I; fprintf(ofd, "%s = %d\n", cm, count); break;
     case 'B':
-	if(bytecell) { I; fprintf(ofd, "%s = %s%%256\n", cm, cm); }
+	print_bytemod(cm);
 	I; fprintf(ofd, "v = %s\n", cm);
 	break;
     case 'M': I; fprintf(ofd, "%s = %s+v*%d\n", cm, cm, count); break;
@@ -360,7 +378,7 @@ loutcmd(int ch, int count, int mov, struct instruction *n)
     case ',': I; fprintf(ofd, "getch(%d)\n", mov); do_input=1; break;
 
     case '[':
-	if(bytecell) { I; fprintf(ofd, "%s = %s%%256\n", cm, cm); }
+	print_bytemod(cm);
 	I; fprintf(ofd, "while %s~=0 do\n", cm);
 	ind++;
 	break;
@@ -371,12 +389,12 @@ loutcmd(int ch, int count, int mov, struct instruction *n)
             I; fprintf(ofd, "p = p - %d\n", -count);
         }
 
-	if(bytecell) { I; fprintf(ofd, "%s = %s%%256\n", cm, cm); }
+	print_bytemod(cm);
 	ind--; I; fprintf(ofd, "end\n");
 	break;
 
     case 'I':
-	if(bytecell) { I; fprintf(ofd, "%s = %s%%256\n", cm, cm); }
+	print_bytemod(cm);
 	I; fprintf(ofd, "if %s~=0 then\n", cm);
 	ind++;
 	break;
@@ -420,6 +438,24 @@ loutcmd(int ch, int count, int mov, struct instruction *n)
 	}
 	break;
     }
+}
+
+void
+print_byteset()
+{
+    if (!bytecell) return;
+    if (no_jit_test) return;
+    I; fprintf(ofd, "local nj\n");
+    I; fprintf(ofd, "nj = (type(jit) ~= 'table')\n");
+}
+
+void
+print_bytemod(const char *cm)
+{
+    if (!bytecell) return;
+    if (no_jit_test) { I; fprintf(ofd, "%s = %s%%256\n", cm, cm); return; }
+
+    I; fprintf(ofd, "if nj then %s = %s%%256 end\n", cm, cm);
 }
 
 static void
