@@ -78,10 +78,10 @@
 
     // If that's not zero we have a bignum; probably
     [
-	// Calculate 2^112 this is too large for any floating point type
+	// Calculate 2^115 this is too large for any floating point type
 	// to treat as an integer
 	[-]>[-]>[-]+++++++<<
-	+>>[-<<
+	++++++++>>[-<<
 	    [->++++++++++++++++<]>[-<++++++++++++++++>]<
 	    [->++++++++++++++++<]>[-<++++++++++++++++>]<
 	>>]<<
