@@ -237,7 +237,7 @@ addcmd() {
 o(){
     C=XX
     printf -v C '\%04o' $((M[P])) >/dev/null 2>&1 ||:
-    [[ "$C" = "XX" ]] && {
+    [[ "$C" = "XX" || "$C" = "%04o" ]] && {
 	o() { printf "\x$(printf %x $((M[P])) )" ; }
 	o;return
     }
